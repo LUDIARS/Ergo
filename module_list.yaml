@@ -1,0 +1,67 @@
+# Ergo モジュール一覧 (AI/自動処理用)
+# 最終更新: 2026-03-17
+
+modules:
+  - name: ergo_input
+    display_name: Ergo Input System
+    description: >
+      複数入力デバイス（マウス・キーボード・ゲームパッド・USB HID）を
+      統一インターフェースで管理する入力システムモジュール
+    namespace: ergo::input
+    language: C++17
+    library_type: static
+    branch: module/input
+    last_updated: "2026-03-17"
+    supported_os:
+      - Windows
+      - Linux
+      - macOS
+    supported_platforms:
+      - x86_64
+      - ARM64
+    dependencies:
+      - name: pthread
+        type: system
+        description: std::thread サポート
+    classes:
+      - name: InputSystem
+        header: include/ergo/input/input_system.h
+        description: 全デバイスを統括するファサードクラス
+      - name: IInputDevice
+        header: include/ergo/input/input_device.h
+        description: デバイス抽象基底クラス
+      - name: MouseDevice
+        header: include/ergo/input/mouse_device.h
+        description: マウス入力デバイス（最大4台）
+      - name: KeyboardDevice
+        header: include/ergo/input/keyboard_device.h
+        description: キーボード入力デバイス（最大4台）
+      - name: GamepadDevice
+        header: include/ergo/input/gamepad_device.h
+        description: ゲームパッド入力デバイス（最大8台）
+      - name: UsbDevice
+        header: include/ergo/input/usb_device.h
+        description: 汎用USB HIDデバイス（最大8台）
+      - name: DoubleBuffer<T>
+        header: include/ergo/input/double_buffer.h
+        description: ロックフリーダブルバッファテンプレート
+      - name: InputBuffer
+        header: include/ergo/input/input_buffer.h
+        description: イベント履歴リングバッファ
+      - name: Observer
+        header: include/ergo/input/observer.h
+        description: イベント通知システム
+      - name: PollingThread
+        header: include/ergo/input/polling_thread.h
+        description: バックグラウンドポーリングスレッド
+    design_doc: doc/modules/input/README.md
+    tests:
+      - test_double_buffer
+      - test_input_buffer
+      - test_observer
+      - test_polling_thread
+      - test_mouse_device
+      - test_keyboard_device
+      - test_gamepad_device
+      - test_usb_device
+      - test_input_system
