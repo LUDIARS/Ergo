@@ -1,50 +1,49 @@
 cmake_minimum_required(VERSION 3.14)
-project(ergo_compose VERSION 0.1.0 LANGUAGES CXX)
+project(ergo_sound VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # オプション
-option(ERGO_COMPOSE_BUILD_TESTS "テストをビルドする" ON)
-option(ERGO_COMPOSE_BUILD_DUMMY "ダミープラグをビルドする" ON)
+option(ERGO_SOUND_BUILD_TESTS "テストをビルドする" ON)
+option(ERGO_SOUND_BUILD_DUMMY "ダミープラグをビルドする" ON)
 
 # ソースファイル
-set(COMPOSE_SOURCES
-    src/transpiler.cpp
-    src/actor_composer.cpp
-    src/scene_builder.cpp
-    src/quic_commander.cpp
-    src/hot_reloader.cpp
-    src/compose_system.cpp
+set(SOUND_SOURCES
+    src/audio_decoder.cpp
+    src/audio_stream.cpp
+    src/audio_engine.cpp
+    src/waveform_processor.cpp
+    src/quantizer.cpp
 )
 
 # 静的ライブラリ
-add_library(ergo_compose STATIC ${COMPOSE_SOURCES})
+add_library(ergo_sound STATIC ${SOUND_SOURCES})
 
-target_include_directories(ergo_compose PUBLIC
+target_include_directories(ergo_sound PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_compile_features(ergo_compose PUBLIC cxx_std_17)
+target_compile_features(ergo_sound PUBLIC cxx_std_17)
 
 # プラットフォーム別リンク
 if(UNIX AND NOT APPLE)
-    target_link_libraries(ergo_compose PUBLIC pthread stdc++fs)
+    target_link_libraries(ergo_sound PUBLIC pthread stdc++fs)
 elseif(APPLE)
-    target_link_libraries(ergo_compose PUBLIC pthread)
+    target_link_libraries(ergo_sound PUBLIC pthread)
 endif()
 
 # ダミープラグ
-if(ERGO_COMPOSE_BUILD_DUMMY)
-    add_library(ergo_compose_dummy STATIC src/compose_dummy.cpp)
-    target_include_directories(ergo_compose_dummy PUBLIC
+if(ERGO_SOUND_BUILD_DUMMY)
+    add_library(ergo_sound_dummy STATIC src/sound_dummy.cpp)
+    target_include_directories(ergo_sound_dummy PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     )
-    target_link_libraries(ergo_compose_dummy PUBLIC ergo_compose)
+    target_link_libraries(ergo_sound_dummy PUBLIC ergo_sound)
 endif()
 
 # テスト
-if(ERGO_COMPOSE_BUILD_TESTS)
+if(ERGO_SOUND_BUILD_TESTS)
     enable_testing()
 
     # GoogleTest
@@ -58,20 +57,19 @@ if(ERGO_COMPOSE_BUILD_TESTS)
 
     # テストファイル
     set(TEST_SOURCES
-        tests/test_transpiler.cpp
-        tests/test_actor_composer.cpp
-        tests/test_scene_builder.cpp
-        tests/test_quic_commander.cpp
-        tests/test_hot_reloader.cpp
-        tests/test_compose_system.cpp
+        tests/test_audio_decoder.cpp
+        tests/test_audio_stream.cpp
+        tests/test_audio_engine.cpp
+        tests/test_waveform_processor.cpp
+        tests/test_quantizer.cpp
     )
 
-    add_executable(compose_tests ${TEST_SOURCES})
-    target_link_libraries(compose_tests PRIVATE ergo_compose GTest::gtest_main)
-    target_include_directories(compose_tests PRIVATE
+    add_executable(sound_tests ${TEST_SOURCES})
+    target_link_libraries(sound_tests PRIVATE ergo_sound GTest::gtest_main)
+    target_include_directories(sound_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     )
 
     include(GoogleTest)
-    gtest_discover_tests(compose_tests)
+    gtest_discover_tests(sound_tests)
 endif()
