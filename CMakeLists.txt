@@ -5,31 +5,29 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(ERGO_INSPECTOR_BUILD_TESTS "Build inspector tests" ON)
-option(ERGO_INSPECTOR_BUILD_DUMMY "Build dummy plug implementations" ON)
-option(ERGO_INSPECTOR_BUILD_SERVER "Build the WebSocket server (off = registry-only)" OFF)
+option(ERGO_INSPECTOR_BUILD_TESTS  "Build inspector tests" ON)
+option(ERGO_INSPECTOR_BUILD_DUMMY  "Build dummy plug implementations" ON)
+option(ERGO_INSPECTOR_BUILD_SERVER "Build the WebSocket server (POSIX-only; Windows uses dummy)" ON)
 
 # ---------------------------------------------------------------------------
-# Real implementation
+# Core library
 # ---------------------------------------------------------------------------
 set(ERGO_INSPECTOR_SOURCES
     src/inspector/tweakable.cpp
     src/inspector/command_queue.cpp
     src/inspector/inspector.cpp
+    # Platform-neutral helpers: always compile (also useful for tests on any host).
+    src/inspector/json_min.cpp
+    src/inspector/ws_handshake.cpp
 )
 
-if(ERGO_INSPECTOR_BUILD_SERVER)
-    list(APPEND ERGO_INSPECTOR_SOURCES
-        src/inspector/json_min.cpp
-        src/inspector/ws_handshake.cpp
-    )
-    if(WIN32)
-        list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_win32.cpp)
-    else()
-        list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_posix.cpp)
-    endif()
+if(ERGO_INSPECTOR_BUILD_SERVER AND NOT WIN32)
+    list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_posix.cpp)
 else()
     list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_dummy.cpp)
+    if(ERGO_INSPECTOR_BUILD_SERVER AND WIN32)
+        message(STATUS "ergo_inspector: WebSocket server is POSIX-only; using dummy on Windows")
+    endif()
 endif()
 
 add_library(ergo_inspector ${ERGO_INSPECTOR_SOURCES})
@@ -39,14 +37,10 @@ target_compile_definitions(ergo_inspector PUBLIC ERGO_INSPECTOR_ENABLED=1)
 find_package(Threads REQUIRED)
 target_link_libraries(ergo_inspector PUBLIC Threads::Threads)
 
-if(WIN32 AND ERGO_INSPECTOR_BUILD_SERVER)
-    target_link_libraries(ergo_inspector PUBLIC ws2_32)
-endif()
-
 # ---------------------------------------------------------------------------
-# Dummy plug — satisfies all symbols with no-op implementations.
-# Use when ERGO_INSPECTOR_ENABLED is *not* defined by the host but you still
-# want unconditional compilation (e.g. for editor tooling).
+# Dummy plug — satisfies all ergo_inspector symbols with no-op implementations.
+# Use when ERGO_INSPECTOR_ENABLED is left defined but actual inspection isn't
+# wanted (e.g. headless CI that exercises host-side hooks).
 # ---------------------------------------------------------------------------
 if(ERGO_INSPECTOR_BUILD_DUMMY)
     add_library(ergo_inspector_dummy
@@ -74,8 +68,6 @@ if(ERGO_INSPECTOR_BUILD_TESTS)
     ergo_add_test(test_tweakable)
     ergo_add_test(test_command_queue)
     ergo_add_test(test_inspector)
-    if(ERGO_INSPECTOR_BUILD_SERVER)
-        ergo_add_test(test_ws_handshake)
-        ergo_add_test(test_json_min)
-    endif()
+    ergo_add_test(test_ws_handshake)
+    ergo_add_test(test_json_min)
 endif()
