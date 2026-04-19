@@ -1,81 +1,96 @@
 cmake_minimum_required(VERSION 3.16)
-project(ErgoInspector LANGUAGES CXX)
+project(ErgoParticle LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(ERGO_INSPECTOR_BUILD_TESTS "Build inspector tests" ON)
-option(ERGO_INSPECTOR_BUILD_DUMMY "Build dummy plug implementations" ON)
-option(ERGO_INSPECTOR_BUILD_SERVER "Build the WebSocket server (off = registry-only)" OFF)
+option(ERGO_PARTICLE_BUILD_TESTS "Build particle tests" ON)
+option(ERGO_PARTICLE_BUILD_DUMMY "Build dummy plug implementations" ON)
 
 # ---------------------------------------------------------------------------
-# Real implementation
+# Core library — CPU simulation only. No Vulkan/Pictor dependency, so this
+# part always builds and is fully testable on any host.
 # ---------------------------------------------------------------------------
-set(ERGO_INSPECTOR_SOURCES
-    src/inspector/tweakable.cpp
-    src/inspector/command_queue.cpp
-    src/inspector/inspector.cpp
+set(ERGO_PARTICLE_SOURCES
+    src/particle/effect_config.cpp
+    src/particle/particle_system.cpp
 )
 
-if(ERGO_INSPECTOR_BUILD_SERVER)
-    list(APPEND ERGO_INSPECTOR_SOURCES
-        src/inspector/json_min.cpp
-        src/inspector/ws_handshake.cpp
-    )
-    if(WIN32)
-        list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_win32.cpp)
-    else()
-        list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_posix.cpp)
-    endif()
-else()
-    list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_dummy.cpp)
-endif()
-
-add_library(ergo_inspector ${ERGO_INSPECTOR_SOURCES})
-target_include_directories(ergo_inspector PUBLIC include)
-target_compile_definitions(ergo_inspector PUBLIC ERGO_INSPECTOR_ENABLED=1)
+add_library(ergo_particle ${ERGO_PARTICLE_SOURCES})
+target_include_directories(ergo_particle PUBLIC include)
 
 find_package(Threads REQUIRED)
-target_link_libraries(ergo_inspector PUBLIC Threads::Threads)
+target_link_libraries(ergo_particle PUBLIC Threads::Threads)
 
-if(WIN32 AND ERGO_INSPECTOR_BUILD_SERVER)
-    target_link_libraries(ergo_inspector PUBLIC ws2_32)
+# ---------------------------------------------------------------------------
+# Optional Vulkan billboard renderer (requires the host to have already added
+# Pictor and Vulkan). When unavailable, renderer.h declarations are gated by
+# ERGO_PARTICLE_HAS_RENDERER.
+# ---------------------------------------------------------------------------
+if(TARGET pictor)
+    find_package(Vulkan QUIET)
+    if(Vulkan_FOUND)
+        target_sources(ergo_particle PRIVATE src/particle/renderer.cpp)
+        target_link_libraries(ergo_particle PUBLIC pictor Vulkan::Vulkan)
+        target_compile_definitions(ergo_particle PUBLIC ERGO_PARTICLE_HAS_RENDERER=1)
+
+        if(Vulkan_GLSLC_EXECUTABLE)
+            set(EP_SHADER_SOURCES
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.vert
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle.frag
+            )
+            set(EP_SPIRV_FILES)
+            foreach(SHADER ${EP_SHADER_SOURCES})
+                get_filename_component(NAME ${SHADER} NAME)
+                set(SPIRV_OUT ${CMAKE_BINARY_DIR}/shaders/${NAME}.spv)
+                add_custom_command(
+                    OUTPUT ${SPIRV_OUT}
+                    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
+                    COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${SHADER} -o ${SPIRV_OUT}
+                    DEPENDS ${SHADER}
+                    COMMENT "Compiling ${NAME} -> SPIR-V"
+                )
+                list(APPEND EP_SPIRV_FILES ${SPIRV_OUT})
+            endforeach()
+            add_custom_target(ergo_particle_shaders ALL DEPENDS ${EP_SPIRV_FILES})
+            add_dependencies(ergo_particle ergo_particle_shaders)
+        endif()
+
+        message(STATUS "ergo_particle: renderer enabled (Pictor + Vulkan)")
+    else()
+        message(STATUS "ergo_particle: renderer disabled (Vulkan not found)")
+    endif()
+else()
+    message(STATUS "ergo_particle: renderer disabled (pictor target not found)")
 endif()
 
 # ---------------------------------------------------------------------------
-# Dummy plug — satisfies all symbols with no-op implementations.
-# Use when ERGO_INSPECTOR_ENABLED is *not* defined by the host but you still
-# want unconditional compilation (e.g. for editor tooling).
+# Dummy plug
 # ---------------------------------------------------------------------------
-if(ERGO_INSPECTOR_BUILD_DUMMY)
-    add_library(ergo_inspector_dummy
-        src/inspector/inspector_dummy.cpp
+if(ERGO_PARTICLE_BUILD_DUMMY)
+    add_library(ergo_particle_dummy
+        src/particle/particle_dummy.cpp
     )
-    target_include_directories(ergo_inspector_dummy PUBLIC include)
-    target_link_libraries(ergo_inspector_dummy PUBLIC Threads::Threads)
+    target_include_directories(ergo_particle_dummy PUBLIC include)
+    target_link_libraries(ergo_particle_dummy PUBLIC Threads::Threads)
 endif()
 
 # ---------------------------------------------------------------------------
-# Tests
+# Tests — simulation only, no Vulkan needed.
 # ---------------------------------------------------------------------------
-if(ERGO_INSPECTOR_BUILD_TESTS)
+if(ERGO_PARTICLE_BUILD_TESTS)
     enable_testing()
 
     add_library(gtest_main STATIC tests/gtest_main.cpp)
     target_include_directories(gtest_main PUBLIC third_party)
 
     function(ergo_add_test NAME)
-        add_executable(${NAME} tests/inspector/${NAME}.cpp)
-        target_link_libraries(${NAME} PRIVATE ergo_inspector gtest_main)
+        add_executable(${NAME} tests/particle/${NAME}.cpp)
+        target_link_libraries(${NAME} PRIVATE ergo_particle gtest_main)
         add_test(NAME ${NAME} COMMAND ${NAME})
     endfunction()
 
-    ergo_add_test(test_tweakable)
-    ergo_add_test(test_command_queue)
-    ergo_add_test(test_inspector)
-    if(ERGO_INSPECTOR_BUILD_SERVER)
-        ergo_add_test(test_ws_handshake)
-        ergo_add_test(test_json_min)
-    endif()
+    ergo_add_test(test_effect_config)
+    ergo_add_test(test_particle_system)
 endif()
