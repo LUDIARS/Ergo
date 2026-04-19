@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ergo Inspector</title>
+<style>
+  :root {
+    --bg:#1a1d21; --panel:#23272d; --line:#343a42; --text:#e7eaef; --muted:#8a93a0;
+    --accent:#7cc4ff; --bad:#ff7d7d; --ok:#7cd47c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+  header { padding:.6rem 1rem; background:var(--panel); border-bottom:1px solid var(--line);
+           display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:1rem; margin:0; font-weight:600; letter-spacing:.02em; }
+  header .status { font-size:.85rem; color:var(--muted); }
+  header .status.ok { color:var(--ok); }
+  header .status.bad { color:var(--bad); }
+  main { padding:1rem; max-width:900px; margin:0 auto; }
+  .cat { margin-bottom:1.4rem; }
+  .cat h2 { font-size:.85rem; text-transform:uppercase; letter-spacing:.08em;
+            color:var(--muted); margin:0 0 .4rem 0; padding:0 .25rem;
+            border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+  .row { display:grid; grid-template-columns: 220px 1fr 90px;
+         align-items:center; gap:.75rem; padding:.4rem .25rem;
+         border-bottom:1px solid #2a2e34; }
+  .row:last-child { border-bottom:none; }
+  .row .name { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:.85rem;
+               color:var(--text); }
+  .row .name .unit { color:var(--muted); margin-left:.4rem; font-size:.75rem; }
+  .row .val { font-family: ui-monospace, monospace; font-size:.85rem; color:var(--accent);
+              text-align:right; }
+  .row input[type=range] { width:100%; }
+  .row input[type=number],
+  .row input[type=text] { width:100%; background:#1a1d21; color:var(--text);
+                          border:1px solid var(--line); border-radius:4px; padding:.25rem .4rem;
+                          font-family: ui-monospace, monospace; font-size:.85rem; }
+  .row input[type=color] { width:100%; height:1.8rem; background:none; border:1px solid var(--line);
+                           padding:0; cursor:pointer; }
+  .row input[type=checkbox] { width:1.2rem; height:1.2rem; }
+  .row.ro { opacity:.55; }
+  .vec3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:.25rem; }
+  footer { color:var(--muted); font-size:.75rem; text-align:center;
+           padding:.5rem; border-top:1px solid var(--line); }
+  .actions { margin-left:auto; display:flex; gap:.5rem; }
+  .actions button { background:var(--panel); color:var(--text); border:1px solid var(--line);
+                    padding:.3rem .6rem; border-radius:4px; cursor:pointer; font-size:.8rem; }
+  .actions button:hover { background:#2a2e34; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ergo Inspector</h1>
+  <span id="status" class="status">connecting...</span>
+  <div class="actions">
+    <button id="refresh">Refresh</button>
+  </div>
+</header>
+<main id="root"></main>
+<footer id="footer">—</footer>
+
+<script>
+"use strict";
+
+const root  = document.getElementById("root");
+const stat  = document.getElementById("status");
+const foot  = document.getElementById("footer");
+const refresh = document.getElementById("refresh");
+
+let ws = null;
+let vars = [];                  // last enumerated vars
+const rows = new Map();         // name -> render context
+
+function setStatus(text, cls) {
+  stat.textContent = text;
+  stat.className = "status" + (cls ? " " + cls : "");
+}
+
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+function format(value, kind) {
+  if (kind === "double" || kind === "float") return Number(value).toFixed(3);
+  if (kind === "color")  return value.map(v => Number(v).toFixed(2)).join(", ");
+  if (kind === "vec3")   return value.map(v => Number(v).toFixed(2)).join(", ");
+  return String(value);
+}
+
+function buildRow(v) {
+  const row = document.createElement("div");
+  row.className = "row" + (v.meta && v.meta.read_only ? " ro" : "");
+
+  const name = document.createElement("div");
+  name.className = "name";
+  name.textContent = v.name;
+  if (v.meta && v.meta.unit) {
+    const u = document.createElement("span");
+    u.className = "unit"; u.textContent = v.meta.unit;
+    name.appendChild(u);
+  }
+  row.appendChild(name);
+
+  const ctrl = document.createElement("div");
+  row.appendChild(ctrl);
+
+  const val = document.createElement("div");
+  val.className = "val";
+  val.textContent = format(v.value, v.kind);
+  row.appendChild(val);
+
+  let setter = null;
+
+  const ro = !!(v.meta && v.meta.read_only);
+
+  if (v.kind === "bool") {
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!v.value;
+    cb.disabled = ro;
+    cb.oninput = () => send({op:"set", name:v.name, value: cb.checked});
+    ctrl.appendChild(cb);
+    setter = nv => { cb.checked = !!nv; val.textContent = format(nv, v.kind); };
+  }
+  else if (v.kind === "string") {
+    const t = document.createElement("input");
+    t.type = "text"; t.value = String(v.value); t.disabled = ro;
+    t.onchange = () => send({op:"set", name:v.name, value: t.value});
+    ctrl.appendChild(t);
+    setter = nv => { t.value = String(nv); val.textContent = format(nv, v.kind); };
+  }
+  else if (v.kind === "color") {
+    const c = document.createElement("input");
+    c.type = "color"; c.disabled = ro;
+    const rgb = (v.value || [0,0,0,1]).slice(0,3);
+    const toHex = x => Math.max(0, Math.min(255, Math.round(x*255))).toString(16).padStart(2,"0");
+    c.value = "#" + rgb.map(toHex).join("");
+    c.oninput = () => {
+      const hex = c.value.slice(1);
+      const r = parseInt(hex.slice(0,2),16)/255;
+      const g = parseInt(hex.slice(2,4),16)/255;
+      const b = parseInt(hex.slice(4,6),16)/255;
+      const a = (v.value && v.value.length>=4) ? v.value[3] : 1.0;
+      send({op:"set", name:v.name, value: [r,g,b,a]});
+    };
+    ctrl.appendChild(c);
+    setter = nv => {
+      val.textContent = format(nv, v.kind);
+      c.value = "#" + nv.slice(0,3).map(toHex).join("");
+    };
+  }
+  else if (v.kind === "vec3") {
+    const wrap = document.createElement("div");
+    wrap.className = "vec3";
+    const inputs = [];
+    for (let i = 0; i < 3; ++i) {
+      const n = document.createElement("input");
+      n.type = "number"; n.step = "0.01";
+      n.value = Number(v.value[i] || 0); n.disabled = ro;
+      n.onchange = () => {
+        const arr = inputs.map(x => Number(x.value));
+        send({op:"set", name:v.name, value: arr});
+      };
+      wrap.appendChild(n); inputs.push(n);
+    }
+    ctrl.appendChild(wrap);
+    setter = nv => {
+      for (let i = 0; i < 3; ++i) inputs[i].value = Number(nv[i]);
+      val.textContent = format(nv, v.kind);
+    };
+  }
+  else {
+    // numeric (int/float/double)
+    const m = v.meta || {};
+    const hasRange = m.min < m.max;
+    if (hasRange && !ro) {
+      const r = document.createElement("input");
+      r.type = "range";
+      r.min = m.min; r.max = m.max;
+      r.step = (m.step && m.step > 0) ? m.step
+              : (v.kind === "double" || v.kind === "float") ? (m.max - m.min)/1000 : 1;
+      r.value = Number(v.value);
+      r.oninput = () => {
+        const n = Number(r.value);
+        val.textContent = format(n, v.kind);
+        send({op:"set", name:v.name, value: n});
+      };
+      ctrl.appendChild(r);
+      setter = nv => { r.value = Number(nv); val.textContent = format(nv, v.kind); };
+    } else {
+      const n = document.createElement("input");
+      n.type = "number"; n.value = Number(v.value); n.disabled = ro;
+      if (m.step) n.step = m.step;
+      n.onchange = () => send({op:"set", name:v.name, value: Number(n.value)});
+      ctrl.appendChild(n);
+      setter = nv => { n.value = Number(nv); val.textContent = format(nv, v.kind); };
+    }
+  }
+
+  rows.set(v.name, {row, setter, kind: v.kind});
+  return row;
+}
+
+function rebuild(varsArr) {
+  vars = varsArr;
+  root.innerHTML = "";
+  rows.clear();
+
+  // Group by category (or "default" if none)
+  const groups = new Map();
+  for (const v of vars) {
+    const cat = (v.meta && v.meta.category) ? v.meta.category : "general";
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push(v);
+  }
+  const sortedCats = [...groups.keys()].sort();
+  for (const cat of sortedCats) {
+    const sec = document.createElement("section");
+    sec.className = "cat";
+    const h = document.createElement("h2"); h.textContent = cat;
+    sec.appendChild(h);
+    for (const v of groups.get(cat).sort((a,b) => a.name.localeCompare(b.name))) {
+      sec.appendChild(buildRow(v));
+    }
+    root.appendChild(sec);
+  }
+  foot.textContent = vars.length + " variable" + (vars.length === 1 ? "" : "s");
+}
+
+function applyChange(name, newValue) {
+  const r = rows.get(name);
+  if (!r) return;
+  r.setter(newValue);
+}
+
+function connect() {
+  const url = "ws://" + location.host + "/";
+  setStatus("connecting to " + url + " ...");
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    setStatus("connected", "ok");
+    send({op:"enumerate"});
+    send({op:"subscribe", name:"*"});
+  };
+  ws.onmessage = ev => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    if (Array.isArray(msg.vars)) {
+      rebuild(msg.vars);
+      return;
+    }
+    if (msg.op === "changed") {
+      applyChange(msg.name, msg.value);
+      return;
+    }
+    // ignore plain ok/err echoes
+  };
+  ws.onclose = () => {
+    setStatus("disconnected — retrying...", "bad");
+    setTimeout(connect, 1500);
+  };
+  ws.onerror = () => { /* close handler will retry */ };
+}
+
+refresh.onclick = () => send({op:"enumerate"});
+connect();
+</script>
+</body>
+</html>
