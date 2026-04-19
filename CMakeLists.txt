@@ -1,77 +1,81 @@
-cmake_minimum_required(VERSION 3.14)
-project(ergo_compose VERSION 0.1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.16)
+project(ErgoInspector LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# オプション
-option(ERGO_COMPOSE_BUILD_TESTS "テストをビルドする" ON)
-option(ERGO_COMPOSE_BUILD_DUMMY "ダミープラグをビルドする" ON)
+option(ERGO_INSPECTOR_BUILD_TESTS "Build inspector tests" ON)
+option(ERGO_INSPECTOR_BUILD_DUMMY "Build dummy plug implementations" ON)
+option(ERGO_INSPECTOR_BUILD_SERVER "Build the WebSocket server (off = registry-only)" OFF)
 
-# ソースファイル
-set(COMPOSE_SOURCES
-    src/transpiler.cpp
-    src/actor_composer.cpp
-    src/scene_builder.cpp
-    src/quic_commander.cpp
-    src/hot_reloader.cpp
-    src/compose_system.cpp
+# ---------------------------------------------------------------------------
+# Real implementation
+# ---------------------------------------------------------------------------
+set(ERGO_INSPECTOR_SOURCES
+    src/inspector/tweakable.cpp
+    src/inspector/command_queue.cpp
+    src/inspector/inspector.cpp
 )
 
-# 静的ライブラリ
-add_library(ergo_compose STATIC ${COMPOSE_SOURCES})
-
-target_include_directories(ergo_compose PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_compile_features(ergo_compose PUBLIC cxx_std_17)
-
-# プラットフォーム別リンク
-if(UNIX AND NOT APPLE)
-    target_link_libraries(ergo_compose PUBLIC pthread stdc++fs)
-elseif(APPLE)
-    target_link_libraries(ergo_compose PUBLIC pthread)
-endif()
-
-# ダミープラグ
-if(ERGO_COMPOSE_BUILD_DUMMY)
-    add_library(ergo_compose_dummy STATIC src/compose_dummy.cpp)
-    target_include_directories(ergo_compose_dummy PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+if(ERGO_INSPECTOR_BUILD_SERVER)
+    list(APPEND ERGO_INSPECTOR_SOURCES
+        src/inspector/json_min.cpp
+        src/inspector/ws_handshake.cpp
     )
-    target_link_libraries(ergo_compose_dummy PUBLIC ergo_compose)
+    if(WIN32)
+        list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_win32.cpp)
+    else()
+        list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_posix.cpp)
+    endif()
+else()
+    list(APPEND ERGO_INSPECTOR_SOURCES src/inspector/server_dummy.cpp)
 endif()
 
-# テスト
-if(ERGO_COMPOSE_BUILD_TESTS)
+add_library(ergo_inspector ${ERGO_INSPECTOR_SOURCES})
+target_include_directories(ergo_inspector PUBLIC include)
+target_compile_definitions(ergo_inspector PUBLIC ERGO_INSPECTOR_ENABLED=1)
+
+find_package(Threads REQUIRED)
+target_link_libraries(ergo_inspector PUBLIC Threads::Threads)
+
+if(WIN32 AND ERGO_INSPECTOR_BUILD_SERVER)
+    target_link_libraries(ergo_inspector PUBLIC ws2_32)
+endif()
+
+# ---------------------------------------------------------------------------
+# Dummy plug — satisfies all symbols with no-op implementations.
+# Use when ERGO_INSPECTOR_ENABLED is *not* defined by the host but you still
+# want unconditional compilation (e.g. for editor tooling).
+# ---------------------------------------------------------------------------
+if(ERGO_INSPECTOR_BUILD_DUMMY)
+    add_library(ergo_inspector_dummy
+        src/inspector/inspector_dummy.cpp
+    )
+    target_include_directories(ergo_inspector_dummy PUBLIC include)
+    target_link_libraries(ergo_inspector_dummy PUBLIC Threads::Threads)
+endif()
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+if(ERGO_INSPECTOR_BUILD_TESTS)
     enable_testing()
 
-    # GoogleTest
-    include(FetchContent)
-    FetchContent_Declare(
-        googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        v1.14.0
-    )
-    FetchContent_MakeAvailable(googletest)
+    add_library(gtest_main STATIC tests/gtest_main.cpp)
+    target_include_directories(gtest_main PUBLIC third_party)
 
-    # テストファイル
-    set(TEST_SOURCES
-        tests/test_transpiler.cpp
-        tests/test_actor_composer.cpp
-        tests/test_scene_builder.cpp
-        tests/test_quic_commander.cpp
-        tests/test_hot_reloader.cpp
-        tests/test_compose_system.cpp
-    )
+    function(ergo_add_test NAME)
+        add_executable(${NAME} tests/inspector/${NAME}.cpp)
+        target_link_libraries(${NAME} PRIVATE ergo_inspector gtest_main)
+        add_test(NAME ${NAME} COMMAND ${NAME})
+    endfunction()
 
-    add_executable(compose_tests ${TEST_SOURCES})
-    target_link_libraries(compose_tests PRIVATE ergo_compose GTest::gtest_main)
-    target_include_directories(compose_tests PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-    )
-
-    include(GoogleTest)
-    gtest_discover_tests(compose_tests)
+    ergo_add_test(test_tweakable)
+    ergo_add_test(test_command_queue)
+    ergo_add_test(test_inspector)
+    if(ERGO_INSPECTOR_BUILD_SERVER)
+        ergo_add_test(test_ws_handshake)
+        ergo_add_test(test_json_min)
+    endif()
 endif()
