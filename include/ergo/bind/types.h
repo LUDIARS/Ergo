@@ -29,6 +29,11 @@ struct VarMeta {
     bool        read_only = false;
     std::string category;
     std::string unit;
+
+    /// Owner actor handle (0 = global, no owner). Set by
+    /// `ergo::actor::Actor::bind_var` so the variable editor can group
+    /// variables under the right actor in its tree view.
+    uint64_t    actor_handle = 0;
 };
 
 struct Value {
