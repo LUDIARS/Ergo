@@ -90,6 +90,11 @@ jsonm::JsonValue meta_to_json(const VarMeta& m) {
     if (m.read_only)   j.set("read_only", JsonValue::make_bool(true));
     if (!m.category.empty()) j.set("category", JsonValue::make_string(m.category));
     if (!m.unit.empty())     j.set("unit",     JsonValue::make_string(m.unit));
+    if (m.actor_handle != 0) {
+        // JSON Number is double; we'd lose precision above 2^53. In practice
+        // handles are monotonically-assigned small integers so this is safe.
+        j.set("actor", JsonValue::make_number(static_cast<double>(m.actor_handle)));
+    }
     return j;
 }
 
@@ -121,6 +126,13 @@ struct Engine::Impl {
     std::unordered_map<Handle, Entry>        by_handle;
     std::unordered_map<std::string, Handle>  by_name;
     Handle                                   next_handle = 1;
+
+    struct ActorEntry {
+        uint64_t    handle = 0;
+        uint64_t    parent = 0;
+        std::string name;
+    };
+    std::unordered_map<uint64_t, ActorEntry> actors;
 
     std::mutex                               wq_mtx;
     std::vector<PendingWrite>                wq;
@@ -166,6 +178,24 @@ struct Engine::Impl {
         client.send_text(serialize(m));
     }
 
+    void send_actor_register(const ActorEntry& a) {
+        using namespace jsonm;
+        auto m = JsonValue::make_object();
+        m.set("op",     JsonValue::make_string("actor_register"));
+        m.set("handle", JsonValue::make_number(static_cast<double>(a.handle)));
+        m.set("parent", JsonValue::make_number(static_cast<double>(a.parent)));
+        m.set("name",   JsonValue::make_string(a.name));
+        client.send_text(serialize(m));
+    }
+
+    void send_actor_unregister(uint64_t handle) {
+        using namespace jsonm;
+        auto m = JsonValue::make_object();
+        m.set("op",     JsonValue::make_string("actor_unregister"));
+        m.set("handle", JsonValue::make_number(static_cast<double>(handle)));
+        client.send_text(serialize(m));
+    }
+
     void on_text(const std::string& text) {
         using namespace jsonm;
         JsonValue req;
@@ -200,12 +230,19 @@ struct Engine::Impl {
 
     void on_open() {
         send_hello();
-        std::vector<Entry> entries;
+        // Replay actor topology first — the server should know every
+        // actor before bind messages start flowing so it can attach
+        // variables to the right tree node.
+        std::vector<ActorEntry> actor_snapshot;
+        std::vector<Entry>      entries;
         {
             std::lock_guard<std::mutex> lk(mtx);
+            actor_snapshot.reserve(actors.size());
+            for (auto& [h, a] : actors) actor_snapshot.push_back(a);
             entries.reserve(by_handle.size());
             for (auto& [h, e] : by_handle) entries.push_back(e);
         }
+        for (auto& a : actor_snapshot) send_actor_register(a);
         for (auto& e : entries) send_bind(e);
         // Mark all entries as "published" to prime change detection.
         std::lock_guard<std::mutex> lk(mtx);
@@ -350,6 +387,33 @@ void Engine::unbind(Handle h) {
     }
     if (was_published && impl_->client.is_connected()) {
         impl_->send_unbind(name);
+    }
+}
+
+void Engine::actor_register(uint64_t handle, uint64_t parent,
+                            const std::string& name)
+{
+    if (handle == 0) return;
+    Impl::ActorEntry a;
+    a.handle = handle;
+    a.parent = parent;
+    a.name   = name;
+    {
+        std::lock_guard<std::mutex> lk(impl_->mtx);
+        impl_->actors[handle] = a;
+    }
+    if (impl_->client.is_connected()) impl_->send_actor_register(a);
+}
+
+void Engine::actor_unregister(uint64_t handle) {
+    if (handle == 0) return;
+    bool was_known = false;
+    {
+        std::lock_guard<std::mutex> lk(impl_->mtx);
+        was_known = impl_->actors.erase(handle) > 0;
+    }
+    if (was_known && impl_->client.is_connected()) {
+        impl_->send_actor_unregister(handle);
     }
 }
 

@@ -68,6 +68,20 @@ public:
 
     void unbind(Handle h);
 
+    // ---- actor hierarchy -------------------------------------------------
+    //
+    // Used by ergo_actor to announce scene-graph nodes. The engine
+    // caches these so they can be replayed on reconnect alongside the
+    // bind table. No-ops are safe — tests can register actors even
+    // without a live connection.
+
+    /// Notify the server that an actor exists in the scene graph.
+    /// `parent == 0` means a root actor.
+    void actor_register(uint64_t handle, uint64_t parent, const std::string& name);
+
+    /// Remove a previously-registered actor.
+    void actor_unregister(uint64_t handle);
+
     // ---- per-frame --------------------------------------------------------
 
     /// Drain queued writes and invoke setters. Also publishes value-change
@@ -114,6 +128,8 @@ public:
                          std::function<void(const Value&)>,
                          VarMeta = {}) { return INVALID_HANDLE; }
     void unbind(Handle) {}
+    void actor_register(uint64_t, uint64_t, const std::string&) {}
+    void actor_unregister(uint64_t) {}
     void apply_pending_writes() {}
 };
 

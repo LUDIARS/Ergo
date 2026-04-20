@@ -9,10 +9,13 @@
     --bg:#1a1d21; --panel:#23272d; --line:#343a42;
     --text:#e7eaef; --muted:#8a93a0;
     --accent:#7cc4ff; --bad:#ff7d7d; --ok:#7cd47c;
+    --sel:#2f4a66;
   }
   * { box-sizing:border-box; }
   html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
-               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+               height:100%; overflow:hidden; }
+  body { display:grid; grid-template-rows: auto 1fr; height:100vh; }
   header { padding:.6rem 1rem; background:var(--panel); border-bottom:1px solid var(--line);
            display:flex; gap:1rem; align-items:center; }
   header h1 { font-size:1rem; margin:0; font-weight:600; letter-spacing:.02em; }
@@ -20,7 +23,21 @@
                    font-family: ui-monospace, monospace; }
   header .status.ok { color:var(--ok); }
   header .status.bad { color:var(--bad); }
-  main { padding:1rem; max-width:980px; margin:0 auto; }
+
+  .split { display:grid; grid-template-columns: 260px 1fr; min-height:0; }
+  #tree { background:#1e2127; border-right:1px solid var(--line);
+          overflow-y:auto; min-height:0; }
+  #tree h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
+             color:var(--muted); margin:.6rem .8rem .4rem; }
+  .tnode { padding:.2rem .6rem .2rem .2rem; cursor:pointer;
+           font-family: ui-monospace, monospace; font-size:.82rem;
+           border-left:3px solid transparent; white-space:nowrap;
+           text-overflow:ellipsis; overflow:hidden; }
+  .tnode:hover { background:#262b31; }
+  .tnode.sel  { background:var(--sel); border-left-color:var(--accent); }
+  .tnode .count { color:var(--muted); font-size:.72rem; margin-left:.3rem; }
+
+  main { overflow-y:auto; min-height:0; padding:1rem; }
   .empty { color:var(--muted); font-size:.9rem; text-align:center; padding:3rem 1rem; }
   .app { margin-bottom:1.5rem; }
   .app h2 { font-size:.78rem; text-transform:uppercase; letter-spacing:.08em;
@@ -55,22 +72,32 @@
   <h1>Variable Editor</h1>
   <span class="status" id="status">connecting...</span>
 </header>
-<main id="root">
-  <div class="empty" id="empty">No variables bound yet. Start an app that calls <code>BIND_VAR(...)</code>.</div>
-</main>
+<div class="split">
+  <aside id="tree"></aside>
+  <main id="root">
+    <div class="empty" id="empty">No variables bound yet. Start an app that calls <code>BIND_VAR(...)</code>.</div>
+  </main>
+</div>
 
 <script>
 "use strict";
 
-const root = document.getElementById("root");
-const empty = document.getElementById("empty");
-const status = document.getElementById("status");
+const root    = document.getElementById("root");
+const empty   = document.getElementById("empty");
+const status  = document.getElementById("status");
+const treeEl  = document.getElementById("tree");
 
 let ws = null;
-let registry = [];                  // last full snapshot
+let registry = [];                  // last full var snapshot
+let actors   = [];                  // last full actor snapshot (ActorNode[])
 const rowSetters = new Map();       // name -> setter(value)
-const inputsByName = new Map();     // name -> sidecar (inputs we suppress while applying)
-let suppressName = null;            // suppress send when programmatically updating this var
+let suppressName = null;            // suppress send while programmatically updating
+
+// Special tree-filter values:
+//   null  -> show everything (default)
+//   0     -> "(global)" only (meta.actor missing or 0)
+//   >0    -> only vars whose meta.actor matches
+let selectedHandle = null;
 
 function setStatus(text, cls) {
   status.textContent = text;
@@ -118,7 +145,6 @@ function buildRow(v) {
 
   const ro = !!(v.meta && v.meta.read_only);
   let setter = null;
-
   const m = v.meta || {};
 
   const setSend = (newVal) => {
@@ -150,10 +176,7 @@ function buildRow(v) {
       setSend([rgb[0], rgb[1], rgb[2], a]);
     };
     ctrl.appendChild(c);
-    setter = nv => {
-      val.textContent = format(nv, v.kind);
-      c.value = rgbaToHex(nv);
-    };
+    setter = nv => { val.textContent = format(nv, v.kind); c.value = rgbaToHex(nv); };
   }
   else if (v.kind === "vec3") {
     const wrap = document.createElement("div");
@@ -173,7 +196,6 @@ function buildRow(v) {
     };
   }
   else {
-    // Numeric kinds (int32 / int64 / float / double)
     const hasRange = (m.min != null && m.max != null && m.min < m.max);
     if (hasRange && !ro) {
       const r = document.createElement("input");
@@ -182,11 +204,7 @@ function buildRow(v) {
       r.step = (m.step != null && m.step > 0) ? m.step
               : (v.kind === "double" || v.kind === "float") ? (m.max - m.min)/1000 : 1;
       r.value = Number(v.value);
-      r.oninput = () => {
-        const n = Number(r.value);
-        val.textContent = format(n, v.kind);
-        setSend(n);
-      };
+      r.oninput = () => { const n = Number(r.value); val.textContent = format(n, v.kind); setSend(n); };
       ctrl.appendChild(r);
       setter = nv => { r.value = Number(nv); val.textContent = format(nv, v.kind); };
     } else {
@@ -203,15 +221,75 @@ function buildRow(v) {
   return row;
 }
 
-function rebuild(vars) {
-  registry = vars;
+function currentFilter() {
+  // Which vars pass the current tree-filter?
+  if (selectedHandle === null) return registry;
+  if (selectedHandle === 0)    return registry.filter(v => !v.meta || !v.meta.actor);
+  return registry.filter(v => v.meta && v.meta.actor === selectedHandle);
+}
+
+function countVarsFor(handle) {
+  if (handle === null) return registry.length;
+  if (handle === 0)    return registry.filter(v => !v.meta || !v.meta.actor).length;
+  return registry.filter(v => v.meta && v.meta.actor === handle).length;
+}
+
+function renderTree() {
+  treeEl.innerHTML = "";
+  const h = document.createElement("h2"); h.textContent = "Scene"; treeEl.appendChild(h);
+
+  const addNode = (label, handle, indent) => {
+    const d = document.createElement("div");
+    d.className = "tnode" + (selectedHandle === handle ? " sel" : "");
+    d.style.paddingLeft = (0.2 + indent * 0.9) + "rem";
+    d.textContent = label;
+    const count = countVarsFor(handle);
+    const cs = document.createElement("span");
+    cs.className = "count"; cs.textContent = "(" + count + ")";
+    d.appendChild(cs);
+    d.onclick = () => { selectedHandle = handle; rebuild(); };
+    treeEl.appendChild(d);
+  };
+
+  addNode("(all)",    null, 0);
+  addNode("(global)", 0,    0);
+
+  // Build child map, render roots first, then recurse.
+  const byParent = new Map();
+  for (const a of actors) {
+    const p = a.parent || 0;
+    if (!byParent.has(p)) byParent.set(p, []);
+    byParent.get(p).push(a);
+  }
+  for (const arr of byParent.values()) arr.sort((a,b) => a.name.localeCompare(b.name));
+
+  const visit = (parent, depth) => {
+    const kids = byParent.get(parent) || [];
+    for (const a of kids) {
+      addNode(a.name, a.handle, depth);
+      visit(a.handle, depth + 1);
+    }
+  };
+  visit(0, 1);
+}
+
+function rebuild(newVars) {
+  if (newVars) registry = newVars;
   rowSetters.clear();
   root.innerHTML = "";
+  renderTree();
+
+  const vars = currentFilter();
   if (vars.length === 0) {
-    root.appendChild(empty);
+    const e = empty.cloneNode(true);
+    if (selectedHandle !== null) {
+      e.innerHTML = "No variables bound under this actor.";
+    }
+    root.appendChild(e);
     return;
   }
-  // group by app, then by category within each app
+
+  // Group by app, then by category within each app.
   const byApp = new Map();
   for (const v of vars) {
     const a = v.app || "default";
@@ -234,7 +312,7 @@ function rebuild(vars) {
     for (const cat of cats) {
       const cs = document.createElement("div"); cs.className = "cat";
       const h3 = document.createElement("h3"); h3.textContent = cat; cs.appendChild(h3);
-      for (const v of byCat.get(cat).sort((a,b) => a.name.localeCompare(b.name))) {
+      for (const v of byCat.get(cat).sort((x,y) => x.name.localeCompare(y.name))) {
         cs.appendChild(buildRow(v));
       }
       appSec.appendChild(cs);
@@ -264,15 +342,21 @@ function connect() {
     if (msg.op === "registry") {
       rebuild(msg.vars || []);
       const n = (msg.vars||[]).length;
-      setStatus("connected · " + n + " var" + (n===1?"":"s"), "ok");
+      setStatus("connected · " + n + " var" + (n===1?"":"s") + " · " + actors.length + " actors", "ok");
+    } else if (msg.op === "actors") {
+      actors = msg.nodes || [];
+      // If the selected actor disappeared, reset to (all).
+      if (selectedHandle !== null && selectedHandle !== 0 &&
+          !actors.some(a => a.handle === selectedHandle)) {
+        selectedHandle = null;
+      }
+      rebuild();
+      setStatus("connected · " + registry.length + " vars · " + actors.length + " actors", "ok");
     } else if (msg.op === "value") {
       applyValue(msg.name, msg.value);
     }
   };
-  ws.onclose = () => {
-    setStatus("disconnected — retrying...", "bad");
-    setTimeout(connect, 1500);
-  };
+  ws.onclose = () => { setStatus("disconnected — retrying...", "bad"); setTimeout(connect, 1500); };
   ws.onerror = () => {};
 }
 
