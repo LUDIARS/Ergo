@@ -46,6 +46,7 @@ ergo/
 | `ergo_bind`          | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`)          | `include/ergo/bind/`         | `tools/ergo/` (`variable` plugin) |
 | `ergo_frame`         | アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列      | `include/ergo/frame/`        | — |
 | `ergo_log`           | 4-level ロガー (Error/Warn/Info/Debug)、フレーム番号を行頭に埋め込む | `include/ergo/log/`          | — |
+| `ergo_io`            | 最小ファイル I/O ラッパー (`<filesystem>` の薄膜, UTF-8 `std::string`) | `include/ergo/io/`           | — |
 
 詳細は `spec/module/<名>.md` 参照。
 
