@@ -1,15 +1,11 @@
 #pragma once
 
-/// Common types for the Ergo Inspector module.
-///
-/// `Value` is a tagged-union–style holder that can carry any of the supported
-/// inspector kinds. It is small enough to copy by value freely. `VarMeta`
-/// carries optional UI hints (range / unit / category / read-only).
+/// Common types for ergo_bind. Mirrors variable-editor's wire schema (v1).
 
 #include <cstdint>
 #include <string>
 
-namespace ergo::inspector {
+namespace ergo::bind {
 
 enum class VarKind : uint8_t {
     Bool   = 0,
@@ -23,14 +19,15 @@ enum class VarKind : uint8_t {
 };
 
 const char* to_string(VarKind k);
+VarKind     kind_from_string(const std::string& s);
 
 struct VarMeta {
     double      min       = 0.0;
     double      max       = 0.0;   // min == max means "no range hint"
-    double      step      = 0.0;   // 0 = auto
+    double      step      = 0.0;
     bool        read_only = false;
-    std::string category;          // optional UI grouping
-    std::string unit;              // "bpm", "us", "deg", ...
+    std::string category;
+    std::string unit;
 };
 
 struct Value {
@@ -50,8 +47,9 @@ struct Value {
     static Value of_color  (float r, float g, float b, float a = 1.0f);
     static Value of_vec3   (float x, float y, float z);
 
-    bool same_kind(VarKind k) const { return kind == k; }
     bool equals(const Value& other) const;
 };
 
-} // namespace ergo::inspector
+Value clamp_to_meta(const Value& v, const VarMeta& meta);
+
+} // namespace ergo::bind
