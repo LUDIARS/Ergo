@@ -20,6 +20,7 @@ option(ERGO_BUILD_ACTOR        "Build ergo_actor"        ON)
 option(ERGO_BUILD_SOUND        "Build ergo_sound"        ON)
 option(ERGO_BUILD_FRAME        "Build ergo_frame"        ON)
 option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
+option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_INSPECTOR_BUILD_SERVER       "ergo_inspector: build POSIX WebSocket server" ON)
@@ -373,5 +374,29 @@ if(ERGO_BUILD_LOG)
         target_link_libraries(test_log PRIVATE ergo_log ergo_gtest_main)
         target_link_libraries(test_log PRIVATE Threads::Threads)
         add_test(NAME test_log COMMAND test_log)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_io — minimal file / path I/O wrapper (thin over <filesystem>)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_IO)
+    add_library(ergo_io src/io/file.cpp)
+    target_include_directories(ergo_io PUBLIC include)
+    # GCC < 9 splits <filesystem> into its own library; MSVC / Clang / newer
+    # GCC fold it into libstdc++. Link unconditionally on GCC to stay safe.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_libraries(ergo_io PUBLIC stdc++fs)
+    endif()
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_io_dummy src/io/file_dummy.cpp)
+        target_include_directories(ergo_io_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_file tests/io/test_file.cpp)
+        target_link_libraries(test_file PRIVATE ergo_io ergo_gtest_main)
+        add_test(NAME test_file COMMAND test_file)
     endif()
 endif()
