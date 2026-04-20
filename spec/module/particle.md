@@ -3,7 +3,7 @@
 ## 概要
 パーティクルエフェクトの **CPU シミュレーション** と **Pictor を介した Vulkan
 ビルボード描画** を提供するモジュール。
-particle-editor (TS/Node サーバ) から WebSocket で配信される
+unified ergo tool の `particle` プラグイン (TS/Node, `tools/ergo/`) から WebSocket で配信される
 `ParticleEffectConfig` を受け取り、ホストアプリ側で生きた粒子を更新・描画する。
 ライブ編集 → 即視覚反映を主目的とする。
 
@@ -14,7 +14,7 @@ particle-editor (TS/Node サーバ) から WebSocket で配信される
 ゲーム描画 / VFX
 
 ## 必要なデータ
-- `ParticleEffectConfig` (particle-editor のスキーマと同一; emission/initial/overLife/forces/render の各セクション)
+- `ParticleEffectConfig` (`particle` プラグインのスキーマと同一; emission/initial/overLife/forces/render の各セクション)
 - 起動時に渡される Pictor の `VulkanContext` 参照 + 描画ターゲットの `VkRenderPass`
 - カメラ行列 (view / projection, column-major float[16])
 - フレーム時間 (delta time, seconds)

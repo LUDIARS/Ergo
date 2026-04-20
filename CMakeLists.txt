@@ -177,7 +177,8 @@ if(ERGO_BUILD_PARTICLE)
 endif()
 
 # ---------------------------------------------------------------------------
-# ergo_bind — outbound WS client publishing host vars to variable-editor
+# ergo_bind — outbound WS client publishing host vars to the unified
+# ergo tool's `variable` plugin (tools/ergo/)
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_BIND)
     add_library(ergo_bind
