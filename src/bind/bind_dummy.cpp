@@ -52,6 +52,8 @@ Handle Engine::bind_accessor(std::string, VarKind,
                              std::function<void(const Value&)>,
                              VarMeta) { return INVALID_HANDLE; }
 void Engine::unbind(Handle) {}
+void Engine::actor_register(uint64_t, uint64_t, const std::string&) {}
+void Engine::actor_unregister(uint64_t) {}
 void Engine::apply_pending_writes() {}
 
 template<class T> Handle Engine::bind(std::string, T*, VarMeta) { return INVALID_HANDLE; }
