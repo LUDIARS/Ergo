@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Variable Editor</title>
+<style>
+  :root {
+    --bg:#1a1d21; --panel:#23272d; --line:#343a42;
+    --text:#e7eaef; --muted:#8a93a0;
+    --accent:#7cc4ff; --bad:#ff7d7d; --ok:#7cd47c;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { padding:.6rem 1rem; background:var(--panel); border-bottom:1px solid var(--line);
+           display:flex; gap:1rem; align-items:center; }
+  header h1 { font-size:1rem; margin:0; font-weight:600; letter-spacing:.02em; }
+  header .status { font-size:.8rem; color:var(--muted); margin-left:auto;
+                   font-family: ui-monospace, monospace; }
+  header .status.ok { color:var(--ok); }
+  header .status.bad { color:var(--bad); }
+  main { padding:1rem; max-width:980px; margin:0 auto; }
+  .empty { color:var(--muted); font-size:.9rem; text-align:center; padding:3rem 1rem; }
+  .app { margin-bottom:1.5rem; }
+  .app h2 { font-size:.78rem; text-transform:uppercase; letter-spacing:.08em;
+            color:var(--accent); margin:0 0 .35rem 0;
+            border-bottom:1px solid var(--line); padding-bottom:.2rem; }
+  .cat { margin: .8rem 0; }
+  .cat h3 { font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
+            color:var(--muted); margin:0 0 .25rem .25rem; }
+  .row { display:grid; grid-template-columns: 240px 1fr 100px;
+         align-items:center; gap:.75rem; padding:.32rem .25rem;
+         border-bottom:1px solid #2a2e34; }
+  .row:last-child { border-bottom:none; }
+  .row .name { font-family: ui-monospace, monospace; font-size:.84rem; }
+  .row .name .unit { color:var(--muted); margin-left:.4rem; font-size:.72rem; }
+  .row .val { font-family: ui-monospace, monospace; font-size:.82rem;
+              color:var(--accent); text-align:right; }
+  .row.ro { opacity:.55; }
+  .row input[type=range] { width:100%; }
+  .row input[type=number],
+  .row input[type=text] { width:100%; background:#1a1d21; color:var(--text);
+                          border:1px solid var(--line); border-radius:3px;
+                          padding:.18rem .35rem; font-family: ui-monospace, monospace;
+                          font-size:.78rem; }
+  .row input[type=color] { width:100%; height:1.5rem; background:none;
+                           border:1px solid var(--line); padding:0; cursor:pointer; }
+  .row input[type=checkbox] { width:1.1rem; height:1.1rem; }
+  .vec { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:.25rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Variable Editor</h1>
+  <span class="status" id="status">connecting...</span>
+</header>
+<main id="root">
+  <div class="empty" id="empty">No variables bound yet. Start an app that calls <code>BIND_VAR(...)</code>.</div>
+</main>
+
+<script>
+"use strict";
+
+const root = document.getElementById("root");
+const empty = document.getElementById("empty");
+const status = document.getElementById("status");
+
+let ws = null;
+let registry = [];                  // last full snapshot
+const rowSetters = new Map();       // name -> setter(value)
+const inputsByName = new Map();     // name -> sidecar (inputs we suppress while applying)
+let suppressName = null;            // suppress send when programmatically updating this var
+
+function setStatus(text, cls) {
+  status.textContent = text;
+  status.className = "status" + (cls ? " " + cls : "");
+}
+
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+function format(value, kind) {
+  if (kind === "double" || kind === "float") return Number(value).toFixed(3);
+  if (kind === "color") return value.map(v => Number(v).toFixed(2)).join(", ");
+  if (kind === "vec3")  return value.map(v => Number(v).toFixed(2)).join(", ");
+  return String(value);
+}
+
+function rgbaToHex(c) {
+  const f = x => Math.max(0, Math.min(255, Math.round(x*255))).toString(16).padStart(2,"0");
+  return "#" + f(c[0]) + f(c[1]) + f(c[2]);
+}
+function hexToRgb(h) {
+  return [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255];
+}
+
+function buildRow(v) {
+  const row = document.createElement("div");
+  row.className = "row" + (v.meta && v.meta.read_only ? " ro" : "");
+  const nm = document.createElement("div");
+  nm.className = "name";
+  nm.textContent = v.name;
+  if (v.meta && v.meta.unit) {
+    const u = document.createElement("span");
+    u.className = "unit"; u.textContent = v.meta.unit;
+    nm.appendChild(u);
+  }
+  row.appendChild(nm);
+
+  const ctrl = document.createElement("div");
+  row.appendChild(ctrl);
+  const val = document.createElement("div");
+  val.className = "val";
+  val.textContent = format(v.value, v.kind);
+  row.appendChild(val);
+
+  const ro = !!(v.meta && v.meta.read_only);
+  let setter = null;
+
+  const m = v.meta || {};
+
+  const setSend = (newVal) => {
+    if (suppressName === v.name) return;
+    send({ op:"set", name:v.name, value:newVal });
+  };
+
+  if (v.kind === "bool") {
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = !!v.value; cb.disabled = ro;
+    cb.oninput = () => setSend(cb.checked);
+    ctrl.appendChild(cb);
+    setter = nv => { cb.checked = !!nv; val.textContent = format(nv, v.kind); };
+  }
+  else if (v.kind === "string") {
+    const t = document.createElement("input");
+    t.type = "text"; t.value = String(v.value); t.disabled = ro;
+    t.onchange = () => setSend(t.value);
+    ctrl.appendChild(t);
+    setter = nv => { t.value = String(nv); val.textContent = format(nv, v.kind); };
+  }
+  else if (v.kind === "color") {
+    const c = document.createElement("input");
+    c.type = "color"; c.disabled = ro;
+    c.value = rgbaToHex(v.value);
+    c.oninput = () => {
+      const rgb = hexToRgb(c.value);
+      const a = (v.value.length>=4) ? v.value[3] : 1.0;
+      setSend([rgb[0], rgb[1], rgb[2], a]);
+    };
+    ctrl.appendChild(c);
+    setter = nv => {
+      val.textContent = format(nv, v.kind);
+      c.value = rgbaToHex(nv);
+    };
+  }
+  else if (v.kind === "vec3") {
+    const wrap = document.createElement("div");
+    wrap.className = "vec";
+    const inputs = [];
+    for (let i = 0; i < 3; ++i) {
+      const n = document.createElement("input");
+      n.type = "number"; n.step = "0.01";
+      n.value = Number(v.value[i] || 0); n.disabled = ro;
+      n.onchange = () => setSend(inputs.map(x => Number(x.value)));
+      wrap.appendChild(n); inputs.push(n);
+    }
+    ctrl.appendChild(wrap);
+    setter = nv => {
+      for (let i = 0; i < 3; ++i) inputs[i].value = Number(nv[i]);
+      val.textContent = format(nv, v.kind);
+    };
+  }
+  else {
+    // Numeric kinds (int32 / int64 / float / double)
+    const hasRange = (m.min != null && m.max != null && m.min < m.max);
+    if (hasRange && !ro) {
+      const r = document.createElement("input");
+      r.type = "range";
+      r.min = m.min; r.max = m.max;
+      r.step = (m.step != null && m.step > 0) ? m.step
+              : (v.kind === "double" || v.kind === "float") ? (m.max - m.min)/1000 : 1;
+      r.value = Number(v.value);
+      r.oninput = () => {
+        const n = Number(r.value);
+        val.textContent = format(n, v.kind);
+        setSend(n);
+      };
+      ctrl.appendChild(r);
+      setter = nv => { r.value = Number(nv); val.textContent = format(nv, v.kind); };
+    } else {
+      const n = document.createElement("input");
+      n.type = "number"; n.value = Number(v.value); n.disabled = ro;
+      if (m.step != null) n.step = m.step;
+      n.onchange = () => setSend(Number(n.value));
+      ctrl.appendChild(n);
+      setter = nv => { n.value = Number(nv); val.textContent = format(nv, v.kind); };
+    }
+  }
+
+  rowSetters.set(v.name, setter);
+  return row;
+}
+
+function rebuild(vars) {
+  registry = vars;
+  rowSetters.clear();
+  root.innerHTML = "";
+  if (vars.length === 0) {
+    root.appendChild(empty);
+    return;
+  }
+  // group by app, then by category within each app
+  const byApp = new Map();
+  for (const v of vars) {
+    const a = v.app || "default";
+    if (!byApp.has(a)) byApp.set(a, []);
+    byApp.get(a).push(v);
+  }
+  const apps = [...byApp.keys()].sort();
+  for (const a of apps) {
+    const appSec = document.createElement("section");
+    appSec.className = "app";
+    const h = document.createElement("h2"); h.textContent = a; appSec.appendChild(h);
+
+    const byCat = new Map();
+    for (const v of byApp.get(a)) {
+      const cat = (v.meta && v.meta.category) ? v.meta.category : "general";
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat).push(v);
+    }
+    const cats = [...byCat.keys()].sort();
+    for (const cat of cats) {
+      const cs = document.createElement("div"); cs.className = "cat";
+      const h3 = document.createElement("h3"); h3.textContent = cat; cs.appendChild(h3);
+      for (const v of byCat.get(cat).sort((a,b) => a.name.localeCompare(b.name))) {
+        cs.appendChild(buildRow(v));
+      }
+      appSec.appendChild(cs);
+    }
+    root.appendChild(appSec);
+  }
+}
+
+function applyValue(name, value) {
+  const setter = rowSetters.get(name);
+  if (!setter) return;
+  suppressName = name;
+  setter(value);
+  suppressName = null;
+}
+
+function connect() {
+  const url = "ws://" + location.host + "/ws";
+  setStatus("connecting...");
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    setStatus("connected", "ok");
+    send({op:"hello", role:"ui"});
+  };
+  ws.onmessage = ev => {
+    let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+    if (msg.op === "registry") {
+      rebuild(msg.vars || []);
+      const n = (msg.vars||[]).length;
+      setStatus("connected · " + n + " var" + (n===1?"":"s"), "ok");
+    } else if (msg.op === "value") {
+      applyValue(msg.name, msg.value);
+    }
+  };
+  ws.onclose = () => {
+    setStatus("disconnected — retrying...", "bad");
+    setTimeout(connect, 1500);
+  };
+  ws.onerror = () => {};
+}
+
+connect();
+</script>
+</body>
+</html>
