@@ -89,7 +89,7 @@ inline int runAllTests() {
 #define MINI_GTEST_COMPARE(a, b, op, opStr, fatal) \
     do { \
         testing::totalAssertions()++; \
-        auto _a = (a); auto _b = (b); \
+        auto&& _a = (a); auto&& _b = (b); \
         if (!(_a op _b)) { \
             std::printf("  %s:%d: Failure\n  Expected: %s %s %s\n", \
                         __FILE__, __LINE__, #a, opStr, #b); \
@@ -112,6 +112,16 @@ inline int runAllTests() {
         testing::totalAssertions()++; \
         if (std::abs(static_cast<float>(a) - static_cast<float>(b)) > 1e-5f) { \
             std::printf("  %s:%d: Failure\n  EXPECT_FLOAT_EQ(%s, %s)\n  Actual: %f vs %f\n", \
+                        __FILE__, __LINE__, #a, #b, (double)(a), (double)(b)); \
+            testing::failCount()++; \
+        } \
+    } while(0)
+
+#define EXPECT_DOUBLE_EQ(a, b) \
+    do { \
+        testing::totalAssertions()++; \
+        if (std::abs(static_cast<double>(a) - static_cast<double>(b)) > 1e-9) { \
+            std::printf("  %s:%d: Failure\n  EXPECT_DOUBLE_EQ(%s, %s)\n  Actual: %f vs %f\n", \
                         __FILE__, __LINE__, #a, #b, (double)(a), (double)(b)); \
             testing::failCount()++; \
         } \
