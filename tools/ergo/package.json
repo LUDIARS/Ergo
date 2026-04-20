@@ -2,12 +2,15 @@
   "name": "ergo",
   "version": "0.1.0",
   "private": true,
-  "description": "Unified Ergo developer tool. Single-port Hono/WS server hosting particle, variable (and later inspector) editors as in-process plugins.",
+  "description": "Unified Ergo developer tool. Single-port Hono/WS server hosting particle, variable (and later inspector) editors as in-process plugins. Default mode: Electron standalone desktop app.",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
-    "dev":   "tsx watch src/main.ts",
-    "start": "tsx src/main.ts",
-    "build": "tsc -p tsconfig.json"
+    "start":     "npm run build && electron .",
+    "app":       "npm run build && electron .",
+    "serve":     "tsx src/main.ts",
+    "dev":       "tsx watch src/main.ts",
+    "build":     "tsc -p tsconfig.json"
   },
   "engines": {
     "node": ">=20"
@@ -20,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/ws":   "^8.5.13",
+    "electron":    "^33.0.0",
     "tsx":         "^4.19.2",
     "typescript":  "^5.6.3"
   }

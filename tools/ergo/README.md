@@ -4,27 +4,50 @@ Single-port Node server that hosts Ergo's browser-facing developer tools
 as in-process plugins. Replaces the separate `particle-editor` and
 `variable-editor` packages.
 
+**Default launch mode is a standalone Electron desktop app.** A pure
+headless-server mode is kept as a fallback for CI / remote use.
+
 ## Ports and URLs
 
 Default port: **5170** (override with `PORT=...`).
 
 | URL                                | Role                                                   |
 |------------------------------------|--------------------------------------------------------|
-| `http://localhost:5170/`           | Plugin picker shell                                    |
+| `http://localhost:5170/`           | Plugin picker shell (also loaded by the Electron app)  |
 | `http://localhost:5170/particle/`  | Particle editor UI                                     |
 | `ws://localhost:5170/particle/ws`  | Particle WS hub (engine clients via `ergo_particle`)   |
 | `http://localhost:5170/variable/`  | Variable editor UI                                     |
 | `ws://localhost:5170/variable/ws`  | Variable WS hub (engine clients via `ergo_bind`)       |
 | `http://localhost:5170/api/health` | Aggregated health of every plugin                      |
 
+Engine clients always speak to these URLs regardless of whether the
+server is running inside the Electron app or headless.
+
 ## Commands
 
 ```bash
 npm install
-npm run dev       # watch + reload
-npm run start     # run once
-npm run build     # tsc -> dist/
+
+# Primary: standalone Electron desktop app (builds + launches a window).
+npm start            # alias: npm run app
+
+# Headless server only (no window) — open your own browser or connect
+# engine clients. Useful for CI, docker, remote workstations, or when
+# you already have a preferred browser stack.
+npm run serve        # one-shot
+npm run dev          # watch + reload
+
+# Just build the TS sources to dist/ (used by `npm start`).
+npm run build
 ```
+
+## Why Electron (not Tauri)?
+
+The backend is pure Node (Hono + `ws`). Electron hosts that process
+natively, so the app is a thin shell around the existing server. Tauri
+would force either a Rust rewrite of the backend or bundling Node as a
+sidecar — both significantly more work for the same user-facing result.
+If the backend ever moves to Rust/WebGPU, a Tauri swap is on the table.
 
 ## Adding a plugin
 
@@ -47,3 +70,5 @@ HTTP/WS bootstrap and the top-level shell UI.
   module's built-in POSIX HTTP/WS server disappears; `ergo_inspector`
   becomes an outbound client like `ergo_bind`, and the existing
   `tools/inspector_web/` page moves under `src/plugins/inspector/ui/`.
+- **Packaging**: ship signed `ergo.exe` / `ergo.app` via electron-builder
+  when there's a clear distribution need (currently run from source).
