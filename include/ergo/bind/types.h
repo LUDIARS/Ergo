@@ -1,6 +1,7 @@
 #pragma once
 
-/// Common types for ergo_bind. Mirrors variable-editor's wire schema (v1).
+/// Common types for ergo_bind. Mirrors the `variable` plugin's wire
+/// schema (tools/ergo/src/plugins/variable/protocol.ts, v1).
 
 #include <cstdint>
 #include <string>

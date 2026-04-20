@@ -252,7 +252,7 @@ function applyValue(name, value) {
 }
 
 function connect() {
-  const url = "ws://" + location.host + "/ws";
+  const url = "ws://" + location.host + "/variable/ws";
   setStatus("connecting...");
   ws = new WebSocket(url);
   ws.onopen = () => {
