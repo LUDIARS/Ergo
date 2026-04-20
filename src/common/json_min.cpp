@@ -1,4 +1,4 @@
-#include "ergo/bind/json_min.h"
+#include "ergo/common/json_min.h"
 
 #include <cctype>
 #include <cstdio>
@@ -6,7 +6,7 @@
 #include <cstring>
 #include <utility>
 
-namespace ergo::bind::jsonm {
+namespace ergo::common::jsonm {
 
 JsonValue JsonValue::make_null()                    { return {}; }
 JsonValue JsonValue::make_bool(bool v)              { JsonValue r; r.kind = JsonKind::Bool;   r.b = v; return r; }
@@ -52,8 +52,8 @@ struct Cursor {
     bool match(char c) { skip_ws(); if (eof() || peek() != c) return false; ++i; return true; }
 };
 
-// Cap recursion; a hostile server sending thousands of nested brackets
-// would otherwise blow the bind worker's stack.
+// Cap recursion; a hostile payload with thousands of nested brackets would
+// otherwise blow the thread stack.
 constexpr int kMaxDepth = 64;
 
 bool parse_value(Cursor& c, JsonValue& out, int depth);
@@ -246,4 +246,4 @@ std::string serialize(const JsonValue& v) {
     return out;
 }
 
-} // namespace ergo::bind::jsonm
+} // namespace ergo::common::jsonm
