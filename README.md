@@ -47,6 +47,7 @@ ergo/
 | `ergo_actor`         | シーングラフ基底 (ツリー + Actor 配下に変数公開, ergo_bind に委譲) | `include/ergo/actor/`        | (variable プラグインで表示) |
 | `ergo_frame`         | アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列      | `include/ergo/frame/`        | — |
 | `ergo_log`           | 4-level ロガー (Error/Warn/Info/Debug)、フレーム番号を行頭に埋め込む | `include/ergo/log/`          | — |
+| `ergo_io`            | 最小ファイル I/O ラッパー (`<filesystem>` の薄膜, UTF-8 `std::string`) | `include/ergo/io/`           | — |
 
 詳細は `spec/module/<名>.md` 参照。
 
