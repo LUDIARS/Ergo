@@ -238,8 +238,14 @@ bool Client::connect_once() {
         // Try to read one frame (non-blocking).
         std::string payload;
         uint8_t op = 0;
-        bool got = read_one_frame(static_cast<int>(s), rx, payload, op);
-        if (got) {
+        int rv = read_one_frame(static_cast<int>(s), rx, payload, op);
+        if (rv < 0) {
+            // Protocol violation (e.g. oversized frame). Drop the connection
+            // and let the worker back off before reconnecting.
+            ok = false;
+            break;
+        }
+        if (rv == 1) {
             if (op == 0x1) {
                 OnText cb;
                 { std::lock_guard<std::mutex> lk(cb_mtx_); cb = on_text_; }
@@ -284,7 +290,12 @@ bool Client::drain_send_queue(int sock) {
     return true;
 }
 
-bool Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint8_t& opcode) {
+// Mirrors the server-side cap in ergo_inspector. Any frame larger than this
+// is almost certainly a hostile or misconfigured peer; we refuse rather
+// than allowing rx to balloon to the attacker-declared length.
+static constexpr uint64_t kMaxFramePayloadBytes = 1ull << 20; // 1 MiB
+
+int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint8_t& opcode) {
     auto try_recv = [&](std::size_t want) -> bool {
         // Try non-blocking read up to `want`. Returns true if rx grew enough.
         while (rx.size() < want) {
@@ -299,7 +310,7 @@ bool Client::read_one_frame(int sock, std::string& rx, std::string& payload, uin
         return true;
     };
 
-    if (!try_recv(2)) return false;
+    if (!try_recv(2)) return 0;
     const uint8_t b0 = static_cast<uint8_t>(rx[0]);
     const uint8_t b1 = static_cast<uint8_t>(rx[1]);
     opcode = b0 & 0x0F;
@@ -307,22 +318,23 @@ bool Client::read_one_frame(int sock, std::string& rx, std::string& payload, uin
     uint64_t plen = b1 & 0x7F;
     std::size_t header = 2;
     if (plen == 126) {
-        if (!try_recv(4)) return false;
+        if (!try_recv(4)) return 0;
         plen = (uint64_t(uint8_t(rx[2])) << 8) | uint8_t(rx[3]);
         header = 4;
     } else if (plen == 127) {
-        if (!try_recv(10)) return false;
+        if (!try_recv(10)) return 0;
         plen = 0;
         for (int i = 0; i < 8; ++i) plen = (plen << 8) | uint8_t(rx[2 + i]);
         header = 10;
     }
+    if (plen > kMaxFramePayloadBytes) return -1;
     uint8_t mask[4] = {0,0,0,0};
     if (masked) {
-        if (!try_recv(header + 4)) return false;
+        if (!try_recv(header + 4)) return 0;
         for (int i = 0; i < 4; ++i) mask[i] = uint8_t(rx[header + i]);
         header += 4;
     }
-    if (!try_recv(header + static_cast<std::size_t>(plen))) return false;
+    if (!try_recv(header + static_cast<std::size_t>(plen))) return 0;
 
     payload.resize(static_cast<std::size_t>(plen));
     for (uint64_t i = 0; i < plen; ++i) {
@@ -331,7 +343,7 @@ bool Client::read_one_frame(int sock, std::string& rx, std::string& payload, uin
         payload[static_cast<std::size_t>(i)] = static_cast<char>(b);
     }
     rx.erase(0, header + static_cast<std::size_t>(plen));
-    return true;
+    return 1;
 }
 
 } // namespace ergo::bind::ws

@@ -74,3 +74,30 @@ TEST(WsFrame, EncodeLongPayloadUses16BitLength) {
     EXPECT_EQ(static_cast<uint8_t>(f[2]), 0);
     EXPECT_EQ(static_cast<uint8_t>(f[3]), 200);
 }
+
+TEST(WsFrame, DecodeRejectsOversizedPayload) {
+    // Craft a header that claims a 2 GiB payload using the 64-bit length
+    // form (opcode 0x81 = FIN|Text, mask bit set, length sentinel 127).
+    // Decoding must flag protocol_err without attempting to buffer 2 GiB.
+    std::string raw;
+    raw.push_back(static_cast<char>(0x81));
+    raw.push_back(static_cast<char>(0xFF)); // mask=1, len=127
+    uint64_t plen = 1ull << 31;
+    for (int i = 7; i >= 0; --i) raw.push_back(static_cast<char>((plen >> (i * 8)) & 0xFF));
+
+    DecodedFrame fr = decode_frame(raw);
+    EXPECT_FALSE(fr.ok);
+    EXPECT_TRUE(fr.protocol_err);
+}
+
+TEST(WsFrame, DecodeRejectsUnmaskedClientFrame) {
+    // Unmasked frame from a client must be rejected per RFC 6455 §5.1.
+    std::string raw;
+    raw.push_back(static_cast<char>(0x81));
+    raw.push_back(static_cast<char>(0x02)); // mask=0, len=2
+    raw.push_back('h');
+    raw.push_back('i');
+    DecodedFrame fr = decode_frame(raw);
+    EXPECT_FALSE(fr.ok);
+    EXPECT_TRUE(fr.protocol_err);
+}

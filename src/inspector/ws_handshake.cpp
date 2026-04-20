@@ -182,6 +182,13 @@ std::string build_http_html_response(const std::string& body) {
     return os.str();
 }
 
+// Reject frames whose payload would blow the server's rx buffer. RFC 6455
+// allows up to 2^63 bytes; we cap at 1 MiB which comfortably fits every
+// request the inspector protocol emits. Oversized frames are treated as a
+// protocol error so the caller drops the connection rather than
+// accumulating bytes toward an unbounded payload.
+constexpr uint64_t kMaxFramePayloadBytes = 1ull << 20; // 1 MiB
+
 DecodedFrame decode_frame(const std::string& buf) {
     DecodedFrame r;
     if (buf.size() < 2) return r;
@@ -195,6 +202,11 @@ DecodedFrame decode_frame(const std::string& buf) {
     r.opcode = static_cast<WsOpcode>(op);
 
     bool masked = (b1 & 0x80) != 0;
+    // RFC 6455 §5.1: a server MUST close the connection on any unmasked
+    // frame from a client. The only client-side opcodes we accept are
+    // Text/Binary/Close/Ping/Pong/Continuation — all must be masked.
+    if (!masked) { r.protocol_err = true; return r; }
+
     uint64_t plen = b1 & 0x7F;
     std::size_t header = 2;
     if (plen == 126) {
@@ -207,19 +219,18 @@ DecodedFrame decode_frame(const std::string& buf) {
         for (int i = 0; i < 8; ++i) plen = (plen << 8) | uint8_t(buf[2 + i]);
         header = 10;
     }
-    uint8_t mask[4] = {0,0,0,0};
-    if (masked) {
-        if (buf.size() < header + 4) return r;
-        for (int i = 0; i < 4; ++i) mask[i] = uint8_t(buf[header + i]);
-        header += 4;
+    if (plen > kMaxFramePayloadBytes) {
+        r.protocol_err = true; return r;
     }
+    uint8_t mask[4] = {0,0,0,0};
+    if (buf.size() < header + 4) return r;
+    for (int i = 0; i < 4; ++i) mask[i] = uint8_t(buf[header + i]);
+    header += 4;
     if (buf.size() < header + plen) return r;
 
     r.payload.resize(static_cast<std::size_t>(plen));
     for (uint64_t i = 0; i < plen; ++i) {
-        uint8_t byte = uint8_t(buf[header + i]);
-        if (masked) byte ^= mask[i & 3];
-        r.payload[static_cast<std::size_t>(i)] = static_cast<char>(byte);
+        r.payload[static_cast<std::size_t>(i)] = static_cast<char>(uint8_t(buf[header + i]) ^ mask[i & 3]);
     }
     r.consumed = header + static_cast<std::size_t>(plen);
     r.ok = true;

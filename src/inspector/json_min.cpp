@@ -52,7 +52,12 @@ struct Cursor {
     bool match(char c) { skip_ws(); if (eof() || peek() != c) return false; ++i; return true; }
 };
 
-bool parse_value(Cursor& c, JsonValue& out);
+// Cap recursion to keep a malicious payload with thousands of nested
+// brackets from blowing the thread stack. 64 is well beyond anything the
+// inspector protocol legitimately produces.
+constexpr int kMaxDepth = 64;
+
+bool parse_value(Cursor& c, JsonValue& out, int depth);
 
 bool parse_string(Cursor& c, std::string& out) {
     if (!c.match('"')) { c.err = true; return false; }
@@ -110,12 +115,12 @@ bool parse_number(Cursor& c, double& out) {
     return true;
 }
 
-bool parse_array(Cursor& c, JsonValue& out) {
+bool parse_array(Cursor& c, JsonValue& out, int depth) {
     out = JsonValue::make_array();
     if (c.match(']')) return true;
     while (true) {
         JsonValue elt;
-        if (!parse_value(c, elt)) return false;
+        if (!parse_value(c, elt, depth)) return false;
         out.push(std::move(elt));
         c.skip_ws();
         if (c.match(',')) continue;
@@ -124,7 +129,7 @@ bool parse_array(Cursor& c, JsonValue& out) {
     }
 }
 
-bool parse_object(Cursor& c, JsonValue& out) {
+bool parse_object(Cursor& c, JsonValue& out, int depth) {
     out = JsonValue::make_object();
     if (c.match('}')) return true;
     while (true) {
@@ -133,7 +138,7 @@ bool parse_object(Cursor& c, JsonValue& out) {
         if (!parse_string(c, key)) return false;
         if (!c.match(':')) { c.err = true; return false; }
         JsonValue v;
-        if (!parse_value(c, v)) return false;
+        if (!parse_value(c, v, depth)) return false;
         out.set(key, std::move(v));
         c.skip_ws();
         if (c.match(',')) continue;
@@ -142,7 +147,8 @@ bool parse_object(Cursor& c, JsonValue& out) {
     }
 }
 
-bool parse_value(Cursor& c, JsonValue& out) {
+bool parse_value(Cursor& c, JsonValue& out, int depth) {
+    if (depth > kMaxDepth) { c.err = true; return false; }
     c.skip_ws();
     if (c.eof()) { c.err = true; return false; }
     char ch = c.peek();
@@ -152,8 +158,8 @@ bool parse_value(Cursor& c, JsonValue& out) {
         out = JsonValue::make_string(std::move(s));
         return true;
     }
-    if (ch == '{') { ++c.i; return parse_object(c, out); }
-    if (ch == '[') { ++c.i; return parse_array(c, out); }
+    if (ch == '{') { ++c.i; return parse_object(c, out, depth + 1); }
+    if (ch == '[') { ++c.i; return parse_array(c, out, depth + 1); }
     if (ch == 't') {
         if (c.src.compare(c.i, 4, "true") != 0) { c.err = true; return false; }
         c.i += 4; out = JsonValue::make_bool(true); return true;
@@ -230,7 +236,7 @@ void write_value(const JsonValue& v, std::string& out) {
 
 bool parse(const std::string& src, JsonValue& out) {
     Cursor c{src};
-    if (!parse_value(c, out)) return false;
+    if (!parse_value(c, out, 0)) return false;
     c.skip_ws();
     return !c.err;
 }

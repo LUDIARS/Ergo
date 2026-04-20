@@ -41,6 +41,14 @@ constexpr const char* kFallbackHtml =
 
 enum class ConnState : uint8_t { Http, Open, Closing };
 
+// Limits on unprocessed bytes per connection. HTTP requests are short
+// (few KB of headers); any client that sends more without completing the
+// request is buggy or hostile. Frame payloads are already capped inside
+// decode_frame; this keeps the rx buffer from growing between frames when
+// lots of back-to-back traffic arrives.
+constexpr std::size_t kMaxHttpHeaderBytes = 16 * 1024;
+constexpr std::size_t kMaxConnRxBytes     = (1 << 20) + 64 * 1024; // 1 MiB + header slack
+
 struct Conn {
     int                          fd       = -1;
     ConnState                    state    = ConnState::Http;
@@ -434,6 +442,12 @@ bool Inspector::start_server(uint16_t port) {
                         else if (errno == EAGAIN || errno == EWOULDBLOCK) break;
                         else { drop = true; break; }
                     }
+                    // Refuse to buffer endlessly. Hard cap differs per state:
+                    // HTTP requests are tiny, WS bodies already pass through
+                    // decode_frame's per-frame cap.
+                    const std::size_t cap =
+                        (c.state == ConnState::Http) ? kMaxHttpHeaderBytes : kMaxConnRxBytes;
+                    if (c.rx.size() > cap) drop = true;
                 }
                 if (!drop) {
                     if (c.state == ConnState::Http) process_http(c);
