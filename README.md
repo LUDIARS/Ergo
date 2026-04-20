@@ -41,8 +41,9 @@ ergo/
 |---|---|---|---|
 | `ergo_input`     | マウス・キーボード・ゲームパッド・USB HID 統一入力       | `include/ergo/input/`     | — |
 | `ergo_inspector` | ブラウザ in-process WS サーバでホスト変数をライブ編集    | `include/ergo/inspector/` | (内蔵 UI) |
-| `ergo_particle`  | CPU パーティクル sim + Pictor Vulkan ビルボード描画       | `include/ergo/particle/`  | `tools/particle-editor/` |
-| `ergo_bind`      | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`)     | `include/ergo/bind/`      | `tools/variable-editor/` |
+| `ergo_particle`      | CPU パーティクル sim + Pictor Vulkan ビルボード描画       | `include/ergo/particle/`     | `tools/particle-editor/` |
+| `ergo_gpu_particle`  | Shuriken相当 GPU コンピュートパーティクル (`IGpuBackend` 抽象) | `include/ergo/gpu_particle/` | — |
+| `ergo_bind`          | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`)     | `include/ergo/bind/`         | `tools/variable-editor/` |
 
 詳細は `spec/module/<名>.md` 参照。
 

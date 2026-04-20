@@ -1,0 +1,194 @@
+#version 450
+
+// ============================================================
+// particle_spawn.comp
+//
+// Emits up to `EmitterBlock.to_spawn` new particles into the
+// particle SSBO. Dead slots (lifetime_remaining <= 0) are
+// claimed atomically via `counters.spawn_cursor`.
+//
+// Bindings match ergo::gpu_particle::ParticleSystem:
+//   binding 0  ssbo  particles[]      (rw)
+//   binding 1  ssbo  counters         (rw)
+//   binding 2  ssbo  instances[]      (w, written by update)
+//   binding 3  ubo   EmitterBlock
+//   binding 4..13  curve_* 1D textures (not sampled here; update uses them)
+// ============================================================
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct Particle {
+    vec3  position;
+    float lifetime_remaining;
+    vec3  velocity;
+    float lifetime_initial;
+    vec4  color;
+    float size;
+    float rotation;
+    float atlas_frame;
+    float seed;
+};
+
+layout(std430, binding = 0) buffer Particles { Particle particles[]; };
+
+layout(std430, binding = 1) buffer Counters {
+    uint alive_count;
+    uint spawn_cursor;
+    uint draw_count;
+    uint total_emitted;
+};
+
+layout(std140, binding = 3) uniform EmitterBlock {
+    float delta_time;
+    float emitter_time;
+    float simulation_speed;
+    float _pad0;
+
+    uint  to_spawn;
+    uint  max_particles;
+    uint  simulation_space;
+    uint  random_seed;
+
+    mat4  emitter_world;
+
+    vec4  start_color;
+
+    uint  shape;
+    float cone_angle_rad;
+    float cone_radius;
+    float cone_radius_thickness;
+    float sphere_radius;
+    float _pad1_0;
+    float _pad1_1;
+    float _pad1_2;
+    vec3  box_extents;
+    float _pad2;
+    vec3  shape_position;
+    float _pad3;
+
+    vec3  gravity;
+    float gravity_modifier;
+    float linear_damping;
+    vec3  wind_direction;
+    float wind_strength;
+    float wind_turbulence;
+    float _pad4_0;
+    float _pad4_1;
+
+    float start_lifetime_min;
+    float start_lifetime_max;
+    float start_speed_min;
+    float start_speed_max;
+    float start_size_min;
+    float start_size_max;
+    float start_rotation_min;
+    float start_rotation_max;
+} E;
+
+// xorshift32
+uint  rng_u32(inout uint state) {
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return state;
+}
+float rng01(inout uint state) {
+    return float(rng_u32(state) >> 8) * (1.0 / 16777216.0);
+}
+
+vec3 sample_shape_direction(inout uint rng) {
+    // Cone by default; fall through to sphere for Sphere/Hemisphere.
+    if (E.shape == 3u) {                           // Cone
+        float phi   = rng01(rng) * 6.28318530718;
+        float ring  = mix(1.0 - E.cone_radius_thickness, 1.0, rng01(rng));
+        float r     = E.cone_radius * sqrt(ring);
+        float cx    = cos(phi) * r;
+        float cz    = sin(phi) * r;
+        float t     = tan(E.cone_angle_rad);
+        vec3  dir   = normalize(vec3(cx * t, 1.0, cz * t));
+        return dir;
+    }
+    if (E.shape == 4u) {                           // Box — velocity mostly +Y
+        return vec3(rng01(rng) * 2.0 - 1.0,
+                    rng01(rng),
+                    rng01(rng) * 2.0 - 1.0);
+    }
+    if (E.shape == 5u) {                           // Circle (XZ)
+        float phi = rng01(rng) * 6.28318530718;
+        return vec3(cos(phi), 0.0, sin(phi));
+    }
+    // Sphere / hemisphere / default
+    float z   = rng01(rng) * 2.0 - 1.0;
+    if (E.shape == 2u) z = abs(z);                 // hemisphere
+    float r   = sqrt(max(0.0, 1.0 - z * z));
+    float phi = rng01(rng) * 6.28318530718;
+    return vec3(cos(phi) * r, z, sin(phi) * r);
+}
+
+vec3 sample_shape_position(inout uint rng) {
+    if (E.shape == 1u || E.shape == 2u) {          // Sphere / hemisphere
+        vec3 d = sample_shape_direction(rng);
+        return E.shape_position + d * (E.sphere_radius * pow(rng01(rng), 1.0/3.0));
+    }
+    if (E.shape == 4u) {                            // Box
+        return E.shape_position + vec3(
+            (rng01(rng) * 2.0 - 1.0) * E.box_extents.x,
+            (rng01(rng) * 2.0 - 1.0) * E.box_extents.y,
+            (rng01(rng) * 2.0 - 1.0) * E.box_extents.z);
+    }
+    if (E.shape == 3u) {                            // Cone base ring
+        float phi   = rng01(rng) * 6.28318530718;
+        float ring  = mix(1.0 - E.cone_radius_thickness, 1.0, rng01(rng));
+        float r     = E.cone_radius * sqrt(ring);
+        return E.shape_position + vec3(cos(phi) * r, 0.0, sin(phi) * r);
+    }
+    return E.shape_position;                        // Point / fallback
+}
+
+void main() {
+    const uint tid = gl_GlobalInvocationID.x;
+    if (tid >= E.to_spawn) return;
+
+    // Claim a slot. Scan the particle buffer for a dead slot starting
+    // from `spawn_cursor`. Bounded to `max_particles` iterations so we
+    // never spin on a full buffer.
+    uint offset = atomicAdd(spawn_cursor, 1u) % E.max_particles;
+    uint slot   = offset;
+    for (uint i = 0u; i < E.max_particles; ++i) {
+        uint candidate = (offset + i) % E.max_particles;
+        if (particles[candidate].lifetime_remaining <= 0.0) {
+            slot = candidate;
+            break;
+        }
+    }
+
+    uint rng = E.random_seed ^ (tid * 0x9E3779B9u) ^
+               floatBitsToUint(E.emitter_time * 1000.0);
+
+    // Sample start values.
+    float life  = mix(E.start_lifetime_min, E.start_lifetime_max, rng01(rng));
+    float speed = mix(E.start_speed_min,    E.start_speed_max,    rng01(rng));
+    float size  = mix(E.start_size_min,     E.start_size_max,     rng01(rng));
+    float rot   = mix(E.start_rotation_min, E.start_rotation_max, rng01(rng));
+
+    vec3 local_pos = sample_shape_position(rng);
+    vec3 local_dir = sample_shape_direction(rng);
+
+    // Emitter transform: row-vector convention (v * M), so translation
+    // sits in row 3 of `emitter_world` (matches Ergo's Float4x4).
+    mat4 W = E.emitter_world;
+    vec4 wp = vec4(local_pos, 1.0) * W;
+    vec3 wd = (vec4(local_dir, 0.0) * W).xyz;
+
+    particles[slot].position           = wp.xyz;
+    particles[slot].lifetime_remaining = life;
+    particles[slot].velocity           = normalize(wd) * speed;
+    particles[slot].lifetime_initial   = life;
+    particles[slot].color              = E.start_color;
+    particles[slot].size               = size;
+    particles[slot].rotation           = rot;
+    particles[slot].atlas_frame        = 0.0;
+    particles[slot].seed               = rng01(rng);
+
+    atomicAdd(total_emitted, 1u);
+}
