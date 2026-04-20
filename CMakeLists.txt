@@ -21,11 +21,20 @@ option(ERGO_BUILD_SOUND        "Build ergo_sound"        ON)
 option(ERGO_BUILD_FRAME        "Build ergo_frame"        ON)
 option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
 option(ERGO_BUILD_IO           "Build ergo_io"           ON)
+option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_INSPECTOR_BUILD_SERVER       "ergo_inspector: build POSIX WebSocket server" ON)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
 option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute shaders to SPIR-V via glslc" ON)
+
+# ergo_audio backend selector. "auto" probes for FMOD via the bundled
+# FindFMOD.cmake and falls back to dummy; "dummy" forces no-op; "fmod"
+# hard-requires the SDK and errors if not found.
+set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / dummy")
+set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 find_package(Threads REQUIRED)
 
@@ -398,5 +407,46 @@ if(ERGO_BUILD_IO)
         add_executable(test_file tests/io/test_file.cpp)
         target_link_libraries(test_file PRIVATE ergo_io ergo_gtest_main)
         add_test(NAME test_file COMMAND test_file)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_audio — game audio wrapper. FMOD Core by default (auto-detected);
+# dummy backend when the SDK is missing so hosts link unconditionally.
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_AUDIO)
+    set(_ERGO_AUDIO_USE_FMOD OFF)
+    if(NOT ERGO_AUDIO_BACKEND STREQUAL "dummy")
+        if(ERGO_AUDIO_BACKEND STREQUAL "fmod")
+            find_package(FMOD REQUIRED)
+        else()
+            find_package(FMOD QUIET)
+        endif()
+        if(FMOD_FOUND)
+            set(_ERGO_AUDIO_USE_FMOD ON)
+        endif()
+    endif()
+
+    if(_ERGO_AUDIO_USE_FMOD)
+        add_library(ergo_audio src/audio/audio_engine_fmod.cpp)
+        target_link_libraries(ergo_audio PUBLIC FMOD::FMOD Threads::Threads)
+        target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_FMOD=1)
+        message(STATUS "ergo_audio: backend = FMOD (${FMOD_LIBRARY})")
+    else()
+        add_library(ergo_audio src/audio/audio_engine_dummy.cpp)
+        target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_DUMMY=1)
+        if(ERGO_AUDIO_BACKEND STREQUAL "fmod")
+            message(FATAL_ERROR "ergo_audio: ERGO_AUDIO_BACKEND=fmod but FMOD SDK not found. Set FMOD_SDK_DIR.")
+        endif()
+        message(STATUS "ergo_audio: backend = Dummy (set FMOD_SDK_DIR + reconfigure for FMOD)")
+    endif()
+    target_include_directories(ergo_audio PUBLIC include)
+
+    if(ERGO_BUILD_TESTS)
+        # Name-disambiguated from ergo_sound's existing test_audio_engine
+        # (same naming pattern as bind/inspector test_json_min overlap).
+        add_executable(test_ergo_audio tests/audio/test_ergo_audio.cpp)
+        target_link_libraries(test_ergo_audio PRIVATE ergo_audio ergo_gtest_main)
+        add_test(NAME test_ergo_audio COMMAND test_ergo_audio)
     endif()
 endif()
