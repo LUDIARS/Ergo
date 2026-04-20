@@ -605,7 +605,7 @@ document.querySelector("aside").addEventListener("change", scheduleSend);
 
 function connectWS() {
   try {
-    ws = new WebSocket("ws://" + location.host + "/ws");
+    ws = new WebSocket("ws://" + location.host + "/particle/ws");
   } catch {
     setLink("off", "offline");
     return;

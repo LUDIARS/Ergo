@@ -20,7 +20,9 @@ Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツ
 
 - **main に全コード集約** (モジュールごとのブランチは作らない)
 - 各モジュールは `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` に配置
-- 付随ツール (Web エディタ等) は `tools/<ツール名>/` に配置
+- Web 開発者ツールは **`tools/ergo/` に統合**。新規ツールは単独
+  パッケージではなく `tools/ergo/src/plugins/<id>/` にプラグインとして追加する
+  (詳細は `spec/tool/ergo.md`)。
 - 仕様書は `spec/module/<名>.md`
 - 既存の `module/<名>` ブランチ (`module/input`, `module/inspector`,
   `module/particle`, `module/bind`) は履歴保全のため削除しないが、
@@ -32,7 +34,7 @@ Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツ
 2. `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` を作成
 3. トップレベル `CMakeLists.txt` に `add_library(ergo_<名>)` を追加
 4. `module_list.md` / `module_list.yaml` に行を追加
-5. (Web ツールが要るなら) `tools/<ツール名>/` に配置
+5. (Web ツールが要るなら) `tools/ergo/src/plugins/<id>/` にプラグインとして追加
 6. main に直接コミット → push
 
 ### 横断変更 (モジュール + ツール)
@@ -70,13 +72,18 @@ target_link_libraries(myapp PRIVATE ergo_input ergo_bind)
 
 ## Web ツールの起動
 
+全ての Web 系開発ツールは `tools/ergo/` に統合済み (`particle` /
+`variable` プラグインなど)。
+
 ```bash
-cd <ergo>/tools/<tool-name>
+cd <ergo>/tools/ergo
 npm install
-npm run dev
+npm run dev           # watch, default port 5170
 ```
 
-利用側 worktree 経由の場合: `<host>/external/ergo/tools/<tool-name>`。
+利用側 worktree 経由の場合: `<host>/external/ergo/tools/ergo`。
+旧 `tools/particle-editor/` / `tools/variable-editor/` は削除済み。
+仕様は `spec/tool/ergo.md` を参照。
 
 ## 注意事項
 

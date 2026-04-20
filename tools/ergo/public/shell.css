@@ -1,0 +1,121 @@
+:root {
+  --bg:        #0e1116;
+  --panel:     #171b22;
+  --panel-2:   #1e232c;
+  --border:    #2a313c;
+  --fg:        #d8deea;
+  --fg-dim:    #8891a5;
+  --accent:    #5aa8ff;
+  --accent-2:  #82ffcc;
+  --danger:    #ff7a7a;
+  --ok:        #88e4a0;
+  --warn:      #ffc862;
+  font-family: "Inter", "Helvetica Neue", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+}
+
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar header {
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+.subtitle {
+  font-size: 11px;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+.plugins {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+.plugin {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: var(--fg);
+  text-decoration: none;
+  margin-bottom: 2px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.plugin:hover {
+  background: var(--panel-2);
+}
+.plugin.active {
+  background: var(--panel-2);
+  border-color: var(--border);
+}
+.plugin .title {
+  font-weight: 600;
+}
+.plugin .desc {
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.plugin .badge {
+  float: right;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #20262f;
+  color: var(--fg-dim);
+}
+.plugin .badge.ok   { color: var(--ok);   }
+.plugin .badge.warn { color: var(--warn); }
+.plugin .badge.err  { color: var(--danger); }
+
+.sidebar footer {
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+.sidebar footer a { color: var(--fg-dim); text-decoration: none; }
+.sidebar footer a:hover { color: var(--accent); }
+
+main { min-width: 0; min-height: 0; position: relative; }
+#viewer {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+}
+.empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--fg-dim);
+  font-size: 13px;
+}

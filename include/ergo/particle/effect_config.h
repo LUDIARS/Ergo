@@ -1,11 +1,10 @@
 #pragma once
 
-/// ParticleEffectConfig — mirror of particle-editor's wire schema (v1).
-///
-/// Field names and units match the JSON shape produced by particle-editor
-/// (see particle-editor/src/schema.ts). Hosts typically receive raw JSON
-/// over WebSocket, decode into this struct, and pass it to ParticleSystem
-/// via `set_config`.
+/// ParticleEffectConfig — mirror of the `particle` plugin's wire schema
+/// (v1). Field names and units match the JSON shape produced by the
+/// unified ergo tool (see tools/ergo/src/plugins/particle/schema.ts).
+/// Hosts typically receive raw JSON over WebSocket, decode into this
+/// struct, and pass it to ParticleSystem via `set_config`.
 
 #include <array>
 #include <cstdint>
@@ -52,8 +51,8 @@ struct ParticleEffectConfig {
     ShapeMode       render_shape = ShapeMode::Circle;
 };
 
-/// Parse a JSON document (as produced by particle-editor's `state` message
-/// or `/api/effect`) into a ParticleEffectConfig. Returns false on syntax
+/// Parse a JSON document (as produced by the `particle` plugin's `state`
+/// message or `/particle/api/effect`) into a ParticleEffectConfig. Returns false on syntax
 /// error or missing top-level object. Unknown fields are ignored; missing
 /// fields keep the existing values in `out` (deep-merge semantics).
 bool parse_config_json(const std::string& json, ParticleEffectConfig& out);

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ergo</title>
+  <link rel="stylesheet" href="/shell/shell.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <header>
+      <div class="brand">ergo</div>
+      <div class="subtitle">developer tools</div>
+    </header>
+    <nav id="plugin-nav" class="plugins"></nav>
+    <footer>
+      <a id="health-link" href="/api/health" target="_blank" rel="noopener">/api/health</a>
+    </footer>
+  </aside>
+  <main>
+    <iframe id="viewer" name="viewer" title="plugin viewer"></iframe>
+  </main>
+  <script type="module" src="/shell/shell.js"></script>
+</body>
+</html>

@@ -30,7 +30,7 @@ ergo/
 ├── include/ergo/<name>/   # 各モジュールの公開ヘッダ
 ├── src/<name>/            # 各モジュールの実装
 ├── tests/<name>/          # 各モジュールのテスト
-├── tools/<tool-name>/     # 各モジュールに付随する Web ツール等 (TS/Node など)
+├── tools/ergo/            # 統合 Web 開発者ツール (単一 Node サーバ + プラグイン)
 ├── third_party/           # 同梱依存 (mini-gtest など)
 └── doc/                   # 補助ドキュメント
 ```
@@ -41,9 +41,9 @@ ergo/
 |---|---|---|---|
 | `ergo_input`     | マウス・キーボード・ゲームパッド・USB HID 統一入力       | `include/ergo/input/`     | — |
 | `ergo_inspector` | ブラウザ in-process WS サーバでホスト変数をライブ編集    | `include/ergo/inspector/` | (内蔵 UI) |
-| `ergo_particle`      | CPU パーティクル sim + Pictor Vulkan ビルボード描画       | `include/ergo/particle/`     | `tools/particle-editor/` |
+| `ergo_particle`      | CPU パーティクル sim + Pictor Vulkan ビルボード描画            | `include/ergo/particle/`     | `tools/ergo/` (`particle` plugin) |
 | `ergo_gpu_particle`  | Shuriken相当 GPU コンピュートパーティクル (`IGpuBackend` 抽象) | `include/ergo/gpu_particle/` | — |
-| `ergo_bind`          | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`)     | `include/ergo/bind/`         | `tools/variable-editor/` |
+| `ergo_bind`          | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`)          | `include/ergo/bind/`         | `tools/ergo/` (`variable` plugin) |
 
 詳細は `spec/module/<名>.md` 参照。
 

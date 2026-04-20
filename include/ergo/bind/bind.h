@@ -1,10 +1,11 @@
 #pragma once
 
-/// ergo::bind — bind any host variable for live editing from variable-editor.
+/// ergo::bind — bind any host variable for live editing from the unified
+/// ergo tool (tools/ergo/, `variable` plugin).
 ///
 /// Hosts call `bind()` (or the `BIND_VAR` macro) on debug code paths. The
-/// engine connects outbound to a variable-editor server (default
-/// `ws://127.0.0.1:5174/ws`) and:
+/// engine connects outbound to the tool's variable plugin (default
+/// `ws://127.0.0.1:5170/variable/ws`) and:
 ///   * sends a `bind` message for each registered variable
 ///   * watches the value each frame; on change, sends a `value` message
 ///   * accepts `set` messages from the server, queues them, and applies
@@ -34,16 +35,17 @@ public:
     Engine(const Engine&)            = delete;
     Engine& operator=(const Engine&) = delete;
 
-    /// Identify this app on the variable-editor side. Default: "anonymous".
-    /// Must be called before connect() to take effect on the server side.
+    /// Identify this app on the tool side. Default: "anonymous". Must be
+    /// called before connect() to take effect on the server side.
     void set_app_name(std::string app);
     const std::string& app_name() const;
 
-    /// Connect outbound to a variable-editor server. Returns true if a
-    /// background worker was started. Reconnects automatically on failure.
+    /// Connect outbound to the unified ergo tool's `variable` plugin.
+    /// Returns true if a background worker was started. Reconnects
+    /// automatically on failure.
     bool connect(const std::string& host = "127.0.0.1",
-                 uint16_t port = 5174,
-                 const std::string& path = "/ws");
+                 uint16_t port = 5170,
+                 const std::string& path = "/variable/ws");
 
     /// Stop the worker thread. Idempotent.
     void disconnect();
@@ -102,8 +104,8 @@ public:
     static Engine& instance() { static Engine e; return e; }
     void set_app_name(std::string) {}
     const std::string& app_name() const { static const std::string s; return s; }
-    bool connect(const std::string& = "127.0.0.1", uint16_t = 5174,
-                 const std::string& = "/ws") { return false; }
+    bool connect(const std::string& = "127.0.0.1", uint16_t = 5170,
+                 const std::string& = "/variable/ws") { return false; }
     void disconnect() {}
     bool is_connected() const { return false; }
     template<class T> Handle bind(std::string, T*, VarMeta = {}) { return INVALID_HANDLE; }

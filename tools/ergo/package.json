@@ -1,12 +1,12 @@
 {
-  "name": "particle-editor",
+  "name": "ergo",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-based particle effect editor that broadcasts edits over WS to engine clients (e.g. AdventureCube via ergo_particle).",
+  "description": "Unified Ergo developer tool. Single-port Hono/WS server hosting particle, variable (and later inspector) editors as in-process plugins.",
   "type": "module",
   "scripts": {
-    "dev":   "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev":   "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
     "build": "tsc -p tsconfig.json"
   },
   "engines": {
