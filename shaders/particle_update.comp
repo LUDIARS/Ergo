@@ -1,0 +1,180 @@
+#version 450
+
+// ============================================================
+// particle_update.comp
+//
+// Advances every particle (alive or dead) by `delta_time`, applies
+// forces, samples over-lifetime curves, and emits an `InstanceData`
+// record for the live ones. `counters.alive_count` / `draw_count`
+// are reset in this pass via an atomic compaction.
+// ============================================================
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct Particle {
+    vec3  position;
+    float lifetime_remaining;
+    vec3  velocity;
+    float lifetime_initial;
+    vec4  color;
+    float size;
+    float rotation;
+    float atlas_frame;
+    float seed;
+};
+
+struct InstanceData {
+    vec3  position;
+    float size;
+    vec4  color;
+    float rotation;
+    float atlas_frame;
+    float _pad0;
+    float _pad1;
+};
+
+layout(std430, binding = 0) buffer Particles { Particle    particles[]; };
+layout(std430, binding = 1) buffer Counters {
+    uint alive_count;
+    uint spawn_cursor;
+    uint draw_count;
+    uint total_emitted;
+};
+layout(std430, binding = 2) buffer Instances { InstanceData instances[]; };
+
+layout(std140, binding = 3) uniform EmitterBlock {
+    float delta_time;
+    float emitter_time;
+    float simulation_speed;
+    float _pad0;
+
+    uint  to_spawn;
+    uint  max_particles;
+    uint  simulation_space;
+    uint  random_seed;
+
+    mat4  emitter_world;
+
+    vec4  start_color;
+
+    uint  shape;
+    float cone_angle_rad;
+    float cone_radius;
+    float cone_radius_thickness;
+    float sphere_radius;
+    float _pad1_0;
+    float _pad1_1;
+    float _pad1_2;
+    vec3  box_extents;
+    float _pad2;
+    vec3  shape_position;
+    float _pad3;
+
+    vec3  gravity;
+    float gravity_modifier;
+    float linear_damping;
+    vec3  wind_direction;
+    float wind_strength;
+    float wind_turbulence;
+    float _pad4_0;
+    float _pad4_1;
+
+    float start_lifetime_min;
+    float start_lifetime_max;
+    float start_speed_min;
+    float start_speed_max;
+    float start_size_min;
+    float start_size_max;
+    float start_rotation_min;
+    float start_rotation_max;
+} E;
+
+layout(binding =  4) uniform sampler1D curve_size;
+layout(binding =  5) uniform sampler1D curve_rotation;
+layout(binding =  6) uniform sampler1D curve_color_r;
+layout(binding =  7) uniform sampler1D curve_color_g;
+layout(binding =  8) uniform sampler1D curve_color_b;
+layout(binding =  9) uniform sampler1D curve_color_a;
+layout(binding = 10) uniform sampler1D curve_atlas_frame;
+layout(binding = 11) uniform sampler1D curve_velocity_x;
+layout(binding = 12) uniform sampler1D curve_velocity_y;
+layout(binding = 13) uniform sampler1D curve_velocity_z;
+
+float sample_curve_at(sampler1D s, float age01) {
+    return texture(s, clamp(age01, 0.0, 1.0)).r;
+}
+
+uint rng_u32(inout uint state) {
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return state;
+}
+float rng01(inout uint state) {
+    return float(rng_u32(state) >> 8) * (1.0 / 16777216.0);
+}
+
+void main() {
+    const uint idx = gl_GlobalInvocationID.x;
+    if (idx == 0u) {
+        alive_count = 0u;
+        draw_count  = 0u;
+    }
+    barrier();
+
+    if (idx >= E.max_particles) return;
+
+    Particle p = particles[idx];
+    if (p.lifetime_remaining <= 0.0) return;
+
+    const float dt = E.delta_time;
+
+    // Age in 0..1.
+    float age01 = (p.lifetime_initial > 0.0)
+                ? 1.0 - clamp(p.lifetime_remaining / p.lifetime_initial, 0.0, 1.0)
+                : 0.0;
+
+    // Forces.
+    vec3 v = p.velocity;
+    v += E.gravity * E.gravity_modifier * dt;
+    if (E.wind_strength > 0.0) {
+        v += normalize(E.wind_direction) * (E.wind_strength * dt);
+    }
+    float damp = clamp(1.0 - E.linear_damping * dt, 0.0, 1.0);
+    v *= damp;
+
+    // Over-lifetime velocity curve (evaluated as a per-axis multiplier
+    // delta so the shader doesn't need bounds-checking).
+    v.x += sample_curve_at(curve_velocity_x, age01) * dt;
+    v.y += sample_curve_at(curve_velocity_y, age01) * dt;
+    v.z += sample_curve_at(curve_velocity_z, age01) * dt;
+
+    // Integrate.
+    p.position += v * dt;
+    p.velocity = v;
+    p.lifetime_remaining -= dt;
+
+    // Over-lifetime modifiers.
+    p.size       *= sample_curve_at(curve_size, age01);
+    p.rotation   += sample_curve_at(curve_rotation, age01) * dt;
+    p.atlas_frame = sample_curve_at(curve_atlas_frame, age01);
+    float cr = sample_curve_at(curve_color_r, age01);
+    float cg = sample_curve_at(curve_color_g, age01);
+    float cb = sample_curve_at(curve_color_b, age01);
+    float ca = sample_curve_at(curve_color_a, age01);
+    if (cr > 0.0 || cg > 0.0 || cb > 0.0 || ca > 0.0) {
+        p.color = vec4(cr, cg, cb, ca);
+    }
+
+    particles[idx] = p;
+
+    if (p.lifetime_remaining > 0.0) {
+        uint out_idx = atomicAdd(alive_count, 1u);
+        atomicAdd(draw_count, 1u);
+        instances[out_idx].position    = p.position;
+        instances[out_idx].size        = p.size;
+        instances[out_idx].color       = p.color;
+        instances[out_idx].rotation    = p.rotation;
+        instances[out_idx].atlas_frame = p.atlas_frame;
+    }
+}

@@ -11,15 +11,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(ERGO_BUILD_TESTS  "Build module tests"             ON)
 option(ERGO_BUILD_DUMMY  "Build dummy plug libraries"     ON)
 
-option(ERGO_BUILD_INPUT      "Build ergo_input"     ON)
-option(ERGO_BUILD_INSPECTOR  "Build ergo_inspector" ON)
-option(ERGO_BUILD_PARTICLE   "Build ergo_particle"  ON)
-option(ERGO_BUILD_BIND       "Build ergo_bind"      ON)
-option(ERGO_BUILD_SOUND      "Build ergo_sound"     ON)
+option(ERGO_BUILD_INPUT        "Build ergo_input"        ON)
+option(ERGO_BUILD_INSPECTOR    "Build ergo_inspector"    ON)
+option(ERGO_BUILD_PARTICLE     "Build ergo_particle"     ON)
+option(ERGO_BUILD_GPU_PARTICLE "Build ergo_gpu_particle" ON)
+option(ERGO_BUILD_BIND         "Build ergo_bind"         ON)
+option(ERGO_BUILD_SOUND        "Build ergo_sound"        ON)
 
 # Per-module knobs (passed through to module sections below)
-option(ERGO_INSPECTOR_BUILD_SERVER "ergo_inspector: build POSIX WebSocket server" ON)
-option(ERGO_PARTICLE_HAS_RENDERER  "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
+option(ERGO_INSPECTOR_BUILD_SERVER       "ergo_inspector: build POSIX WebSocket server" ON)
+option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
+option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute shaders to SPIR-V via glslc" ON)
 
 find_package(Threads REQUIRED)
 
@@ -242,6 +244,70 @@ if(ERGO_BUILD_SOUND)
             add_executable(${NAME} tests/sound/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_sound ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_gpu_particle — Shuriken-style GPU compute particle module.
+# Pure C++ module; GPU backend is an abstract interface (`IGpuBackend`)
+# supplied by host integration layers (Vulkan / WebGPU). Compute shaders
+# are baked to SPIR-V when glslc is available.
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_GPU_PARTICLE)
+    add_library(ergo_gpu_particle
+        src/gpu_particle/curve.cpp
+        src/gpu_particle/emitter_descriptor.cpp
+        src/gpu_particle/particle_system.cpp
+    )
+    target_include_directories(ergo_gpu_particle PUBLIC include)
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_gpu_particle_dummy
+            src/gpu_particle/curve_dummy.cpp
+            src/gpu_particle/emitter_descriptor_dummy.cpp
+            src/gpu_particle/particle_system_dummy.cpp
+        )
+        target_include_directories(ergo_gpu_particle_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_GPU_PARTICLE_COMPILE_SHADERS)
+        find_package(Vulkan QUIET COMPONENTS glslc)
+        if(Vulkan_GLSLC_EXECUTABLE)
+            set(_GPU_PART_SHADERS
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle_spawn.comp
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/particle_update.comp
+            )
+            set(_GPU_PART_SPV)
+            foreach(SRC ${_GPU_PART_SHADERS})
+                get_filename_component(N ${SRC} NAME)
+                set(OUT ${CMAKE_BINARY_DIR}/shaders/${N}.spv)
+                add_custom_command(
+                    OUTPUT  ${OUT}
+                    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
+                    COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${SRC} -o ${OUT}
+                    DEPENDS ${SRC}
+                    COMMENT "ergo_gpu_particle: compiling ${N} -> SPIR-V")
+                list(APPEND _GPU_PART_SPV ${OUT})
+            endforeach()
+            add_custom_target(ergo_gpu_particle_shaders ALL DEPENDS ${_GPU_PART_SPV})
+            add_dependencies(ergo_gpu_particle ergo_gpu_particle_shaders)
+        else()
+            message(STATUS "ergo_gpu_particle: glslc not found — SPIR-V bake skipped")
+        endif()
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME test_curve test_emitter_descriptor test_particle_system)
+            # test_particle_system name collision with ergo_particle — disambiguate.
+            if("${NAME}" STREQUAL "test_particle_system")
+                set(TGT gpu_test_particle_system)
+            else()
+                set(TGT ${NAME})
+            endif()
+            add_executable(${TGT} tests/gpu_particle/${NAME}.cpp)
+            target_link_libraries(${TGT} PRIVATE ergo_gpu_particle ergo_gtest_main)
+            add_test(NAME ${TGT} COMMAND ${TGT})
         endforeach()
     endif()
 endif()
