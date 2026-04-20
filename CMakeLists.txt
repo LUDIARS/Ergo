@@ -17,6 +17,8 @@ option(ERGO_BUILD_PARTICLE     "Build ergo_particle"     ON)
 option(ERGO_BUILD_GPU_PARTICLE "Build ergo_gpu_particle" ON)
 option(ERGO_BUILD_BIND         "Build ergo_bind"         ON)
 option(ERGO_BUILD_SOUND        "Build ergo_sound"        ON)
+option(ERGO_BUILD_FRAME        "Build ergo_frame"        ON)
+option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_INSPECTOR_BUILD_SERVER       "ergo_inspector: build POSIX WebSocket server" ON)
@@ -310,5 +312,45 @@ if(ERGO_BUILD_GPU_PARTICLE)
             target_link_libraries(${TGT} PRIVATE ergo_gpu_particle ergo_gtest_main)
             add_test(NAME ${TGT} COMMAND ${TGT})
         endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_frame — per-frame tick counter + rolling FPS
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_FRAME)
+    add_library(ergo_frame src/frame/counter.cpp)
+    target_include_directories(ergo_frame PUBLIC include)
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_frame_dummy src/frame/frame_dummy.cpp)
+        target_include_directories(ergo_frame_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_counter tests/frame/test_counter.cpp)
+        target_link_libraries(test_counter PRIVATE ergo_frame ergo_gtest_main)
+        add_test(NAME test_counter COMMAND test_counter)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_log — 4-level logger with frame-number prefix (injectable source)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_LOG)
+    add_library(ergo_log src/log/log.cpp)
+    target_include_directories(ergo_log PUBLIC include)
+    target_link_libraries(ergo_log PUBLIC Threads::Threads)
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_log_dummy src/log/log_dummy.cpp)
+        target_include_directories(ergo_log_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_log tests/log/test_log.cpp)
+        target_link_libraries(test_log PRIVATE ergo_log ergo_gtest_main)
+        target_link_libraries(test_log PRIVATE Threads::Threads)
+        add_test(NAME test_log COMMAND test_log)
     endif()
 endif()
