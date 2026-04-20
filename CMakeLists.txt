@@ -15,6 +15,7 @@ option(ERGO_BUILD_INPUT      "Build ergo_input"     ON)
 option(ERGO_BUILD_INSPECTOR  "Build ergo_inspector" ON)
 option(ERGO_BUILD_PARTICLE   "Build ergo_particle"  ON)
 option(ERGO_BUILD_BIND       "Build ergo_bind"      ON)
+option(ERGO_BUILD_SOUND      "Build ergo_sound"     ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_INSPECTOR_BUILD_SERVER "ergo_inspector: build POSIX WebSocket server" ON)
@@ -207,6 +208,40 @@ if(ERGO_BUILD_BIND)
             add_executable(${TGT} tests/bind/${NAME}.cpp)
             target_link_libraries(${TGT} PRIVATE ergo_bind ergo_gtest_main)
             add_test(NAME ${TGT} COMMAND ${TGT})
+        endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_sound — WAV/OGG decode, streaming, mixing engine, waveform, quantizer
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_SOUND)
+    add_library(ergo_sound
+        src/sound/audio_decoder.cpp
+        src/sound/audio_stream.cpp
+        src/sound/audio_engine.cpp
+        src/sound/waveform_processor.cpp
+        src/sound/quantizer.cpp
+    )
+    target_include_directories(ergo_sound PUBLIC include)
+    target_link_libraries(ergo_sound PUBLIC Threads::Threads)
+    # MSVC: enable M_PI et al from <cmath>. Propagated to dependents
+    # (notably the sound tests that sample sine waves).
+    target_compile_definitions(ergo_sound PUBLIC _USE_MATH_DEFINES)
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_sound_dummy src/sound/sound_dummy.cpp)
+        target_include_directories(ergo_sound_dummy PUBLIC include)
+        target_link_libraries(ergo_sound_dummy PUBLIC Threads::Threads)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME
+                test_audio_decoder test_audio_stream test_audio_engine
+                test_waveform_processor test_quantizer)
+            add_executable(${NAME} tests/sound/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_sound ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
 endif()
