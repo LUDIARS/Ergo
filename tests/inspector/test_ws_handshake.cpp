@@ -35,6 +35,36 @@ TEST(WsHandshake, ParseHttpReturnsFalseOnIncomplete) {
     EXPECT_FALSE(parse_http_request("GET / HTTP/1.1\r\nHost: x\r\n", req));
 }
 
+TEST(WsHandshake, ParseHttpExtractsOrigin) {
+    std::string raw =
+        "GET / HTTP/1.1\r\n"
+        "Host: localhost:17317\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n"
+        "Origin: http://localhost:5170\r\n"
+        "Sec-WebSocket-Version: 13\r\n\r\n";
+    HttpRequest req;
+    ASSERT_TRUE(parse_http_request(raw, req));
+    EXPECT_EQ(req.origin, "http://localhost:5170");
+}
+
+TEST(WsOrigin, AllowsLoopbackAndMissing) {
+    EXPECT_TRUE(is_origin_allowed(""));                          // non-browser
+    EXPECT_TRUE(is_origin_allowed("null"));                      // file://
+    EXPECT_TRUE(is_origin_allowed("http://localhost"));
+    EXPECT_TRUE(is_origin_allowed("http://localhost:5170"));
+    EXPECT_TRUE(is_origin_allowed("https://127.0.0.1:8443"));
+    EXPECT_TRUE(is_origin_allowed("http://[::1]:17317"));
+}
+
+TEST(WsOrigin, RejectsRemoteOrigins) {
+    EXPECT_FALSE(is_origin_allowed("http://example.com"));
+    EXPECT_FALSE(is_origin_allowed("https://evil.test:443"));
+    EXPECT_FALSE(is_origin_allowed("http://192.168.0.5"));
+    EXPECT_FALSE(is_origin_allowed("not a url"));
+}
+
 TEST(WsFrame, EncodeShortText) {
     std::string f = encode_frame(WsOpcode::Text, "hello");
     ASSERT_EQ(f.size(), 7u);

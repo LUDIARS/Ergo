@@ -158,8 +158,39 @@ bool parse_http_request(const std::string& buf, HttpRequest& out) {
         if      (ieq(name, "Sec-WebSocket-Key")) out.sec_websocket_key = value;
         else if (ieq(name, "Upgrade"))           out.upgrade           = value;
         else if (ieq(name, "Connection"))        out.connection        = value;
+        else if (ieq(name, "Origin"))            out.origin            = value;
     }
     return true;
+}
+
+bool is_origin_allowed(const std::string& origin) {
+    // No Origin header: the caller is a non-browser client (our own
+    // bind / inspector CLI, curl -H, etc.). Browsers always send Origin
+    // on cross-origin WebSocket upgrades, so a missing value is a
+    // reliable signal that the request didn't originate from a page.
+    if (origin.empty()) return true;
+    // `null` is what browsers send for file:// pages and sandboxed
+    // iframes; accepting it keeps local-file-based dashboards working.
+    if (origin == "null") return true;
+
+    // Pull out the host (between "scheme://" and the next ':' or '/').
+    const auto scheme_end = origin.find("://");
+    if (scheme_end == std::string::npos) return false;
+    std::string rest = origin.substr(scheme_end + 3);
+    // Trim path if present.
+    if (auto slash = rest.find('/'); slash != std::string::npos) rest.resize(slash);
+    // Trim port if present. IPv6 literals come bracketed (`[::1]:port`),
+    // so only split on the last colon when there's no closing bracket.
+    if (!rest.empty() && rest.front() == '[') {
+        auto close = rest.find(']');
+        if (close == std::string::npos) return false;
+        // Keep the bracket form for comparison.
+        rest = rest.substr(0, close + 1);
+    } else if (auto colon = rest.rfind(':'); colon != std::string::npos) {
+        rest.resize(colon);
+    }
+
+    return rest == "localhost" || rest == "127.0.0.1" || rest == "[::1]";
 }
 
 std::string build_handshake_response(const std::string& accept) {

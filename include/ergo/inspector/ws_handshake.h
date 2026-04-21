@@ -17,8 +17,18 @@ struct HttpRequest {
     std::string sec_websocket_key;
     std::string upgrade;
     std::string connection;
+    std::string origin;  // empty if no Origin header was sent
     std::size_t total_size = 0;
 };
+
+/// Returns true if `origin` names a local (loopback) site that the
+/// inspector server should accept for a WebSocket upgrade. The check is
+/// deliberately narrow: non-browser clients don't send Origin and are
+/// allowed by policy; browsers must come from localhost / 127.0.0.1 /
+/// [::1] / `null` (file://). Anything else is refused so that a
+/// malicious remote page can't drive the inspector via the user's
+/// browser.
+bool is_origin_allowed(const std::string& origin);
 bool parse_http_request(const std::string& buf, HttpRequest& out);
 
 std::string build_handshake_response(const std::string& accept);

@@ -273,25 +273,28 @@ bool process_http(Conn& c) {
 
     if (req.upgrade.find("websocket") != std::string::npos &&
         !req.sec_websocket_key.empty()) {
-        const std::string accept = ws::compute_accept(req.sec_websocket_key);
-        c.tx += ws::build_handshake_response(accept);
-        c.state = ConnState::Open;
-    } else {
-        std::string body;
-        FILE* f = std::fopen("inspector_web/index.html", "rb");
-        if (!f) f = std::fopen("../inspector_web/index.html", "rb");
-        if (!f) f = std::fopen("../../inspector_web/index.html", "rb");
-        if (f) {
-            std::fseek(f, 0, SEEK_END);
-            long sz = std::ftell(f);
-            std::fseek(f, 0, SEEK_SET);
-            body.resize(static_cast<std::size_t>(sz));
-            std::fread(body.data(), 1, body.size(), f);
-            std::fclose(f);
+        // Reject WS upgrades from non-local Origins so a page the user
+        // visits elsewhere can't drive the inspector through their
+        // browser. Non-browser callers don't send Origin and are
+        // allowed by is_origin_allowed.
+        if (!ws::is_origin_allowed(req.origin)) {
+            const std::string body =
+                "<!doctype html><html><body>"
+                "<h3>Ergo Inspector</h3>"
+                "<p>Refused: Origin is not a local site.</p>"
+                "</body></html>";
+            c.tx += ws::build_http_html_response(body);
+            c.state = ConnState::Closing;
         } else {
-            body = kFallbackHtml;
+            const std::string accept = ws::compute_accept(req.sec_websocket_key);
+            c.tx += ws::build_handshake_response(accept);
+            c.state = ConnState::Open;
         }
-        c.tx += ws::build_http_html_response(body);
+    } else {
+        // Plain HTTP GET (landing page). The UI is served by the
+        // unified ergo tool (tools/ergo/ inspector plugin, Phase 2);
+        // here we just return a short pointer page.
+        c.tx += ws::build_http_html_response(kFallbackHtml);
         c.state = ConnState::Closing;
     }
     c.rx.erase(0, req.total_size);
