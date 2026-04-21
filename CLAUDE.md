@@ -24,9 +24,10 @@ Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツ
   パッケージではなく `tools/ergo/src/plugins/<id>/` にプラグインとして追加する
   (詳細は `spec/tool/ergo.md`)。
 - 仕様書は `spec/module/<名>.md`
-- 既存の `module/<名>` ブランチ (`module/input`, `module/inspector`,
-  `module/particle`, `module/bind`) は履歴保全のため削除しないが、
-  **新規開発は main 上で行う**
+- 既存の `module/<名>` ブランチ (`module/input`, `module/particle`,
+  `module/bind` など) は履歴保全のため削除しないが、**新規開発は main 上で行う**
+- `module/inspector` ブランチも履歴として残すが、`ergo_inspector` モジュール
+  自体は 2026-04-21 に廃止 (機能は `ergo_bind` に完全吸収)
 
 ### 新規モジュール追加手順
 

@@ -2,7 +2,7 @@
   "name": "ergo",
   "version": "0.1.0",
   "private": true,
-  "description": "Unified Ergo developer tool. Single-port Hono/WS server hosting particle, variable (and later inspector) editors as in-process plugins. Default mode: Electron standalone desktop app.",
+  "description": "Unified Ergo developer tool. Single-port Hono/WS server hosting particle and variable editors as in-process plugins. Default mode: Electron standalone desktop app.",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
