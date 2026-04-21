@@ -1,6 +1,10 @@
 // Shell UI — fetches the plugin list and renders the sidebar.
 // Clicking a plugin swaps the iframe to its root URL. Health polling
 // paints a small "clients" badge next to each entry every 2 seconds.
+//
+// State changes (plugins loaded, plugin activated, health updated) are
+// announced through `window.ergo.shell` so extensions can react. See
+// `extensions.js` for the public API; `spec/tool/ergo.md` for usage.
 
 const nav    = document.getElementById("plugin-nav");
 const viewer = document.getElementById("viewer");
@@ -12,6 +16,7 @@ async function fetchPlugins() {
     const j = await r.json();
     plugins = j.plugins ?? [];
     render();
+    window.ergo?.shell?._internal?.setPlugins(plugins);
     applyInitialRoute();
 }
 
@@ -48,6 +53,7 @@ function activate(id) {
     for (const el of nav.querySelectorAll(".plugin")) {
         el.classList.toggle("active", el.dataset.id === id);
     }
+    window.ergo?.shell?._internal?.setActive(id);
 }
 
 function applyInitialRoute() {
@@ -76,6 +82,7 @@ async function pollHealth() {
             el.textContent = `● ${clients}`;
             el.className = `badge ${p.ok ? (clients > 0 ? "ok" : "") : "err"}`;
         }
+        window.ergo?.shell?._internal?.setHealth(j);
     } catch { /* server restart, ignore */ }
 }
 

@@ -55,17 +55,20 @@ Node sidecar 同梱が必要で、同じ UI 体験を出すのにコストが高
 tools/ergo/
 ├── package.json          # name: "ergo" / main: electron/main.cjs
 ├── electron/
-│   └── main.cjs          # Electron main process (boot server + open window)
+│   ├── main.cjs          # Electron main process (boot server + open window)
+│   └── preload.cjs       # contextBridge: window.ergo.electron (IPC)
 ├── tsconfig.json
 ├── README.md
 ├── public/               # シェル UI
 │   ├── index.html
 │   ├── shell.css
-│   └── shell.js
+│   ├── shell.js
+│   └── extensions.js     # window.ergo.shell イベントバス (拡張 API)
 └── src/
     ├── main.ts           # エントリ (port / factories)
     ├── core/
     │   ├── plugin.ts     # Plugin interface
+    │   ├── shell-api.ts  # window.ergo.shell の TypeScript 型定義 (型のみ)
     │   ├── registry.ts   # 組み込みプラグインの列挙
     │   └── server.ts     # Hono + http.Server + WS の共通土台
     └── plugins/
@@ -118,6 +121,81 @@ export default (): Plugin => {
 - 旧 `tools/variable-editor/` の移植
 - `BIND_VAR()` 登録を受ける engine ↔ UI ハブ
 - `hello` メッセージでロール (`engine` / `ui`) を識別
+
+## シェル拡張 API (`window.ergo.shell`)
+
+シェル UI (Electron ウィンドウ全体 + サイドバー) に対する拡張ポイント。
+カスタム動作 (例: 別パネルの追加、特定プラグイン選択時の自動化) を、
+`shell.js` を fork せずに足せるようにするためのイベントバス。
+
+実装は `tools/ergo/public/extensions.js` (DOM script として `shell.js` より
+**先に** ロード)、TypeScript 型は `tools/ergo/src/core/shell-api.ts`。
+
+### イベント
+
+| event 名 | 発火タイミング | payload |
+|----------|---------------|---------|
+| `shell:ready`        | 初期 plugins ロード直後 | `{ plugins: ShellPluginInfo[] }` |
+| `plugin:registered`  | 各プラグインごと、初期ロード時 | `{ id, plugin }` |
+| `plugin:activated`   | サイドバーで選択された時 (初期表示も含む) | `{ id, plugin }` |
+| `plugin:deactivated` | 別プラグインへ切替直前 | `{ id, plugin }` |
+| `plugin:health`      | /api/health ポーリング (2 秒) ごと、各プラグイン | `{ id, health }` |
+| `plugin:event`       | iframe 内プラグインからの `postMessage` を再発信 | `{ id, name, payload }` |
+
+### API
+
+```js
+// シェルページ内に追加した <script> から:
+window.ergo.shell.on("plugin:activated", ({ id, plugin }) => {
+    console.log("now showing:", plugin.title);
+});
+
+const off = window.ergo.shell.on("plugin:event", ({ name, payload }) => {
+    if (name === "selection") highlightInToolbar(payload);
+});
+off();   // 解除
+
+window.ergo.shell.emit("plugin:event", { id: "x", name: "...", payload: {...} });
+```
+
+### iframe → shell ブリッジ
+
+各プラグインの iframe 内 UI から、選択イベントなどを shell に伝播する場合:
+
+```js
+// プラグイン UI 内 (例: variable プラグイン UI で actor が選ばれた時)
+window.parent.postMessage(
+    { type: "ergo:plugin:event", name: "actor:selected", payload: { handle: 42 } },
+    "*"
+);
+```
+
+shell は `plugin:event` として再発信し、`id` は **その時点でアクティブな
+プラグインの id** が自動補完される。
+
+### Electron IPC
+
+Electron アプリとして起動した場合のみ、preload 経由で
+`window.ergo.electron` が露出する。許可済みチャネル:
+
+| 方向 | チャネル | 用途 |
+|------|---------|------|
+| 送信 | `shell:ready`            | 初回プラグイン数を main へ通知 |
+| 送信 | `shell:plugin-activated` | 選択中プラグインを main へ通知 |
+
+`extensions.js` のデフォルト動作は **`plugin:activated` を IPC に転送**
+するだけ。`electron/main.cjs` 側は受信したらウィンドウタイトルを
+`ergo — <plugin title>` に更新する。新しい IPC チャネルが必要なら
+`electron/preload.cjs` の `ALLOWED_OUTBOUND` / `ALLOWED_INBOUND` に追加し、
+`main.cjs` で `ipcMain.on(...)` を増やす。
+
+### 拡張の追加方法
+
+1. **シェル内のみのカスタムロジック** — `public/` に `myext.js` を置き、
+   `index.html` の `<script>` リストに追加 (extensions.js の後ろ)。
+   `window.ergo.shell.on(...)` で必要なイベントを購読する。
+2. **メインプロセス連携が必要な場合** — `electron/preload.cjs` の
+   ALLOWED 集合に新チャネルを追加し、`main.cjs` でハンドラを書く。
 
 ## 廃止プラン (履歴) — `inspector` プラグイン統合は実施せず
 
