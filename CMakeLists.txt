@@ -22,6 +22,7 @@ option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
 option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
 option(ERGO_BUILD_WORLD_TIME   "Build ergo_world_time"   ON)
+option(ERGO_BUILD_BLACKBOARD   "Build ergo_blackboard"   ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -446,5 +447,24 @@ if(ERGO_BUILD_WORLD_TIME)
         add_executable(test_world_time tests/world_time/test_world_time.cpp)
         target_link_libraries(test_world_time PRIVATE ergo_world_time ergo_gtest_main)
         add_test(NAME test_world_time COMMAND test_world_time)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_blackboard — global named-property registry with category lifecycle
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_BLACKBOARD)
+    add_library(ergo_blackboard src/blackboard/blackboard.cpp)
+    target_include_directories(ergo_blackboard PUBLIC include)
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_blackboard_dummy src/blackboard/blackboard_dummy.cpp)
+        target_include_directories(ergo_blackboard_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_blackboard tests/blackboard/test_blackboard.cpp)
+        target_link_libraries(test_blackboard PRIVATE ergo_blackboard ergo_gtest_main)
+        add_test(NAME test_blackboard COMMAND test_blackboard)
     endif()
 endif()
