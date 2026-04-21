@@ -75,33 +75,4 @@ private:
     bool parseHeader();
 };
 
-// =====================================================================
-// OggDecoder — OGG Vorbisデコーダ（簡易実装）
-// =====================================================================
-class OggDecoder : public IAudioDecoder {
-public:
-    OggDecoder() = default;
-    ~OggDecoder() override;
-
-    bool open(const std::string& filePath) override;
-    size_t decode(float* buffer, size_t maxFrames) override;
-    bool seekTo(size_t framePosition) override;
-    AudioFormat getFormat() const override;
-    size_t getTotalFrames() const override;
-    size_t getCurrentFrame() const override;
-    void close() override;
-    bool isOpen() const override;
-
-private:
-    std::vector<uint8_t>    fileData_;
-    AudioFormat             format_;
-    size_t                  totalFrames_    = 0;
-    size_t                  currentFrame_   = 0;
-    bool                    opened_         = false;
-
-    // Vorbis デコード用の内部状態
-    std::vector<float>      decodedPcm_;    // デコード済みPCM全体
-    bool parseAndDecode();
-};
-
 } // namespace ergo::sound

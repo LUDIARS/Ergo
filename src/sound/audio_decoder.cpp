@@ -1,4 +1,4 @@
-// AudioDecoder — WAV/OGGファイルデコーダ実装
+// AudioDecoder — WAVファイルデコーダ実装
 
 #include "ergo/sound/audio_decoder.h"
 #include <algorithm>
@@ -20,14 +20,12 @@ DecoderType IAudioDecoder::detectType(const std::string& filePath) {
     }
 
     if (lower == "wav" || lower == "wave") return DecoderType::Wav;
-    if (lower == "ogg")                    return DecoderType::Ogg;
     return DecoderType::Unknown;
 }
 
 std::unique_ptr<IAudioDecoder> IAudioDecoder::create(const std::string& filePath) {
     switch (detectType(filePath)) {
         case DecoderType::Wav: return std::make_unique<WavDecoder>();
-        case DecoderType::Ogg: return std::make_unique<OggDecoder>();
         default: return nullptr;
     }
 }
@@ -210,125 +208,6 @@ void WavDecoder::close() {
     currentFrame_ = 0;
     totalFrames_ = 0;
     dataOffset_ = 0;
-}
-
-// =====================================================================
-// OggDecoder — 簡易OGG Vorbisデコーダ
-// =====================================================================
-// 注: 完全なVorbisデコーダの実装は非常に大規模なため、
-// ここではOGGコンテナの解析とヘッダ読み取りを行い、
-// PCMデータの読み取り基盤を提供する。
-// 本番環境では stb_vorbis や libvorbis との連携を想定する。
-
-OggDecoder::~OggDecoder() {
-    close();
-}
-
-bool OggDecoder::open(const std::string& filePath) {
-    close();
-
-    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) return false;
-
-    size_t fileSize = static_cast<size_t>(file.tellg());
-    file.seekg(0, std::ios::beg);
-
-    fileData_.resize(fileSize);
-    file.read(reinterpret_cast<char*>(fileData_.data()), static_cast<std::streamsize>(fileSize));
-    file.close();
-
-    if (!parseAndDecode()) {
-        close();
-        return false;
-    }
-
-    opened_ = true;
-    currentFrame_ = 0;
-    return true;
-}
-
-bool OggDecoder::parseAndDecode() {
-    // OGGマジックナンバーの確認: "OggS"
-    if (fileData_.size() < 27) return false;
-    if (fileData_[0] != 'O' || fileData_[1] != 'g' ||
-        fileData_[2] != 'g' || fileData_[3] != 'S') {
-        return false;
-    }
-
-    // Vorbisヘッダの解析（最小限）
-    // Vorbis identification header は OGGページ内に格納される
-    // ページヘッダ: 27バイト + セグメントテーブル
-    uint8_t numSegments = fileData_[26];
-    size_t headerSize = 27 + numSegments;
-    if (fileData_.size() < headerSize + 7) return false;
-
-    // セグメントデータ開始位置
-    size_t segmentStart = headerSize;
-
-    // Vorbis identification header: パケットタイプ(1) + "vorbis"(6)
-    if (fileData_[segmentStart] != 0x01) return false;
-    if (fileData_[segmentStart + 1] != 'v' || fileData_[segmentStart + 2] != 'o' ||
-        fileData_[segmentStart + 3] != 'r' || fileData_[segmentStart + 4] != 'b' ||
-        fileData_[segmentStart + 5] != 'i' || fileData_[segmentStart + 6] != 's') {
-        return false;
-    }
-
-    // Vorbis identification headerの解析
-    if (fileData_.size() < segmentStart + 30) return false;
-
-    // vorbis_version (4bytes) at offset 7
-    // channels (1byte) at offset 11
-    // sample_rate (4bytes) at offset 12
-    uint8_t channels = fileData_[segmentStart + 11];
-    uint32_t sampleRate = 0;
-    std::memcpy(&sampleRate, &fileData_[segmentStart + 12], 4);
-
-    if (channels == 0 || sampleRate == 0) return false;
-
-    format_.channels = channels;
-    format_.sampleRate = sampleRate;
-    format_.format = SampleFormat::Float32;
-
-    // 注: 実際のVorbisデコードは外部ライブラリに委譲する設計
-    // ここではヘッダ解析のみ行い、PCMデータは空として扱う
-    totalFrames_ = 0;
-    decodedPcm_.clear();
-
-    return true;
-}
-
-size_t OggDecoder::decode(float* buffer, size_t maxFrames) {
-    if (!opened_) return 0;
-
-    size_t available = (totalFrames_ > currentFrame_) ? totalFrames_ - currentFrame_ : 0;
-    size_t framesToRead = std::min(maxFrames, available);
-    if (framesToRead == 0) return 0;
-
-    size_t sampleOffset = currentFrame_ * format_.channels;
-    size_t sampleCount = framesToRead * format_.channels;
-    std::memcpy(buffer, decodedPcm_.data() + sampleOffset, sampleCount * sizeof(float));
-
-    currentFrame_ += framesToRead;
-    return framesToRead;
-}
-
-bool OggDecoder::seekTo(size_t framePosition) {
-    if (!opened_) return false;
-    currentFrame_ = std::min(framePosition, totalFrames_);
-    return true;
-}
-
-AudioFormat OggDecoder::getFormat() const { return format_; }
-size_t OggDecoder::getTotalFrames() const { return totalFrames_; }
-size_t OggDecoder::getCurrentFrame() const { return currentFrame_; }
-bool OggDecoder::isOpen() const { return opened_; }
-
-void OggDecoder::close() {
-    fileData_.clear();
-    decodedPcm_.clear();
-    opened_ = false;
-    currentFrame_ = 0;
-    totalFrames_ = 0;
 }
 
 } // namespace ergo::sound

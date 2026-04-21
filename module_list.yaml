@@ -74,7 +74,7 @@ modules:
     status: stable
 
   - name: ergo_sound
-    summary: WAV/OGG デコード + ストリーム + ミキサ + 波形処理 + Quantizer
+    summary: WAV デコード + ストリーム + ミキサ + 波形処理 + Quantizer (外部 lib 無し)
     category: システム
     header_dir: include/ergo/sound/
     source_dir: src/sound/
@@ -82,7 +82,7 @@ modules:
     spec:       spec/module/sound.md
     cmake_option: ERGO_BUILD_SOUND
     tool_plugin: null
-    status: incomplete   # OGG の実 PCM デコードが未実装
+    status: stable   # WAV only; 圧縮フォーマットは別 commit で stb_vorbis を vendor
 
   - name: ergo_frame
     summary: アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列
