@@ -122,9 +122,80 @@ export interface Enemy {
 export interface SkillBlock {
     id:     string;
     name:   string;
-    /** 含有スキルの ID 一覧 (free-form). Foundation スキルカタログの ID を想定. */
+    /** 含有 Skill ID 一覧. `SKILL_CATALOG` の `id` (数値文字列) のみが
+     *  UI の multi-select から選ばれる前提. 重複は許可 (攻撃系は
+     *  同じブロックを集めると実ゲームでレベルアップするため). */
     skills: string[];
     notes?: string;
+}
+
+// ─── Skill catalog (Issue 追加要求: SkillID は実装済みリストから
+//      プルダウン / 番号帯は 攻撃系 100000〜, パッシブ系 500000〜,
+//      特殊系 900000〜) ───────────────────────────────────────────
+
+export type SkillCategory = "attack" | "ranged" | "buff" | "special";
+
+export interface SkillDefinition {
+    /** 数値文字列. `100000`〜`199999` 攻撃系, `500000`〜 パッシブ系,
+     *  `900000`〜 特殊系. 番号は実装順. */
+    id:          string;
+    /** UI 表示名 (日本語). */
+    name:        string;
+    /** 分類. UI で見出し/フィルタに使う. */
+    category:    SkillCategory;
+    /** 短い説明. */
+    description: string;
+    /** N が効果量 (攻撃力 / マス数 / 延長時間など) に入るパラメトリック
+     *  スキルなら true. 特殊の "レベル固定 Lv1-5" は false. */
+    parametric:  boolean;
+    /** 特殊系の「レベル固定」スキル専用. true のときは該当固定値。 */
+    fixedLevel?: 1 | 2 | 3 | 4 | 5;
+}
+
+/**
+ * 実装済み Skill のカタログ. 新規スキルはこの末尾に追加し、
+ * `id` は直前 id の次の未使用番号にする (= 実装順).
+ *
+ * カテゴリ別の ID 帯:
+ *   - 100000〜199999  攻撃系 (近接 / 遠隔)
+ *   - 500000〜599999  パッシブ系 (強化 / 防御)
+ *   - 900000〜999999  特殊系
+ */
+export const SKILL_CATALOG: readonly SkillDefinition[] = [
+    // 攻撃系 ─────────────────────────────────
+    { id: "100000", name: "前方3マス攻撃",         category: "attack",
+      description: "前方3マスに攻撃. 攻撃力 N", parametric: true },
+    { id: "100001", name: "前方Nマスに攻撃",         category: "attack",
+      description: "前方N マスに攻撃. 攻撃力 2",  parametric: true },
+    { id: "100002", name: "遠距離 直線",             category: "ranged",
+      description: "射程5 の直線状に遠距離攻撃. 攻撃力 N", parametric: true },
+    { id: "100003", name: "遠距離 範囲",             category: "ranged",
+      description: "射程5 の範囲内に遠距離攻撃. 攻撃体数 N", parametric: true },
+
+    // パッシブ系 ─────────────────────────────
+    { id: "500000", name: "攻撃力アップ",            category: "buff",
+      description: "攻撃力が N アップ",              parametric: true },
+    { id: "500001", name: "敵攻撃を防ぐ",            category: "buff",
+      description: "敵の攻撃を N 回防ぐ",            parametric: true },
+
+    // 特殊系 ─────────────────────────────────
+    { id: "900000", name: "パッシブ延長",            category: "special",
+      description: "パッシブ効果を N 分延長",         parametric: true },
+    { id: "900001", name: "レベル固定 Lv1",          category: "special",
+      description: "所持ブロックのレベルを 1 に固定", parametric: false, fixedLevel: 1 },
+    { id: "900002", name: "レベル固定 Lv2",          category: "special",
+      description: "所持ブロックのレベルを 2 に固定", parametric: false, fixedLevel: 2 },
+    { id: "900003", name: "レベル固定 Lv3",          category: "special",
+      description: "所持ブロックのレベルを 3 に固定", parametric: false, fixedLevel: 3 },
+    { id: "900004", name: "レベル固定 Lv4",          category: "special",
+      description: "所持ブロックのレベルを 4 に固定", parametric: false, fixedLevel: 4 },
+    { id: "900005", name: "レベル固定 Lv5",          category: "special",
+      description: "所持ブロックのレベルを 5 に固定", parametric: false, fixedLevel: 5 },
+];
+
+/** 文字列 ID を catalog に照合. 未知 ID なら `null`. */
+export function lookupSkill(id: string): SkillDefinition | null {
+    return SKILL_CATALOG.find((s) => s.id === id) ?? null;
 }
 
 // ─── Store ───────────────────────────────────────────────────

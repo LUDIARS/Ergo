@@ -34,6 +34,7 @@ import {
     BLOCK_ROWS_ALLOWED,
     PLACED_OBJECT_TYPES,
     SCHEMA_VERSION,
+    SKILL_CATALOG,
     makeBlock,
     makeEnemy,
     makeSkillBlock,
@@ -93,6 +94,9 @@ const factory: PluginFactory = () => {
             app.get("/api/health", async (c) =>
                 c.json({ ok: true, ...countHealth(await store.snapshot()), clients: wsClients.size })
             );
+
+            // --- skill catalog (read-only) ------------------------------
+            app.get("/api/skills", (c) => c.json({ skills: SKILL_CATALOG }));
 
             // --- bulk ----------------------------------------------------
             app.get("/api/store", async (c) => c.json(await store.snapshot()));

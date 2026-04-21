@@ -12,6 +12,8 @@ const state = {
     stages: [],
     enemies: [],
     skillBlocks: [],
+    /** Skill catalog fetched from /api/skills. */
+    skillCatalog: [],
     mode: "blocks",
     selectedBlockId: null,
     selectedStageId: null,
@@ -43,6 +45,16 @@ function setStatus(text, cls = "") {
     el.className   = "status" + (cls ? " " + cls : "");
 }
 
+function categoryLabel(cat) {
+    return ({ attack: "攻撃", ranged: "遠隔", buff: "強化", special: "特殊" }[cat]) ?? cat;
+}
+function lookupSkill(id) {
+    return state.skillCatalog.find((s) => s.id === id) ?? null;
+}
+function skillOptionLabel(s) {
+    return `[${categoryLabel(s.category)}] ${s.name}  (${s.id})`;
+}
+
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
@@ -56,15 +68,17 @@ function escapeHtml(s) {
 async function boot() {
     setStatus("loading…");
     try {
-        const [meta, store] = await Promise.all([
+        const [meta, store, skills] = await Promise.all([
             api("GET", "./api/meta"),
             api("GET", "./api/store"),
+            api("GET", "./api/skills"),
         ]);
-        state.meta        = meta;
-        state.blocks      = store.blocks      || [];
-        state.stages      = store.stages      || [];
-        state.enemies     = store.enemies     || [];
-        state.skillBlocks = store.skillBlocks || [];
+        state.meta         = meta;
+        state.blocks       = store.blocks      || [];
+        state.stages       = store.stages      || [];
+        state.enemies      = store.enemies     || [];
+        state.skillBlocks  = store.skillBlocks || [];
+        state.skillCatalog = skills?.skills    || [];
         $("#store-path").textContent = meta.storePath;
         if (state.blocks[0])      state.selectedBlockId  = state.blocks[0].id;
         if (state.stages[0])      state.selectedStageId  = state.stages[0].id;
@@ -119,8 +133,15 @@ function placedObjectDisplay(o) {
             if (!lv || lv.kind === "random") lbl = "box/rand";
             else if (lv.kind === "random_in_set") lbl = `box/${(lv.levels ?? []).join(",") || "rand"}`;
             else if (lv.kind === "fixed") lbl = `box/L${lv.level}`;
-            const skills = (o.skills ?? []).length;
-            return `${lbl} × ${skills || "any"}`;
+            const ids   = o.skills ?? [];
+            if (ids.length === 0) return `${lbl} × any`;
+            // Show up to 2 resolved skill names then "+N more".
+            const names = ids.slice(0, 2).map((id) => {
+                const meta = lookupSkill(id);
+                return meta ? meta.name : id;
+            });
+            const suffix = ids.length > 2 ? ` +${ids.length - 2}` : "";
+            return `${lbl} ${names.join("/")}${suffix}`;
         }
         case "Special":
             return o.label ?? "special";
@@ -410,7 +431,7 @@ function renderNewObjFields() {
         }
         case "SkillBox": {
             // Skills multi-select (chips).
-            const chipsWrap = renderChips(draft.skills, (next) => { draft.skills = next; });
+            const chipsWrap = renderSkillPicker(draft.skills, (next) => { draft.skills = next; });
             root.appendChild(wrapLabel("出現スキル (複数可)", chipsWrap));
 
             // Level mode.
@@ -514,38 +535,98 @@ function buildReferenceSelect(list, currentId, onChange) {
     return sel;
 }
 
-function renderChips(values, onChange) {
+/**
+ * Catalog-driven skill picker.
+ *
+ * Renders a `<select>` that adds a skill on change, plus a row of chips
+ * for the currently selected IDs (duplicates allowed — 攻撃系の
+ * 「同じブロック集めるとレベルアップ」を表現).
+ */
+function renderSkillPicker(values, onChange) {
     const wrap = document.createElement("div");
-    wrap.className = "chips";
-    for (const v of values) {
-        const chip = document.createElement("span");
-        chip.className = "chip";
-        chip.innerHTML = `${escapeHtml(v)}<button type="button" aria-label="remove">×</button>`;
-        chip.querySelector("button").addEventListener("click", () => {
-            const next = values.filter((x) => x !== v);
-            onChange(next);
-            const replaced = renderChips(next, onChange);
-            wrap.replaceWith(replaced);
+    wrap.className = "skill-picker";
+
+    // --- Chips ---
+    const chipsRow = document.createElement("div");
+    chipsRow.className = "chips";
+    if (values.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "hint";
+        empty.style.padding = "4px";
+        empty.textContent = "(skill 未選択)";
+        chipsRow.appendChild(empty);
+    } else {
+        values.forEach((id, idx) => {
+            const meta = lookupSkill(id);
+            const chip = document.createElement("span");
+            chip.className = "chip";
+            const label = meta ? `[${categoryLabel(meta.category)}] ${meta.name}` : id;
+            chip.innerHTML = `${escapeHtml(label)}<button type="button" aria-label="remove">×</button>`;
+            chip.title = meta ? `${meta.description}  (id=${meta.id})` : id;
+            chip.querySelector("button").addEventListener("click", () => {
+                const next = [...values];
+                next.splice(idx, 1);
+                onChange(next);
+                const replaced = renderSkillPicker(next, onChange);
+                wrap.replaceWith(replaced);
+            });
+            chipsRow.appendChild(chip);
         });
-        wrap.appendChild(chip);
     }
-    const input = document.createElement("input");
-    input.className = "chip-input";
-    input.placeholder = "スキル ID を入力して Enter";
-    input.addEventListener("keydown", (ev) => {
-        if (ev.key !== "Enter") return;
-        ev.preventDefault();
-        const v = input.value.trim();
-        if (!v) return;
-        if (values.includes(v)) { input.value = ""; return; }
-        const next = [...values, v];
+    wrap.appendChild(chipsRow);
+
+    // --- Add row: select categorised options + "add" button ---
+    const addRow = document.createElement("div");
+    addRow.style.display = "flex";
+    addRow.style.gap = "6px";
+    addRow.style.marginTop = "4px";
+
+    const sel = document.createElement("select");
+    sel.style.flex = "1";
+
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "skill を選択して追加";
+    sel.appendChild(placeholder);
+
+    for (const cat of ["attack", "ranged", "buff", "special"]) {
+        const group = document.createElement("optgroup");
+        group.label = categoryLabel(cat);
+        for (const s of state.skillCatalog.filter((x) => x.category === cat)) {
+            const opt = document.createElement("option");
+            opt.value = s.id;
+            opt.textContent = skillOptionLabel(s);
+            group.appendChild(opt);
+        }
+        if (group.childNodes.length > 0) sel.appendChild(group);
+    }
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.textContent = "＋";
+    addBtn.addEventListener("click", () => {
+        const id = sel.value;
+        if (!id) return;
+        const next = [...values, id];   // duplicates allowed
         onChange(next);
-        const replaced = renderChips(next, onChange);
+        const replaced = renderSkillPicker(next, onChange);
         wrap.replaceWith(replaced);
     });
-    wrap.appendChild(input);
+
+    addRow.appendChild(sel);
+    addRow.appendChild(addBtn);
+    wrap.appendChild(addRow);
+
+    if (state.skillCatalog.length === 0) {
+        const note = document.createElement("p");
+        note.className = "hint";
+        note.textContent = "skill catalog が空です (サーバの /api/skills を確認)";
+        wrap.appendChild(note);
+    }
+
     return wrap;
 }
+
 
 function note(text) {
     const p = document.createElement("p");
@@ -820,7 +901,7 @@ function renderSbEditor() {
     });
     const nameInp = fieldInput("name", sb.name || "", (v) => { sb.name = v; saveSb(sb); });
 
-    const chipsWrap = renderChips(sb.skills, (next) => { sb.skills = next; saveSb(sb); renderSbList(); });
+    const chipsWrap = renderSkillPicker(sb.skills, (next) => { sb.skills = next; saveSb(sb); renderSbList(); });
 
     const notesTa = document.createElement("textarea");
     notesTa.value = sb.notes ?? "";
