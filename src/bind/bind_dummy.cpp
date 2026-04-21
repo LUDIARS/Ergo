@@ -1,8 +1,11 @@
 /// Dummy plug — no-op implementations of every ergo_bind symbol.
+///
+/// JSON codec dummies are intentionally not provided here: jsonm now lives
+/// in `ergo_common`. Hosts that link against `ergo_bind_dummy` and also need
+/// jsonm symbols should link `ergo_common` directly (or skip jsonm calls).
 
 #define ERGO_BIND_ENABLED 1
 #include "ergo/bind/bind.h"
-#include "ergo/bind/json_min.h"
 
 #include <cstdint>
 
@@ -20,20 +23,6 @@ Value Value::of_color(float, float, float, float) { return {}; }
 Value Value::of_vec3(float, float, float) { return {}; }
 bool  Value::equals(const Value&) const   { return false; }
 Value clamp_to_meta(const Value& v, const VarMeta&) { return v; }
-
-namespace jsonm {
-JsonValue JsonValue::make_null()                { return {}; }
-JsonValue JsonValue::make_bool(bool)            { return {}; }
-JsonValue JsonValue::make_number(double)        { return {}; }
-JsonValue JsonValue::make_string(std::string)   { return {}; }
-JsonValue JsonValue::make_array()               { return {}; }
-JsonValue JsonValue::make_object()              { return {}; }
-JsonValue& JsonValue::set(const std::string&, JsonValue) { return *this; }
-JsonValue& JsonValue::push(JsonValue)           { return *this; }
-const JsonValue* JsonValue::find(const std::string&) const { return nullptr; }
-bool        parse(const std::string&, JsonValue&) { return false; }
-std::string serialize(const JsonValue&)         { return {}; }
-} // namespace jsonm
 
 struct Engine::Impl {};
 
