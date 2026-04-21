@@ -1,1 +1,7 @@
 build/
+build_*/
+
+# tools/ergo — per-developer local state
+tools/ergo/placer-data.json
+tools/ergo/dist/
+tools/ergo/node_modules/
