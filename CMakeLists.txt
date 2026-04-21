@@ -449,4 +449,23 @@ if(ERGO_BUILD_AUDIO)
         target_link_libraries(test_ergo_audio PRIVATE ergo_audio ergo_gtest_main)
         add_test(NAME test_ergo_audio COMMAND test_ergo_audio)
     endif()
+
+    # Host helper: stage the FMOD runtime DLL next to an executable so it
+    # can load at launch time without PATH tweaks. No-op on the Dummy
+    # backend (DLL path is unset) or when FindFMOD did not resolve the
+    # runtime binary.
+    #
+    # Usage (from host CMakeLists):
+    #     add_executable(mygame ...)
+    #     target_link_libraries(mygame PRIVATE ergo_audio)
+    #     ergo_audio_stage_runtime(mygame)
+    function(ergo_audio_stage_runtime TARGET)
+        if(_ERGO_AUDIO_USE_FMOD AND FMOD_RUNTIME AND EXISTS "${FMOD_RUNTIME}")
+            add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${FMOD_RUNTIME}"
+                    "$<TARGET_FILE_DIR:${TARGET}>/"
+                COMMENT "Staging FMOD runtime next to ${TARGET}: ${FMOD_RUNTIME}")
+        endif()
+    endfunction()
 endif()
