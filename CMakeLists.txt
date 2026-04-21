@@ -21,6 +21,7 @@ option(ERGO_BUILD_FRAME        "Build ergo_frame"        ON)
 option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
 option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
+option(ERGO_BUILD_WORLD_TIME   "Build ergo_world_time"   ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -427,4 +428,23 @@ if(ERGO_BUILD_AUDIO)
                 COMMENT "Staging FMOD runtime next to ${TARGET}: ${FMOD_RUNTIME}")
         endif()
     endfunction()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_world_time — global time-scale composer for hit-stop / hit-slow
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_WORLD_TIME)
+    add_library(ergo_world_time src/world_time/world_time.cpp)
+    target_include_directories(ergo_world_time PUBLIC include)
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_world_time_dummy src/world_time/world_time_dummy.cpp)
+        target_include_directories(ergo_world_time_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_world_time tests/world_time/test_world_time.cpp)
+        target_link_libraries(test_world_time PRIVATE ergo_world_time ergo_gtest_main)
+        add_test(NAME test_world_time COMMAND test_world_time)
+    endif()
 endif()
