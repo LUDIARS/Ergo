@@ -1,0 +1,114 @@
+# Ergo モジュール一覧 (機械処理用)
+#
+# 人間向けの一覧は module_list.md を参照。新規モジュール追加時は両方に
+# エントリを足すこと。
+#
+# schema (modules[].*):
+#   name:        CMake ターゲット名 (ergo_*)
+#   summary:     1 行概要 (日本語)
+#   category:    UI / ロジック / システム / ゲームオブジェクト
+#   header_dir:  公開ヘッダのルート
+#   source_dir:  実装ソースのルート
+#   test_dir:    テストソースのルート
+#   spec:        モジュール仕様書
+#   cmake_option: ON/OFF で切り替える CMake オプション
+#   tool_plugin: 付随する tools/ergo/ プラグイン id (無ければ null)
+#   status:      stable / preview / incomplete のいずれか
+
+schema_version: 1
+
+modules:
+  - name: ergo_input
+    summary: マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ
+    category: システム
+    header_dir: include/ergo/input/
+    source_dir: src/input/
+    test_dir:   tests/input/
+    spec:       spec/module/input.md
+    cmake_option: ERGO_BUILD_INPUT
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_inspector
+    summary: in-process POSIX WS サーバでホスト変数をブラウザからライブ編集
+    category: システム
+    header_dir: include/ergo/inspector/
+    source_dir: src/inspector/
+    test_dir:   tests/inspector/
+    spec:       spec/module/inspector.md
+    cmake_option: ERGO_BUILD_INSPECTOR
+    tool_plugin: null   # Phase 2 で `inspector` プラグイン化予定
+    status: preview
+
+  - name: ergo_particle
+    summary: CPU パーティクル sim + (任意) Pictor Vulkan ビルボード renderer
+    category: システム
+    header_dir: include/ergo/particle/
+    source_dir: src/particle/
+    test_dir:   tests/particle/
+    spec:       spec/module/particle.md
+    cmake_option: ERGO_BUILD_PARTICLE
+    tool_plugin: particle
+    status: stable
+
+  - name: ergo_gpu_particle
+    summary: Shuriken 相当の GPU compute パーティクル (IGpuBackend 抽象)
+    category: システム
+    header_dir: include/ergo/gpu_particle/
+    source_dir: src/gpu_particle/
+    test_dir:   tests/gpu_particle/
+    spec:       spec/module/gpu_particle.md
+    cmake_option: ERGO_BUILD_GPU_PARTICLE
+    tool_plugin: null
+    status: preview   # Burst cycles / shape variants が TODO
+
+  - name: ergo_bind
+    summary: 任意ホスト変数を WS アウトバウンドで外部エディタに公開
+    category: システム
+    header_dir: include/ergo/bind/
+    source_dir: src/bind/
+    test_dir:   tests/bind/
+    spec:       spec/module/bind.md
+    cmake_option: ERGO_BUILD_BIND
+    tool_plugin: variable
+    status: stable
+
+  - name: ergo_sound
+    summary: WAV/OGG デコード + ストリーム + ミキサ + 波形処理 + Quantizer
+    category: システム
+    header_dir: include/ergo/sound/
+    source_dir: src/sound/
+    test_dir:   tests/sound/
+    spec:       spec/module/sound.md
+    cmake_option: ERGO_BUILD_SOUND
+    tool_plugin: null
+    status: incomplete   # OGG の実 PCM デコードが未実装
+
+  - name: ergo_frame
+    summary: アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列
+    category: システム
+    header_dir: include/ergo/frame/
+    source_dir: src/frame/
+    test_dir:   tests/frame/
+    spec:       spec/module/frame.md
+    cmake_option: ERGO_BUILD_FRAME
+    tool_plugin: null
+    status: stable
+
+  - name: ergo_log
+    summary: 4-level ロガー (Error/Warn/Info/Debug)、先頭にフレーム番号
+    category: システム
+    header_dir: include/ergo/log/
+    source_dir: src/log/
+    test_dir:   tests/log/
+    spec:       spec/module/log.md
+    cmake_option: ERGO_BUILD_LOG
+    tool_plugin: null
+    status: stable
+
+shared_libs:
+  - name: ergo_common
+    summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
+    header_dir: include/ergo/common/
+    source_dir: src/common/
+    spec: null
