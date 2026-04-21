@@ -49,6 +49,7 @@ ergo/
 | `ergo_io`            | 最小ファイル I/O ラッパー (`<filesystem>` の薄膜, UTF-8 `std::string`) | `include/ergo/io/`           | — |
 | **`ergo_sound`** ⭐  | **コア音響エンジン** (自前 WAV/OGG デコーダ + ミキサ + DSP + BPM クォンタイズ)。rendering と並ぶ主要実装 | `include/ergo/sound/`        | — |
 | `ergo_audio`         | ゲーム SE ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。`ergo_sound` とは独立・横並び | `include/ergo/audio/`        | — |
+| `ergo_world_time`    | グローバル time-scale コンポーザ (HitStop / HitSlow + observer)。Foundation/WorldTimeScale の C++ ポート | `include/ergo/world_time/`   | — |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。
