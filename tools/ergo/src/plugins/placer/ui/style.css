@@ -423,3 +423,62 @@ dialog#cell-dialog header {
     min-height: 60px;
     resize: vertical;
 }
+
+/* ── SkillBlock shape editor ───────────────── */
+.shape-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+}
+.shape-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.shape-nav .shape-z {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    color: var(--fg-dim);
+    min-width: 90px;
+    text-align: center;
+}
+.shape-nav input[type="range"] {
+    flex: 1;
+    min-width: 100px;
+}
+.shape-grid-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+.shape-grid {
+    display: grid;
+    gap: 2px;
+    padding: 4px;
+    background: #101725;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+.shape-cell {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    background: #1a2030;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 2px;
+    transition: background 0.1s, border-color 0.1s;
+}
+.shape-cell:hover    { border-color: var(--accent); }
+.shape-cell.on       { background: #5eb2ff; border-color: #7ec0ff; }
+.shape-cell.on:hover { background: #7ec0ff; }
+.shape-meta {
+    font-size: 11px;
+    color: var(--fg-dim);
+}
