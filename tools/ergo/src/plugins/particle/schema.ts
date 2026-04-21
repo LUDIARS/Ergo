@@ -5,11 +5,31 @@
 
 export const SCHEMA_VERSION = 1;
 
+/// Shape that governs initial particle positions.
+///
+/// - `disc`      uses `initial.positionRadius` (original behavior).
+/// - `svgStroke` samples uniformly along the length of every geometric
+///               element inside `initial.svgSource` (paths, polygons,
+///               rect/circle/ellipse/line). Useful for silhouette outlines.
+/// - `svgFill`   rejection-samples inside any shape's filled area. Useful
+///               for emitting "from inside a logo".
+///
+/// The engine-side C++ consumer (`ergo_particle`) currently only implements
+/// the `disc` mode; `svgStroke` / `svgFill` fall back to disc. The UI
+/// preview fully supports all modes.
+export type PositionShape = "disc" | "svgStroke" | "svgFill";
+
 export interface ParticleEffectConfig {
     version: number;
     name:    string;
     emission: { rate: number; maxAlive: number };
     initial: {
+        positionShape:          PositionShape;
+        /// Raw SVG markup (full `<svg>` document) or a single path's `d` data.
+        /// Ignored when `positionShape === "disc"` or when the string is empty.
+        svgSource:              string;
+        /// Uniform scale applied after the SVG is centered on its bbox.
+        svgScale:               number;
         positionRadius:         number;
         velocityAngleDeg:       number;
         velocityAngleSpreadDeg: number;
@@ -36,6 +56,9 @@ export const DEFAULT_EFFECT: ParticleEffectConfig = {
     name: "untitled",
     emission: { rate: 60, maxAlive: 400 },
     initial: {
+        positionShape: "disc",
+        svgSource: "",
+        svgScale: 1,
         positionRadius: 4,
         velocityAngleDeg: 270,
         velocityAngleSpreadDeg: 60,
