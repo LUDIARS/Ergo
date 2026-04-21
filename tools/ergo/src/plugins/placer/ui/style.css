@@ -1,0 +1,425 @@
+:root {
+    color-scheme: dark;
+    --bg:      #0f131c;
+    --bg-alt:  #1a2030;
+    --bg-cell: #141a28;
+    --fg:      #e6ecf5;
+    --fg-dim:  #8a93a8;
+    --accent:  #5eb2ff;
+    --danger:  #e66060;
+    --border:  #2a3144;
+    --combo:   #efc56a;   /* multi-object combination badge */
+}
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-alt);
+    flex-wrap: wrap;
+}
+
+.tabs { display: flex; gap: 6px; }
+.tab {
+    background: transparent;
+    color: var(--fg-dim);
+    border: 1px solid transparent;
+    padding: 4px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+}
+.tab.active {
+    color: var(--fg);
+    border-color: var(--border);
+    background: var(--bg);
+}
+
+.store-path {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 50%;
+}
+
+.status {
+    font-size: 12px;
+    color: var(--fg-dim);
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-left: 8px;
+}
+.status.ok   { color: #7ddba2; border-color: #355c3f; }
+.status.warn { color: #efc56a; border-color: #614f1d; }
+.status.err  { color: var(--danger); border-color: #6c2e2e; }
+
+button {
+    background: var(--bg-alt);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+}
+button:hover   { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #0b1220; border-color: transparent; font-weight: 600; }
+button.primary:hover { filter: brightness(1.1); }
+button.danger  { color: var(--danger); border-color: #4a2a2a; background: transparent; }
+button.ghost   { background: transparent; color: var(--fg-dim); padding: 2px 8px; font-size: 11px; }
+
+input, select {
+    font: inherit;
+    color: var(--fg);
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+input:focus, select:focus { outline: 1px solid var(--accent); }
+
+/* -------------- view layout -------------- */
+
+.view {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+}
+.view.hidden { display: none; }
+
+.sidebar {
+    border-right: 1px solid var(--border);
+    background: #10141d;
+    overflow-y: auto;
+}
+
+.sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 4px;
+}
+.sidebar-head h2 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+    margin: 0;
+}
+
+#block-list, #stage-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 16px 0;
+}
+#block-list li, #stage-list li {
+    padding: 8px 12px;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+#block-list li:hover, #stage-list li:hover { background: #171c2a; }
+#block-list li.sel,  #stage-list li.sel    { background: #1f2536; border-left-color: var(--accent); }
+#block-list .nm, #stage-list .nm { font-weight: 600; }
+#block-list .sub, #stage-list .sub {
+    font-size: 11px; color: var(--fg-dim);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.editor {
+    padding: 18px 22px;
+    overflow: auto;
+}
+.editor .hint { color: var(--fg-dim); }
+
+/* -------------- block editor -------------- */
+
+.block-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px 14px;
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-alt);
+}
+.block-meta label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--fg-dim);
+}
+.block-meta .special textarea {
+    width: 100%;
+    min-height: 48px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+}
+.block-meta .special { grid-column: 1 / -1; }
+
+.block-grid-wrap {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    background: var(--bg-alt);
+    overflow: auto;
+}
+
+.block-grid {
+    display: grid;
+    grid-template-columns: 30px repeat(10, 1fr);
+    grid-auto-rows: 54px;
+    gap: 2px;
+    min-width: 720px;
+}
+.block-grid .col-label, .block-grid .row-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--fg-dim);
+}
+.block-grid .col-label { height: 18px; }
+
+.cell {
+    background: var(--bg-cell);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 4px 4px 3px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    gap: 2px;
+    transition: border-color 120ms;
+    text-align: center;
+}
+.cell:hover { border-color: var(--accent); }
+.cell .obj {
+    font-size: 11px;
+    line-height: 1.1;
+    color: var(--fg);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cell .obj.type-enemy  { color: #ff8a5c; }
+.cell .obj.type-skill  { color: #7ddba2; }
+.cell .obj.type-item   { color: #d199ff; }
+.cell .obj.type-marker { color: var(--accent); }
+.cell .combo-flag {
+    font-size: 9px;
+    color: var(--combo);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cell.empty .hint {
+    color: var(--border);
+    font-size: 12px;
+    user-select: none;
+}
+
+.block-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* -------------- stage editor -------------- */
+
+.stage-meta {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    align-items: flex-end;
+}
+.stage-meta label { display: flex; flex-direction: column; font-size: 11px; color: var(--fg-dim); gap: 3px; }
+
+.stage-sequence {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.stage-step {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+.stage-step .step-idx { color: var(--fg-dim); font-size: 11px; width: 28px; }
+.stage-step select { flex: 1; }
+.stage-step .nav { display: flex; gap: 4px; }
+
+/* -------------- cell dialog -------------- */
+
+dialog#cell-dialog {
+    border: 1px solid var(--border);
+    background: var(--bg-alt);
+    color: var(--fg);
+    padding: 0;
+    border-radius: 6px;
+    min-width: 360px;
+}
+dialog#cell-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+dialog#cell-dialog header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #10141d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.cell-dialog-body { padding: 12px 14px; }
+.cell-dialog-body h3 {
+    font-size: 11px; font-weight: 600; color: var(--fg-dim);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: 10px 0 6px 0;
+}
+.cell-dialog-body h3:first-child { margin-top: 0; }
+.cell-dialog-body ul {
+    list-style: none;
+    margin: 0 0 4px 0;
+    padding: 0;
+}
+.cell-dialog-body li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+}
+.cell-dialog-body li:last-child { border-bottom: none; }
+.cell-dialog-body li .o-type  { color: var(--fg-dim); font-size: 11px; width: 70px; }
+.cell-dialog-body li .o-label { flex: 1; font-weight: 600; }
+
+.add-row {
+    display: flex; gap: 6px; justify-content: flex-end;
+}
+.add-row input { flex: 1; }
+
+/* ── typed cell editor ─────────────────────── */
+.new-obj-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.new-obj-fields .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.new-obj-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 10px;
+    color: var(--fg-dim);
+    flex: 1;
+}
+.row-label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 10px;
+    color: var(--fg-dim);
+    margin-bottom: 8px;
+}
+.chips {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-height: 32px;
+    background: var(--bg);
+}
+.chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 6px 2px 8px;
+    border-radius: 12px;
+    background: #223049;
+    font-size: 11px;
+    color: var(--fg);
+}
+.chip button {
+    background: transparent; border: 0; color: var(--fg-dim);
+    cursor: pointer; padding: 0 2px; font-size: 12px; line-height: 1;
+}
+.chip-input {
+    flex: 1;
+    min-width: 120px;
+    background: transparent;
+    border: 0;
+    color: var(--fg);
+    font: inherit;
+    padding: 2px 4px;
+    outline: none;
+}
+
+/* ── sheet editors (enemy / skill block) ───── */
+.sheet-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 14px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-alt);
+    margin-bottom: 10px;
+}
+.sheet-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--fg-dim);
+}
+.sheet-grid .span-2 { grid-column: 1 / -1; }
+.sheet-grid textarea {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px;
+    font: inherit;
+    min-height: 60px;
+    resize: vertical;
+}
