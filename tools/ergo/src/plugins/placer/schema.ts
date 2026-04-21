@@ -119,6 +119,13 @@ export interface Enemy {
     notes?:       string;
 }
 
+/** SkillBlock の立方体サイズ (エッジ長). 3/5/7/9 の 4 択. */
+export type SkillBlockSize = 3 | 5 | 7 | 9;
+export const SKILL_BLOCK_SIZES: readonly SkillBlockSize[] = [3, 5, 7, 9] as const;
+
+/** 3D voxel shape. `shape[z][y][x]` は 0/1 の整数. 各軸長 = size. */
+export type SkillBlockShape = number[][][];
+
 export interface SkillBlock {
     id:     string;
     name:   string;
@@ -126,7 +133,57 @@ export interface SkillBlock {
      *  UI の multi-select から選ばれる前提. 重複は許可 (攻撃系は
      *  同じブロックを集めると実ゲームでレベルアップするため). */
     skills: string[];
+    /** 立方体のエッジ長 (3/5/7/9). Default 3. */
+    size:   SkillBlockSize;
+    /** N×N×N voxel 配列. 1 = 埋まっている, 0 = 空. */
+    shape:  SkillBlockShape;
+    /** インターバル (cooldown) in 秒. 0 以上. */
+    interval: number;
     notes?: string;
+}
+
+/** 指定サイズの空の shape を作る (全 0). */
+export function emptyShape(size: SkillBlockSize): SkillBlockShape {
+    const out: SkillBlockShape = [];
+    for (let z = 0; z < size; ++z) {
+        const layer: number[][] = [];
+        for (let y = 0; y < size; ++y) {
+            const row: number[] = new Array(size).fill(0);
+            layer.push(row);
+        }
+        out.push(layer);
+    }
+    return out;
+}
+
+/** 既存 shape を新しいサイズにリサイズする.
+ *  重なる領域の値は保持、はみ出しは捨て、足りない領域は 0 埋め. */
+export function resizeShape(src: SkillBlockShape, nextSize: SkillBlockSize): SkillBlockShape {
+    const out = emptyShape(nextSize);
+    const minZ = Math.min(src.length, nextSize);
+    for (let z = 0; z < minZ; ++z) {
+        const sL = src[z];
+        const dL = out[z]!;
+        const minY = Math.min(sL?.length ?? 0, nextSize);
+        for (let y = 0; y < minY; ++y) {
+            const sR = sL?.[y];
+            const dR = dL[y]!;
+            const minX = Math.min(sR?.length ?? 0, nextSize);
+            for (let x = 0; x < minX; ++x) {
+                dR[x] = (sR?.[x] ? 1 : 0);
+            }
+        }
+    }
+    return out;
+}
+
+/** shape の埋まっている voxel 数を数える. */
+export function countFilledVoxels(shape: SkillBlockShape): number {
+    let n = 0;
+    for (const layer of shape)
+        for (const row of layer)
+            for (const v of row) if (v) ++n;
+    return n;
 }
 
 // ─── Skill catalog (Issue 追加要求: SkillID は実装済みリストから
@@ -299,8 +356,15 @@ export function makeEnemy(id: string): Enemy {
     return { id, name: id, skillBlockId: "", level: 1 };
 }
 
-export function makeSkillBlock(id: string): SkillBlock {
-    return { id, name: id, skills: [] };
+export function makeSkillBlock(id: string, size: SkillBlockSize = 3): SkillBlock {
+    return {
+        id,
+        name:     id,
+        skills:   [],
+        size,
+        shape:    emptyShape(size),
+        interval: 1.0,
+    };
 }
 
 export function emptyStore(): Store {
@@ -514,13 +578,46 @@ export function normaliseSkillBlock(raw: unknown): SkillBlock {
     const r = raw as Record<string, unknown>;
     const id = String(r.id ?? "").trim();
     if (!id) throw new Error("skillBlock.id is required");
+
+    // skills は旧挙動: 文字列化、空削除。重複は **許可** (attack の
+    // 「同じブロック集めるとレベルアップ」仕様を表現できるよう).
     const skills = Array.isArray(r.skills)
-        ? Array.from(new Set((r.skills as unknown[]).map(String).filter((s) => s.length > 0)))
+        ? (r.skills as unknown[]).map(String).filter((s) => s.length > 0)
         : [];
+
+    // size: 3/5/7/9 のどれか. それ以外は 3 にフォールバック.
+    const sizeRaw = Number(r.size);
+    const size: SkillBlockSize = SKILL_BLOCK_SIZES.includes(sizeRaw as SkillBlockSize)
+        ? (sizeRaw as SkillBlockSize) : 3;
+
+    // shape: 3D 配列. 欠落 / 形状不一致は emptyShape(size) で置換.
+    const rawShape = r.shape;
+    let shape = emptyShape(size);
+    if (Array.isArray(rawShape)) {
+        const maybe: number[][][] = [];
+        for (const layer of rawShape) {
+            if (!Array.isArray(layer)) { maybe.push([]); continue; }
+            const mLayer: number[][] = [];
+            for (const row of layer) {
+                if (!Array.isArray(row)) { mLayer.push([]); continue; }
+                mLayer.push((row as unknown[]).map((v) => (v ? 1 : 0)));
+            }
+            maybe.push(mLayer);
+        }
+        shape = resizeShape(maybe, size);
+    }
+
+    // interval: 0 以上の数値, それ以外は 1.0.
+    const ivRaw = Number(r.interval);
+    const interval = Number.isFinite(ivRaw) && ivRaw >= 0 ? ivRaw : 1.0;
+
     return {
         id,
-        name:   String(r.name ?? id),
+        name:     String(r.name ?? id),
         skills,
-        notes:  typeof r.notes === "string" ? r.notes : undefined,
+        size,
+        shape,
+        interval,
+        notes:    typeof r.notes === "string" ? r.notes : undefined,
     };
 }

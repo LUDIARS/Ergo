@@ -34,6 +34,7 @@ import {
     BLOCK_ROWS_ALLOWED,
     PLACED_OBJECT_TYPES,
     SCHEMA_VERSION,
+    SKILL_BLOCK_SIZES,
     SKILL_CATALOG,
     makeBlock,
     makeEnemy,
@@ -44,10 +45,12 @@ import {
     normaliseSkillBlock,
     normaliseStage,
     resizeGrid,
+    resizeShape,
     type Block,
     type BlockRows,
     type Enemy,
     type SkillBlock,
+    type SkillBlockSize,
     type Stage,
     type Store,
 } from "./schema.js";
@@ -83,11 +86,12 @@ const factory: PluginFactory = () => {
             // --- meta ----------------------------------------------------
             app.get("/api/meta", (c) =>
                 c.json({
-                    version:          SCHEMA_VERSION,
-                    storePath:        store.filePath(),
-                    allowedRows:      BLOCK_ROWS_ALLOWED,
-                    cols:             BLOCK_COLS,
-                    placedObjectTypes: PLACED_OBJECT_TYPES,
+                    version:            SCHEMA_VERSION,
+                    storePath:          store.filePath(),
+                    allowedRows:        BLOCK_ROWS_ALLOWED,
+                    cols:               BLOCK_COLS,
+                    placedObjectTypes:  PLACED_OBJECT_TYPES,
+                    skillBlockSizes:    SKILL_BLOCK_SIZES,
                 })
             );
 
@@ -293,7 +297,35 @@ const factory: PluginFactory = () => {
                 const body = await c.req.json().catch(() => ({}));
                 const snap = await store.snapshot();
                 const id   = String((body as Record<string, unknown>)?.id ?? "").trim() || nextIdFor(snap, "skillBlock");
-                return c.json(makeSkillBlock(id));
+                const sz   = Number((body as Record<string, unknown>)?.size);
+                const size: SkillBlockSize = SKILL_BLOCK_SIZES.includes(sz as SkillBlockSize)
+                    ? (sz as SkillBlockSize) : 3;
+                return c.json(makeSkillBlock(id, size));
+            });
+
+            /** Change a SkillBlock's cube size, preserving overlapping
+             *  voxels. Useful UI-side so the client doesn't need to know
+             *  the resize algorithm. */
+            app.post("/api/skill-blocks/:id/resize", async (c) => {
+                const id   = c.req.param("id");
+                const body = await c.req.json().catch(() => null);
+                if (!body || typeof body !== "object") return c.json({ ok: false, error: "invalid JSON" }, 400);
+                const sz   = Number((body as Record<string, unknown>).size);
+                if (!SKILL_BLOCK_SIZES.includes(sz as SkillBlockSize)) {
+                    return c.json({ ok: false, error: `size must be one of ${SKILL_BLOCK_SIZES.join(",")}` }, 400);
+                }
+                const snap = await store.snapshot();
+                const current = snap.skillBlocks.find((s) => s.id === id);
+                if (!current) return c.json({ ok: false, error: "not found" }, 404);
+                const resized: SkillBlock = {
+                    ...current,
+                    size:  sz as SkillBlockSize,
+                    shape: resizeShape(current.shape, sz as SkillBlockSize),
+                };
+                const next: Store = structuredClone(snap);
+                upsertById(next.skillBlocks, resized);
+                await commit(next);
+                return c.json({ ok: true, skillBlock: resized });
             });
 
             return app;

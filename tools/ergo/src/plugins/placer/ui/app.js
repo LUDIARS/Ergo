@@ -19,6 +19,8 @@ const state = {
     selectedStageId: null,
     selectedEnemyId: null,
     selectedSbId:    null,
+    /** Which Z-layer of the current SkillBlock is being edited. */
+    selectedSbZ:     0,
     activeCell: null,
     // Staged "new object" being composed in the dialog.
     newObjDraft: null,
@@ -866,17 +868,39 @@ function renderSbList() {
     for (const s of state.skillBlocks) {
         const li = document.createElement("li");
         if (s.id === state.selectedSbId) li.classList.add("sel");
+        const filled = countFilledVoxels(s.shape);
+        const size   = s.size ?? 3;
         li.innerHTML = `
             <span class="nm">${escapeHtml(s.name || s.id)}</span>
-            <span class="sub">${escapeHtml(s.id)} · ${s.skills.length} skills</span>
+            <span class="sub">${escapeHtml(s.id)} · ${size}³ · ${filled} voxels · ${s.skills.length} skills · ${formatInterval(s.interval)}</span>
         `;
-        li.addEventListener("click", () => { state.selectedSbId = s.id; render(); });
+        li.addEventListener("click", () => {
+            state.selectedSbId = s.id;
+            state.selectedSbZ  = 0;
+            render();
+        });
         ul.appendChild(li);
     }
 }
 
 function currentSb() {
     return state.skillBlocks.find((s) => s.id === state.selectedSbId) || null;
+}
+
+function countFilledVoxels(shape) {
+    if (!Array.isArray(shape)) return 0;
+    let n = 0;
+    for (const layer of shape)
+        for (const row of layer)
+            for (const v of row) if (v) ++n;
+    return n;
+}
+
+function formatInterval(iv) {
+    const n = Number(iv);
+    if (!Number.isFinite(n)) return "CD?";
+    if (n === 0) return "CD 0s";
+    return `CD ${n}s`;
 }
 
 function renderSbEditor() {
@@ -901,6 +925,37 @@ function renderSbEditor() {
     });
     const nameInp = fieldInput("name", sb.name || "", (v) => { sb.name = v; saveSb(sb); });
 
+    // size select (server-side resize preserves overlapping voxels)
+    const sizes = state.meta?.skillBlockSizes ?? [3, 5, 7, 9];
+    const sizeSel = document.createElement("select");
+    for (const n of sizes) {
+        const o = document.createElement("option");
+        o.value = String(n); o.textContent = `${n}×${n}×${n}`;
+        sizeSel.appendChild(o);
+    }
+    sizeSel.value = String(sb.size ?? 3);
+    sizeSel.addEventListener("change", async () => {
+        const nextSize = Number(sizeSel.value);
+        try {
+            const r = await api("POST", `./api/skill-blocks/${encodeURIComponent(sb.id)}/resize`, { size: nextSize });
+            const idx = state.skillBlocks.findIndex((x) => x.id === sb.id);
+            if (idx >= 0) state.skillBlocks[idx] = r.skillBlock;
+            if (state.selectedSbZ >= nextSize) state.selectedSbZ = nextSize - 1;
+            render();
+            setStatus("resized", "ok");
+        } catch (err) { setStatus(err.message, "err"); }
+    });
+
+    // interval (seconds)
+    const ivInp = document.createElement("input");
+    ivInp.type = "number"; ivInp.min = "0"; ivInp.step = "0.1";
+    ivInp.value = String(sb.interval ?? 1.0);
+    ivInp.addEventListener("input", () => {
+        const n = Number(ivInp.value);
+        sb.interval = Number.isFinite(n) && n >= 0 ? n : 0;
+        saveSb(sb); renderSbList();
+    });
+
     const chipsWrap = renderSkillPicker(sb.skills, (next) => { sb.skills = next; saveSb(sb); renderSbList(); });
 
     const notesTa = document.createElement("textarea");
@@ -911,9 +966,13 @@ function renderSbEditor() {
 
     grid.appendChild(wrapLabel("id", idInp.input));
     grid.appendChild(wrapLabel("表示名", nameInp.input));
-    const skillsLbl = wrapLabel("skills (id を Enter で追加)", chipsWrap); skillsLbl.classList.add("span-2");
+    grid.appendChild(wrapLabel("立方体サイズ (N³)", sizeSel));
+    grid.appendChild(wrapLabel("インターバル (秒)", ivInp));
+    const skillsLbl = wrapLabel("skills (カタログから multi-select)", chipsWrap); skillsLbl.classList.add("span-2");
     grid.appendChild(skillsLbl);
-    const notesLbl = wrapLabel("notes", notesTa); notesLbl.classList.add("span-2");
+    const shapeLbl  = wrapLabel("形状 (Z レイヤ切替 + セルクリック)", renderShapeEditor(sb)); shapeLbl.classList.add("span-2");
+    grid.appendChild(shapeLbl);
+    const notesLbl  = wrapLabel("notes", notesTa); notesLbl.classList.add("span-2");
     grid.appendChild(notesLbl);
     root.appendChild(grid);
 
@@ -933,6 +992,127 @@ function renderSbEditor() {
     });
     actions.appendChild(delBtn);
     root.appendChild(actions);
+}
+
+/**
+ * 3D voxel shape editor.
+ *
+ * UI strategy: show one Z-layer at a time as an N×N clickable grid.
+ * Below, a Z navigator lets you jump between layers or flip through.
+ * Filled voxels in neighbouring layers are shown as faint outlines so
+ * the editor has some depth feedback without a true 3D view.
+ */
+function renderShapeEditor(sb) {
+    const wrap = document.createElement("div");
+    wrap.className = "shape-editor";
+
+    const size = sb.size ?? 3;
+    if (!Array.isArray(sb.shape) || sb.shape.length !== size) {
+        // Defensive: re-create a zero shape if something was lost.
+        sb.shape = Array.from({ length: size }, () =>
+            Array.from({ length: size }, () =>
+                Array.from({ length: size }, () => 0)));
+    }
+
+    state.selectedSbZ = Math.max(0, Math.min(state.selectedSbZ, size - 1));
+
+    // ---- Z navigator ---------------------------------------------
+    const nav = document.createElement("div");
+    nav.className = "shape-nav";
+    const prev = document.createElement("button");
+    prev.type = "button"; prev.textContent = "◀";
+    prev.addEventListener("click", () => {
+        state.selectedSbZ = Math.max(0, state.selectedSbZ - 1);
+        renderSbEditor();
+    });
+    const zLabel = document.createElement("span");
+    zLabel.className = "shape-z";
+    zLabel.textContent = `Z = ${state.selectedSbZ + 1} / ${size}`;
+    const next = document.createElement("button");
+    next.type = "button"; next.textContent = "▶";
+    next.addEventListener("click", () => {
+        state.selectedSbZ = Math.min(size - 1, state.selectedSbZ + 1);
+        renderSbEditor();
+    });
+
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = "0"; slider.max = String(size - 1); slider.step = "1";
+    slider.value = String(state.selectedSbZ);
+    slider.addEventListener("input", () => {
+        state.selectedSbZ = Number(slider.value);
+        zLabel.textContent = `Z = ${state.selectedSbZ + 1} / ${size}`;
+        refreshGrid();
+    });
+    nav.append(prev, zLabel, next, slider);
+
+    // Bulk actions
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button"; clearBtn.textContent = "この層をクリア";
+    clearBtn.addEventListener("click", () => {
+        const layer = sb.shape[state.selectedSbZ];
+        if (!Array.isArray(layer)) return;
+        for (let y = 0; y < size; ++y)
+            for (let x = 0; x < size; ++x)
+                layer[y][x] = 0;
+        saveSb(sb); refreshGrid(); renderSbList();
+    });
+    const fillBtn = document.createElement("button");
+    fillBtn.type = "button"; fillBtn.textContent = "この層を全塗り";
+    fillBtn.addEventListener("click", () => {
+        const layer = sb.shape[state.selectedSbZ];
+        if (!Array.isArray(layer)) return;
+        for (let y = 0; y < size; ++y)
+            for (let x = 0; x < size; ++x)
+                layer[y][x] = 1;
+        saveSb(sb); refreshGrid(); renderSbList();
+    });
+    nav.append(clearBtn, fillBtn);
+
+    wrap.appendChild(nav);
+
+    // ---- 2D grid (for the current Z layer) -----------------------
+    const gridBox = document.createElement("div");
+    gridBox.className = "shape-grid-wrap";
+    wrap.appendChild(gridBox);
+
+    function refreshGrid() {
+        gridBox.innerHTML = "";
+        const tbl = document.createElement("div");
+        tbl.className = "shape-grid";
+        tbl.style.gridTemplateColumns = `repeat(${size}, 28px)`;
+        const layer = sb.shape[state.selectedSbZ] ?? [];
+        for (let y = 0; y < size; ++y) {
+            const row = layer[y] ?? [];
+            for (let x = 0; x < size; ++x) {
+                const cell = document.createElement("button");
+                cell.type = "button";
+                cell.className = "shape-cell";
+                const filled = !!row[x];
+                if (filled) cell.classList.add("on");
+                cell.dataset.x = String(x);
+                cell.dataset.y = String(y);
+                cell.title = `x=${x}, y=${y}, z=${state.selectedSbZ}`;
+                cell.addEventListener("click", () => {
+                    const v = sb.shape[state.selectedSbZ][y][x];
+                    sb.shape[state.selectedSbZ][y][x] = v ? 0 : 1;
+                    cell.classList.toggle("on");
+                    saveSb(sb); renderSbList();
+                });
+                tbl.appendChild(cell);
+            }
+        }
+        gridBox.appendChild(tbl);
+
+        const meta = document.createElement("div");
+        meta.className = "shape-meta";
+        const thisLayerFilled = (layer || []).reduce(
+            (sum, r) => sum + (Array.isArray(r) ? r.reduce((s, v) => s + (v ? 1 : 0), 0) : 0), 0);
+        const total = countFilledVoxels(sb.shape);
+        meta.textContent = `layer filled: ${thisLayerFilled} / ${size * size}  ·  total: ${total} / ${size ** 3}`;
+        gridBox.appendChild(meta);
+    }
+    refreshGrid();
+    return wrap;
 }
 
 // ---------------------------------------------------------------------------
