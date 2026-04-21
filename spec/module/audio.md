@@ -100,3 +100,18 @@ setx FMOD_SDK_DIR "C:/Program Files (x86)/FMOD SoundSystem/FMOD Studio API Windo
 
 CMake 再構成後は FMOD バックエンドが自動選択される (`ergo_audio: using
 FMOD 2.x at ...` がログに出る)。
+
+### ランタイム DLL の配置
+
+FMOD ライブラリは DLL (Windows) / .so (Linux) / .dylib (macOS) を実行時に
+要求する。ホスト側の CMake では以下のヘルパ関数で exe の隣に DLL を
+staging できる:
+
+```cmake
+add_executable(mygame ...)
+target_link_libraries(mygame PRIVATE ergo_audio)
+ergo_audio_stage_runtime(mygame)  # POST_BUILD で FMOD DLL をコピー
+```
+
+Dummy バックエンド時は no-op。FindFMOD が DLL を解決できなかった場合
+(稀) も no-op。
