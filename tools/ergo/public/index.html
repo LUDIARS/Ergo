@@ -20,6 +20,9 @@
   <main>
     <iframe id="viewer" name="viewer" title="plugin viewer"></iframe>
   </main>
+  <!-- Extension API loaded first so subscribers can register before the
+       shell starts emitting events. -->
+  <script src="/shell/extensions.js"></script>
   <script type="module" src="/shell/shell.js"></script>
 </body>
 </html>

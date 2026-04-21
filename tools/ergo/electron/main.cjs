@@ -11,10 +11,11 @@
  * and dynamic-imports the ESM server bundle produced by `tsc`.
  */
 
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("node:path");
 
 const PORT = Number(process.env.PORT) || 5170;
+const BASE_TITLE = "ergo";
 
 let mainWindow = null;
 
@@ -22,12 +23,13 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width:  1280,
         height: 820,
-        title:  "ergo",
+        title:  BASE_TITLE,
         autoHideMenuBar: true,
         backgroundColor: "#0e1116",
         webPreferences: {
             contextIsolation: true,
             nodeIntegration:  false,
+            preload: path.join(__dirname, "preload.cjs"),
         },
     });
     mainWindow.loadURL(`http://localhost:${PORT}/`);
@@ -39,6 +41,15 @@ function createWindow() {
         return { action: "deny" };
     });
 }
+
+// Default extension behavior: reflect the active plugin in the window title.
+// Custom extensions can layer additional reactions on top by adding their
+// own ipcMain.on handlers in a forked main.cjs.
+ipcMain.on("shell:plugin-activated", (_event, payload) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const title = payload?.title ? `${BASE_TITLE} — ${payload.title}` : BASE_TITLE;
+    mainWindow.setTitle(title);
+});
 
 app.whenReady().then(async () => {
     // Dynamically import the ESM server build. `npm start` runs

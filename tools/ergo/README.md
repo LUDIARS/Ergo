@@ -59,6 +59,35 @@ If the backend ever moves to Rust/WebGPU, a Tauri swap is on the table.
 Each plugin owns its own state and WebSocket handler, but shares the
 HTTP/WS bootstrap and the top-level shell UI.
 
+## Extending the shell window
+
+The shell UI exposes an event bus at `window.ergo.shell` for adding
+behavior without forking `shell.js`. Subscribe to e.g. `plugin:activated`
+to react when a plugin is selected from the sidebar:
+
+```js
+// drop a <script> tag in public/index.html (after extensions.js):
+window.ergo.shell.on("plugin:activated", ({ id, plugin }) => {
+    console.log("now showing:", plugin.title);
+});
+```
+
+Plugins running in the iframe can also push events up:
+
+```js
+// inside a plugin UI
+window.parent.postMessage(
+    { type: "ergo:plugin:event", name: "selection", payload: {...} },
+    "*"
+);
+```
+
+The Electron app additionally exposes `window.ergo.electron.send(channel,
+payload)` (declared in `electron/preload.cjs`) for renderer→main IPC. The
+default reaction is to retitle the window to the active plugin. Full
+event list, type signatures, and IPC channel allowlist live in
+`spec/tool/ergo.md` § "シェル拡張 API".
+
 ## Migrated from
 
 - `tools/particle-editor/` (port 5173, `/ws`) — now `/particle/ws` at 5170
