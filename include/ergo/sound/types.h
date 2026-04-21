@@ -131,7 +131,7 @@ enum class FadeType : uint8_t {
 // エンベロープポイント
 // =====================================================================
 struct EnvelopePoint {
-    size_t  framePosiiton;  // フレーム位置
+    size_t  framePosition;  // フレーム位置
     float   amplitude;      // 振幅（0.0〜1.0）
 };
 
