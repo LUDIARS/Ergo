@@ -12,7 +12,6 @@ option(ERGO_BUILD_TESTS  "Build module tests"             ON)
 option(ERGO_BUILD_DUMMY  "Build dummy plug libraries"     ON)
 
 option(ERGO_BUILD_INPUT        "Build ergo_input"        ON)
-option(ERGO_BUILD_INSPECTOR    "Build ergo_inspector"    ON)
 option(ERGO_BUILD_PARTICLE     "Build ergo_particle"     ON)
 option(ERGO_BUILD_GPU_PARTICLE "Build ergo_gpu_particle" ON)
 option(ERGO_BUILD_BIND         "Build ergo_bind"         ON)
@@ -24,7 +23,6 @@ option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
 
 # Per-module knobs (passed through to module sections below)
-option(ERGO_INSPECTOR_BUILD_SERVER       "ergo_inspector: build POSIX WebSocket server" ON)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
 option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute shaders to SPIR-V via glslc" ON)
 
@@ -40,7 +38,7 @@ find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
 # ergo_common — small utility lib shared across modules. Currently just the
-# minimal JSON codec (used by both ergo_inspector and ergo_bind).
+# minimal JSON codec (used by ergo_bind).
 # ---------------------------------------------------------------------------
 add_library(ergo_common STATIC src/common/json_min.cpp)
 target_include_directories(ergo_common PUBLIC include)
@@ -94,43 +92,6 @@ if(ERGO_BUILD_INPUT)
                 test_input_system)
             add_executable(${NAME} tests/input/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_input ergo_gtest_main)
-            add_test(NAME ${NAME} COMMAND ${NAME})
-        endforeach()
-    endif()
-endif()
-
-# ---------------------------------------------------------------------------
-# ergo_inspector — in-process WS server for live var editing (legacy/optional)
-# ---------------------------------------------------------------------------
-if(ERGO_BUILD_INSPECTOR)
-    set(_INSP_SRC
-        src/inspector/tweakable.cpp
-        src/inspector/command_queue.cpp
-        src/inspector/inspector.cpp
-        src/inspector/ws_handshake.cpp
-    )
-    if(ERGO_INSPECTOR_BUILD_SERVER AND NOT WIN32)
-        list(APPEND _INSP_SRC src/inspector/server_posix.cpp)
-    else()
-        list(APPEND _INSP_SRC src/inspector/server_dummy.cpp)
-    endif()
-    add_library(ergo_inspector ${_INSP_SRC})
-    target_include_directories(ergo_inspector PUBLIC include)
-    target_compile_definitions(ergo_inspector PUBLIC ERGO_INSPECTOR_ENABLED=1)
-    target_link_libraries(ergo_inspector PUBLIC ergo_common Threads::Threads)
-
-    if(ERGO_BUILD_DUMMY)
-        add_library(ergo_inspector_dummy src/inspector/inspector_dummy.cpp)
-        target_include_directories(ergo_inspector_dummy PUBLIC include)
-        target_link_libraries(ergo_inspector_dummy PUBLIC Threads::Threads)
-    endif()
-
-    if(ERGO_BUILD_TESTS)
-        foreach(NAME
-                test_tweakable test_command_queue test_inspector
-                test_ws_handshake test_json_min)
-            add_executable(${NAME} tests/inspector/${NAME}.cpp)
-            target_link_libraries(${NAME} PRIVATE ergo_inspector ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
@@ -220,15 +181,9 @@ if(ERGO_BUILD_BIND)
 
     if(ERGO_BUILD_TESTS)
         foreach(NAME test_types test_json_min test_bind_engine)
-            # test_json_min name collision with inspector — disambiguate.
-            if("${NAME}" STREQUAL "test_json_min")
-                set(TGT bind_test_json_min)
-            else()
-                set(TGT ${NAME})
-            endif()
-            add_executable(${TGT} tests/bind/${NAME}.cpp)
-            target_link_libraries(${TGT} PRIVATE ergo_bind ergo_gtest_main)
-            add_test(NAME ${TGT} COMMAND ${TGT})
+            add_executable(${NAME} tests/bind/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_bind ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
 endif()
@@ -448,8 +403,7 @@ if(ERGO_BUILD_AUDIO)
     target_include_directories(ergo_audio PUBLIC include)
 
     if(ERGO_BUILD_TESTS)
-        # Name-disambiguated from ergo_sound's existing test_audio_engine
-        # (same naming pattern as bind/inspector test_json_min overlap).
+        # Name-disambiguated from ergo_sound's existing test_audio_engine.
         add_executable(test_ergo_audio tests/audio/test_ergo_audio.cpp)
         target_link_libraries(test_ergo_audio PRIVATE ergo_audio ergo_gtest_main)
         add_test(NAME test_ergo_audio COMMAND test_ergo_audio)

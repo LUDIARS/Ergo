@@ -5,8 +5,12 @@
 へエクスポートし、ブラウザ UI からのライブ編集を受け取る Ergo モジュール。
 
 ホスト側はアウトバウンドでエディタサーバ (`ws://host:5170/variable/ws`) へ接続するため、
-Win32 サーバ実装に依存しない。`ergo_inspector` の発展系 (in-process server →
-out-of-process server) の位置づけ。
+Win32 サーバ実装に依存しない。
+
+> **歴史的経緯**: 旧 `ergo_inspector` モジュール (in-process WebSocket サーバ + Windows
+> dummy フォールバック) は本モジュールに完全吸収され、2026-04-21 に廃止された。
+> live tuning の唯一の窓口は `ergo_bind`。inspector が持っていた機能 (型消し変数登録 /
+> メタデータ / 値変化検出 broadcast) は `bind` 側で全 OS 同等に動く。
 
 ## カテゴリ
 システム

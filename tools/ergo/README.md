@@ -66,9 +66,9 @@ HTTP/WS bootstrap and the top-level shell UI.
 
 ## Roadmap
 
-- **Phase 2**: migrate `ergo_inspector` to plug in here. The C++
-  module's built-in POSIX HTTP/WS server disappears; `ergo_inspector`
-  becomes an outbound client like `ergo_bind`, and the existing
-  `tools/inspector_web/` page moves under `src/plugins/inspector/ui/`.
+- ~~**Phase 2**: migrate `ergo_inspector` to plug in here.~~ Cancelled
+  2026-04-21 — `ergo_inspector` was a strict subset of `ergo_bind` and was
+  removed from the engine entirely. New live-tuning features land in
+  `ergo_bind` + the `variable` plugin.
 - **Packaging**: ship signed `ergo.exe` / `ergo.app` via electron-builder
   when there's a clear distribution need (currently run from source).

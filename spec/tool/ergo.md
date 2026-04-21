@@ -119,31 +119,24 @@ export default (): Plugin => {
 - `BIND_VAR()` 登録を受ける engine ↔ UI ハブ
 - `hello` メッセージでロール (`engine` / `ui`) を識別
 
-## ロードマップ (Phase 2)
+## 廃止プラン (履歴) — `inspector` プラグイン統合は実施せず
 
-### `inspector` プラグイン統合
+当初は `inspector` を tools/ergo プラグインとして取り込む案 (Phase 2) を
+検討したが、機能調査の結果 **`ergo_inspector` は `ergo_bind` の完全な
+サブセット** と判定し、2026-04-21 に **inspector モジュール自体を廃止**
+した。
 
-現状:
-- `ergo_inspector` モジュールが C++ 内蔵 POSIX WS サーバで UI を配信
-- `tools/inspector_web/index.html` を自前で serve
-- Windows は dummy 実装で事実上機能しない
+| 機能 | bind | (旧) inspector |
+|------|------|----------------|
+| 型消し変数登録 | ✅ | ✅ |
+| メタデータ (min/max/step/unit/read_only) | ✅ | ✅ |
+| 値変化検出 → 自動 broadcast | ✅ (apply_pending_writes 経由) | ✅ |
+| Actor tree 階層 | ✅ | ❌ |
+| Win32 含む全 OS で同等動作 | ✅ | ❌ (Windows は dummy) |
+| WS サーバ位置 | アウトバウンド (tools/ergo) | エンジン内蔵 POSIX |
 
-Phase 2 で以下を実施:
-
-1. `src/plugins/inspector/` を新設し、`inspector_web/index.html` を
-   `plugins/inspector/ui/` に移動
-2. `ergo_inspector` の C++ 側を **アウトバウンド WS クライアント**
-   (`ergo_bind` と同じ形) に書き換え、内蔵 POSIX サーバを削除
-3. デフォルト接続先を `ws://127.0.0.1:5170/inspector/ws` とする
-4. Windows dummy 実装も撤去 (全 OS 同一コードパス)
-5. `spec/module/inspector.md` を更新
-6. 旧 `tools/inspector_web/` (存在すれば) を削除
-
-既知のリスク:
-- `ergo_bind` との機能重複。Phase 2 着手前に「inspector は bind の
-  スーパーセットか、別機能を提供するか」を判定する。もし bind の
-  サブセットであれば **inspector モジュール自体を廃止** し、variable
-  プラグインに一本化する選択肢もある。
+新規ライブチューニング機能は `ergo_bind` + `tools/ergo/src/plugins/variable/`
+に追加する。`tools/inspector_web/` は本廃止以前から既に未配備。
 
 ## 互換性
 
