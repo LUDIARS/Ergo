@@ -124,6 +124,11 @@
 
     <h2>SVG Source</h2>
     <div id="svgPanel">
+      <div class="btnrow" id="svgPresets">
+        <button type="button" data-svg-preset="square">□ Square</button>
+        <button type="button" data-svg-preset="triangle">△ Triangle</button>
+        <button type="button" data-svg-preset="circle">○ Circle</button>
+      </div>
       <div class="btnrow">
         <label id="svgFileLabel" class="svgfile-label">
           <input type="file" id="svgFile" accept=".svg,image/svg+xml" hidden>
@@ -708,6 +713,15 @@ document.getElementById("btnDownload").onclick = () => {
 };
 
 // ---- SVG source panel ----
+// Built-in presets so users can try svgStroke / svgFill without needing to
+// find an SVG file. All use viewBox="0 0 100 100" so `svgScale=1` maps the
+// shape to a ~100 px emitter diameter.
+const SVG_PRESETS = {
+  square:   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 10 L90 10 L90 90 L10 90 Z"/></svg>`,
+  triangle: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 10 L90 85 L10 85 Z"/></svg>`,
+  circle:   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>`,
+};
+
 const svgTxt = document.getElementById("svgSource");
 const svgMsg = document.getElementById("svgMsg");
 function showSvgMsg(text, kind) {
@@ -754,6 +768,23 @@ document.getElementById("svgClear").onclick = () => {
   cfg.initial.svgSource = "";
   refreshSvgState();
 };
+
+// Built-in presets: clicking a button drops a viewBox="0 0 100 100" SVG into
+// the source and auto-switches to svgFill if the user is still on disc.
+document.getElementById("svgPresets").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button[data-svg-preset]");
+  if (!btn) return;
+  const key = btn.getAttribute("data-svg-preset");
+  const src = SVG_PRESETS[key];
+  if (!src) return;
+  svgTxt.value = src;
+  cfg.initial.svgSource = src;
+  refreshSvgState();
+  if (cfg.initial.positionShape === "disc") {
+    cfg.initial.positionShape = "svgFill";
+    rebuildUI();
+  }
+});
 
 function mergeWithDefaults(input) {
   const out = JSON.parse(JSON.stringify(DEFAULTS));
