@@ -1,61 +1,14 @@
 #pragma once
 
-/// json_min — single-translation-unit JSON for the inspector's RPC protocol.
+/// Re-export of the common JSON codec under the inspector namespace.
 ///
-/// Scope: only what enumerate / get / set / subscribe / changed need. Supports
-/// objects, arrays, strings, numbers (parsed as double), booleans, null. No
-/// streaming, no schema validation, no fancy diagnostics — if a payload fails
-/// to parse, callers reply with `{"ok":false,"err":"json"}` and move on.
-///
-/// JsonValue is a tagged-union holder. Lifetime is RAII; deep-copy semantics.
+/// The implementation lives at `ergo/common/json_min.{h,cpp}` and is
+/// shared with ergo_bind (and any future WS-protocol module). The
+/// namespace alias below keeps existing `ergo::inspector::jsonm::...`
+/// call sites compiling unchanged.
 
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
+#include "ergo/common/json_min.h"
 
-namespace ergo::inspector::jsonm {
-
-enum class JsonKind : uint8_t { Null, Bool, Number, String, Array, Object };
-
-struct JsonValue;
-using JsonArray  = std::vector<JsonValue>;
-using JsonObject = std::map<std::string, JsonValue>;
-
-struct JsonValue {
-    JsonKind                          kind = JsonKind::Null;
-    bool                              b    = false;
-    double                            n    = 0.0;
-    std::string                       s;
-    std::shared_ptr<JsonArray>        a;
-    std::shared_ptr<JsonObject>       o;
-
-    static JsonValue make_null();
-    static JsonValue make_bool(bool v);
-    static JsonValue make_number(double v);
-    static JsonValue make_string(std::string v);
-    static JsonValue make_array();
-    static JsonValue make_object();
-
-    JsonValue& set(const std::string& key, JsonValue v);
-    JsonValue& push(JsonValue v);
-
-    const JsonValue* find(const std::string& key) const;
-
-    bool is_null()   const { return kind == JsonKind::Null;  }
-    bool is_bool()   const { return kind == JsonKind::Bool;  }
-    bool is_number() const { return kind == JsonKind::Number;}
-    bool is_string() const { return kind == JsonKind::String;}
-    bool is_array()  const { return kind == JsonKind::Array; }
-    bool is_object() const { return kind == JsonKind::Object;}
-
-    std::string as_string(std::string fallback = {}) const { return is_string() ? s : fallback; }
-    double      as_number(double fallback = 0.0) const     { return is_number() ? n : fallback; }
-    bool        as_bool(bool fallback = false) const       { return is_bool() ? b : fallback; }
-};
-
-bool        parse(const std::string& src, JsonValue& out);
-std::string serialize(const JsonValue& v);
-
-} // namespace ergo::inspector::jsonm
+namespace ergo::inspector {
+namespace jsonm = ::ergo::common::jsonm;
+} // namespace ergo::inspector

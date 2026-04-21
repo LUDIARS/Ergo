@@ -130,16 +130,16 @@ void WaveformProcessor::applyEnvelope(AudioBuffer& buffer, const std::vector<Env
         float amplitude = 1.0f;
 
         // 現在のフレーム位置に対応するエンベロープ値を線形補間で計算
-        if (f <= points.front().framePosiiton) {
+        if (f <= points.front().framePosition) {
             amplitude = points.front().amplitude;
-        } else if (f >= points.back().framePosiiton) {
+        } else if (f >= points.back().framePosition) {
             amplitude = points.back().amplitude;
         } else {
             for (size_t p = 0; p + 1 < points.size(); ++p) {
-                if (f >= points[p].framePosiiton && f < points[p + 1].framePosiiton) {
-                    size_t range = points[p + 1].framePosiiton - points[p].framePosiiton;
+                if (f >= points[p].framePosition && f < points[p + 1].framePosition) {
+                    size_t range = points[p + 1].framePosition - points[p].framePosition;
                     if (range > 0) {
-                        float t = static_cast<float>(f - points[p].framePosiiton) /
+                        float t = static_cast<float>(f - points[p].framePosition) /
                                   static_cast<float>(range);
                         amplitude = points[p].amplitude + t * (points[p + 1].amplitude - points[p].amplitude);
                     }

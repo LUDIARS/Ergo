@@ -43,7 +43,10 @@ private:
     bool connect_once();
     bool perform_handshake(int sock);
     bool drain_send_queue(int sock);
-    bool read_one_frame(int sock, std::string& rx_buf, std::string& payload, uint8_t& opcode);
+    /// Returns 1 when a full frame has been decoded into `payload`/`opcode`,
+    /// 0 when more bytes are needed, -1 on a fatal protocol violation
+    /// (oversized frame). The caller drops the connection on -1.
+    int  read_one_frame(int sock, std::string& rx_buf, std::string& payload, uint8_t& opcode);
 
     std::string                     host_;
     uint16_t                        port_   = 0;

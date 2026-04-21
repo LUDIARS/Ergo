@@ -158,8 +158,39 @@ bool parse_http_request(const std::string& buf, HttpRequest& out) {
         if      (ieq(name, "Sec-WebSocket-Key")) out.sec_websocket_key = value;
         else if (ieq(name, "Upgrade"))           out.upgrade           = value;
         else if (ieq(name, "Connection"))        out.connection        = value;
+        else if (ieq(name, "Origin"))            out.origin            = value;
     }
     return true;
+}
+
+bool is_origin_allowed(const std::string& origin) {
+    // No Origin header: the caller is a non-browser client (our own
+    // bind / inspector CLI, curl -H, etc.). Browsers always send Origin
+    // on cross-origin WebSocket upgrades, so a missing value is a
+    // reliable signal that the request didn't originate from a page.
+    if (origin.empty()) return true;
+    // `null` is what browsers send for file:// pages and sandboxed
+    // iframes; accepting it keeps local-file-based dashboards working.
+    if (origin == "null") return true;
+
+    // Pull out the host (between "scheme://" and the next ':' or '/').
+    const auto scheme_end = origin.find("://");
+    if (scheme_end == std::string::npos) return false;
+    std::string rest = origin.substr(scheme_end + 3);
+    // Trim path if present.
+    if (auto slash = rest.find('/'); slash != std::string::npos) rest.resize(slash);
+    // Trim port if present. IPv6 literals come bracketed (`[::1]:port`),
+    // so only split on the last colon when there's no closing bracket.
+    if (!rest.empty() && rest.front() == '[') {
+        auto close = rest.find(']');
+        if (close == std::string::npos) return false;
+        // Keep the bracket form for comparison.
+        rest = rest.substr(0, close + 1);
+    } else if (auto colon = rest.rfind(':'); colon != std::string::npos) {
+        rest.resize(colon);
+    }
+
+    return rest == "localhost" || rest == "127.0.0.1" || rest == "[::1]";
 }
 
 std::string build_handshake_response(const std::string& accept) {
@@ -182,6 +213,13 @@ std::string build_http_html_response(const std::string& body) {
     return os.str();
 }
 
+// Reject frames whose payload would blow the server's rx buffer. RFC 6455
+// allows up to 2^63 bytes; we cap at 1 MiB which comfortably fits every
+// request the inspector protocol emits. Oversized frames are treated as a
+// protocol error so the caller drops the connection rather than
+// accumulating bytes toward an unbounded payload.
+constexpr uint64_t kMaxFramePayloadBytes = 1ull << 20; // 1 MiB
+
 DecodedFrame decode_frame(const std::string& buf) {
     DecodedFrame r;
     if (buf.size() < 2) return r;
@@ -195,6 +233,11 @@ DecodedFrame decode_frame(const std::string& buf) {
     r.opcode = static_cast<WsOpcode>(op);
 
     bool masked = (b1 & 0x80) != 0;
+    // RFC 6455 §5.1: a server MUST close the connection on any unmasked
+    // frame from a client. The only client-side opcodes we accept are
+    // Text/Binary/Close/Ping/Pong/Continuation — all must be masked.
+    if (!masked) { r.protocol_err = true; return r; }
+
     uint64_t plen = b1 & 0x7F;
     std::size_t header = 2;
     if (plen == 126) {
@@ -207,19 +250,18 @@ DecodedFrame decode_frame(const std::string& buf) {
         for (int i = 0; i < 8; ++i) plen = (plen << 8) | uint8_t(buf[2 + i]);
         header = 10;
     }
-    uint8_t mask[4] = {0,0,0,0};
-    if (masked) {
-        if (buf.size() < header + 4) return r;
-        for (int i = 0; i < 4; ++i) mask[i] = uint8_t(buf[header + i]);
-        header += 4;
+    if (plen > kMaxFramePayloadBytes) {
+        r.protocol_err = true; return r;
     }
+    uint8_t mask[4] = {0,0,0,0};
+    if (buf.size() < header + 4) return r;
+    for (int i = 0; i < 4; ++i) mask[i] = uint8_t(buf[header + i]);
+    header += 4;
     if (buf.size() < header + plen) return r;
 
     r.payload.resize(static_cast<std::size_t>(plen));
     for (uint64_t i = 0; i < plen; ++i) {
-        uint8_t byte = uint8_t(buf[header + i]);
-        if (masked) byte ^= mask[i & 3];
-        r.payload[static_cast<std::size_t>(i)] = static_cast<char>(byte);
+        r.payload[static_cast<std::size_t>(i)] = static_cast<char>(uint8_t(buf[header + i]) ^ mask[i & 3]);
     }
     r.consumed = header + static_cast<std::size_t>(plen);
     r.ok = true;

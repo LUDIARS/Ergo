@@ -39,6 +39,13 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
+# ergo_common — small utility lib shared across modules. Currently just the
+# minimal JSON codec (used by both ergo_inspector and ergo_bind).
+# ---------------------------------------------------------------------------
+add_library(ergo_common STATIC src/common/json_min.cpp)
+target_include_directories(ergo_common PUBLIC include)
+
+# ---------------------------------------------------------------------------
 # Shared mini-gtest (header-only), bound into one static lib used by all tests
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_TESTS)
@@ -100,7 +107,6 @@ if(ERGO_BUILD_INSPECTOR)
         src/inspector/tweakable.cpp
         src/inspector/command_queue.cpp
         src/inspector/inspector.cpp
-        src/inspector/json_min.cpp
         src/inspector/ws_handshake.cpp
     )
     if(ERGO_INSPECTOR_BUILD_SERVER AND NOT WIN32)
@@ -111,7 +117,7 @@ if(ERGO_BUILD_INSPECTOR)
     add_library(ergo_inspector ${_INSP_SRC})
     target_include_directories(ergo_inspector PUBLIC include)
     target_compile_definitions(ergo_inspector PUBLIC ERGO_INSPECTOR_ENABLED=1)
-    target_link_libraries(ergo_inspector PUBLIC Threads::Threads)
+    target_link_libraries(ergo_inspector PUBLIC ergo_common Threads::Threads)
 
     if(ERGO_BUILD_DUMMY)
         add_library(ergo_inspector_dummy src/inspector/inspector_dummy.cpp)
@@ -197,12 +203,11 @@ if(ERGO_BUILD_BIND)
     add_library(ergo_bind
         src/bind/types.cpp
         src/bind/bind_engine.cpp
-        src/bind/json_min.cpp
         src/bind/ws_client.cpp
     )
     target_include_directories(ergo_bind PUBLIC include)
     target_compile_definitions(ergo_bind PUBLIC ERGO_BIND_ENABLED=1)
-    target_link_libraries(ergo_bind PUBLIC Threads::Threads)
+    target_link_libraries(ergo_bind PUBLIC ergo_common Threads::Threads)
     if(WIN32)
         target_link_libraries(ergo_bind PUBLIC ws2_32)
     endif()

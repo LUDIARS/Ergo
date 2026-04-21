@@ -61,6 +61,17 @@ TEST(JsonMin, SerializeObjectIsParsable) {
     EXPECT_EQ(back.find("value")->n, 120.0);
 }
 
+TEST(JsonMin, ParseRejectsDeeplyNested) {
+    // Deeply nested arrays must fail rather than recursing into a stack
+    // overflow. 2048 levels is well past the documented cap.
+    std::string src;
+    src.reserve(8192);
+    for (int i = 0; i < 2048; ++i) src.push_back('[');
+    for (int i = 0; i < 2048; ++i) src.push_back(']');
+    JsonValue v;
+    EXPECT_FALSE(parse(src, v));
+}
+
 TEST(JsonMin, SerializeArrayOfObjects) {
     auto a = JsonValue::make_array();
     auto e1 = JsonValue::make_object();

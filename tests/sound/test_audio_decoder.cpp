@@ -73,54 +73,6 @@ std::string createInvalidFile(const std::string& path) {
     return path;
 }
 
-// テスト用の最小OGGファイルヘッダを作成
-std::string createTestOggFile(const std::string& path,
-                               uint8_t channels = 2, uint32_t sampleRate = 44100) {
-    std::ofstream file(path, std::ios::binary);
-
-    // OGGページヘッダ
-    file.write("OggS", 4);         // capture pattern
-    uint8_t version = 0;
-    file.write(reinterpret_cast<const char*>(&version), 1);    // version
-    uint8_t headerType = 0x02;     // beginning of stream
-    file.write(reinterpret_cast<const char*>(&headerType), 1);
-    uint64_t granulePos = 0;
-    file.write(reinterpret_cast<const char*>(&granulePos), 8);
-    uint32_t serialNumber = 1;
-    file.write(reinterpret_cast<const char*>(&serialNumber), 4);
-    uint32_t pageSequence = 0;
-    file.write(reinterpret_cast<const char*>(&pageSequence), 4);
-    uint32_t checksum = 0;
-    file.write(reinterpret_cast<const char*>(&checksum), 4);
-    uint8_t numSegments = 1;
-    file.write(reinterpret_cast<const char*>(&numSegments), 1);
-    uint8_t segmentSize = 30;      // Vorbis identification header size
-    file.write(reinterpret_cast<const char*>(&segmentSize), 1);
-
-    // Vorbis identification header
-    uint8_t packetType = 0x01;
-    file.write(reinterpret_cast<const char*>(&packetType), 1);
-    file.write("vorbis", 6);
-
-    uint32_t vorbisVersion = 0;
-    file.write(reinterpret_cast<const char*>(&vorbisVersion), 4);
-    file.write(reinterpret_cast<const char*>(&channels), 1);
-    file.write(reinterpret_cast<const char*>(&sampleRate), 4);
-
-    // 残りのヘッダフィールド（ビットレート等）
-    int32_t bitrateMax = 0, bitrateNominal = 128000, bitrateMin = 0;
-    file.write(reinterpret_cast<const char*>(&bitrateMax), 4);
-    file.write(reinterpret_cast<const char*>(&bitrateNominal), 4);
-    file.write(reinterpret_cast<const char*>(&bitrateMin), 4);
-    uint8_t blockSizes = 0x88;  // blocksize_0=8, blocksize_1=8
-    file.write(reinterpret_cast<const char*>(&blockSizes), 1);
-    uint8_t framingFlag = 1;
-    file.write(reinterpret_cast<const char*>(&framingFlag), 1);
-
-    file.close();
-    return path;
-}
-
 } // namespace
 
 class WavDecoderTest : public ::testing::Test {
@@ -255,7 +207,8 @@ TEST(DecoderTypeTest, DetectType) {
     EXPECT_EQ(IAudioDecoder::detectType("test.wav"), DecoderType::Wav);
     EXPECT_EQ(IAudioDecoder::detectType("test.WAV"), DecoderType::Wav);
     EXPECT_EQ(IAudioDecoder::detectType("test.wave"), DecoderType::Wav);
-    EXPECT_EQ(IAudioDecoder::detectType("test.ogg"), DecoderType::Ogg);
+    // OGG/MP3/その他すべて Unknown — ergo_sound は WAV 専用。
+    EXPECT_EQ(IAudioDecoder::detectType("test.ogg"), DecoderType::Unknown);
     EXPECT_EQ(IAudioDecoder::detectType("test.mp3"), DecoderType::Unknown);
 }
 
@@ -264,36 +217,6 @@ TEST(DecoderFactoryTest, CreateDecoder) {
     auto wavDecoder = IAudioDecoder::create("test.wav");
     EXPECT_NE(wavDecoder, nullptr);
 
-    auto oggDecoder = IAudioDecoder::create("test.ogg");
-    EXPECT_NE(oggDecoder, nullptr);
-
-    auto unknown = IAudioDecoder::create("test.mp3");
-    EXPECT_EQ(unknown, nullptr);
-}
-
-// OGGデコーダのヘッダ解析
-TEST(OggDecoderTest, ParseHeader) {
-    std::string path = "/tmp/ergo_test.ogg";
-    createTestOggFile(path, 2, 48000);
-
-    OggDecoder decoder;
-    ASSERT_TRUE(decoder.open(path));
-
-    auto fmt = decoder.getFormat();
-    EXPECT_EQ(fmt.channels, 2);
-    EXPECT_EQ(fmt.sampleRate, 48000u);
-
-    decoder.close();
-    std::remove(path.c_str());
-}
-
-// 不正なOGGファイル
-TEST(OggDecoderTest, InvalidFile) {
-    std::string path = "/tmp/ergo_test_invalid.ogg";
-    createInvalidFile(path);
-
-    OggDecoder decoder;
-    EXPECT_FALSE(decoder.open(path));
-
-    std::remove(path.c_str());
+    EXPECT_EQ(IAudioDecoder::create("test.ogg"), nullptr);
+    EXPECT_EQ(IAudioDecoder::create("test.mp3"), nullptr);
 }
