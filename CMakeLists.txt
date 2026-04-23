@@ -477,6 +477,8 @@ if(ERGO_BUILD_UI)
     add_library(ergo_ui STATIC
         src/ui/svg_raster.cpp
         src/ui/nine_slice.cpp
+        src/ui/gradient.cpp
+        src/ui/line_glow.cpp
     )
     target_include_directories(ergo_ui PUBLIC include)
     # nanoSVG is header-only and used only by svg_raster.cpp. PRIVATE so
@@ -484,7 +486,7 @@ if(ERGO_BUILD_UI)
     target_include_directories(ergo_ui PRIVATE third_party)
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME test_nine_slice test_svg_raster)
+        foreach(NAME test_nine_slice test_svg_raster test_gradient test_line_glow)
             add_executable(${NAME} tests/ui/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_ui ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
