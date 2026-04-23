@@ -9,10 +9,12 @@ import type { PluginFactory } from "./plugin.js";
 import makeParticlePlugin from "../plugins/particle/index.js";
 import makeVariablePlugin from "../plugins/variable/index.js";
 import makePlacerPlugin   from "../plugins/placer/index.js";
+import makeTerrainPlugin  from "../plugins/terrain/index.js";
 
 export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeParticlePlugin,
     makeVariablePlugin,
     makePlacerPlugin,
+    makeTerrainPlugin,
     // Phase 2: makeInspectorPlugin,
 ];

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>ice_01 — 氷 (cracked sheet)</title>
+  <defs>
+    <linearGradient id="ice01-base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d8ecff"/>
+      <stop offset="1" stop-color="#8ab8db"/>
+    </linearGradient>
+    <radialGradient id="ice01-gloss" cx="30%" cy="25%" r="70%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#ice01-base)"/>
+  <rect width="512" height="512" fill="url(#ice01-gloss)"/>
+  <!-- cracks -->
+  <g stroke="#3e6b8f" stroke-width="1.4" fill="none" opacity="0.55" stroke-linecap="round">
+    <path d="M40 60  L120 110 L160 90  L230 140 L300 120 L370 170 L450 150"/>
+    <path d="M60 260 L150 240 L220 300 L320 280 L410 330"/>
+    <path d="M80 420 L180 400 L260 450 L360 430 L470 460"/>
+    <path d="M120 30  L130 70  L160 90"/>
+    <path d="M230 140 L220 200 L260 260"/>
+    <path d="M370 170 L360 250 L410 330"/>
+    <path d="M320 280 L330 360 L360 430"/>
+    <path d="M150 240 L140 320 L180 400"/>
+    <path d="M450 150 L480 220 L470 320 L470 460"/>
+  </g>
+  <!-- snowflake hints -->
+  <g stroke="#ffffff" stroke-width="1.2" opacity="0.65" fill="none">
+    <g transform="translate(110 180)">
+      <line x1="-10" y1="0" x2="10" y2="0"/>
+      <line x1="0" y1="-10" x2="0" y2="10"/>
+      <line x1="-7" y1="-7" x2="7" y2="7"/>
+      <line x1="-7" y1="7" x2="7" y2="-7"/>
+    </g>
+    <g transform="translate(340 90)">
+      <line x1="-8" y1="0" x2="8" y2="0"/>
+      <line x1="0" y1="-8" x2="0" y2="8"/>
+      <line x1="-6" y1="-6" x2="6" y2="6"/>
+      <line x1="-6" y1="6" x2="6" y2="-6"/>
+    </g>
+    <g transform="translate(420 380)">
+      <line x1="-10" y1="0" x2="10" y2="0"/>
+      <line x1="0" y1="-10" x2="0" y2="10"/>
+      <line x1="-7" y1="-7" x2="7" y2="7"/>
+      <line x1="-7" y1="7" x2="7" y2="-7"/>
+    </g>
+    <g transform="translate(60 440)">
+      <line x1="-8" y1="0" x2="8" y2="0"/>
+      <line x1="0" y1="-8" x2="0" y2="8"/>
+      <line x1="-6" y1="-6" x2="6" y2="6"/>
+      <line x1="-6" y1="6" x2="6" y2="-6"/>
+    </g>
+    <g transform="translate(240 340)">
+      <line x1="-6" y1="0" x2="6" y2="0"/>
+      <line x1="0" y1="-6" x2="0" y2="6"/>
+      <line x1="-4" y1="-4" x2="4" y2="4"/>
+      <line x1="-4" y1="4" x2="4" y2="-4"/>
+    </g>
+  </g>
+  <g fill="#ffffff" opacity="0.35">
+    <circle cx="120" cy="110" r="3"/>
+    <circle cx="270" cy="200" r="2.5"/>
+    <circle cx="400" cy="240" r="2.8"/>
+    <circle cx="160" cy="360" r="2.4"/>
+    <circle cx="350" cy="470" r="2.6"/>
+  </g>
+</svg>

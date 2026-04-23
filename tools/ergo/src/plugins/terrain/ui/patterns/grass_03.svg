@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>grass_03 — 草原 (dense tufts, darker)</title>
+  <rect width="512" height="512" fill="#4f7a3a"/>
+  <g fill="#6aa84f">
+    <ellipse cx="80" cy="90" rx="46" ry="14"/>
+    <ellipse cx="210" cy="180" rx="60" ry="16"/>
+    <ellipse cx="370" cy="70" rx="50" ry="14"/>
+    <ellipse cx="440" cy="210" rx="44" ry="14"/>
+    <ellipse cx="60" cy="310" rx="54" ry="16"/>
+    <ellipse cx="220" cy="370" rx="64" ry="18"/>
+    <ellipse cx="370" cy="310" rx="50" ry="14"/>
+    <ellipse cx="450" cy="430" rx="46" ry="14"/>
+    <ellipse cx="120" cy="460" rx="40" ry="12"/>
+    <ellipse cx="300" cy="470" rx="40" ry="12"/>
+  </g>
+  <g stroke="#3e6a2b" stroke-width="2.4" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M40 96 L34 66"/><path d="M56 98 L60 68"/><path d="M76 100 L80 68"/><path d="M96 98 L102 68"/><path d="M116 96 L120 68"/>
+    <path d="M180 186 L178 156"/><path d="M198 188 L200 158"/><path d="M218 188 L224 158"/><path d="M238 186 L242 156"/>
+    <path d="M340 76 L338 46"/><path d="M360 78 L364 48"/><path d="M380 76 L384 46"/><path d="M400 76 L404 48"/>
+    <path d="M410 216 L408 186"/><path d="M430 218 L434 188"/><path d="M450 216 L454 188"/>
+    <path d="M30 316 L26 286"/><path d="M50 318 L52 288"/><path d="M70 316 L74 288"/><path d="M90 318 L94 288"/>
+    <path d="M180 376 L178 346"/><path d="M200 378 L204 348"/><path d="M220 378 L224 348"/><path d="M240 378 L246 348"/>
+    <path d="M340 316 L338 286"/><path d="M360 318 L362 288"/><path d="M380 318 L384 288"/><path d="M400 316 L404 288"/>
+    <path d="M430 436 L428 406"/><path d="M450 438 L454 408"/><path d="M470 436 L474 408"/>
+  </g>
+  <g fill="#8ac364" opacity="0.6">
+    <circle cx="150" cy="60" r="3"/>
+    <circle cx="300" cy="120" r="3"/>
+    <circle cx="420" cy="150" r="3"/>
+    <circle cx="250" cy="260" r="3"/>
+    <circle cx="40" cy="380" r="3"/>
+    <circle cx="180" cy="420" r="3"/>
+    <circle cx="360" cy="390" r="3"/>
+    <circle cx="480" cy="360" r="3"/>
+  </g>
+</svg>
