@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>soil_02 — 土 (cracked dry earth)</title>
+  <rect width="512" height="512" fill="#8b6239"/>
+  <g fill="#6c4521" opacity="0.45">
+    <rect x="0" y="0" width="512" height="512"/>
+  </g>
+  <!-- irregular polygons to mimic cracked tiles -->
+  <g fill="#a5794f" stroke="#3e2914" stroke-width="2.5" stroke-linejoin="round">
+    <polygon points="4,4  180,20  160,160  60,200  8,120"/>
+    <polygon points="180,20  360,14  340,110  240,140  160,160"/>
+    <polygon points="360,14  508,30  500,160  420,180  340,110"/>
+    <polygon points="60,200  160,160  240,140  260,280  140,320  20,260"/>
+    <polygon points="340,110 420,180 440,280  340,320  260,280  240,140"/>
+    <polygon points="420,180 500,160 508,320  440,340  340,320  440,280"/>
+    <polygon points="20,260  140,320  120,460  20,480"/>
+    <polygon points="140,320 260,280 340,320 320,440 200,480 120,460"/>
+    <polygon points="340,320 440,340 508,340 500,500 380,500 320,440"/>
+    <polygon points="20,480  120,460 200,480 180,508  20,508"/>
+    <polygon points="200,480 320,440 380,500 320,508 180,508"/>
+  </g>
+  <g fill="#5a3518" opacity="0.55">
+    <circle cx="96"  cy="80"  r="2.6"/>
+    <circle cx="250" cy="70"  r="2.2"/>
+    <circle cx="420" cy="90"  r="2.6"/>
+    <circle cx="90"  cy="260" r="2.6"/>
+    <circle cx="200" cy="220" r="2.4"/>
+    <circle cx="380" cy="260" r="2.4"/>
+    <circle cx="260" cy="360" r="2.6"/>
+    <circle cx="420" cy="380" r="2.6"/>
+    <circle cx="140" cy="420" r="2.2"/>
+    <circle cx="280" cy="460" r="2.6"/>
+  </g>
+</svg>

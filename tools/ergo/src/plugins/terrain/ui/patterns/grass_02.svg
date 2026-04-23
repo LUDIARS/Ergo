@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>grass_02 — 草原 (with flowers)</title>
+  <rect width="512" height="512" fill="#6aa84f"/>
+  <g fill="#5a8f3d" opacity="0.5">
+    <path d="M0 0 L512 0 L512 32 Q256 56 0 32 Z"/>
+    <path d="M0 120 Q128 140 256 124 Q384 108 512 128 L512 140 Q384 120 256 136 Q128 152 0 132 Z"/>
+    <path d="M0 260 Q128 280 256 264 Q384 248 512 268 L512 280 Q384 260 256 276 Q128 292 0 272 Z"/>
+    <path d="M0 400 Q128 420 256 404 Q384 388 512 408 L512 420 Q384 400 256 416 Q128 432 0 412 Z"/>
+  </g>
+  <g stroke="#3e6a2b" stroke-width="2" stroke-linecap="round" opacity="0.7" fill="none">
+    <path d="M50 70 L50 46"/><path d="M58 72 L62 48"/>
+    <path d="M140 180 L140 156"/><path d="M148 182 L152 158"/>
+    <path d="M240 70 L240 46"/><path d="M248 72 L252 48"/>
+    <path d="M340 200 L340 176"/><path d="M348 202 L352 178"/>
+    <path d="M420 90 L420 66"/><path d="M428 92 L432 68"/>
+    <path d="M80 340 L80 316"/><path d="M88 342 L92 318"/>
+    <path d="M200 360 L200 336"/><path d="M208 362 L212 338"/>
+    <path d="M320 380 L320 356"/><path d="M328 382 L332 358"/>
+    <path d="M460 320 L460 296"/><path d="M468 322 L472 298"/>
+  </g>
+  <!-- flowers -->
+  <g>
+    <g transform="translate(120 95)">
+      <circle r="6" fill="#ffd966"/>
+      <circle cx="-6" cy="-4" r="3.2" fill="#fff"/>
+      <circle cx="6" cy="-4" r="3.2" fill="#fff"/>
+      <circle cx="0" cy="6" r="3.2" fill="#fff"/>
+      <circle cx="-5" cy="5" r="3.2" fill="#fff"/>
+      <circle cx="5" cy="5" r="3.2" fill="#fff"/>
+    </g>
+    <g transform="translate(300 150)">
+      <circle r="6" fill="#ffd966"/>
+      <circle cx="-6" cy="-4" r="3.2" fill="#f3c6d4"/>
+      <circle cx="6" cy="-4" r="3.2" fill="#f3c6d4"/>
+      <circle cx="0" cy="6" r="3.2" fill="#f3c6d4"/>
+      <circle cx="-5" cy="5" r="3.2" fill="#f3c6d4"/>
+      <circle cx="5" cy="5" r="3.2" fill="#f3c6d4"/>
+    </g>
+    <g transform="translate(400 260)">
+      <circle r="6" fill="#ffd966"/>
+      <circle cx="-6" cy="-4" r="3.2" fill="#fff"/>
+      <circle cx="6" cy="-4" r="3.2" fill="#fff"/>
+      <circle cx="0" cy="6" r="3.2" fill="#fff"/>
+      <circle cx="-5" cy="5" r="3.2" fill="#fff"/>
+      <circle cx="5" cy="5" r="3.2" fill="#fff"/>
+    </g>
+    <g transform="translate(180 380)">
+      <circle r="6" fill="#ffd966"/>
+      <circle cx="-6" cy="-4" r="3.2" fill="#c8a2d0"/>
+      <circle cx="6" cy="-4" r="3.2" fill="#c8a2d0"/>
+      <circle cx="0" cy="6" r="3.2" fill="#c8a2d0"/>
+      <circle cx="-5" cy="5" r="3.2" fill="#c8a2d0"/>
+      <circle cx="5" cy="5" r="3.2" fill="#c8a2d0"/>
+    </g>
+    <g transform="translate(420 430)">
+      <circle r="6" fill="#ffd966"/>
+      <circle cx="-6" cy="-4" r="3.2" fill="#fff"/>
+      <circle cx="6" cy="-4" r="3.2" fill="#fff"/>
+      <circle cx="0" cy="6" r="3.2" fill="#fff"/>
+      <circle cx="-5" cy="5" r="3.2" fill="#fff"/>
+      <circle cx="5" cy="5" r="3.2" fill="#fff"/>
+    </g>
+  </g>
+</svg>

@@ -76,10 +76,21 @@ tools/ergo/
         │   ├── index.ts
         │   ├── schema.ts
         │   └── ui/
-        └── variable/     # 旧 variable-editor
+        ├── variable/     # 旧 variable-editor
+        │   ├── index.ts
+        │   ├── protocol.ts
+        │   └── ui/
+        ├── placer/       # ブロックベースのレベルデザイナ
+        │   ├── index.ts
+        │   ├── schema.ts
+        │   ├── store.ts
+        │   └── ui/
+        └── terrain/      # 地面 Field (草原/土/氷/石畳) で Stage を構成
             ├── index.ts
-            ├── protocol.ts
+            ├── schema.ts
+            ├── store.ts
             └── ui/
+                └── patterns/   # 512×512 SVG x 8
 ```
 
 ## Plugin I/F (TypeScript)
@@ -121,6 +132,25 @@ export default (): Plugin => {
 - 旧 `tools/variable-editor/` の移植
 - `BIND_VAR()` 登録を受ける engine ↔ UI ハブ
 - `hello` メッセージでロール (`engine` / `ui`) を識別
+
+### `placer`
+- ブロックベースのレベルデザイナ (3×10 / 5×10 grid × Cell(Enemy/SkillBlock/
+  SkillBox/Special) 配置)
+- Stage は Block ID の列
+- REST: `/placer/api/{blocks,stages,enemies,skill-blocks}`
+- 詳細は [placer.md](./placer.md)
+
+### `terrain`
+- Stage を **正方形の Field** (草原 / 土 / 氷 / 石畳) の列として構成する
+  地面エディタ。DWW `StageScenario` の `SEQUENTIAL` 動作を最小実装した形。
+- 設計者は Field ごとにカテゴリを選ぶだけ。具体的な SVG パターン
+  (grass_01/02/03, soil_01/02, ice_01, cobble_01/02 の計 8 種, 512×512)
+  はランタイムが FNV-1a ハッシュから決定的に選択する
+  (`pickPattern(category, stageId, fieldId, seed)`)。
+- REST: `/terrain/api/{meta,store,stages,patterns/:category,new/{stage,field}}`
+- エディタと AdventureCube ランタイム (`adventurecube::terrain::pick_pattern`)
+  は同じハッシュ式を使うので、プレビューハイライトと実行時表示が一致する。
+- 保存先: `ERGO_TERRAIN_FILE` (既定 `terrain-data.json`)
 
 ## シェル拡張 API (`window.ergo.shell`)
 

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Terrain — Stage Field Editor</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header>
+    <h1>🌱 Terrain</h1>
+    <span class="store-path" id="store-path"></span>
+    <span class="status" id="status">loading…</span>
+</header>
+
+<main class="view">
+    <aside class="sidebar">
+        <div class="sidebar-head">
+            <h2>Stages</h2>
+            <button id="stage-add" class="ghost" title="新しい Stage を追加">＋</button>
+        </div>
+        <ul id="stage-list"></ul>
+    </aside>
+
+    <section class="editor" id="stage-editor">
+        <p class="hint">左から Stage を選択してください。<br>Stage が無ければ ＋ で追加してください。</p>
+    </section>
+
+    <aside class="preview">
+        <h2>Pattern Preview</h2>
+        <p class="hint" id="preview-hint">Field を選ぶと、その category の全パターンが表示されます。ゲーム実行時は seed から自動選択されます。</p>
+        <div class="preview-grid" id="preview-grid"></div>
+    </aside>
+</main>
+
+<template id="tpl-stage-row">
+    <li class="stage-row">
+        <span class="stage-label"></span>
+        <span class="stage-count"></span>
+    </li>
+</template>
+
+<template id="tpl-field-row">
+    <li class="field-row">
+        <span class="field-index"></span>
+        <select class="field-category">
+            <option value="grass">草原</option>
+            <option value="soil">土</option>
+            <option value="ice">氷</option>
+            <option value="cobble">石畳</option>
+        </select>
+        <input type="text" class="field-note" placeholder="note (任意)">
+        <button class="field-up ghost" title="上に移動">▲</button>
+        <button class="field-down ghost" title="下に移動">▼</button>
+        <button class="field-remove ghost danger" title="削除">×</button>
+    </li>
+</template>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
