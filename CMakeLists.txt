@@ -23,6 +23,7 @@ option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
 option(ERGO_BUILD_WORLD_TIME   "Build ergo_world_time"   ON)
 option(ERGO_BUILD_BLACKBOARD   "Build ergo_blackboard"   ON)
+option(ERGO_BUILD_UI           "Build ergo_ui (SVG raster + 9-slice)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -466,5 +467,27 @@ if(ERGO_BUILD_BLACKBOARD)
         add_executable(test_blackboard tests/blackboard/test_blackboard.cpp)
         target_link_libraries(test_blackboard PRIVATE ergo_blackboard ergo_gtest_main)
         add_test(NAME test_blackboard COMMAND test_blackboard)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_ui — headless SVG raster + 9-slice frame composer for UI
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_UI)
+    add_library(ergo_ui STATIC
+        src/ui/svg_raster.cpp
+        src/ui/nine_slice.cpp
+    )
+    target_include_directories(ergo_ui PUBLIC include)
+    # nanoSVG is header-only and used only by svg_raster.cpp. PRIVATE so
+    # downstream targets don't accidentally rely on the vendored path.
+    target_include_directories(ergo_ui PRIVATE third_party)
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME test_nine_slice test_svg_raster)
+            add_executable(${NAME} tests/ui/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_ui ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
     endif()
 endif()

@@ -106,6 +106,17 @@ modules:
     tool_plugin: null
     status: stable
 
+  - name: ergo_ui
+    summary: SVG ラスタ + 9-slice フレームコンポーザ (RGBA8, Pictor/Vulkan 依存なし)
+    category: UI
+    header_dir: include/ergo/ui/
+    source_dir: src/ui/
+    test_dir:   tests/ui/
+    spec:       spec/module/ui.md
+    cmake_option: ERGO_BUILD_UI
+    tool_plugin: null
+    status: preview
+
 shared_libs:
   - name: ergo_common
     summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
