@@ -13,6 +13,10 @@
     --cat-soil:   #8b6239;
     --cat-ice:    #a3cfe6;
     --cat-cobble: #6e6e76;
+    --cat-sand:   #d4b074;
+    --cat-water:  #3d6fa3;
+    --cat-lava:   #d14f2b;
+    --cat-wood:   #a07a44;
 }
 * { box-sizing: border-box; }
 
@@ -208,6 +212,10 @@ input[type="text"], select {
 .field-row[data-category="soil"]   { border-left: 4px solid var(--cat-soil); }
 .field-row[data-category="ice"]    { border-left: 4px solid var(--cat-ice); }
 .field-row[data-category="cobble"] { border-left: 4px solid var(--cat-cobble); }
+.field-row[data-category="sand"]   { border-left: 4px solid var(--cat-sand); }
+.field-row[data-category="water"]  { border-left: 4px solid var(--cat-water); }
+.field-row[data-category="lava"]   { border-left: 4px solid var(--cat-lava); }
+.field-row[data-category="wood"]   { border-left: 4px solid var(--cat-wood); }
 
 .stage-sequence-preview {
     display: flex;
@@ -235,6 +243,10 @@ input[type="text"], select {
 .stage-sequence-preview .cell.soil   { background: var(--cat-soil); }
 .stage-sequence-preview .cell.ice    { background: var(--cat-ice); }
 .stage-sequence-preview .cell.cobble { background: var(--cat-cobble); }
+.stage-sequence-preview .cell.sand   { background: var(--cat-sand); }
+.stage-sequence-preview .cell.water  { background: var(--cat-water); }
+.stage-sequence-preview .cell.lava   { background: var(--cat-lava); }
+.stage-sequence-preview .cell.wood   { background: var(--cat-wood); }
 .stage-sequence-preview .cell .idx {
     position: absolute; top: 1px; left: 2px; font-size: 9px;
 }

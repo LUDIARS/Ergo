@@ -20,15 +20,22 @@ export const SCHEMA_VERSION = 1;
 
 /** Broad ground categories. Authors pick one per field; the renderer
  *  selects an actual SVG pattern from `FIELD_PATTERNS[category]`. */
-export const FIELD_CATEGORIES = ["grass", "soil", "ice", "cobble"] as const;
+export const FIELD_CATEGORIES = [
+    "grass", "soil", "ice", "cobble",
+    "sand",  "water", "lava", "wood",
+] as const;
 export type FieldCategory = typeof FIELD_CATEGORIES[number];
 
 /** Human-readable labels and accent colours for the UI. */
 export const CATEGORY_META: Record<FieldCategory, { label: string; accent: string; tint: string }> = {
-    grass:  { label: "草原", accent: "#6aa84f", tint: "rgba(106,168,79,0.18)"  },
-    soil:   { label: "土",   accent: "#8b6239", tint: "rgba(139,98,57,0.18)"   },
-    ice:    { label: "氷",   accent: "#a3cfe6", tint: "rgba(163,207,230,0.25)" },
-    cobble: { label: "石畳", accent: "#6e6e76", tint: "rgba(110,110,118,0.2)"  },
+    grass:  { label: "草原",   accent: "#6aa84f", tint: "rgba(106,168,79,0.18)"  },
+    soil:   { label: "土",     accent: "#8b6239", tint: "rgba(139,98,57,0.18)"   },
+    ice:    { label: "氷",     accent: "#a3cfe6", tint: "rgba(163,207,230,0.25)" },
+    cobble: { label: "石畳",   accent: "#6e6e76", tint: "rgba(110,110,118,0.2)"  },
+    sand:   { label: "砂",     accent: "#d4b074", tint: "rgba(212,176,116,0.22)" },
+    water:  { label: "水",     accent: "#3d6fa3", tint: "rgba(61,111,163,0.25)"  },
+    lava:   { label: "溶岩",   accent: "#d14f2b", tint: "rgba(209,79,43,0.25)"   },
+    wood:   { label: "木",     accent: "#a07a44", tint: "rgba(160,122,68,0.2)"   },
 };
 
 /** Shipping SVG patterns per category. File names live under
@@ -36,8 +43,12 @@ export const CATEGORY_META: Record<FieldCategory, { label: string; accent: strin
 export const FIELD_PATTERNS: Record<FieldCategory, readonly string[]> = {
     grass:  ["grass_01.svg", "grass_02.svg", "grass_03.svg"],
     soil:   ["soil_01.svg", "soil_02.svg"],
-    ice:    ["ice_01.svg"],
+    ice:    ["ice_01.svg", "ice_02.svg"],
     cobble: ["cobble_01.svg", "cobble_02.svg"],
+    sand:   ["sand_01.svg"],
+    water:  ["water_01.svg"],
+    lava:   ["lava_01.svg"],
+    wood:   ["wood_01.svg"],
 };
 
 export interface Field {
