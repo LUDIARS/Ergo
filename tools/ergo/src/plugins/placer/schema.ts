@@ -242,6 +242,14 @@ export const SKILL_CATALOG: readonly SkillDefinition[] = [
       description: "N 拍溜めて 1 発巨大攻撃 (攻撃力 ∝ N)", parametric: true },
     { id: "100010", name: "突進",            category: "attack",
       description: "前方 N マス踏破、通過した敵にダメージ", parametric: true },
+    { id: "100011", name: "自爆",            category: "attack",
+      description: "周囲 N マスに自爆ダメージ (自身 HP -1)", parametric: true },
+    { id: "100012", name: "毒刃",            category: "attack",
+      description: "命中敵に毒。N 拍間ダメージ持続", parametric: true },
+    { id: "100013", name: "跳弾",            category: "ranged",
+      description: "遠距離弾が N 回跳ね返って追加命中", parametric: true },
+    { id: "100014", name: "乱射",            category: "ranged",
+      description: "ランダム方向に N 発同時発射", parametric: true },
 
     // パッシブ系 ─────────────────────────────
     { id: "500000", name: "攻撃力アップ",        category: "buff",
@@ -262,6 +270,16 @@ export const SKILL_CATALOG: readonly SkillDefinition[] = [
       description: "キューブドロップ時 HP 全回復を N 回まで可能", parametric: true },
     { id: "500008", name: "行動ボーナス",        category: "buff",
       description: "N 拍ごとに無料攻撃 (追加行動)", parametric: true },
+    { id: "500009", name: "ダメージ軽減",        category: "buff",
+      description: "被ダメージを N% 軽減 (上限 80%)", parametric: true },
+    { id: "500010", name: "反射",                category: "buff",
+      description: "被ダメージの N% を攻撃者に返す (thorns)", parametric: true },
+    { id: "500011", name: "回避率",              category: "buff",
+      description: "被弾を確率 N% で完全回避", parametric: true },
+    { id: "500012", name: "状態異常耐性",        category: "buff",
+      description: "スロー / 毒 / 凍結を N% 無効化", parametric: true },
+    { id: "500013", name: "ドロップ吸引",        category: "buff",
+      description: "周囲 N マスのスキル/回復をプレイヤーに引き寄せる", parametric: true },
 
     // 特殊系 ─────────────────────────────────
     { id: "900000", name: "パッシブ延長",        category: "special",
@@ -294,6 +312,16 @@ export const SKILL_CATALOG: readonly SkillDefinition[] = [
       description: "特定レア度でしかドロップしない縛り", parametric: false },
     { id: "900014", name: "カテゴリ封印",        category: "special",
       description: "指定カテゴリのスキルだけ無効化 (デバフ試練)", parametric: false },
+    { id: "900015", name: "スキル再抽選",        category: "special",
+      description: "手持ちスキル 1 つをランダム別スキルに差し替え (N 回)", parametric: true },
+    { id: "900016", name: "緊急回復",            category: "special",
+      description: "HP 1 到達時 1 度だけ全回復 + N 拍無敵", parametric: true },
+    { id: "900017", name: "地形凍結",            category: "special",
+      description: "踏んだ地面を N 秒氷化 (後続敵がスリップ)", parametric: true },
+    { id: "900018", name: "スコア倍率",          category: "special",
+      description: "N 秒間 スコア獲得 ×1.5", parametric: true },
+    { id: "900019", name: "ブロック複製",        category: "special",
+      description: "所持スキル 1 つを N 秒だけコピー", parametric: true },
 ];
 
 /** 文字列 ID を catalog に照合. 未知 ID なら `null`. */
