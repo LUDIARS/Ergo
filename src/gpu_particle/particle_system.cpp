@@ -445,14 +445,39 @@ uint32_t ParticleSystem::Impl::compute_spawn_count(EmitterRuntime& rt, float dt)
     rt.spawn_accumulator    -= static_cast<float>(static_cast<uint32_t>(rt.spawn_accumulator));
     rt.distance_accumulator -= static_cast<float>(static_cast<uint32_t>(rt.distance_accumulator));
 
-    // Bursts: simple one-shot support (cycles/interval TODO).
+    // Bursts: `time` is the first firing, repeated `cycles` times at
+    // `interval` seconds. `probability` < 1 gates each firing stochastically.
+    // A cycle count of 0 is treated as 1 (fire once at `time`).
+    const float prev = rt.time_since_play - dt;
     for (const Burst& b : rt.desc.bursts) {
-        const float prev = rt.time_since_play - dt;
-        if (b.time > prev && b.time <= rt.time_since_play) {
-            const uint32_t span = b.count_max - b.count_min;
+        const uint32_t cycles = b.cycles == 0 ? 1u : b.cycles;
+        for (uint32_t c = 0; c < cycles; ++c) {
+            const float fire_time = b.time + static_cast<float>(c) * b.interval;
+            if (fire_time <= prev || fire_time > rt.time_since_play) continue;
+
+            // Stochastic gate.
+            if (b.probability < 1.0f && random01(rt.random_state) > b.probability) {
+                continue;
+            }
+
+            // `span + 1` so both `count_min` and `count_max` are reachable.
+            const uint32_t span  = b.count_max - b.count_min;
             const uint32_t burst = span == 0 ? b.count_min
                 : b.count_min + static_cast<uint32_t>(random01(rt.random_state) * (span + 1));
             count += burst;
+
+            // If interval is zero and cycles > 1, all fires would collapse on
+            // the same tick — fire them all in one iteration to avoid a
+            // useless inner loop.
+            if (b.interval <= 0.0f && cycles > 1) {
+                for (uint32_t k = 1; k < cycles; ++k) {
+                    if (b.probability < 1.0f && random01(rt.random_state) > b.probability) continue;
+                    const uint32_t extra = span == 0 ? b.count_min
+                        : b.count_min + static_cast<uint32_t>(random01(rt.random_state) * (span + 1));
+                    count += extra;
+                }
+                break;
+            }
         }
     }
     return count;
@@ -570,6 +595,120 @@ static float random01(uint32_t& state) {
     return static_cast<float>(state >> 8) * (1.0f / 16777216.0f);
 }
 
+// ---------------------------------------------------------------------------
+// CPU-side shape sampling. Mirrors `sample_shape_direction` /
+// `sample_shape_position` in shaders/particle_spawn.comp so emitters
+// produce the same particle distribution regardless of which path runs.
+// Edge (shape = 6) is the only shape the GPU kernel doesn't model yet;
+// we model it as a segment along local X of length `edge_length`.
+// ---------------------------------------------------------------------------
+
+namespace {
+constexpr float TWO_PI = 6.28318530718f;
+
+inline float mixf(float a, float b, float t) { return a + t * (b - a); }
+
+inline Vec3f normalize3(Vec3f v) {
+    const float len2 = v.x * v.x + v.y * v.y + v.z * v.z;
+    if (len2 <= 1e-12f) return {0.f, 1.f, 0.f};
+    const float inv = 1.0f / std::sqrt(len2);
+    return {v.x * inv, v.y * inv, v.z * inv};
+}
+
+Vec3f cpu_sample_shape_direction(const EmitterDescriptor& d, uint32_t& rng) {
+    switch (d.shape) {
+        case EmitterShape::Cone: {
+            const float phi   = random01(rng) * TWO_PI;
+            const float ring  = mixf(1.0f - d.cone_radius_thickness, 1.0f, random01(rng));
+            const float r     = d.cone_radius * std::sqrt(std::max(0.0f, ring));
+            const float cx    = std::cos(phi) * r;
+            const float cz    = std::sin(phi) * r;
+            const float t     = std::tan(d.cone_angle_deg * (3.14159265f / 180.f));
+            return normalize3({cx * t, 1.0f, cz * t});
+        }
+        case EmitterShape::Box: {
+            return { random01(rng) * 2.0f - 1.0f,
+                     random01(rng),
+                     random01(rng) * 2.0f - 1.0f };
+        }
+        case EmitterShape::Circle: {
+            const float phi = random01(rng) * TWO_PI;
+            return { std::cos(phi), 0.0f, std::sin(phi) };
+        }
+        case EmitterShape::Edge: {
+            // Emit sideways from the edge — direction orthogonal to the
+            // edge axis biased toward +Y for visibility.
+            const float phi = random01(rng) * TWO_PI;
+            return normalize3({0.0f, std::cos(phi), std::sin(phi)});
+        }
+        case EmitterShape::Sphere:
+        case EmitterShape::Hemisphere:
+        case EmitterShape::Point:
+        default: {
+            float z = random01(rng) * 2.0f - 1.0f;
+            if (d.shape == EmitterShape::Hemisphere) z = std::fabs(z);
+            const float r   = std::sqrt(std::max(0.0f, 1.0f - z * z));
+            const float phi = random01(rng) * TWO_PI;
+            return { std::cos(phi) * r, z, std::sin(phi) * r };
+        }
+    }
+}
+
+Vec3f cpu_sample_shape_position(const EmitterDescriptor& d, uint32_t& rng) {
+    const Vec3f origin = d.shape_position;
+    switch (d.shape) {
+        case EmitterShape::Sphere:
+        case EmitterShape::Hemisphere: {
+            const Vec3f dir = cpu_sample_shape_direction(d, rng);
+            const float r   = d.sphere_radius * std::pow(random01(rng), 1.0f / 3.0f);
+            return { origin.x + dir.x * r, origin.y + dir.y * r, origin.z + dir.z * r };
+        }
+        case EmitterShape::Box: {
+            return {
+                origin.x + (random01(rng) * 2.0f - 1.0f) * d.box_extents.x,
+                origin.y + (random01(rng) * 2.0f - 1.0f) * d.box_extents.y,
+                origin.z + (random01(rng) * 2.0f - 1.0f) * d.box_extents.z,
+            };
+        }
+        case EmitterShape::Cone: {
+            const float phi  = random01(rng) * TWO_PI;
+            const float ring = mixf(1.0f - d.cone_radius_thickness, 1.0f, random01(rng));
+            const float r    = d.cone_radius * std::sqrt(std::max(0.0f, ring));
+            return { origin.x + std::cos(phi) * r, origin.y, origin.z + std::sin(phi) * r };
+        }
+        case EmitterShape::Circle: {
+            const float phi = random01(rng) * TWO_PI;
+            const float r   = d.sphere_radius * std::sqrt(random01(rng));
+            return { origin.x + std::cos(phi) * r, origin.y, origin.z + std::sin(phi) * r };
+        }
+        case EmitterShape::Edge: {
+            const float u = random01(rng) * 2.0f - 1.0f;   // -1..+1
+            return { origin.x + u * (d.edge_length * 0.5f), origin.y, origin.z };
+        }
+        case EmitterShape::Point:
+        default:
+            return origin;
+    }
+}
+
+// Row-vector * row-major 4x4. v = (x, y, z, w). Translation lives in M[3].
+inline Vec3f transform_point(const Float4x4& M, Vec3f v) {
+    return {
+        v.x * M.m[0][0] + v.y * M.m[1][0] + v.z * M.m[2][0] + M.m[3][0],
+        v.x * M.m[0][1] + v.y * M.m[1][1] + v.z * M.m[2][1] + M.m[3][1],
+        v.x * M.m[0][2] + v.y * M.m[1][2] + v.z * M.m[2][2] + M.m[3][2],
+    };
+}
+inline Vec3f transform_direction(const Float4x4& M, Vec3f v) {
+    return {
+        v.x * M.m[0][0] + v.y * M.m[1][0] + v.z * M.m[2][0],
+        v.x * M.m[0][1] + v.y * M.m[1][1] + v.z * M.m[2][1],
+        v.x * M.m[0][2] + v.y * M.m[1][2] + v.z * M.m[2][2],
+    };
+}
+
+} // namespace
+
 static void spawn_one_cpu(EmitterRuntime& rt, Particle& p) {
     const float r_life = random01(rt.random_state);
     const float r_spd  = random01(rt.random_state);
@@ -581,9 +720,13 @@ static void spawn_one_cpu(EmitterRuntime& rt, Particle& p) {
     const float size  = rt.desc.start_size    .evaluate(0.0f, r_sz);
     const float rot   = rt.desc.start_rotation.evaluate(0.0f, r_rot);
 
-    // Origin at emitter world position (shape-specific variants TODO).
-    p.position = {rt.world.m[3][0], rt.world.m[3][1], rt.world.m[3][2]};
-    p.velocity = {0.0f, speed, 0.0f};   // cone approximation: along +Y
+    const Vec3f local_pos = cpu_sample_shape_position(rt.desc, rt.random_state);
+    const Vec3f local_dir = cpu_sample_shape_direction(rt.desc, rt.random_state);
+    const Vec3f world_pos = transform_point    (rt.world, local_pos);
+    const Vec3f world_dir = normalize3(transform_direction(rt.world, local_dir));
+
+    p.position = world_pos;
+    p.velocity = { world_dir.x * speed, world_dir.y * speed, world_dir.z * speed };
     p.color    = rt.desc.start_color;
     p.size     = size;
     p.rotation = rot;
@@ -621,13 +764,18 @@ void ParticleSystem::Impl::cpu_simulate(EmitterRuntime& rt, float dt) {
     }
     rt.cpu_alive = alive;
 
-    // Spawn new particles.
+    // Spawn new particles. Account for them in `cpu_alive` so
+    // `get_live_particle_count` reflects the post-update state without a
+    // one-frame lag — the instance buffer itself is filled on the next
+    // integrate pass, which is fine because the renderer only consumes it
+    // the following frame anyway.
     uint32_t to_spawn = compute_spawn_count(rt, dt);
     for (uint32_t i = 0; i < rt.desc.max_particles && to_spawn > 0; ++i) {
         Particle& p = rt.cpu_particles[i];
         if (p.lifetime_remaining > 0.0f) continue;
         spawn_one_cpu(rt, p);
         --to_spawn;
+        ++rt.cpu_alive;
     }
 }
 
