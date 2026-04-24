@@ -8,8 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ---------------------------------------------------------------------------
 # Top-level options. Hosts can flip per-module knobs as needed.
 # ---------------------------------------------------------------------------
-option(ERGO_BUILD_TESTS  "Build module tests"             ON)
-option(ERGO_BUILD_DUMMY  "Build dummy plug libraries"     ON)
+option(ERGO_BUILD_TESTS       "Build module tests"             ON)
+option(ERGO_BUILD_DUMMY       "Build dummy plug libraries"     ON)
+option(ERGO_BUILD_BENCHMARKS  "Build micro-benchmark executables (opt-in)" OFF)
 
 option(ERGO_BUILD_INPUT        "Build ergo_input"        ON)
 option(ERGO_BUILD_PARTICLE     "Build ergo_particle"     ON)
@@ -491,5 +492,25 @@ if(ERGO_BUILD_UI)
             target_link_libraries(${NAME} PRIVATE ergo_ui ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# benchmarks/ — micro-benchmarks, opt-in via ERGO_BUILD_BENCHMARKS.
+#
+# Each benchmark is a standalone executable that uses the tiny harness in
+# `benchmarks/bench_common.h` (no external benchmarking framework — we
+# value zero-dep builds over richer reporting). Run manually; no CTest hook
+# on purpose — benchmarks measure runtime variance, not correctness.
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_BENCHMARKS)
+    if(ERGO_BUILD_GPU_PARTICLE)
+        add_executable(bench_particle_cpu benchmarks/bench_particle_cpu.cpp)
+        target_include_directories(bench_particle_cpu PRIVATE benchmarks)
+        target_link_libraries(bench_particle_cpu PRIVATE ergo_gpu_particle)
+
+        add_executable(bench_curve benchmarks/bench_curve.cpp)
+        target_include_directories(bench_curve PRIVATE benchmarks)
+        target_link_libraries(bench_curve PRIVATE ergo_gpu_particle)
     endif()
 endif()
