@@ -23,6 +23,10 @@ const CATEGORY_META = {
     soil:   { label: "土",   accent: "#8b6239" },
     ice:    { label: "氷",   accent: "#a3cfe6" },
     cobble: { label: "石畳", accent: "#6e6e76" },
+    sand:   { label: "砂",   accent: "#d4b074" },
+    water:  { label: "水",   accent: "#3d6fa3" },
+    lava:   { label: "溶岩", accent: "#d14f2b" },
+    wood:   { label: "木",   accent: "#a07a44" },
 };
 
 const state = {
