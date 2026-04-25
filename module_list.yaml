@@ -117,6 +117,17 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_custos
+    summary: Custos 遠隔テストランナー (LUDIARS/Custos) と話す in-process HTTP ブリッジ
+    category: システム
+    header_dir: include/ergo/custos/
+    source_dir: src/custos/
+    test_dir:   tests/custos/
+    spec:       spec/module/custos.md
+    cmake_option: ERGO_BUILD_CUSTOS
+    tool_plugin: null   # サービス側は LUDIARS/Custos リポ
+    status: preview
+
 shared_libs:
   - name: ergo_common
     summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
