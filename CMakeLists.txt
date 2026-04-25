@@ -25,6 +25,7 @@ option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
 option(ERGO_BUILD_WORLD_TIME   "Build ergo_world_time"   ON)
 option(ERGO_BUILD_BLACKBOARD   "Build ergo_blackboard"   ON)
 option(ERGO_BUILD_UI           "Build ergo_ui (SVG raster + 9-slice)" ON)
+option(ERGO_BUILD_CUSTOS       "Build ergo_custos (Custos remote-test bridge)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -490,6 +491,39 @@ if(ERGO_BUILD_UI)
         foreach(NAME test_nine_slice test_svg_raster test_gradient test_line_glow)
             add_executable(${NAME} tests/ui/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_ui ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_custos — Custos remote-test runner と話す in-process HTTP ブリッジ
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_CUSTOS)
+    add_library(ergo_custos STATIC
+        src/custos/custos_module.cpp
+        src/custos/http_server.cpp
+        src/custos/png_writer.cpp
+    )
+    target_include_directories(ergo_custos PUBLIC include)
+    target_include_directories(ergo_custos PRIVATE third_party)
+    target_link_libraries(ergo_custos PUBLIC Threads::Threads)
+    if(WIN32)
+        target_link_libraries(ergo_custos PRIVATE ws2_32)
+    endif()
+    # MSVC は BOM なし UTF-8 を CodePage 932 (Shift-JIS) として読むので、
+    # 日本語コメントを含む source は /utf-8 を渡す必要がある。
+    if(MSVC)
+        target_compile_options(ergo_custos PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME test_http_server test_custos_module)
+            add_executable(${NAME} tests/custos/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_custos ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(${NAME} PRIVATE /utf-8)
+            endif()
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
