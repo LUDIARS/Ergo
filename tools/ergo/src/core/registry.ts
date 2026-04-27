@@ -10,11 +10,13 @@ import makeParticlePlugin from "../plugins/particle/index.js";
 import makeVariablePlugin from "../plugins/variable/index.js";
 import makePlacerPlugin   from "../plugins/placer/index.js";
 import makeTerrainPlugin  from "../plugins/terrain/index.js";
+import makeACStagePlugin  from "../plugins/acstage/index.js";
 
 export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeParticlePlugin,
     makeVariablePlugin,
     makePlacerPlugin,
     makeTerrainPlugin,
+    makeACStagePlugin,
     // Phase 2: makeInspectorPlugin,
 ];

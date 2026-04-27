@@ -73,6 +73,10 @@ if(ERGO_BUILD_INPUT)
     )
     target_include_directories(ergo_input PUBLIC include)
     target_link_libraries(ergo_input PUBLIC Threads::Threads)
+    if(ERGO_BUILD_LOG)
+        # keyboard_device.cpp で ERGO_LOG_INFO を使うため依存を立てる。
+        target_link_libraries(ergo_input PUBLIC ergo_log)
+    endif()
 
     if(ERGO_BUILD_DUMMY)
         add_library(ergo_input_dummy

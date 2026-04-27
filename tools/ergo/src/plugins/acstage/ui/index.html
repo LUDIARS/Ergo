@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>AC Stage Editor</title>
+<style>
+:root {
+    --bg:    #1f2329;
+    --panel: #2a3038;
+    --line:  #3a414b;
+    --fg:    #e6e9ef;
+    --mute:  #8d97a4;
+    --acc:   #6ee7b7;
+    --warn:  #f87171;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--fg);
+    font-family: ui-monospace, "JetBrains Mono", Consolas, "MS Gothic", monospace;
+    font-size: 13px;
+    height: 100vh; display: flex; flex-direction: column;
+}
+header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 16px;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+}
+header h1 { margin: 0; font-size: 14px; font-weight: 600; }
+header select, header button {
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 4px 8px; font: inherit;
+}
+header button.acc { background: var(--acc); color: #1f2329; border-color: var(--acc); font-weight: 600; }
+header button.warn { color: var(--warn); border-color: var(--warn); }
+header button:disabled { opacity: 0.4; cursor: not-allowed; }
+header .meta {
+    margin-left: auto; color: var(--mute); font-size: 12px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+header .meta code { color: var(--fg); }
+
+main {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 1fr 320px;
+    gap: 0;
+}
+#editor-wrap {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+}
+#editor-toolbar {
+    display: flex; gap: 6px; padding: 6px 12px;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+}
+#editor-toolbar button { font-size: 12px; padding: 3px 8px; }
+#editor {
+    flex: 1; min-height: 0;
+    background: #14171c; color: var(--fg);
+    border: none; outline: none; resize: none;
+    padding: 12px 16px;
+    font: inherit; line-height: 1.5;
+    tab-size: 2; -moz-tab-size: 2;
+}
+aside.side {
+    background: var(--panel); border-left: 1px solid var(--line);
+    padding: 12px; overflow: auto;
+    display: flex; flex-direction: column; gap: 12px;
+}
+aside.side h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--mute); margin: 0 0 4px;
+}
+aside.side .summary {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+    padding: 8px 10px;
+}
+aside.side .summary div { margin-bottom: 2px; }
+aside.side .summary span { float: right; color: var(--acc); }
+aside.side .help { color: var(--mute); font-size: 11px; line-height: 1.5; }
+aside.side .help code { color: var(--fg); }
+.status {
+    padding: 6px 16px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--mute);
+    background: var(--panel);
+}
+.status.ok   { color: var(--acc); }
+.status.err  { color: var(--warn); }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🎮 AC Stage Editor</h1>
+    <select id="stage-select"></select>
+    <button id="btn-new">＋ New</button>
+    <button id="btn-dup" title="現在のステージを複製">⎘ Duplicate</button>
+    <button id="btn-del" class="warn">🗑 Delete</button>
+    <button id="btn-save" class="acc">💾 Save</button>
+    <div class="meta">
+        <div>dir: <code id="meta-dir">…</code></div>
+        <div>schema v<span id="meta-ver">?</span> · <span id="meta-count">0</span> stages</div>
+    </div>
+</header>
+
+<main>
+    <div id="editor-wrap">
+        <div id="editor-toolbar">
+            <button id="btn-fmt">⤳ Format JSON</button>
+            <button id="btn-add-field">＋ field</button>
+            <button id="btn-add-placement">＋ placement</button>
+            <button id="btn-add-enemy">＋ enemy</button>
+        </div>
+        <textarea id="editor" spellcheck="false"></textarea>
+    </div>
+
+    <aside class="side">
+        <div>
+            <h2>Summary</h2>
+            <div class="summary" id="summary">
+                <div>fields     <span id="sum-fields">0</span></div>
+                <div>placements <span id="sum-placements">0</span></div>
+                <div>enemies    <span id="sum-enemies">0</span></div>
+            </div>
+        </div>
+        <div>
+            <h2>編集ルール</h2>
+            <div class="help">
+                <p><code>fields[]</code> は順序が <code>+X</code> 進行方向。<br>
+                   <code>category</code>: <code>grass / soil / ice / cobble</code></p>
+                <p><code>enemies[]</code>:
+                   <code>type</code>: <code>grunt / brute / runner</code><br>
+                   <code>attack</code> 省略時は AC 側 default が適用</p>
+                <p>Save 後 <strong>exe を再起動</strong>すると反映 (現状 hot-reload なし)</p>
+            </div>
+        </div>
+    </aside>
+</main>
+
+<div class="status" id="status">起動中…</div>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const editor = $("editor");
+const stageSelect = $("stage-select");
+const btnSave = $("btn-save");
+const btnDel  = $("btn-del");
+const btnDup  = $("btn-dup");
+const btnNew  = $("btn-new");
+const btnFmt  = $("btn-fmt");
+const status  = $("status");
+
+let allowedCategories = ["grass", "soil", "ice", "cobble"];
+let allowedEnemyTypes = ["grunt", "brute", "runner"];
+let currentId = null;
+let dirty = false;
+
+function setStatus(msg, kind) {
+    status.textContent = msg;
+    status.className = "status" + (kind ? " " + kind : "");
+}
+
+function setDirty(d) {
+    dirty = d;
+    btnSave.disabled = !d;
+}
+
+editor.addEventListener("input", () => {
+    setDirty(true);
+    refreshSummary();
+});
+
+function refreshSummary() {
+    let parsed = null;
+    try { parsed = JSON.parse(editor.value); }
+    catch { /* ignore — show last good summary */ return; }
+    $("sum-fields").textContent     = (parsed.fields || []).length;
+    $("sum-placements").textContent = (parsed.placements || []).length;
+    $("sum-enemies").textContent    = (parsed.enemies || []).length;
+}
+
+async function fetchJSON(url, opts) {
+    const r = await fetch(url, opts);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+}
+
+async function refreshMeta() {
+    const m = await fetchJSON("./api/meta");
+    $("meta-dir").textContent  = m.dir;
+    $("meta-ver").textContent  = m.schema_version;
+    $("meta-count").textContent = m.stages;
+    if (Array.isArray(m.allowed_categories))  allowedCategories  = m.allowed_categories;
+    if (Array.isArray(m.allowed_enemy_types)) allowedEnemyTypes = m.allowed_enemy_types;
+}
+
+async function refreshStageList(selectId) {
+    const j = await fetchJSON("./api/stages");
+    stageSelect.innerHTML = "";
+    for (const s of j.stages) {
+        const opt = document.createElement("option");
+        opt.value = s.stage_id;
+        opt.textContent = s.stage_id;
+        stageSelect.appendChild(opt);
+    }
+    if (selectId && j.stages.some((s) => s.stage_id === selectId)) {
+        stageSelect.value = selectId;
+    }
+    if (stageSelect.value) await loadStage(stageSelect.value);
+    else { editor.value = ""; currentId = null; setDirty(false); }
+}
+
+async function loadStage(id) {
+    if (dirty && !confirm("未保存の変更を破棄してロードしますか?")) {
+        stageSelect.value = currentId || "";
+        return;
+    }
+    const j = await fetchJSON(`./api/stages/${encodeURIComponent(id)}`);
+    editor.value = JSON.stringify(j.stage, null, 2) + "\n";
+    currentId = id;
+    setDirty(false);
+    refreshSummary();
+    setStatus(`Loaded ${id}`, "ok");
+}
+
+stageSelect.addEventListener("change", () => loadStage(stageSelect.value));
+
+btnSave.addEventListener("click", async () => {
+    if (!currentId) return;
+    let body;
+    try { body = JSON.parse(editor.value); }
+    catch (err) { setStatus("JSON parse error: " + err.message, "err"); return; }
+    try {
+        await fetchJSON(`./api/stages/${encodeURIComponent(currentId)}`, {
+            method:  "PUT",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify(body),
+        });
+        setStatus(`Saved ${currentId}`, "ok");
+        setDirty(false);
+        await refreshMeta();
+    } catch (err) {
+        setStatus("Save failed: " + err.message, "err");
+    }
+});
+
+btnNew.addEventListener("click", async () => {
+    const id = (prompt("新規 stage_id:") || "").trim();
+    if (!id) return;
+    try {
+        await fetchJSON(`./api/stages/${encodeURIComponent(id)}`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    "{}",
+        });
+        setStatus(`Created ${id}`, "ok");
+        await refreshMeta();
+        await refreshStageList(id);
+    } catch (err) {
+        setStatus("Create failed: " + err.message, "err");
+    }
+});
+
+btnDup.addEventListener("click", async () => {
+    if (!currentId) return;
+    const id = (prompt("複製先 stage_id:", currentId + "_copy") || "").trim();
+    if (!id) return;
+    try {
+        await fetchJSON(`./api/stages/${encodeURIComponent(id)}`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ from: currentId }),
+        });
+        setStatus(`Duplicated to ${id}`, "ok");
+        await refreshMeta();
+        await refreshStageList(id);
+    } catch (err) {
+        setStatus("Duplicate failed: " + err.message, "err");
+    }
+});
+
+btnDel.addEventListener("click", async () => {
+    if (!currentId) return;
+    if (!confirm(`Delete ${currentId}?`)) return;
+    try {
+        await fetchJSON(`./api/stages/${encodeURIComponent(currentId)}`, { method: "DELETE" });
+        setStatus(`Deleted ${currentId}`, "ok");
+        await refreshMeta();
+        await refreshStageList(null);
+    } catch (err) {
+        setStatus("Delete failed: " + err.message, "err");
+    }
+});
+
+btnFmt.addEventListener("click", () => {
+    try {
+        const obj = JSON.parse(editor.value);
+        editor.value = JSON.stringify(obj, null, 2) + "\n";
+        setStatus("Formatted", "ok");
+        refreshSummary();
+    } catch (err) {
+        setStatus("Format failed: " + err.message, "err");
+    }
+});
+
+function appendEntry(arrayKey, makeStub) {
+    let obj;
+    try { obj = JSON.parse(editor.value); }
+    catch (err) { setStatus("JSON parse error: " + err.message, "err"); return; }
+    if (!Array.isArray(obj[arrayKey])) obj[arrayKey] = [];
+    obj[arrayKey].push(makeStub(obj[arrayKey].length + 1));
+    editor.value = JSON.stringify(obj, null, 2) + "\n";
+    setDirty(true);
+    refreshSummary();
+    setStatus(`Added ${arrayKey} entry`, "ok");
+}
+
+$("btn-add-field").addEventListener("click", () => appendEntry("fields", (n) => ({
+    id:       `f_${String(n).padStart(2, "0")}`,
+    category: allowedCategories[0],
+})));
+
+$("btn-add-placement").addEventListener("click", () => appendEntry("placements", (n) => ({
+    instance_id: `p_${String(n).padStart(2, "0")}`,
+    position:    [0.0, 0.35, 0.0],
+})));
+
+$("btn-add-enemy").addEventListener("click", () => appendEntry("enemies", (n) => ({
+    instance_id: `e_${String(n).padStart(2, "0")}`,
+    type:        allowedEnemyTypes[0],
+    position:    [0.0, 0.5, 0.0],
+})));
+
+// Boot
+(async () => {
+    try {
+        await refreshMeta();
+        await refreshStageList(null);
+        setStatus("Ready", "ok");
+    } catch (err) {
+        setStatus("Init failed: " + err.message, "err");
+    }
+})();
+
+// Optional WS hook (server is ready for it; AC has no live-reload yet).
+try {
+    const ws = new WebSocket(`ws://${location.host}/acstage/ws`);
+    ws.addEventListener("message", () => { /* future: external edit notification */ });
+} catch { /* ignore — non-fatal */ }
+</script>
+
+</body>
+</html>
