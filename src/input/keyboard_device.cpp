@@ -1,6 +1,51 @@
 #include "ergo/input/keyboard_device.h"
 
+#include "ergo/log/log.h"
+
 namespace ergo::input {
+
+namespace {
+
+/// KeyCode → 短い人間可読ラベル。デバッグログ専用。Unknown キーは
+/// `code=NN` の数値表記にフォールバック (新規 KeyCode を増やしても
+/// ここを忘れて compile エラーにならないように、`switch` ではなく
+/// テーブル探索)。
+const char* keycode_label(KeyCode key) {
+    using K = KeyCode;
+    switch (key) {
+        case K::A: return "A"; case K::B: return "B"; case K::C: return "C";
+        case K::D: return "D"; case K::E: return "E"; case K::F: return "F";
+        case K::G: return "G"; case K::H: return "H"; case K::I: return "I";
+        case K::J: return "J"; case K::K: return "K"; case K::L: return "L";
+        case K::M: return "M"; case K::N: return "N"; case K::O: return "O";
+        case K::P: return "P"; case K::Q: return "Q"; case K::R: return "R";
+        case K::S: return "S"; case K::T: return "T"; case K::U: return "U";
+        case K::V: return "V"; case K::W: return "W"; case K::X: return "X";
+        case K::Y: return "Y"; case K::Z: return "Z";
+        case K::Num1: return "1"; case K::Num2: return "2"; case K::Num3: return "3";
+        case K::Num4: return "4"; case K::Num5: return "5"; case K::Num6: return "6";
+        case K::Num7: return "7"; case K::Num8: return "8"; case K::Num9: return "9";
+        case K::Num0: return "0";
+        case K::Enter:     return "Enter";
+        case K::Escape:    return "Escape";
+        case K::Backspace: return "Backspace";
+        case K::Tab:       return "Tab";
+        case K::Space:     return "Space";
+        case K::F1:  return "F1";  case K::F2:  return "F2";  case K::F3:  return "F3";
+        case K::F4:  return "F4";  case K::F5:  return "F5";  case K::F6:  return "F6";
+        case K::F7:  return "F7";  case K::F8:  return "F8";  case K::F9:  return "F9";
+        case K::F10: return "F10"; case K::F11: return "F11"; case K::F12: return "F12";
+        case K::Right: return "Right"; case K::Left: return "Left";
+        case K::Down:  return "Down";  case K::Up:   return "Up";
+        case K::LCtrl:  return "LCtrl";  case K::LShift: return "LShift";
+        case K::LAlt:   return "LAlt";   case K::LSuper: return "LSuper";
+        case K::RCtrl:  return "RCtrl";  case K::RShift: return "RShift";
+        case K::RAlt:   return "RAlt";   case K::RSuper: return "RSuper";
+        default: return nullptr;
+    }
+}
+
+} // namespace
 
 KeyboardDevice::KeyboardDevice() = default;
 KeyboardDevice::~KeyboardDevice() { shutdown(); }
@@ -91,11 +136,21 @@ void KeyboardDevice::injectKeyState(KeyCode key, bool down, DeviceIndex index) {
         InputEvent ev{DeviceType::Keyboard, index, EventType::Press, code, 1.0f, 0, now};
         inputBuffer_.push(ev);
         observer_.notify(ev);
+        if (const char* name = keycode_label(key)) {
+            ERGO_LOG_INFO("[input] key down: %s (code=%u, dev=%u)", name, code, index);
+        } else {
+            ERGO_LOG_INFO("[input] key down: code=%u (dev=%u)", code, index);
+        }
     } else if (!down && wasDown) {
         devices_[index].pressStartTimes.erase(code);
         InputEvent ev{DeviceType::Keyboard, index, EventType::Release, code, 0.0f, 0, now};
         inputBuffer_.push(ev);
         observer_.notify(ev);
+        if (const char* name = keycode_label(key)) {
+            ERGO_LOG_INFO("[input] key up:   %s (code=%u, dev=%u)", name, code, index);
+        } else {
+            ERGO_LOG_INFO("[input] key up:   code=%u (dev=%u)", code, index);
+        }
     }
 }
 
