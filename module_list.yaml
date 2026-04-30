@@ -128,6 +128,50 @@ modules:
     tool_plugin: null   # サービス側は LUDIARS/Custos リポ
     status: preview
 
+  - name: ergo_health
+    summary: HP コンテナ + ダメージ / 回復 / 死亡コールバック (game-lexicon: health-system)
+    category: ロジック
+    header_dir: include/ergo/health/
+    source_dir: src/health/
+    test_dir:   tests/health/
+    spec:       spec/module/health.md
+    cmake_option: ERGO_BUILD_HEALTH
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_score
+    summary: スコアカウンタ + コンボ倍率 + ハイスコア通知 (game-lexicon: score-system)
+    category: ロジック
+    header_dir: include/ergo/score/
+    source_dir: src/score/
+    test_dir:   tests/score/
+    spec:       spec/module/score.md
+    cmake_option: ERGO_BUILD_SCORE
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_combo_counter
+    summary: 連続成功カウンタ + フルコンボ通知 (game-lexicon: combo-counter)
+    category: ロジック
+    header_dir: include/ergo/combo_counter/
+    source_dir: src/combo_counter/
+    test_dir:   tests/combo_counter/
+    spec:       spec/module/combo_counter.md
+    cmake_option: ERGO_BUILD_COMBO_COUNTER
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_timing_judge
+    summary: 音ゲー用ミリ秒タイミング判定 (PERFECT/GREAT/GOOD/MISS) (game-lexicon: timing-judge)
+    category: ロジック
+    header_dir: include/ergo/timing_judge/
+    source_dir: src/timing_judge/
+    test_dir:   tests/timing_judge/
+    spec:       spec/module/timing_judge.md
+    cmake_option: ERGO_BUILD_TIMING_JUDGE
+    tool_plugin: null
+    status: preview
+
 shared_libs:
   - name: ergo_common
     summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
