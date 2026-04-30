@@ -26,6 +26,10 @@ option(ERGO_BUILD_WORLD_TIME   "Build ergo_world_time"   ON)
 option(ERGO_BUILD_BLACKBOARD   "Build ergo_blackboard"   ON)
 option(ERGO_BUILD_UI           "Build ergo_ui (SVG raster + 9-slice)" ON)
 option(ERGO_BUILD_CUSTOS       "Build ergo_custos (Custos remote-test bridge)" ON)
+option(ERGO_BUILD_HEALTH       "Build ergo_health"        ON)
+option(ERGO_BUILD_SCORE        "Build ergo_score"         ON)
+option(ERGO_BUILD_COMBO_COUNTER "Build ergo_combo_counter" ON)
+option(ERGO_BUILD_TIMING_JUDGE "Build ergo_timing_judge"  ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -530,6 +534,75 @@ if(ERGO_BUILD_CUSTOS)
             endif()
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_health — minimal HP component (game-lexicon: health-system)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_HEALTH)
+    add_library(ergo_health STATIC src/health/health.cpp)
+    target_include_directories(ergo_health PUBLIC include)
+    # MSVC は BOM なし UTF-8 を CodePage 932 として読むので /utf-8 を渡す。
+    if(MSVC)
+        target_compile_options(ergo_health PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_health tests/health/test_health.cpp)
+        target_link_libraries(test_health PRIVATE ergo_health ergo_gtest_main)
+        add_test(NAME test_health COMMAND test_health)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_score — score counter + combo multiplier (game-lexicon: score-system)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_SCORE)
+    add_library(ergo_score STATIC src/score/score.cpp)
+    target_include_directories(ergo_score PUBLIC include)
+    if(MSVC)
+        target_compile_options(ergo_score PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_score tests/score/test_score.cpp)
+        target_link_libraries(test_score PRIVATE ergo_score ergo_gtest_main)
+        add_test(NAME test_score COMMAND test_score)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_combo_counter — successive-success counter (game-lexicon: combo-counter)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_COMBO_COUNTER)
+    add_library(ergo_combo_counter STATIC src/combo_counter/combo_counter.cpp)
+    target_include_directories(ergo_combo_counter PUBLIC include)
+    if(MSVC)
+        target_compile_options(ergo_combo_counter PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_combo_counter tests/combo_counter/test_combo_counter.cpp)
+        target_link_libraries(test_combo_counter PRIVATE ergo_combo_counter ergo_gtest_main)
+        add_test(NAME test_combo_counter COMMAND test_combo_counter)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_timing_judge — rhythm timing window classifier (game-lexicon: timing-judge)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_TIMING_JUDGE)
+    add_library(ergo_timing_judge STATIC src/timing_judge/timing_judge.cpp)
+    target_include_directories(ergo_timing_judge PUBLIC include)
+    if(MSVC)
+        target_compile_options(ergo_timing_judge PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_timing_judge tests/timing_judge/test_timing_judge.cpp)
+        target_link_libraries(test_timing_judge PRIVATE ergo_timing_judge ergo_gtest_main)
+        add_test(NAME test_timing_judge COMMAND test_timing_judge)
     endif()
 endif()
 
