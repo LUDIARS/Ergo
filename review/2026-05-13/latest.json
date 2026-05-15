@@ -1,0 +1,50 @@
+{
+  "repo": "ergo",
+  "date": "2026-05-13",
+  "weighted_score": 84,
+  "grades": {
+    "design": "A-",
+    "vulnerability": "B",
+    "implementation": "A-",
+    "missing_features": "B",
+    "quality": "A-"
+  },
+  "weights": {
+    "design": 0.20,
+    "vulnerability": 0.25,
+    "implementation": 0.25,
+    "missing_features": 0.15,
+    "quality": 0.15
+  },
+  "counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 9,
+    "low": 8,
+    "total": 17
+  },
+  "autofix_count": 0,
+  "files": [
+    "REVIEW.md",
+    "REVIEW_DESIGN.md",
+    "REVIEW_VULNERABILITY.md",
+    "REVIEW_IMPLEMENTATION.md",
+    "REVIEW_MISSING_FEATURES.md",
+    "REVIEW_QUALITY.md",
+    "AUTOFIX.md",
+    "latest.json"
+  ],
+  "summary": "Ergo モノレポは main 集約運用 + ergo_inspector 廃止吸収が確立、 ergo_bind / ergo_custos / ergo_particle / tools/ergo の主要 4 モジュールは責務分離・スレッド安全・例外境界が揃う。 ドキュメント追従 (README Module テーブル半分、module_list.md に廃止済 ergo_inspector 残存、spec/module/physics.md 未整備) と HTTP/JSON パーサの入力 validation (Content-Length stoul 例外、parse_key_body の不正値処理) が主な低コスト改善点。 High/Critical 無し。",
+  "top_findings": [
+    {"id": "D-1", "severity": "medium", "file": "module_list.md:11", "msg": "廃止済 ergo_inspector が依然先頭付近に掲載され、 CLAUDE.md / spec の廃止記述と矛盾"},
+    {"id": "D-2/M-3", "severity": "medium", "file": "README.md:42-53", "msg": "Module テーブルが world_time までで途切れ、 physics / shuriken_migrator / health / score / combo_counter / timing_judge / ui / custos / actor / audio が欠落"},
+    {"id": "M-4", "severity": "medium", "file": "spec/module/physics.md", "msg": "spec ファイル未作成。 CLAUDE.md「新規モジュール追加手順 step 1」を満たしていない"},
+    {"id": "V-1", "severity": "medium", "file": "src/custos/http_server.cpp:98", "msg": "Content-Length の std::stoul 例外が未 catch、 不正値で accept スレッドが落ちる"},
+    {"id": "V-2", "severity": "medium", "file": "src/custos/custos_module.cpp:36-60", "msg": "parse_key_body が不正 down 値を silently false 扱い、 4xx を返すべき"},
+    {"id": "V-3", "severity": "medium", "file": "tools/ergo/src/plugins/variable/index.ts:105", "msg": "複数 engine 環境で同名 var が後勝ち上書き、 app プレフィックスで namespace 分離が必要"},
+    {"id": "M-1", "severity": "medium", "file": "src/custos/custos_module.cpp:121-126", "msg": "Custos Phase 2 (WebRTC capture / ストリーミング) 用の WS upgrade 経路が未配備"},
+    {"id": "M-2", "severity": "medium", "file": "tools/ergo/src/core/registry.ts:21", "msg": "廃止済 inspector の Phase 2 コメントが死コードとして残存"},
+    {"id": "I-1", "severity": "medium", "file": "src/bind/bind_engine.cpp:454-463", "msg": "値変化検出が全 var を毎フレーム O(N) で getter + 比較、 dirty マーキング型 API を検討"},
+    {"id": "Q-1", "severity": "medium", "file": "src/bind/ws_client.cpp:9-44, src/custos/http_server.cpp:6-25", "msg": "Win32/POSIX socket 薄膜が 2 cpp で二重定義、 ergo_common/socket.h に集約余地"}
+  ]
+}
