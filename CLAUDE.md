@@ -3,45 +3,57 @@
 ## プロジェクト概要
 
 Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツール群。
-**全モジュール・全ツールを main ブランチに集約して開発する。**
+**全モジュール・全ツールを 1 つの main 系列に集約して開発する** (per-module の
+長命ブランチは作らない)。 一方で **変更は必ず feat ブランチ + PR で main に
+入れる** — main 直 push は禁止 (下記「ブランチ運用」参照)。
 
 ## 運用方針
 
-### 旧運用 (廃止)
+### ブランチ運用 (例外なし)
 
-以前は `module/<名>` ブランチで各モジュールを独立開発していたが、以下の
-理由で main 集約に戻した:
+- **main への直接コミット / push は禁止**。 全変更は短命な feat / fix / docs /
+  chore ブランチを切って PR を経由する
+  - 例外なし。 typo 修正・1 行の doc 修正でも feat ブランチ + PR
+- 推奨ブランチ命名: `feat/<short-name>` / `fix/<...>` / `docs/<...>` / `chore/<...>`
+- PR は通常 squash merge。 main の履歴は 1 機能 1 コミットを目安に保つ
+- うっかり main に直接コミットした場合は `git checkout -b feat/<name>` で
+  退避 → `git checkout main && git reset --hard <prev>` で巻き戻してから PR
+- 旧運用 (「main に直接 push」) は 2026-05-15 に廃止。 本ファイルが正
 
-- モジュール数 + 付随 Web ツール数の増加で全容把握が困難
-- モジュール ↔ ツール schema 整合のような横断変更が散らかる
-- ホスト側 worktree 取り込みパターンも追跡コスト大
+### コード配置の方針
 
-### 現運用
-
-- **main に全コード集約** (モジュールごとのブランチは作らない)
+- **全モジュール / 全ツールのソースは main 系列の 1 ツリーに置く**
+  (per-module の独立ブランチは作らない。 長命ブランチで分散させない)
 - 各モジュールは `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` に配置
-- Web 開発者ツールは **`tools/ergo/` に統合**。新規ツールは単独
+- Web 開発者ツールは **`tools/ergo/` に統合**。 新規ツールは単独
   パッケージではなく `tools/ergo/src/plugins/<id>/` にプラグインとして追加する
-  (詳細は `spec/tool/ergo.md`)。
+  (詳細は `spec/tool/ergo.md`)。 ゲーム固有のエディタは Ergo に入れず、
+  ホストリポの plugin pack + `ERGO_PLUGIN_DIR` でロードする
 - 仕様書は `spec/module/<名>.md`
-- 既存の `module/<名>` ブランチ (`module/input`, `module/particle`,
-  `module/bind` など) は履歴保全のため削除しないが、**新規開発は main 上で行う**
-- `module/inspector` ブランチも履歴として残すが、`ergo_inspector` モジュール
+
+### 旧運用 (履歴保全のみ・参照禁止)
+
+- `module/<名>` ブランチ群 (`module/input` / `module/particle` / `module/bind`
+  など) は履歴保全のため残しているが、**新規コミット禁止**
+- `module/inspector` ブランチも履歴として残すが、 `ergo_inspector` モジュール
   自体は 2026-04-21 に廃止 (機能は `ergo_bind` に完全吸収)
+- 旧 worktree-per-module パターン (`git worktree add external/ergo/<mod>
+  module/<mod>`) は使わない
 
 ### 新規モジュール追加手順
 
-1. `spec/module/<名>.md` を `template/module_template.md` に従い作成
-2. `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` を作成
-3. トップレベル `CMakeLists.txt` に `add_library(ergo_<名>)` を追加
-4. `module_list.md` / `module_list.yaml` に行を追加
-5. (Web ツールが要るなら) `tools/ergo/src/plugins/<id>/` にプラグインとして追加
-6. main に直接コミット → push
+1. `git checkout -b feat/<モジュール名>` で main からブランチを切る
+2. `spec/module/<名>.md` を `template/module_template.md` に従い作成
+3. `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` を作成
+4. トップレベル `CMakeLists.txt` に `add_library(ergo_<名>)` を追加
+5. `module_list.md` / `module_list.yaml` に行を追加
+6. (Web ツールが要るなら) `tools/ergo/src/plugins/<id>/` にプラグインとして追加
+7. 1 PR にまとめて push → レビュー → squash merge
 
 ### 横断変更 (モジュール + ツール)
 
-schema や protocol の変更はモジュール側ヘッダとツール側コードを同一コミットで
-更新する。バージョン分裂を防ぐため、必ず両方触ること。
+schema や protocol の変更はモジュール側ヘッダとツール側コードを同一 PR (理想は
+同一コミット) で更新する。バージョン分裂を防ぐため、必ず両方触ること。
 
 ## モジュール定義書
 
@@ -88,8 +100,10 @@ npm run dev           # watch, default port 5170
 
 ## 注意事項
 
-- `module/*` ブランチへの新規コミットは原則不要 (どうしても必要な場合のみ
-  main へ反映する PR を切ること)
-- main へ直接 push する運用なので、コミットメッセージは丁寧に書く
+- `module/*` ブランチへの新規コミットは禁止 (履歴保全のみ)。 該当領域への
+  修正は main から feat ブランチを切って PR で入れる
+- 全変更は feat / fix / docs / chore ブランチ + PR を経由する (上記「ブランチ運用」)
+- PR メッセージとコミットメッセージは丁寧に書く (squash merge で main の履歴に
+  そのまま残る)
 - README.md に最新のモジュール一覧と運用方針を反映する
-- 横断変更 (モジュール側 + ツール側) は 1 コミットで行うのが原則
+- 横断変更 (モジュール側 + ツール側) は 1 PR (理想は 1 コミット) で行うのが原則
