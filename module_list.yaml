@@ -29,17 +29,6 @@ modules:
     tool_plugin: null
     status: preview
 
-  - name: ergo_inspector
-    summary: in-process POSIX WS サーバでホスト変数をブラウザからライブ編集
-    category: システム
-    header_dir: include/ergo/inspector/
-    source_dir: src/inspector/
-    test_dir:   tests/inspector/
-    spec:       spec/module/inspector.md
-    cmake_option: ERGO_BUILD_INSPECTOR
-    tool_plugin: null   # Phase 2 で `inspector` プラグイン化予定
-    status: preview
-
   - name: ergo_particle
     summary: CPU パーティクル sim + (任意) Pictor Vulkan ビルボード renderer
     category: システム
@@ -73,6 +62,17 @@ modules:
     tool_plugin: variable
     status: stable
 
+  - name: ergo_actor
+    summary: シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (ergo_bind に委譲)
+    category: システム
+    header_dir: include/ergo/actor/
+    source_dir: src/actor/
+    test_dir:   tests/actor/
+    spec:       spec/module/actor.md
+    cmake_option: ERGO_BUILD_ACTOR   # ERGO_BUILD_BIND も ON が必須
+    tool_plugin: variable
+    status: preview
+
   - name: ergo_sound
     summary: WAV デコード + ストリーム + ミキサ + 波形処理 + Quantizer (外部 lib 無し)
     category: システム
@@ -105,6 +105,50 @@ modules:
     cmake_option: ERGO_BUILD_LOG
     tool_plugin: null
     status: stable
+
+  - name: ergo_io
+    summary: 最小ファイル I/O ラッパー (<filesystem> の薄膜、UTF-8 std::string API)
+    category: システム
+    header_dir: include/ergo/io/
+    source_dir: src/io/
+    test_dir:   tests/io/
+    spec:       spec/module/io.md
+    cmake_option: ERGO_BUILD_IO
+    tool_plugin: null
+    status: stable
+
+  - name: ergo_audio
+    summary: ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。ergo_sound とは独立・横並び
+    category: システム
+    header_dir: include/ergo/audio/
+    source_dir: src/audio/
+    test_dir:   tests/audio/
+    spec:       spec/module/audio.md
+    cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/dummy)
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_world_time
+    summary: グローバル time-scale コンポーザ (HitStop / HitSlow)。Foundation/WorldTimeScale の C++ ポート
+    category: システム
+    header_dir: include/ergo/world_time/
+    source_dir: src/world_time/
+    test_dir:   tests/world_time/
+    spec:       spec/module/world_time.md
+    cmake_option: ERGO_BUILD_WORLD_TIME
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_blackboard
+    summary: グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle)。Foundation/Blackboard の C++ ポート
+    category: システム
+    header_dir: include/ergo/blackboard/
+    source_dir: src/blackboard/
+    test_dir:   tests/blackboard/
+    spec:       spec/module/blackboard.md
+    cmake_option: ERGO_BUILD_BLACKBOARD
+    tool_plugin: null
+    status: preview
 
   - name: ergo_ui
     summary: SVG ラスタ + 9-slice フレームコンポーザ (RGBA8, Pictor/Vulkan 依存なし)
