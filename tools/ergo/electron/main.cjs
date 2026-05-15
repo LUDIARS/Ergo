@@ -52,12 +52,23 @@ ipcMain.on("shell:plugin-activated", (_event, payload) => {
 });
 
 app.whenReady().then(async () => {
+    // Register tsx's ESM loader so external plugin packs authored in
+    // TypeScript (loaded via ERGO_PLUGIN_DIR) can be dynamic-imported even
+    // though the tool itself runs from compiled dist/. Non-fatal if absent.
+    try {
+        require("tsx/esm/api").register();
+    } catch (err) {
+        console.warn(`[ergo] tsx loader unavailable — .ts external plugins will be skipped (${err.message})`);
+    }
+
     // Dynamically import the ESM server build. `npm start` runs
     // `tsc` first so dist/ exists when we get here.
-    const { boot }             = await import(pathToFileUrl("dist/core/server.js"));
-    const { PLUGIN_FACTORIES } = await import(pathToFileUrl("dist/core/registry.js"));
+    const { boot }                 = await import(pathToFileUrl("dist/core/server.js"));
+    const { PLUGIN_FACTORIES }      = await import(pathToFileUrl("dist/core/registry.js"));
+    const { loadExternalFactories } = await import(pathToFileUrl("dist/core/external.js"));
 
-    boot({ port: PORT, factories: PLUGIN_FACTORIES });
+    const external = await loadExternalFactories();
+    boot({ port: PORT, factories: [...PLUGIN_FACTORIES, ...external] });
 
     // Give the listener a tick to bind before the renderer tries to
     // fetch `/api/plugins`.

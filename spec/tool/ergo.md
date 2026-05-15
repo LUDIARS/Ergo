@@ -16,9 +16,19 @@ inspector など) を **単一の Node サーバ + プラグインアーキテ�
 ## 運用方針
 
 - **1 Node プロセス / 1 ポート / 複数プラグイン**
-- 各プラグインは `src/plugins/<id>/` に配置され、自身の HTTP ルートと
-  WS ハンドラを提供する
-- 新しいツールは **新規プラグインとして追加** (新規サーバは作らない)
+- `tools/ergo` は **共有プラグインホスト**。core/shell + 汎用プラグイン
+  (`particle` / `variable`) だけを持ち、ゲーム固有のエディタは持たない
+- 各プラグインは自身の HTTP ルートと WS ハンドラを提供する
+- プラグインの 2 系統:
+  - **組み込み (汎用)** — `src/plugins/<id>/` に配置し `src/core/registry.ts`
+    に登録。どのホストプロジェクトでも使う `particle` / `variable` のみ
+  - **外部 (ゲーム固有)** — ホストリポ側に置き、`ERGO_PLUGIN_DIR` 環境変数で
+    指定したディレクトリから起動時に動的ロードする (`src/core/external.ts`)。
+    Ergo の core/shell を fork せずに各ゲームが自分のエディタを足せる
+    - PrivateGame → `tools/kzs-web/plugins/{spawn,skill}`
+    - AdventureCube → `tools/ac-web/plugins/{placer,terrain,acstage}`
+- 新しいツールは **新規プラグインとして追加** (新規サーバは作らない)。
+  汎用なら組み込み、特定ゲーム向けなら外部プラグインにする
 
 ## 起動モード
 
@@ -65,33 +75,27 @@ tools/ergo/
 │   ├── shell.js
 │   └── extensions.js     # window.ergo.shell イベントバス (拡張 API)
 └── src/
-    ├── main.ts           # エントリ (port / factories)
+    ├── main.ts           # エントリ (port / 組み込み + 外部 factories)
     ├── core/
     │   ├── plugin.ts     # Plugin interface
     │   ├── shell-api.ts  # window.ergo.shell の TypeScript 型定義 (型のみ)
-    │   ├── registry.ts   # 組み込みプラグインの列挙
+    │   ├── registry.ts   # 組み込み (汎用) プラグインの列挙
+    │   ├── external.ts   # ERGO_PLUGIN_DIR からの外部プラグイン動的ロード
     │   └── server.ts     # Hono + http.Server + WS の共通土台
-    └── plugins/
+    └── plugins/          # 組み込み (汎用) プラグインのみ
         ├── particle/     # 旧 particle-editor
         │   ├── index.ts
         │   ├── schema.ts
         │   └── ui/
-        ├── variable/     # 旧 variable-editor
-        │   ├── index.ts
-        │   ├── protocol.ts
-        │   └── ui/
-        ├── placer/       # ブロックベースのレベルデザイナ
-        │   ├── index.ts
-        │   ├── schema.ts
-        │   ├── store.ts
-        │   └── ui/
-        └── terrain/      # 地面 Field (草原/土/氷/石畳) で Stage を構成
+        └── variable/     # 旧 variable-editor
             ├── index.ts
-            ├── schema.ts
-            ├── store.ts
+            ├── protocol.ts
             └── ui/
-                └── patterns/   # 512×512 SVG x 8
 ```
+
+ゲーム固有プラグイン (`placer` / `terrain` / `acstage` / `spawn` / `skill`
+など) は **このツリーには無い**。各ホストリポの plugin pack に置き、
+`ERGO_PLUGIN_DIR` でロードする (後述「外部プラグイン」)。
 
 ## Plugin I/F (TypeScript)
 
@@ -118,10 +122,40 @@ export default (): Plugin => {
 };
 ```
 
-新規プラグインの追加は `src/core/registry.ts` の配列に factory を 1 行
-足すだけ。
+組み込み (汎用) プラグインの追加は `src/core/registry.ts` の配列に factory を
+1 行足すだけ。
 
-## 現行プラグイン
+## 外部プラグイン (ゲーム固有)
+
+ゲーム固有のエディタは Ergo リポには置かず、**各ホストリポの plugin pack**
+に置く。`tools/ergo` の core/shell を fork せず、各ゲームが自分のエディタを
+持てるようにするための仕組み。
+
+- 起動時に `ERGO_PLUGIN_DIR` 環境変数 (OS のパス区切りで複数指定可) を読み、
+  指定ディレクトリ直下の各サブディレクトリの `index.{js,ts}` を動的 import
+  して `default` export (`PluginFactory`) を組み込み factory に併合する
+  (`src/core/external.ts`)。
+- 壊れた pack エントリはログを出してスキップ — 起動は止めない。
+- TypeScript 製プラグインは `npm run serve` / `dev` (tsx) でそのままロード。
+  Electron (`npm start`) 経路でも `electron/main.cjs` が tsx の ESM ローダを
+  register するので `.ts` のままロードできる。
+- **plugin pack の作り方** (ホストリポ側):
+  - `<host>/tools/<name>-web/plugins/` を作り、各プラグインを
+    `<id>/index.ts` (+ `schema.ts` / `store.ts` / `ui/`) として置く
+  - プラグイン契約は Ergo の `core/plugin.ts` を `plugins/_contract.ts` に
+    コピーして `import type` で使う (ツール側は返り値の構造を duck-type
+    するのでランタイム結合は無い)
+  - `staticRoot` は cwd 相対ではなく
+    `fileURLToPath(new URL("./ui", import.meta.url))` で自分の絶対パスにする
+    (外部ロード時の cwd はホスト側でないため)
+  - `plugins/package.json` に pack が import する依存 (`hono` / `ws`) だけ
+    宣言し、ホストの `editor.bat` が pack で `npm install` してから
+    `ERGO_PLUGIN_DIR` を渡してツールを起動する
+- 既存の plugin pack:
+  - PrivateGame: `tools/kzs-web/plugins/{spawn,skill}`
+  - AdventureCube: `tools/ac-web/plugins/{placer,terrain,acstage}`
+
+## 現行プラグイン (組み込み・汎用)
 
 ### `particle`
 - 旧 `tools/particle-editor/` の移植
@@ -133,24 +167,9 @@ export default (): Plugin => {
 - `BIND_VAR()` 登録を受ける engine ↔ UI ハブ
 - `hello` メッセージでロール (`engine` / `ui`) を識別
 
-### `placer`
-- ブロックベースのレベルデザイナ (3×10 / 5×10 grid × Cell(Enemy/SkillBlock/
-  SkillBox/Special) 配置)
-- Stage は Block ID の列
-- REST: `/placer/api/{blocks,stages,enemies,skill-blocks}`
-- 詳細は [placer.md](./placer.md)
-
-### `terrain`
-- Stage を **正方形の Field** (草原 / 土 / 氷 / 石畳) の列として構成する
-  地面エディタ。DWW `StageScenario` の `SEQUENTIAL` 動作を最小実装した形。
-- 設計者は Field ごとにカテゴリを選ぶだけ。具体的な SVG パターン
-  (grass_01/02/03, soil_01/02, ice_01, cobble_01/02 の計 8 種, 512×512)
-  はランタイムが FNV-1a ハッシュから決定的に選択する
-  (`pickPattern(category, stageId, fieldId, seed)`)。
-- REST: `/terrain/api/{meta,store,stages,patterns/:category,new/{stage,field}}`
-- エディタと AdventureCube ランタイム (`adventurecube::terrain::pick_pattern`)
-  は同じハッシュ式を使うので、プレビューハイライトと実行時表示が一致する。
-- 保存先: `ERGO_TERRAIN_FILE` (既定 `terrain-data.json`)
+> `placer` / `terrain` / `acstage` は AdventureCube 固有のため Ergo から
+> 分離し、`AdventureCube/tools/ac-web/plugins/` の plugin pack へ移設した。
+> 仕様は AC リポ側を参照。
 
 ## シェル拡張 API (`window.ergo.shell`)
 
