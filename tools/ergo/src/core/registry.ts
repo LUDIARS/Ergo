@@ -18,5 +18,7 @@ export const PLUGIN_FACTORIES: PluginFactory[] = [
     makePlacerPlugin,
     makeTerrainPlugin,
     makeACStagePlugin,
-    // Phase 2: makeInspectorPlugin,
+    // Note: the once-planned `inspector` plugin was cancelled (2026-04-21).
+    // `ergo_inspector` was a strict subset of `ergo_bind`; the `variable`
+    // plugin above is the sole live-tuning surface.
 ];

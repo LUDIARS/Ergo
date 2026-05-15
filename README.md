@@ -26,13 +26,14 @@ ergo/
 ├── module_list.md         # モジュール一覧 (人間用)
 ├── module_list.yaml       # モジュール一覧 (機械処理用)
 ├── spec/
-│   └── module/<name>.md   # 各モジュールの定義書
+│   ├── module/<name>.md   # 各モジュールの定義書
+│   └── tool/<name>.md     # Web ツール / プラグインの仕様書
 ├── include/ergo/<name>/   # 各モジュールの公開ヘッダ
 ├── src/<name>/            # 各モジュールの実装
 ├── tests/<name>/          # 各モジュールのテスト
 ├── tools/ergo/            # 統合 Web 開発者ツール (単一 Node サーバ + プラグイン)
-├── third_party/           # 同梱依存 (mini-gtest など)
-└── doc/                   # 補助ドキュメント
+├── benchmarks/            # opt-in マイクロベンチ (ERGO_BUILD_BENCHMARKS)
+└── third_party/           # 同梱依存 (mini-gtest / nanosvg / stb)
 ```
 
 ## モジュール
@@ -51,6 +52,12 @@ ergo/
 | `ergo_audio`         | ゲーム SE ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。`ergo_sound` とは独立・横並び | `include/ergo/audio/`        | — |
 | `ergo_world_time`    | グローバル time-scale コンポーザ (HitStop / HitSlow + observer)。Foundation/WorldTimeScale の C++ ポート | `include/ergo/world_time/`   | — |
 | `ergo_blackboard`    | グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle)。Foundation/Blackboard の C++ ポート | `include/ergo/blackboard/`   | — |
+| `ergo_ui`            | SVG ラスタ + 9-slice フレームコンポーザ (RGBA8, Pictor/Vulkan 依存なし)        | `include/ergo/ui/`           | — |
+| `ergo_custos`        | 遠隔テストランナー Custos と話す in-process HTTP ブリッジ (`/health` `/screenshot` `/key`) | `include/ergo/custos/`       | (外部: `LUDIARS/Custos`) |
+| `ergo_health`        | HP コンテナ + ダメージ/回復/死亡コールバック (game-lexicon: `health-system`)   | `include/ergo/health/`       | — |
+| `ergo_score`         | スコアカウンタ + コンボ倍率 + ハイスコア通知 (game-lexicon: `score-system`)    | `include/ergo/score/`        | — |
+| `ergo_combo_counter` | 連続成功カウンタ + フルコンボ通知 (game-lexicon: `combo-counter`)              | `include/ergo/combo_counter/`| — |
+| `ergo_timing_judge`  | 音ゲー用 ms タイミング判定 PERFECT/GREAT/GOOD/MISS (game-lexicon: `timing-judge`) | `include/ergo/timing_judge/` | — |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。
@@ -67,7 +74,9 @@ cmake --build build --config Release
 ctest --test-dir build -C Release
 ```
 
-各モジュールの個別オプション (例 `ERGO_BIND_BUILD_SERVER=OFF`) はそのまま動作。
+各モジュールは `ERGO_BUILD_<名>` オプションで個別に ON/OFF できる
+(例 `-DERGO_BUILD_AUDIO=OFF`)。`ERGO_BUILD_TESTS` / `ERGO_BUILD_DUMMY` /
+`ERGO_BUILD_BENCHMARKS` もトップレベルオプション。
 
 ## ホストアプリからの利用
 
