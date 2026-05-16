@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ergo — Render Pipeline Viewer</title>
+<link rel="stylesheet" href="./styles.css">
+<!-- vis.js Network (DAG レイアウト) -->
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<!-- highlight.js (GLSL syntax highlight) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-dark.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/glsl.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>Render Pipeline</h1>
+  <span class="status" id="status">loading…</span>
+  <span class="spacer"></span>
+  <button id="btn_rescan" type="button">↻ Rescan</button>
+</header>
+
+<main>
+  <section class="left">
+    <div class="card">
+      <h2>Pass DAG</h2>
+      <p class="meta" id="dag_meta">—</p>
+      <div id="dag"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="detail_title">選択待ち</h2>
+      <div id="detail_body">DAG のノードをクリックして詳細を見る。</div>
+    </div>
+  </section>
+
+  <section class="right">
+    <nav class="tabs">
+      <button data-tab="pipelines" class="active">Pipelines</button>
+      <button data-tab="shaders">Shaders</button>
+      <button data-tab="attachments">Attachments</button>
+    </nav>
+
+    <div class="tab-body" id="tab_pipelines">
+      <div class="filter-row">
+        <input id="pipeline_filter" type="text" placeholder="filter: name / shader / flag…">
+      </div>
+      <table class="spec-table">
+        <thead><tr>
+          <th>関数</th><th>blend</th><th>cull</th><th>depth</th><th>topology</th><th>shaders</th>
+        </tr></thead>
+        <tbody id="pipeline_rows"></tbody>
+      </table>
+    </div>
+
+    <div class="tab-body" id="tab_shaders" style="display:none">
+      <div class="filter-row">
+        <input id="shader_filter" type="text" placeholder="filter: name / stage / location…">
+      </div>
+      <div class="shader-split">
+        <ul id="shader_list" class="shader-list"></ul>
+        <div class="shader-view">
+          <h3 id="shader_view_title">— 選択待ち —</h3>
+          <p class="meta" id="shader_view_meta"></p>
+          <pre><code class="language-glsl" id="shader_view_code">// シェーダを選択</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-body" id="tab_attachments" style="display:none">
+      <table class="spec-table">
+        <thead><tr>
+          <th>id</th><th>label</th><th>format</th><th>usage</th><th>owner</th>
+        </tr></thead>
+        <tbody id="attachment_rows"></tbody>
+      </table>
+      <p class="meta">Producer / Consumer は DAG 側の pass ノードに矢印で表示される。</p>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

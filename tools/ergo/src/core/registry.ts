@@ -10,12 +10,14 @@
 
 import type { PluginFactory } from "./plugin.js";
 
-import makeParticlePlugin from "../plugins/particle/index.js";
-import makeVariablePlugin from "../plugins/variable/index.js";
-import makeRivePlugin     from "../plugins/rive/index.js";
+import makeParticlePlugin       from "../plugins/particle/index.js";
+import makeVariablePlugin       from "../plugins/variable/index.js";
+import makeRivePlugin           from "../plugins/rive/index.js";
+import makeRenderPipelinePlugin from "../plugins/render_pipeline/index.js";
 
 export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeParticlePlugin,
     makeVariablePlugin,
     makeRivePlugin,
+    makeRenderPipelinePlugin,
 ];
