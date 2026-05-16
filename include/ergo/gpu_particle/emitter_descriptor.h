@@ -53,6 +53,93 @@ struct WindZone {
 };
 
 // ---------------------------------------------------------------------------
+// Noise module (Unity Shuriken "Noise")
+// 周波数 / 振幅 / オクターブでパーティクル位置に擬似ノイズを加算する。
+// ---------------------------------------------------------------------------
+
+struct NoiseModule {
+    float    strength          = 1.0f;
+    float    frequency         = 0.5f;
+    uint32_t octaves           = 1;
+    float    octave_multiplier = 0.5f;
+    float    octave_scale      = 2.0f;
+    bool     damping           = true;
+    bool     separate_axes     = false;
+    float    scroll_speed      = 0.0f;
+    bool     enabled           = false;
+};
+
+// ---------------------------------------------------------------------------
+// LimitVelocityOverLifetime (Unity Shuriken "Limit Velocity over Lifetime")
+// 速度上限 + drag。 max_speed を超えた成分を dampen で減衰する。
+// ---------------------------------------------------------------------------
+
+struct LimitVelocityOverLifetime {
+    MinMaxCurve speed_limit = MinMaxCurve::constant(0.0f);
+    float       dampen      = 0.0f;     // 0..1 (per second)
+    float       drag        = 0.0f;     // per-second linear
+    bool        enabled     = false;
+};
+
+// ---------------------------------------------------------------------------
+// Trail module (Unity TrailRenderer / Shuriken Trails 相当)
+// パーティクル毎に短い軌跡を生やす。
+// ---------------------------------------------------------------------------
+
+struct TrailModule {
+    MinMaxCurve trail_lifetime = MinMaxCurve::constant(0.5f);
+    MinMaxCurve trail_width    = MinMaxCurve::constant(0.1f);
+    Vec4f       color_start    = {1.f, 1.f, 1.f, 1.f};
+    Vec4f       color_end      = {1.f, 1.f, 1.f, 0.f};
+    float       min_vertex_distance     = 0.1f;
+    bool        inherit_particle_color  = true;
+    bool        die_with_particle       = true;
+    bool        enabled                 = false;
+};
+
+// ---------------------------------------------------------------------------
+// SubEmitter (Unity Shuriken "Sub Emitters")
+// 親パーティクルの誕生 / 衝突 / 寿命終了で別エミッタを生成。
+// emitter_index: 同じ ParticleSystem に登録済みの他 EmitterHandle 参照。
+// ---------------------------------------------------------------------------
+
+enum class SubEmitterEvent : uint8_t {
+    Birth     = 0,
+    Death     = 1,
+    Collision = 2,
+};
+
+struct SubEmitter {
+    SubEmitterEvent event            = SubEmitterEvent::Death;
+    uint32_t        emitter_index    = 0;   // ホスト側で解決する logical index
+    float           probability      = 1.0f;
+    bool            inherit_color    = false;
+    bool            inherit_size     = false;
+    bool            inherit_rotation = false;
+};
+
+// ---------------------------------------------------------------------------
+// TextureSheetAnimation (Unity Shuriken "Texture Sheet Animation")
+// atlas_cols / atlas_rows / atlas_frame_over_lifetime は既存。 ここでは
+// 行ランダム / 時間軸の選択 / FPS 駆動の拡張パラメータを足す。
+// ---------------------------------------------------------------------------
+
+enum class AtlasTimeMode : uint8_t {
+    Lifetime = 0,
+    Speed    = 1,
+    FPS      = 2,
+};
+
+struct TextureSheetAnimation {
+    AtlasTimeMode time_mode  = AtlasTimeMode::Lifetime;
+    float         fps        = 30.0f;
+    uint32_t      row_count  = 1;
+    bool          random_row = false;
+    uint32_t      cycles     = 1;
+    bool          enabled    = false;
+};
+
+// ---------------------------------------------------------------------------
 // Emitter descriptor
 //
 // Fully describes an emitter. All parameters mirror Unity Shuriken module
@@ -133,6 +220,13 @@ struct EmitterDescriptor {
     Curve        atlas_frame_over_lifetime;  // 0 .. (cols*rows - 1)
     bool         stretch_use_velocity = true;
     float        stretch_scale        = 1.0f;
+    TextureSheetAnimation texture_sheet;
+
+    // ── Extension modules (Shuriken parity) ─────────────────
+    NoiseModule                noise;
+    LimitVelocityOverLifetime  limit_velocity;
+    TrailModule                trail;
+    std::vector<SubEmitter>    sub_emitters;
 
     // ── Helpers ─────────────────────────────────────────────
 
