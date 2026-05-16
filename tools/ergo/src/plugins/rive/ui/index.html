@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ergo — Rive Player</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header>
+  <h1>Rive Player</h1>
+  <span class="status" id="status">ファイル未選択</span>
+</header>
+
+<main>
+  <section class="left">
+    <div class="dropzone" id="dropzone">
+      <p>ここに <code>.riv</code> ファイルをドロップ<br>または <button id="file_btn" type="button">ファイルを開く</button></p>
+      <input type="file" id="file_input" accept=".riv" hidden>
+    </div>
+    <div class="stage">
+      <canvas id="canvas" width="640" height="640"></canvas>
+    </div>
+    <div class="controls">
+      <label>Artboard:
+        <select id="artboard_select"></select>
+      </label>
+      <label>State Machine / Animation:
+        <select id="scene_select"></select>
+      </label>
+      <label>Fit:
+        <select id="fit_select">
+          <option value="contain" selected>contain</option>
+          <option value="cover">cover</option>
+          <option value="fill">fill</option>
+          <option value="fitWidth">fitWidth</option>
+          <option value="fitHeight">fitHeight</option>
+          <option value="none">none</option>
+          <option value="scaleDown">scaleDown</option>
+        </select>
+      </label>
+      <button id="play_btn" type="button">▶ Play</button>
+      <button id="pause_btn" type="button">‖ Pause</button>
+      <label class="speed">
+        speed
+        <input id="speed_input" type="range" min="0.1" max="3.0" step="0.05" value="1.0">
+        <span id="speed_label">1.0×</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="right">
+    <h2>メタ情報</h2>
+    <div id="meta_summary" class="meta-summary">—</div>
+
+    <h2>Artboards</h2>
+    <ul id="artboard_list" class="card-list"></ul>
+
+    <h2>State Machine 入力</h2>
+    <div id="sm_inputs" class="sm-inputs">—</div>
+
+    <h2>Animations</h2>
+    <ul id="animation_list" class="card-list"></ul>
+
+    <h2>Timeline</h2>
+    <div class="timeline" id="timeline_box">
+      <div class="timeline-track"><div class="timeline-cursor" id="timeline_cursor"></div></div>
+      <div class="timeline-readout" id="timeline_readout">0.00 / 0.00 s</div>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
