@@ -30,6 +30,8 @@ option(ERGO_BUILD_HEALTH       "Build ergo_health"        ON)
 option(ERGO_BUILD_SCORE        "Build ergo_score"         ON)
 option(ERGO_BUILD_COMBO_COUNTER "Build ergo_combo_counter" ON)
 option(ERGO_BUILD_TIMING_JUDGE "Build ergo_timing_judge"  ON)
+option(ERGO_BUILD_UI_KIT       "Build ergo_ui_kit (retained-mode UI framework)" ON)
+option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shuriken → ergo_particle migrator + CLI)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -603,6 +605,61 @@ if(ERGO_BUILD_TIMING_JUDGE)
         add_executable(test_timing_judge tests/timing_judge/test_timing_judge.cpp)
         target_link_libraries(test_timing_judge PRIVATE ergo_timing_judge ergo_gtest_main)
         add_test(NAME test_timing_judge COMMAND test_timing_judge)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_ui_kit — retained-mode UI component framework (XD-style)
+# コンポーネントツリー + auto-layout/constraints + 描画リスト生成。
+# 描画は Pictor UIRenderer、 入力/アニメは ergo_ui_kit (P3/P4)。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_UI_KIT)
+    add_library(ergo_ui_kit STATIC
+        src/ui_kit/ui_kit.cpp
+    )
+    target_include_directories(ergo_ui_kit PUBLIC include)
+    target_link_libraries(ergo_ui_kit PUBLIC ergo_common ergo_io)
+    if(MSVC)
+        target_compile_options(ergo_ui_kit PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_ui_kit tests/ui_kit/test_ui_kit.cpp)
+        target_link_libraries(test_ui_kit PRIVATE ergo_ui_kit ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_ui_kit PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_ui_kit COMMAND test_ui_kit)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_shuriken_migrator — Unity ParticleSystem (Shuriken) → ergo_particle
+#   * 依存ゼロの最小 YAML スキャナで .prefab/.unity から !u!198 ブロックを抽出
+#   * MinMaxCurve / 主要 Module を ParticleEffectConfig へ写像
+#   * CLI 実行ファイル shuriken_migrator も同時 build
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_SHURIKEN_MIGRATOR AND ERGO_BUILD_PARTICLE AND ERGO_BUILD_GPU_PARTICLE)
+    add_library(ergo_shuriken_migrator STATIC
+        src/shuriken_migrator/migrator.cpp
+        src/shuriken_migrator/gpu_target.cpp
+    )
+    target_include_directories(ergo_shuriken_migrator PUBLIC include)
+    target_link_libraries(ergo_shuriken_migrator PUBLIC ergo_particle ergo_gpu_particle)
+    if(MSVC)
+        target_compile_options(ergo_shuriken_migrator PUBLIC /utf-8)
+    endif()
+
+    add_executable(shuriken_migrator tools/shuriken_migrator/main.cpp)
+    target_link_libraries(shuriken_migrator PRIVATE ergo_shuriken_migrator)
+    if(MSVC)
+        target_compile_options(shuriken_migrator PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_shuriken_migrator tests/shuriken_migrator/test_shuriken_migrator.cpp)
+        target_link_libraries(test_shuriken_migrator PRIVATE ergo_shuriken_migrator ergo_gtest_main)
+        add_test(NAME test_shuriken_migrator COMMAND test_shuriken_migrator)
     endif()
 endif()
 
