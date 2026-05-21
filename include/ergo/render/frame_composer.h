@@ -86,6 +86,34 @@ public:
         VkFramebuffer (*provider)(uint32_t image_index, void* user),
         void* user);
 
+    /// パス `pass_index` を begin する **直前** に、 render pass の外側で
+    /// コマンドを記録するための hook。 自前で vkCmdBeginRenderPass /
+    /// EndRenderPass を行う合成処理 (post-process チェーン、 投影デカール
+    /// 合成など) は IRenderLayer::record (= renderpass 内) には収まらないので、
+    /// このパス間 hook で記録する。
+    ///
+    /// KS の post-process 経路: 「HDR scene パス」と「HUD パス」の 2 パスを
+    /// add_pass で登録し、 HUD パス (index 1) の pre-pass hook に
+    /// 「投影デカール合成 + post-process チェーン」を積む。 hook は HUD パスの
+    /// vkCmdBeginRenderPass より前、 scene パスの vkCmdEndRenderPass より後に
+    /// 呼ばれる。
+    ///
+    /// `pass_index == 0` の hook はフレーム先頭 (最初のパスの前) に呼ばれる。
+    void set_pre_pass_hook(
+        std::size_t pass_index,
+        void (*hook)(VkCommandBuffer cmd, uint32_t image_index,
+                     const FrameContext& frame, void* user),
+        void* user);
+
+    /// present 完了の **直後** に呼ばれる hook。 スクリーンショットの読み出し
+    /// (提示済み swapchain image を読む) や、 初回フレーム提示後の遅延 bake の
+    /// トリガなど、 「提示後に 1 回やる」処理を積む。 `image_index` は直近に
+    /// present した swapchain image。
+    void set_post_present_hook(
+        void (*hook)(uint32_t image_index, const FrameContext& frame,
+                     void* user),
+        void* user);
+
     /// 全パスの全レイヤーを登録順に初期化する。
     ///   1. 各レイヤー initialize()
     ///   2. 各レイヤーへ所属パスの render pass を set_render_pass() で通知
@@ -119,9 +147,19 @@ private:
         VkFramebuffer (*fn)(uint32_t, void*) = nullptr;
         void* user = nullptr;
     };
+    struct PrePassHook {
+        void (*fn)(VkCommandBuffer, uint32_t, const FrameContext&, void*) = nullptr;
+        void* user = nullptr;
+    };
+    struct PostPresentHook {
+        void (*fn)(uint32_t, const FrameContext&, void*) = nullptr;
+        void* user = nullptr;
+    };
 
     std::vector<RenderPassDesc>      passes_;
     std::vector<FramebufferProvider> fb_providers_;
+    std::vector<PrePassHook>         pre_pass_hooks_;
+    PostPresentHook                  post_present_hook_;
 
     RenderContext* ctx_           = nullptr;
     bool           initialized_   = false;

@@ -35,6 +35,7 @@ void FrameComposer::add_pass(VkRenderPass render_pass,
     desc.clear_values = std::move(clear_values);
     passes_.push_back(std::move(desc));
     fb_providers_.emplace_back();   // パス数と 1:1 で provider スロットを増やす
+    pre_pass_hooks_.emplace_back(); // パス数と 1:1 で pre-pass hook スロットを増やす
 }
 
 void FrameComposer::set_framebuffer_provider(
@@ -44,6 +45,22 @@ void FrameComposer::set_framebuffer_provider(
     if (pass_index >= fb_providers_.size()) return;
     fb_providers_[pass_index].fn   = provider;
     fb_providers_[pass_index].user = user;
+}
+
+void FrameComposer::set_pre_pass_hook(
+        std::size_t pass_index,
+        void (*hook)(VkCommandBuffer, uint32_t, const FrameContext&, void*),
+        void* user) {
+    if (pass_index >= pre_pass_hooks_.size()) return;
+    pre_pass_hooks_[pass_index].fn   = hook;
+    pre_pass_hooks_[pass_index].user = user;
+}
+
+void FrameComposer::set_post_present_hook(
+        void (*hook)(uint32_t, const FrameContext&, void*),
+        void* user) {
+    post_present_hook_.fn   = hook;
+    post_present_hook_.user = user;
 }
 
 void FrameComposer::initialize(RenderContext& ctx) {
@@ -112,6 +129,12 @@ bool FrameComposer::run_frame(const FrameContext& frame) {
     for (std::size_t i = 0; i < passes_.size(); ++i) {
         RenderPassDesc& pass = passes_[i];
 
+        // パス間 hook: このパスを begin する直前、 render pass の外側で
+        // 自前合成 (post-process チェーン / 投影デカール) を記録する。
+        if (i < pre_pass_hooks_.size() && pre_pass_hooks_[i].fn) {
+            pre_pass_hooks_[i].fn(cmd, image_idx, frame, pre_pass_hooks_[i].user);
+        }
+
         // framebuffer の解決: provider が登録されていればそれを使い、
         // 無ければ VulkanContext の default framebuffers から image_idx 番。
         VkFramebuffer fb = VK_NULL_HANDLE;
@@ -167,6 +190,12 @@ bool FrameComposer::run_frame(const FrameContext& frame) {
     vk->present(image_idx);
     last_present_idx_ = image_idx;
     ++frame_count_;
+
+    // present 直後の hook: 提示済み swapchain image の読み出し
+    // (スクリーンショット) など、 「提示後に 1 回」やる処理を回す。
+    if (post_present_hook_.fn) {
+        post_present_hook_.fn(image_idx, frame, post_present_hook_.user);
+    }
     return true;
 #else
     // Vulkan SDK 無しビルド — フレームループは no-op。 ホストのループが
