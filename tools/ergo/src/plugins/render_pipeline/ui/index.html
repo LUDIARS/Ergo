@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ergo — Render Pipeline Viewer</title>
+<title>Ergo — Render Pipeline</title>
 <link rel="stylesheet" href="./styles.css">
 <!-- vis.js Network (DAG レイアウト) -->
 <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
@@ -11,73 +11,198 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-dark.min.css">
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/glsl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/json.min.js"></script>
 </head>
 <body>
 
 <header>
   <h1>Render Pipeline</h1>
-  <span class="status" id="status">loading…</span>
+  <!-- 現状ビュー (scanner, read-only) と 編集ビュー (profile, read/write) の切替 -->
+  <nav class="mode-switch">
+    <button id="mode_scanner" class="active" type="button"
+            title="Pictor の実コード (系統B) が今どう描いているか — 読み取り専用">
+      📷 Scanner <span class="mode-sub">現状・読取専用</span>
+    </button>
+    <button id="mode_editor" type="button"
+            title="*.profile.json を編集 — Pictor にどう描かせたいか (系統A)">
+      ✎ Profile Editor <span class="mode-sub">編集</span>
+    </button>
+  </nav>
   <span class="spacer"></span>
-  <button id="btn_rescan" type="button">↻ Rescan</button>
+  <span class="status" id="status">loading…</span>
 </header>
 
-<main>
-  <section class="left">
-    <div class="card">
-      <h2>Pass DAG</h2>
-      <p class="meta" id="dag_meta">—</p>
-      <div id="dag"></div>
-    </div>
-
-    <div class="card">
-      <h2 id="detail_title">選択待ち</h2>
-      <div id="detail_body">DAG のノードをクリックして詳細を見る。</div>
-    </div>
-  </section>
-
-  <section class="right">
-    <nav class="tabs">
-      <button data-tab="pipelines" class="active">Pipelines</button>
-      <button data-tab="shaders">Shaders</button>
-      <button data-tab="attachments">Attachments</button>
-    </nav>
-
-    <div class="tab-body" id="tab_pipelines">
-      <div class="filter-row">
-        <input id="pipeline_filter" type="text" placeholder="filter: name / shader / flag…">
+<!-- ════════ MODE A: Scanner view (read-only) ════════════════════════ -->
+<main id="view_scanner">
+  <div class="mode-banner scanner">
+    現状ビュー — Pictor のハードコードされた Vulkan 実装 (系統B) を静的スキャンした結果。<strong>読み取り専用。</strong>
+    <button id="btn_rescan" type="button">↻ Rescan</button>
+  </div>
+  <div class="scanner-grid">
+    <section class="left">
+      <div class="card">
+        <h2>Pass DAG</h2>
+        <p class="meta" id="dag_meta">—</p>
+        <div id="dag"></div>
       </div>
-      <table class="spec-table">
-        <thead><tr>
-          <th>関数</th><th>blend</th><th>cull</th><th>depth</th><th>topology</th><th>shaders</th>
-        </tr></thead>
-        <tbody id="pipeline_rows"></tbody>
-      </table>
-    </div>
-
-    <div class="tab-body" id="tab_shaders" style="display:none">
-      <div class="filter-row">
-        <input id="shader_filter" type="text" placeholder="filter: name / stage / location…">
+      <div class="card">
+        <h2 id="detail_title">選択待ち</h2>
+        <div id="detail_body">DAG のノードをクリックして詳細を見る。</div>
       </div>
-      <div class="shader-split">
-        <ul id="shader_list" class="shader-list"></ul>
-        <div class="shader-view">
-          <h3 id="shader_view_title">— 選択待ち —</h3>
-          <p class="meta" id="shader_view_meta"></p>
-          <pre><code class="language-glsl" id="shader_view_code">// シェーダを選択</code></pre>
+    </section>
+
+    <section class="right">
+      <nav class="tabs">
+        <button data-tab="pipelines" class="active">Pipelines</button>
+        <button data-tab="shaders">Shaders</button>
+        <button data-tab="attachments">Attachments</button>
+      </nav>
+
+      <div class="tab-body" id="tab_pipelines">
+        <div class="filter-row">
+          <input id="pipeline_filter" type="text" placeholder="filter: name / shader / flag…">
+        </div>
+        <table class="spec-table">
+          <thead><tr>
+            <th>関数</th><th>blend</th><th>cull</th><th>depth</th><th>topology</th><th>shaders</th>
+          </tr></thead>
+          <tbody id="pipeline_rows"></tbody>
+        </table>
+      </div>
+
+      <div class="tab-body" id="tab_shaders" style="display:none">
+        <div class="filter-row">
+          <input id="shader_filter" type="text" placeholder="filter: name / stage / location…">
+        </div>
+        <div class="shader-split">
+          <ul id="shader_list" class="shader-list"></ul>
+          <div class="shader-view">
+            <h3 id="shader_view_title">— 選択待ち —</h3>
+            <p class="meta" id="shader_view_meta"></p>
+            <pre><code class="language-glsl" id="shader_view_code">// シェーダを選択</code></pre>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="tab-body" id="tab_attachments" style="display:none">
-      <table class="spec-table">
-        <thead><tr>
-          <th>id</th><th>label</th><th>format</th><th>usage</th><th>owner</th>
-        </tr></thead>
-        <tbody id="attachment_rows"></tbody>
-      </table>
-      <p class="meta">Producer / Consumer は DAG 側の pass ノードに矢印で表示される。</p>
-    </div>
-  </section>
+      <div class="tab-body" id="tab_attachments" style="display:none">
+        <table class="spec-table">
+          <thead><tr>
+            <th>id</th><th>label</th><th>format</th><th>usage</th><th>owner</th>
+          </tr></thead>
+          <tbody id="attachment_rows"></tbody>
+        </table>
+        <p class="meta">Producer / Consumer は DAG 側の pass ノードに矢印で表示される。</p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- ════════ MODE B: Profile editor (read/write) ═════════════════════ -->
+<main id="view_editor" style="display:none">
+  <div class="mode-banner editor">
+    編集ビュー — <code id="profile_dir">…</code> 内の <code>*.profile.json</code> を編集。
+    保存すると即ディスクへ書き込まれる (Pictor が <code>register_presets_from_dir()</code> で読む正本)。
+    <strong>scanner の現状ビューとは別物。</strong>
+  </div>
+  <div class="editor-grid">
+    <aside class="profile-list-pane">
+      <div class="plp-head">
+        <h2>Profiles</h2>
+        <button id="btn_reload_profiles" type="button" title="一覧を再読込">↻</button>
+        <button id="btn_new_profile" type="button" title="新規プロファイル">＋</button>
+      </div>
+      <ul id="profile_list" class="profile-list"></ul>
+      <p class="plp-note" id="profile_list_note">—</p>
+    </aside>
+
+    <section class="profile-edit-pane">
+      <div class="pep-head">
+        <h2 id="profile_edit_title">プロファイル未選択</h2>
+        <span class="dirty-flag" id="dirty_flag" style="display:none">未保存</span>
+        <span class="spacer"></span>
+        <button id="btn_save_profile" type="button" disabled>💾 保存</button>
+      </div>
+      <p class="pep-note" id="profile_edit_note">左の一覧から選ぶか「＋」で新規作成。</p>
+
+      <div id="profile_form" class="profile-form" style="display:none">
+        <!-- profile スカラ -->
+        <fieldset>
+          <legend>プロファイル基本設定</legend>
+          <div class="field-grid" id="scalar_fields"></div>
+        </fieldset>
+
+        <!-- render_passes -->
+        <fieldset>
+          <legend>
+            Render Passes
+            <span class="legend-note">存在すれば preset の pass 列を完全置換</span>
+            <button id="btn_add_pass" type="button" class="mini">＋ pass 追加</button>
+          </legend>
+          <div id="passes_list" class="passes-list"></div>
+        </fieldset>
+
+        <!-- post_process -->
+        <fieldset>
+          <legend>
+            Post Process Stack
+            <span class="legend-note">name / enabled のみ C++ に届く。その他は editor 専用 (params)</span>
+            <button id="btn_add_pp" type="button" class="mini">＋ effect 追加</button>
+          </legend>
+          <div id="pp_list" class="pp-list"></div>
+        </fieldset>
+
+        <!-- shadow -->
+        <fieldset>
+          <legend>Shadow (トップレベル)</legend>
+          <div class="field-grid" id="shadow_fields"></div>
+        </fieldset>
+
+        <!-- gi -->
+        <fieldset>
+          <legend>GI / Lighting</legend>
+          <div class="field-grid" id="gi_fields"></div>
+          <h4>gi.shadow — ShadowMapConfig</h4>
+          <div class="field-grid" id="gi_shadow_fields"></div>
+          <h4>gi.ssao — SSAOConfig</h4>
+          <div class="field-grid" id="gi_ssao_fields"></div>
+          <h4>gi.probes — GIProbeConfig</h4>
+          <div class="field-grid" id="gi_probes_fields"></div>
+        </fieldset>
+
+        <!-- memory -->
+        <fieldset>
+          <legend>Memory (バイト単位)</legend>
+          <div class="field-grid" id="memory_fields"></div>
+          <h4>memory.gpu — GpuMemoryAllocator::Config</h4>
+          <div class="field-grid" id="memory_gpu_fields"></div>
+        </fieldset>
+
+        <!-- gpu_driven -->
+        <fieldset>
+          <legend>GPU Driven</legend>
+          <div class="field-grid" id="gpu_driven_fields"></div>
+        </fieldset>
+
+        <!-- update -->
+        <fieldset>
+          <legend>Update Scheduler</legend>
+          <div class="field-grid" id="update_fields"></div>
+        </fieldset>
+
+        <!-- profiler -->
+        <fieldset>
+          <legend>Profiler</legend>
+          <div class="field-grid" id="profiler_fields"></div>
+        </fieldset>
+
+        <!-- JSON プレビュー -->
+        <fieldset>
+          <legend>保存される JSON プレビュー</legend>
+          <pre><code class="language-json" id="json_preview"></code></pre>
+        </fieldset>
+      </div>
+    </section>
+  </div>
 </main>
 
 <script type="module" src="./app.js"></script>
