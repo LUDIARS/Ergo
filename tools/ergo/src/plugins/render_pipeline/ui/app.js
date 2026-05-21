@@ -1,12 +1,16 @@
-// Render Pipeline — two modes:
+// Render Pipeline — three modes:
 //
 //   Scanner (現状ビュー, read-only)   — how Pictor's hard-coded Vulkan code
-//                                       actually renders today (系統B).
+//                                       actually renders today (系統B), as a
+//                                       vis.js DAG.
+//   Timeline (実行順ビュー, read-only)— the same scanner passes laid out as a
+//                                       static execution-order Gantt chart.
 //   Profile Editor (編集ビュー, R/W)  — *.profile.json files = how you want
 //                                       Pictor to render (系統A).
 //
-// The modes share nothing: separate API namespaces, separate artifacts on
-// disk. The header mode-switch toggles which <main> is visible.
+// Scanner & Timeline both read the same scanner snapshot (`SNAPSHOT`); the
+// editor is fully separate (own API namespace, own on-disk artifacts). The
+// header mode-switch toggles which <main> is visible.
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
@@ -14,30 +18,43 @@ const statusEl = $("status");
 // ════════════════════════════════════════════════════════════════════
 //  Mode switch
 // ════════════════════════════════════════════════════════════════════
-const viewScanner = $("view_scanner");
-const viewEditor  = $("view_editor");
-const btnModeScanner = $("mode_scanner");
-const btnModeEditor  = $("mode_editor");
+const viewScanner  = $("view_scanner");
+const viewTimeline = $("view_timeline");
+const viewEditor   = $("view_editor");
+const btnModeScanner  = $("mode_scanner");
+const btnModeTimeline = $("mode_timeline");
+const btnModeEditor   = $("mode_editor");
 
-let scannerLoaded = false;
-let editorLoaded  = false;
+let scannerLoaded  = false;   // scanner snapshot fetched at least once
+let editorLoaded   = false;
+let timelineDrawn  = false;   // timeline rendered for the current SNAPSHOT
 
 function setMode(mode) {
-    const editing = mode === "editor";
-    viewScanner.style.display = editing ? "none" : "";
-    viewEditor.style.display  = editing ? "" : "none";
-    btnModeScanner.classList.toggle("active", !editing);
-    btnModeEditor.classList.toggle("active", editing);
-    if (editing) {
+    const views = { scanner: viewScanner, timeline: viewTimeline, editor: viewEditor };
+    const btns  = { scanner: btnModeScanner, timeline: btnModeTimeline, editor: btnModeEditor };
+    for (const k of Object.keys(views)) {
+        views[k].style.display = k === mode ? "" : "none";
+        btns[k].classList.toggle("active", k === mode);
+    }
+    if (mode === "editor") {
         if (!editorLoaded) { editorLoaded = true; loadProfileList(); }
         else updateStatusEditor();
-    } else {
-        if (!scannerLoaded) { scannerLoaded = true; loadScanner(); }
-        else updateStatusScanner();
+        return;
     }
+    if (mode === "timeline") {
+        // Timeline shares the scanner snapshot. Fetch it once if needed,
+        // then (re)draw the Gantt chart for whatever SNAPSHOT we hold.
+        if (!scannerLoaded) { scannerLoaded = true; loadScanner(); }
+        else { ensureTimeline(); updateStatusTimeline(); }
+        return;
+    }
+    // scanner
+    if (!scannerLoaded) { scannerLoaded = true; loadScanner(); }
+    else updateStatusScanner();
 }
-btnModeScanner.addEventListener("click", () => setMode("scanner"));
-btnModeEditor.addEventListener("click", () => setMode("editor"));
+btnModeScanner.addEventListener("click",  () => setMode("scanner"));
+btnModeTimeline.addEventListener("click", () => setMode("timeline"));
+btnModeEditor.addEventListener("click",   () => setMode("editor"));
 
 // ════════════════════════════════════════════════════════════════════
 //  MODE A — Scanner view (read-only). Logic preserved from Phase 1.
@@ -86,6 +103,9 @@ async function loadScanner() {
     renderPipelineTable(SNAPSHOT);
     renderShaders(SNAPSHOT);
     renderAttachments(SNAPSHOT);
+    timelineDrawn = false;          // new snapshot — timeline must redraw
+    // If the user is already on the Timeline tab, draw it right away.
+    if (btnModeTimeline.classList.contains("active")) ensureTimeline();
 }
 
 btnRescan.addEventListener("click", async () => {
@@ -99,6 +119,8 @@ btnRescan.addEventListener("click", async () => {
             renderPipelineTable(SNAPSHOT);
             renderShaders(SNAPSHOT);
             renderAttachments(SNAPSHOT);
+            timelineDrawn = false;
+            if (btnModeTimeline.classList.contains("active")) ensureTimeline();
         }
         statusEl.textContent = data.ok ? `rescan 完了 (${data.stdout?.trim() ?? ""})` : `rescan 失敗: ${data.err ?? ""}`;
     } catch (e) {
@@ -263,6 +285,381 @@ function renderAttachments(snap) {
             <td>${a.owner || "—"}<br><span class="small">${a.note || ""}</span></td>`;
         tbody.appendChild(tr);
     }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  MODE T — Timeline view (static execution-order Gantt, read-only)
+// ════════════════════════════════════════════════════════════════════
+//
+// Reuses the scanner SNAPSHOT. The model:
+//
+//   • X axis  = execution order. `passes[]` array order *is* the order,
+//     but we group passes into topological "levels" (same level = no
+//     dependency between them → drawn side by side at the same X span).
+//   • Bars    = one per pass. Width is uniform, or weighted by draws[]
+//     count when the "draws で重み付け" toggle is on.
+//   • Lanes   = parallel passes (independent ones at the same level, or
+//     overlapping spans) are pushed to separate horizontal lanes so they
+//     never visually collide.
+//   • Sub-bars= a `graphics_chain` pass nests one small bar per draws[]
+//     entry inside its pass bar (the post-process sub-steps).
+//   • Attachment lifetime = a striped bar from the level where the
+//     attachment is first produced to the level of its last consume.
+//
+// Phase 2 hook: `injectTiming(passId, micros)` overlays a measured GPU
+// timestamp bar + label onto a pass. `applyTimingMessage()` accepts the
+// reserved WS `{op:"timing", ...}` payload. Today nothing feeds it, so
+// the chart is purely static — but the view never needs structural
+// changes to light up once Pictor starts publishing timestamps.
+
+const tlEl          = $("timeline");
+const tlMeta        = $("tl_meta");
+const tlDetailTitle = $("tl_detail_title");
+const tlDetailBody  = $("tl_detail_body");
+const tlEmpty       = $("tl_empty");
+const tlWeightCb    = $("tl_weight");
+const tlLifetimesCb = $("tl_lifetimes");
+const tlTimingState = $("tl_timing_state");
+
+// Layout constants (px). LEVEL_W = horizontal span of one topo level.
+const TL_LEVEL_W  = 200;
+const TL_BAR_H    = 52;
+const TL_LANE_GAP = 8;
+const TL_PAD_X    = 12;
+
+// Measured GPU timings, keyed by pass id → microseconds. Phase 2 fills this.
+const TL_TIMING = Object.create(null);
+let   TL_TIMING_FRAME = null;
+
+// Last computed layout model — kept so toggles / timing can repaint.
+let TL_MODEL = null;
+let TL_SELECTED = null;
+
+tlWeightCb.addEventListener("change",    () => { timelineDrawn = false; ensureTimeline(); });
+tlLifetimesCb.addEventListener("change", () => { timelineDrawn = false; ensureTimeline(); });
+
+function updateStatusTimeline() {
+    if (!SNAPSHOT) { statusEl.textContent = "timeline: snapshot 未取得"; return; }
+    const t = TL_TIMING_FRAME != null ? ` · timing frame ${TL_TIMING_FRAME}` : "";
+    statusEl.textContent =
+        `timeline · passes=${SNAPSHOT.passes.length} ` +
+        `attachments=${SNAPSHOT.attachments.length}${t}`;
+}
+
+// Draw the timeline once per SNAPSHOT (or after a toggle change).
+function ensureTimeline() {
+    if (timelineDrawn) return;
+    if (!SNAPSHOT) { tlEl.innerHTML = `<p class="tl-empty">scanner snapshot 未取得。</p>`; return; }
+    TL_MODEL = buildTimelineModel(SNAPSHOT);
+    renderTimeline(TL_MODEL);
+    timelineDrawn = true;
+    updateStatusTimeline();
+}
+
+// ── model build ────────────────────────────────────────────────────────
+//
+// Returns { passes:[{pass, level, lane, x, w, subs:[...]}],
+//           attachments:[{id, fromLevel, toLevel, lane}],
+//           levelCount, laneCount, attLaneCount }.
+function buildTimelineModel(snap) {
+    const passes = snap.passes || [];
+    const byId = {};
+    passes.forEach((p) => { byId[p.id] = p; });
+
+    // producer attachment → list of producing pass ids
+    const producersOf = {};
+    passes.forEach((p) => {
+        (p.produces || []).forEach((att) => {
+            (producersOf[att] = producersOf[att] || []).push(p.id);
+        });
+    });
+
+    // Topological level per pass — same recurrence as renderDag()'s intent,
+    // but computed explicitly so independent passes share a level.
+    // level(p) = max(level(producer of each consumed attachment)) + 1.
+    const level = {};
+    function levelOf(id, seen) {
+        if (id in level) return level[id];
+        if (seen.has(id)) return 0;           // cycle guard
+        seen.add(id);
+        const p = byId[id];
+        let lv = 0;
+        (p.consumes || []).forEach((att) => {
+            (producersOf[att] || []).forEach((src) => {
+                if (src === id) return;       // self-produce (e.g. swapchain R/W)
+                lv = Math.max(lv, levelOf(src, seen) + 1);
+            });
+        });
+        seen.delete(id);
+        level[id] = lv;
+        return lv;
+    }
+    passes.forEach((p) => levelOf(p.id, new Set()));
+
+    // Bar width: uniform, or weighted by draws[] count (clamped 0.5–2.0×).
+    const weight = tlWeightCb.checked;
+    const maxDraws = Math.max(1, ...passes.map((p) => (p.draws || []).length));
+
+    // Lane assignment: scan passes in execution (array) order; a pass goes
+    // into the first lane whose current X-extent does not overlap it.
+    const laneEndX = [];   // laneEndX[lane] = right edge currently occupied
+    const placed = [];
+    let levelCount = 0;
+
+    passes.forEach((p) => {
+        const lv = level[p.id];
+        levelCount = Math.max(levelCount, lv + 1);
+        const wFactor = weight
+            ? 0.5 + 1.5 * ((p.draws || []).length / maxDraws)
+            : 1;
+        const x = TL_PAD_X + lv * TL_LEVEL_W;
+        const w = Math.max(70, (TL_LEVEL_W - 16) * wFactor);
+
+        let lane = laneEndX.findIndex((end) => x >= end);
+        if (lane === -1) { lane = laneEndX.length; laneEndX.push(0); }
+        laneEndX[lane] = x + w + 14;
+
+        // sub-passes — only graphics_chain nests its draws
+        const subs = (p.kind === "graphics_chain")
+            ? (p.draws || []).map((d) => ({ label: d }))
+            : [];
+
+        placed.push({ pass: p, level: lv, lane, x, w, subs });
+    });
+
+    // Attachment lifetimes: produce level → last consume level.
+    const attModel = [];
+    (snap.attachments || []).forEach((a) => {
+        const producers = passes.filter((p) => (p.produces || []).includes(a.id));
+        const consumers = passes.filter((p) => (p.consumes || []).includes(a.id));
+        if (!producers.length && !consumers.length) return;
+        const lvls = [...producers, ...consumers].map((p) => level[p.id]);
+        attModel.push({
+            id:        a.id,
+            label:     a.label || a.id,
+            fromLevel: Math.min(...lvls),
+            toLevel:   Math.max(...lvls),
+        });
+    });
+    // pack attachment bars into lanes too (no horizontal overlap per lane)
+    attModel.sort((x, y) => x.fromLevel - y.fromLevel);
+    const attLaneEnd = [];
+    attModel.forEach((a) => {
+        let lane = attLaneEnd.findIndex((end) => a.fromLevel > end);
+        if (lane === -1) { lane = attLaneEnd.length; attLaneEnd.push(0); }
+        attLaneEnd[lane] = a.toLevel;
+        a.lane = lane;
+    });
+
+    return {
+        passes:      placed,
+        attachments: attModel,
+        levelCount:  Math.max(1, levelCount),
+        laneCount:   Math.max(1, laneEndX.length),
+        attLaneCount: attLaneEnd.length,
+    };
+}
+
+// ── render ──────────────────────────────────────────────────────────────
+function renderTimeline(model) {
+    tlEl.innerHTML = "";
+    if (!model.passes.length) {
+        tlEl.innerHTML = `<p class="tl-empty">passes 無し — scanner の PASS_DAG が空。</p>`;
+        return;
+    }
+
+    const stageW = TL_PAD_X * 2 + model.levelCount * TL_LEVEL_W;
+    const lanesH = model.laneCount * (TL_BAR_H + TL_LANE_GAP) + TL_LANE_GAP;
+
+    const stage = document.createElement("div");
+    stage.className = "tl-stage";
+    stage.style.width = stageW + "px";
+
+    // ── axis: one tick per execution level ──
+    const axis = document.createElement("div");
+    axis.className = "tl-axis";
+    for (let lv = 0; lv < model.levelCount; lv++) {
+        const tick = document.createElement("div");
+        tick.className = "tl-tick";
+        tick.style.left = (TL_PAD_X + lv * TL_LEVEL_W) + "px";
+        tick.innerHTML = `<span>lv ${lv}</span>`;
+        axis.appendChild(tick);
+        const grid = document.createElement("div");
+        grid.className = "tl-gridline";
+        grid.style.left = (TL_PAD_X + lv * TL_LEVEL_W) + "px";
+        grid.style.height = lanesH + "px";
+        stage.appendChild(grid);
+    }
+    stage.appendChild(axis);
+
+    // ── lane band: pass bars ──
+    const lanes = document.createElement("div");
+    lanes.className = "tl-lanes";
+    lanes.style.height = lanesH + "px";
+
+    model.passes.forEach((item) => {
+        const bar = document.createElement("div");
+        bar.className = "tl-bar" + (item.pass.kind === "graphics_chain" ? " chain" : "");
+        bar.dataset.passId = item.pass.id;
+        bar.style.left   = item.x + "px";
+        bar.style.width  = item.w + "px";
+        bar.style.top    = (TL_LANE_GAP + item.lane * (TL_BAR_H + TL_LANE_GAP)) + "px";
+        bar.style.height = TL_BAR_H + "px";
+
+        const drawCount = (item.pass.draws || []).length;
+        bar.innerHTML =
+            `<div class="tl-bar-label">${escapeHtml(item.pass.label)}</div>
+             <div class="tl-bar-sub">${item.pass.kind} · ${drawCount} draw${drawCount === 1 ? "" : "s"}</div>`;
+
+        // graphics_chain → nested sub-pass mini bars
+        if (item.subs.length) {
+            const subRow = document.createElement("div");
+            subRow.className = "tl-subrow";
+            item.subs.forEach((s) => {
+                const sb = document.createElement("div");
+                sb.className = "tl-sub";
+                sb.textContent = s.label.replace(/_pipeline$/, "");
+                sb.title = s.label;
+                subRow.appendChild(sb);
+            });
+            bar.appendChild(subRow);
+        }
+
+        // Phase 2: measured GPU time overlay, if injected.
+        applyTimingToBar(bar, item.pass.id);
+
+        bar.addEventListener("click", () => selectTimelinePass(item.pass.id));
+        if (TL_SELECTED === item.pass.id) bar.classList.add("selected");
+        lanes.appendChild(bar);
+    });
+    stage.appendChild(lanes);
+
+    // ── attachment lifetime band ──
+    if (tlLifetimesCb.checked && model.attachments.length) {
+        const att = document.createElement("div");
+        att.className = "tl-att-section";
+        const head = document.createElement("div");
+        head.className = "tl-att-head";
+        head.textContent = "attachment ライフタイム (produce → 最後の consume)";
+        att.appendChild(head);
+        model.attachments.forEach((a) => {
+            const row = document.createElement("div");
+            row.className = "tl-att-row";
+            const bar = document.createElement("div");
+            bar.className = "tl-att-bar";
+            const x = TL_PAD_X + a.fromLevel * TL_LEVEL_W;
+            // span at least one level wide so a produce==consume bar is visible
+            const span = Math.max(1, a.toLevel - a.fromLevel);
+            bar.style.left  = x + "px";
+            bar.style.width = (span * TL_LEVEL_W - 16) + "px";
+            bar.title = `${a.id}: lv ${a.fromLevel} → ${a.toLevel}`;
+            bar.innerHTML = `<span>${escapeHtml(a.id)}</span>`;
+            row.appendChild(bar);
+            att.appendChild(row);
+        });
+        stage.appendChild(att);
+    }
+
+    tlEl.appendChild(stage);
+
+    const lifetimeNote = tlLifetimesCb.checked
+        ? ` · ${model.attachments.length} attachment lifetimes`
+        : "";
+    tlMeta.textContent =
+        `${model.passes.length} passes · ${model.levelCount} levels · ` +
+        `${model.laneCount} lanes${lifetimeNote}` +
+        (tlWeightCb.checked ? " · draws 重み付け" : "");
+
+    if (TL_SELECTED) {
+        const sel = model.passes.find((p) => p.pass.id === TL_SELECTED);
+        if (sel) showTimelineDetail(sel.pass);
+    }
+}
+
+function selectTimelinePass(passId) {
+    TL_SELECTED = passId;
+    tlEl.querySelectorAll(".tl-bar").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.passId === passId));
+    const p = (SNAPSHOT.passes || []).find((x) => x.id === passId);
+    if (p) showTimelineDetail(p);
+}
+
+function showTimelineDetail(p) {
+    if (!p) return;
+    tlDetailTitle.textContent = `Pass — ${p.label}`;
+    const fmt = (arr) => (arr && arr.length)
+        ? arr.map((a) => `<code>${escapeHtml(a)}</code>`).join(", ")
+        : "<em>(none)</em>";
+    const us = TL_TIMING[p.id];
+    const timingRow = us != null
+        ? `<tr><th>GPU 実測</th><td>${(us / 1000).toFixed(3)} ms <span class="small">(${us} µs)</span></td></tr>`
+        : `<tr><th>GPU 実測</th><td><em>未計測 (Phase 2)</em></td></tr>`;
+    tlDetailBody.innerHTML =
+        `<table>
+           <tr><th>id</th>          <td>${escapeHtml(p.id)}</td></tr>
+           <tr><th>kind</th>        <td>${escapeHtml(p.kind)}</td></tr>
+           <tr><th>consumes</th>    <td>${fmt(p.consumes)}</td></tr>
+           <tr><th>produces</th>    <td>${fmt(p.produces)}</td></tr>
+           <tr><th>draws</th>       <td>${fmt(p.draws)}</td></tr>
+           ${timingRow}
+           <tr><th>description</th> <td>${escapeHtml(p.description || "")}</td></tr>
+         </table>`;
+}
+
+// ── Phase 2: measured GPU timestamp injection ───────────────────────────
+//
+// `injectTiming` / `applyTimingMessage` are the seam for runtime GPU
+// timestamps. Nothing calls them yet (the chart is static), but the WS
+// `onUpgrade` handler in index.ts already reserves `{op:"timing"}`; wiring
+// it is just: connectWs() → on message → applyTimingMessage(msg).
+function applyTimingToBar(bar, passId) {
+    bar.querySelectorAll(".tl-timing, .tl-timing-tag").forEach((n) => n.remove());
+    const us = TL_TIMING[passId];
+    if (us == null) return;
+    // Width of the measured bar = fraction of the slowest measured pass.
+    const maxUs = Math.max(1, ...Object.values(TL_TIMING));
+    const overlay = document.createElement("div");
+    overlay.className = "tl-timing";
+    overlay.style.width = Math.max(4, (us / maxUs) * 100) + "%";
+    overlay.title = `${(us / 1000).toFixed(3)} ms measured`;
+    bar.appendChild(overlay);
+    const tag = document.createElement("div");
+    tag.className = "tl-timing-tag";
+    tag.textContent = `${(us / 1000).toFixed(2)} ms`;
+    bar.appendChild(tag);
+}
+
+// Inject a single measured timing and repaint that bar (if drawn).
+function injectTiming(passId, micros) {
+    TL_TIMING[passId] = micros;
+    const bar = tlEl.querySelector(`.tl-bar[data-pass-id="${CSS.escape(passId)}"]`);
+    if (bar) applyTimingToBar(bar, passId);
+    if (TL_SELECTED === passId) {
+        const p = (SNAPSHOT?.passes || []).find((x) => x.id === passId);
+        if (p) showTimelineDetail(p);
+    }
+}
+
+// Accept the reserved WS payload {op:"timing", frame, passes:[{id,us}]}
+// (or the single-pass {op:"timing", pass, us} shape). Static-safe: a no-op
+// when the timeline has never been drawn.
+function applyTimingMessage(msg) {
+    if (!msg || msg.op !== "timing") return;
+    let touched = false;
+    if (Array.isArray(msg.passes)) {
+        msg.passes.forEach((e) => {
+            if (e && e.id != null && Number.isFinite(e.us)) {
+                injectTiming(e.id, e.us); touched = true;
+            }
+        });
+    } else if (msg.pass != null && Number.isFinite(msg.us)) {
+        injectTiming(msg.pass, msg.us); touched = true;
+    }
+    if (!touched) return;
+    if (msg.frame != null) TL_TIMING_FRAME = msg.frame;
+    tlTimingState.textContent = `timing: 実測${msg.frame != null ? ` (frame ${msg.frame})` : ""}`;
+    tlTimingState.classList.add("live");
+    if (btnModeTimeline.classList.contains("active")) updateStatusTimeline();
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -974,6 +1371,9 @@ function connectWs() {
         if (msg && msg.op === "profiles-changed") {
             // Refresh the list silently; never clobber unsaved edits.
             if (editorLoaded && !DIRTY) loadProfileList(CURRENT_FILE);
+        } else if (msg && msg.op === "timing") {
+            // Phase 2 seam: runtime GPU timestamps overlaid on the timeline.
+            applyTimingMessage(msg);
         }
     });
     ws.addEventListener("close", () => setTimeout(connectWs, 3000));
