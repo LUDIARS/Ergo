@@ -95,6 +95,17 @@ modules:
     tool_plugin: null
     status: stable
 
+  - name: ergo_profile
+    summary: パフォーマンス確認用タイムライン (AOP 的マーカー注入 → Chrome Trace 出力)
+    category: システム
+    header_dir: include/ergo/profile/
+    source_dir: src/profile/
+    test_dir:   tests/profile/
+    spec:       spec/module/profile.md
+    cmake_option: ERGO_BUILD_PROFILE
+    tool_plugin: profile
+    status: preview   # tools/ergo profile プラグインは別途追加
+
   - name: ergo_log
     summary: 4-level ロガー (Error/Warn/Info/Debug)、先頭にフレーム番号
     category: システム
