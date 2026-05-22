@@ -1,24 +1,33 @@
-/// render_pipeline plugin — Pictor の render pass DAG / pipeline spec /
-/// shader / attachment flow を Web で可視化する。 ハイブリッド構成:
+/// render_pipeline plugin — two clearly separated halves:
 ///
-///   - 静的 scan: `scanner/render_pipeline_scan.py` が事前に出力した
-///     `render_pipeline.json` を /api/snapshot で配信
-///   - 将来の実行時 GPU timestamp: Pictor 側が WS で `{op:"timing"}` を
-///     publish する想定。 サーバ側で受け取って web に転送する hub だけ
-///     先に用意 (実装は Phase 2)
+///   A) Scanner view ("現状ビュー", read-only)
+///      How Pictor's hard-coded Vulkan code (系統B) actually renders today.
+///      A Python scanner (`scanner/render_pipeline_scan.py`) statically
+///      scans Pictor sources into `render_pipeline.json`; the UI draws a
+///      pass DAG + pipeline / shader / attachment tables. Never edited.
 ///
-/// プロトコル (Phase 1 は最小):
-///   GET  /render_pipeline/api/snapshot   → JSON snapshot
-///   GET  /render_pipeline/api/health     → { ok, snapshot_present, shaders }
-///   POST /render_pipeline/api/rescan     → scanner を子プロセスで走らせる
-///   WS   /render_pipeline/ws             → Phase 2 用 (現在は ack だけ返す)
+///   B) Profile editor ("編集ビュー", read/write + disk-persisted)
+///      How you *want* Pictor to render (系統A). Reads & writes the
+///      canonical `Pictor/profiles/*.profile.json` files which Pictor
+///      consumes via `register_presets_from_dir()`. Full CRUD on the
+///      `PipelineProfileDef` schema (spec: Pictor/spec/pipeline-profile-config.md).
 ///
-/// snapshot ファイルの場所:
-///   tools/ergo/scanner/render_pipeline.json
+/// The two halves share no state and address different artifacts on disk.
+/// The UI surfaces them as two distinct top-level modes so "what Pictor
+/// does" and "what Pictor is told to do" are never conflated.
 ///
-/// 静的サイト化 (GitHub Pages 等) では snapshot.json と shader 内容が
-/// 既に JSON に embed されているので、 サーバを介さず UI だけでも動く
-/// (api/snapshot を fetch する fallback として `./snapshot.json` も試す)。
+/// Protocol:
+///   --- Scanner view (A) — read-only ---
+///   GET  /render_pipeline/api/snapshot          → scanner JSON snapshot
+///   GET  /render_pipeline/api/health            → snapshot stats + profile dir info
+///   POST /render_pipeline/api/rescan            → run the Python scanner
+///   --- Profile editor (B) — read/write ---
+///   GET  /render_pipeline/api/profiles          → list *.profile.json
+///   GET  /render_pipeline/api/profile/:file     → one profile (normalized)
+///   POST /render_pipeline/api/profile           → write a profile to disk
+///   --- WS ---
+///   WS   /render_pipeline/ws                    → broadcasts {op:"profiles-changed"}
+///                                                 on save + Phase-2 timing relay
 
 import { Hono } from "hono";
 import { WebSocket as WS } from "ws";
@@ -27,6 +36,10 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 import type { Plugin, PluginContext, PluginFactory } from "../../core/plugin.js";
+import { normalizeProfile, PROFILE_SCHEMA_VERSION } from "./profile_schema.js";
+import {
+    listProfiles, loadProfile, saveProfile, resolveProfileDir,
+} from "./profile_store.js";
 
 const SCHEMA_VERSION = 1;
 
@@ -47,16 +60,24 @@ function loadSnapshot(): any {
 const factory: PluginFactory = () => {
     const clients = new Set<WS>();
 
+    function broadcast(msg: unknown): void {
+        const text = JSON.stringify(msg);
+        for (const c of clients) {
+            if (c.readyState === WS.OPEN) c.send(text);
+        }
+    }
+
     const plugin: Plugin = {
         id:          "render_pipeline",
         title:       "Render Pipeline",
         icon:        "🔲",
-        description: "Pictor の render pass DAG / pipeline spec / shader / attachment flow を静的 scan ベースで可視化。",
+        description: "Pictor の render pass を可視化 (scanner) + パイプラインプロファイル *.profile.json を編集。",
         staticRoot:  "./src/plugins/render_pipeline/ui",
 
         routes(ctx: PluginContext) {
             const app = new Hono();
 
+            // ───── Scanner view (A) — read-only ─────────────────────────
             app.get("/api/snapshot", (c) => {
                 const snap = loadSnapshot();
                 if (!snap) return c.json({ ok: false, err: "snapshot not found — run scanner/render_pipeline_scan.py" }, 404);
@@ -81,6 +102,15 @@ const factory: PluginFactory = () => {
                         meta.attachments = snap.attachments?.length ?? 0;
                         meta.scanned_at  = snap.scanned_at;
                     }
+                }
+                // Profile-editor side health.
+                meta.profile_schema_version = PROFILE_SCHEMA_VERSION;
+                try {
+                    const dir = resolveProfileDir();
+                    meta.profile_dir   = dir;
+                    meta.profile_count = listProfiles(dir).length;
+                } catch (e) {
+                    meta.profile_dir_err = String(e);
                 }
                 return c.json(meta);
             });
@@ -115,6 +145,59 @@ const factory: PluginFactory = () => {
                 return c.json(result, result.ok ? 200 : 500);
             });
 
+            // ───── Profile editor (B) — read/write ──────────────────────
+            // List every *.profile.json the editor can open.
+            app.get("/api/profiles", (c) => {
+                try {
+                    const dir = resolveProfileDir();
+                    return c.json({
+                        ok:       true,
+                        dir,
+                        version:  PROFILE_SCHEMA_VERSION,
+                        profiles: listProfiles(dir),
+                    });
+                } catch (e) {
+                    return c.json({ ok: false, err: String(e) }, 500);
+                }
+            });
+
+            // Load one profile, normalized to the full schema.
+            app.get("/api/profile/:file", (c) => {
+                const file = c.req.param("file");
+                try {
+                    const r = loadProfile(file);
+                    return c.json({ ok: true, ...r });
+                } catch (e) {
+                    const msg = String((e as Error).message ?? e);
+                    const code = /not found/.test(msg) ? 404 : 400;
+                    return c.json({ ok: false, err: msg }, code);
+                }
+            });
+
+            // Write a profile to disk. Body: { profile, file? }.
+            // `file` is optional — when absent the canonical
+            // <lowercased-profile_name>.profile.json name is derived.
+            app.post("/api/profile", async (c) => {
+                const body = await c.req.json().catch(() => null);
+                if (!body || typeof body !== "object" || !("profile" in body)) {
+                    return c.json({ ok: false, err: "body must be { profile, file? }" }, 400);
+                }
+                try {
+                    const profile = normalizeProfile((body as any).profile);
+                    const file: string | undefined =
+                        typeof (body as any).file === "string" && (body as any).file
+                            ? (body as any).file
+                            : undefined;
+                    const r = saveProfile(profile, file);
+                    ctx.log("info", `[render_pipeline] saved profile ${r.file}`);
+                    // Tell other clients the on-disk set changed.
+                    broadcast({ op: "profiles-changed", file: r.file });
+                    return c.json({ ok: true, ...r });
+                } catch (e) {
+                    return c.json({ ok: false, err: String((e as Error).message ?? e) }, 400);
+                }
+            });
+
             return app;
         },
 
@@ -134,11 +217,20 @@ const factory: PluginFactory = () => {
         health() {
             const p = snapshotPath();
             const ok = existsSync(p);
+            let profileDir = "";
+            let profileCount = 0;
+            try {
+                profileDir   = resolveProfileDir();
+                profileCount = listProfiles(profileDir).length;
+            } catch {}
             return {
-                ok:                 true,
-                version:            SCHEMA_VERSION,
-                snapshot_present:   ok,
-                clients:            clients.size,
+                ok:                     true,
+                version:                SCHEMA_VERSION,
+                snapshot_present:       ok,
+                clients:                clients.size,
+                profile_schema_version: PROFILE_SCHEMA_VERSION,
+                profile_dir:            profileDir,
+                profile_count:          profileCount,
             };
         },
     };
