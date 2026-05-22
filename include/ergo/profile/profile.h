@@ -62,6 +62,35 @@ int64_t now_us();
 /// Current process resident set size in bytes (0 when unavailable).
 uint64_t process_rss_bytes();
 
+// --- marker sink (pluggable backend) ---------------------------------------
+
+/// Abstract destination for recorded markers. The built-in collector is the
+/// default sink; an app can implement its own MarkerSink to route markers to
+/// its own telemetry, stream them live, filter them, etc., and install it
+/// with set_sink(). This is the shared interface the app side implements.
+class MarkerSink {
+public:
+    virtual ~MarkerSink() = default;
+
+    /// Receives every recorded marker. Called from any recording thread, so
+    /// implementations must be thread-safe.
+    virtual void on_event(const Event& e) = 0;
+
+    /// Receives thread display-name registrations. Thread-safe required.
+    virtual void on_thread_name(uint64_t tid, const char* name) {
+        (void)tid;
+        (void)name;
+    }
+};
+
+/// Install `sink` as the marker destination. Pass nullptr to restore the
+/// built-in collector. `sink` must stay alive while it is installed.
+void set_sink(MarkerSink* sink);
+
+/// The built-in collector sink (the source for export_chrome_trace / dump).
+/// Useful to restore it, or to chain to it from a custom sink's on_event().
+MarkerSink& default_sink();
+
 // --- export ----------------------------------------------------------------
 
 /// Serialize all recorded events to Chrome Trace Event JSON.

@@ -1,4 +1,4 @@
-// ergo_profile dummy plug — no-op definitions for link-only use.
+// ergo_profile dummy plug - no-op definitions for link-only use.
 //
 // A target that links ergo_profile_dummy instead of ergo_profile resolves
 // every ergo::profile symbol to a no-op. Note: without ERGO_PROFILE_ENABLED
@@ -8,6 +8,17 @@
 #include "ergo/profile/profile.h"
 
 namespace ergo::profile {
+namespace {
+
+/// No-op sink so default_sink() has something to return in dummy builds.
+class NullSink : public MarkerSink {
+public:
+    void on_event(const Event&) override {}
+};
+
+NullSink g_null_sink;
+
+} // namespace
 
 void set_enabled(bool) {}
 bool is_enabled() { return false; }
@@ -19,6 +30,9 @@ void record_instant(const char*) {}
 void record_counter(const char*, double) {}
 void record_complete(const char*, int64_t, int64_t) {}
 void set_thread_name(const char*) {}
+
+void        set_sink(MarkerSink*) {}
+MarkerSink& default_sink() { return g_null_sink; }
 
 int64_t  now_us() { return 0; }
 uint64_t process_rss_bytes() { return 0; }

@@ -14,6 +14,13 @@ void busy_us(int us) {
     std::this_thread::sleep_for(std::chrono::microseconds(us));
 }
 
+/// A minimal app-side MarkerSink implementation, as a host would write.
+class CountingSink : public MarkerSink {
+public:
+    int events = 0;
+    void on_event(const Event&) override { ++events; }
+};
+
 } // namespace
 
 TEST(Profile, StartsEmptyAfterBeginSession) {
@@ -99,4 +106,23 @@ TEST(Profile, NowAdvances) {
     busy_us(500);
     const int64_t t1 = now_us();
     EXPECT_TRUE(t1 >= t0);
+}
+
+TEST(Profile, CustomSinkReceivesMarkers) {
+    begin_session();
+    CountingSink sink;
+    set_sink(&sink);
+    ERGO_PROFILE_MARK("a");
+    ERGO_PROFILE_COUNTER("c", 1);
+    {
+        ERGO_PROFILE_SCOPE("s");  // recorded on scope exit, still inside
+    }
+    set_sink(nullptr);  // restore the built-in collector
+    // instant + counter + complete all routed to the app sink
+    EXPECT_EQ(sink.events, 3);
+    // the built-in collector saw nothing while the custom sink was installed
+    EXPECT_EQ(event_count(), 0u);
+    // ...and recording returns to the collector after restore
+    ERGO_PROFILE_MARK("back");
+    EXPECT_EQ(event_count(), 1u);
 }

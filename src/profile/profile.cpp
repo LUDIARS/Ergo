@@ -33,6 +33,8 @@ int64_t clock_ns() {
 std::atomic<bool>    g_enabled{true};
 std::atomic<int64_t> g_epoch_ns{clock_ns()};
 
+// --- built-in collector state ----------------------------------------------
+
 /// Per-thread event buffer. Intentionally leaked (one per recording thread)
 /// so collected events stay valid for export across the process lifetime.
 struct ThreadBuffer {
@@ -60,6 +62,23 @@ ThreadBuffer& tls_buffer() {
     return *buf;
 }
 
+/// The default MarkerSink: buffers events thread-locally for Chrome-trace
+/// export. Recording is lock-free per thread; only buffer registration and
+/// thread-name updates take the mutex.
+class CollectorSink : public MarkerSink {
+public:
+    void on_event(const Event& e) override {
+        tls_buffer().events.push_back(e);
+    }
+    void on_thread_name(uint64_t tid, const char* name) override {
+        std::lock_guard<std::mutex> lk(g_mutex);
+        g_thread_names[tid] = (name != nullptr) ? name : "";
+    }
+};
+
+CollectorSink            g_collector;
+std::atomic<MarkerSink*> g_sink{&g_collector};
+
 uint64_t current_pid() {
 #if defined(_WIN32)
     return static_cast<uint64_t>(::GetCurrentProcessId());
@@ -70,7 +89,7 @@ uint64_t current_pid() {
 
 /// Append `s` to `out` as a JSON string body (no surrounding quotes).
 void append_escaped(std::string& out, const char* s) {
-    if (!s) return;
+    if (s == nullptr) return;
     for (const char* p = s; *p != '\0'; ++p) {
         const unsigned char c = static_cast<unsigned char>(*p);
         switch (c) {
@@ -93,6 +112,8 @@ void append_escaped(std::string& out, const char* s) {
 }
 
 } // namespace
+
+// --- runtime control --------------------------------------------------------
 
 void set_enabled(bool on) { g_enabled.store(on, std::memory_order_relaxed); }
 bool is_enabled()         { return g_enabled.load(std::memory_order_relaxed); }
@@ -119,30 +140,41 @@ int64_t now_us() {
     return (clock_ns() - g_epoch_ns.load(std::memory_order_relaxed)) / 1000;
 }
 
+// --- marker sink ------------------------------------------------------------
+
+void set_sink(MarkerSink* sink) {
+    g_sink.store(sink != nullptr ? sink : &g_collector,
+                 std::memory_order_relaxed);
+}
+
+MarkerSink& default_sink() { return g_collector; }
+
+// --- recording --------------------------------------------------------------
+
 void record_instant(const char* name) {
     if (!is_enabled()) return;
-    ThreadBuffer& b = tls_buffer();
-    b.events.push_back(Event{name, Phase::instant, now_us(), 0, b.tid, 0.0});
+    g_sink.load(std::memory_order_relaxed)
+        ->on_event(Event{name, Phase::instant, now_us(), 0, current_tid(), 0.0});
 }
 
 void record_counter(const char* name, double value) {
     if (!is_enabled()) return;
-    ThreadBuffer& b = tls_buffer();
-    b.events.push_back(Event{name, Phase::counter, now_us(), 0, b.tid, value});
+    g_sink.load(std::memory_order_relaxed)
+        ->on_event(
+            Event{name, Phase::counter, now_us(), 0, current_tid(), value});
 }
 
 void record_complete(const char* name, int64_t begin_us, int64_t dur_us) {
     if (!is_enabled()) return;
-    ThreadBuffer& b = tls_buffer();
-    b.events.push_back(
-        Event{name, Phase::complete, begin_us, dur_us, b.tid, 0.0});
+    g_sink.load(std::memory_order_relaxed)
+        ->on_event(Event{name, Phase::complete, begin_us, dur_us,
+                         current_tid(), 0.0});
 }
 
 void set_thread_name(const char* name) {
-    if (!name) return;
-    const uint64_t tid = tls_buffer().tid;
-    std::lock_guard<std::mutex> lk(g_mutex);
-    g_thread_names[tid] = name;
+    if (name == nullptr) return;
+    g_sink.load(std::memory_order_relaxed)
+        ->on_thread_name(current_tid(), name);
 }
 
 uint64_t process_rss_bytes() {
@@ -173,6 +205,8 @@ ScopedMarker::ScopedMarker(const char* name)
 ScopedMarker::~ScopedMarker() {
     record_complete(name_, begin_us_, now_us() - begin_us_);
 }
+
+// --- export -----------------------------------------------------------------
 
 std::string export_chrome_trace() {
     std::lock_guard<std::mutex> lk(g_mutex);
