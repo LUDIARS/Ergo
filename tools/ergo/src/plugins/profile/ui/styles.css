@@ -1,0 +1,117 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: "Segoe UI", "Hiragino Sans", Meiryo, sans-serif;
+  background: #1b1d23;
+  color: #d8dae0;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #23262f;
+  border-bottom: 1px solid #343845;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.status {
+  font-size: 12px;
+  color: #8b8fa0;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px;
+  gap: 10px;
+}
+
+.dropzone {
+  border: 2px dashed #3c4150;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  color: #9aa0b0;
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+
+.dropzone.drag {
+  border-color: #5b9bd5;
+  background: #222633;
+}
+
+.dropzone code {
+  background: #2c303c;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+button {
+  background: #3a5b8c;
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: #4a6fa5; }
+button:disabled { background: #353945; color: #6b7080; cursor: default; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.toolbar .hint { color: #7c8190; }
+.toolbar .summary { color: #9aa0b0; margin-left: auto; }
+
+.canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #343845;
+  border-radius: 6px;
+  overflow: auto;
+  background: #15171c;
+}
+
+canvas { display: block; }
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #2c303c;
+  border: 1px solid #4a5060;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #e6e8ee;
+  max-width: 320px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+  z-index: 5;
+}
+
+.tooltip b { color: #fff; }
+.tooltip .dim { color: #9aa0b0; }

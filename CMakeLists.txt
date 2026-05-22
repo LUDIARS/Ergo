@@ -19,6 +19,7 @@ option(ERGO_BUILD_BIND         "Build ergo_bind"         ON)
 option(ERGO_BUILD_ACTOR        "Build ergo_actor"        ON)
 option(ERGO_BUILD_SOUND        "Build ergo_sound"        ON)
 option(ERGO_BUILD_FRAME        "Build ergo_frame"        ON)
+option(ERGO_BUILD_PROFILE      "Build ergo_profile (performance timeline)" ON)
 option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
 option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
@@ -337,6 +338,32 @@ if(ERGO_BUILD_FRAME)
         add_executable(test_counter tests/frame/test_counter.cpp)
         target_link_libraries(test_counter PRIVATE ergo_frame ergo_gtest_main)
         add_test(NAME test_counter COMMAND test_counter)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_profile — performance timeline via AOP-style marker injection
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_PROFILE)
+    add_library(ergo_profile STATIC src/profile/profile.cpp)
+    target_include_directories(ergo_profile PUBLIC include)
+    target_compile_definitions(ergo_profile PUBLIC ERGO_PROFILE_ENABLED=1)
+    target_link_libraries(ergo_profile PUBLIC Threads::Threads)
+    if(WIN32)
+        # GetProcessMemoryInfo (RSS sampling) lives in Psapi.
+        target_link_libraries(ergo_profile PRIVATE psapi)
+    endif()
+
+    if(ERGO_BUILD_DUMMY)
+        add_library(ergo_profile_dummy src/profile/profile_dummy.cpp)
+        target_include_directories(ergo_profile_dummy PUBLIC include)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_profile tests/profile/test_profile.cpp)
+        target_link_libraries(test_profile PRIVATE ergo_profile ergo_gtest_main)
+        target_link_libraries(test_profile PRIVATE Threads::Threads)
+        add_test(NAME test_profile COMMAND test_profile)
     endif()
 endif()
 
