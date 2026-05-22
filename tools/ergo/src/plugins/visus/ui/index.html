@@ -65,12 +65,52 @@
     text-transform: uppercase; letter-spacing: .04em; font-size: .68rem;
   }
 
-  main { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; padding: 0; }
+  main { display: grid; grid-template-rows: auto auto 1fr auto; min-height: 0; padding: 0; }
   #toolbar {
     padding: .55rem 1rem; border-bottom: 1px solid var(--line);
     display: flex; gap: .7rem; align-items: center; flex-wrap: wrap;
     background: var(--panel);
   }
+
+  /* ── CUSTOM kind structured shader form ── */
+  #shaderForm {
+    border-bottom: 1px solid var(--line);
+    background: #1f232a;
+    display: none;            /* shown only when geometry.kind == "custom" */
+  }
+  #shaderForm.visible { display: block; }
+  #shaderForm .head {
+    padding: .45rem 1rem; display: flex; gap: .6rem; align-items: center;
+    cursor: pointer; user-select: none;
+  }
+  #shaderForm .head h2 {
+    font-size: .82rem; margin: 0; font-weight: 600; color: var(--accent);
+    font-family: ui-monospace, monospace;
+  }
+  #shaderForm .head .hint { font-size: .72rem; color: var(--muted); margin-left: auto; }
+  #shaderForm .body { padding: .2rem 1rem .7rem; }
+  #shaderForm.collapsed .body { display: none; }
+  .stage-row {
+    display: grid; grid-template-columns: 70px 1fr; gap: .5rem;
+    align-items: center; margin: .35rem 0;
+  }
+  .stage-row label {
+    font-family: ui-monospace, monospace; font-size: .76rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .stage-row label.req::after { content: " *"; color: var(--accent); }
+  .stage-row input {
+    background: #14171b; color: var(--text); border: 1px solid var(--line);
+    padding: .32rem .5rem; border-radius: 4px; font-size: .78rem;
+    font-family: ui-monospace, monospace; outline: none;
+  }
+  .stage-row input:focus { border-color: var(--accent); }
+  #shaderForm .formNote {
+    font-size: .72rem; color: var(--muted); margin-top: .45rem;
+    font-family: ui-monospace, monospace; line-height: 1.5;
+  }
+  #shaderForm .formNote.warn { color: var(--bad); }
+  #shaderForm .formNote.good { color: var(--ok); }
   #toolbar .label {
     font-size: .8rem; color: var(--muted); font-family: ui-monospace, monospace;
     margin-right: auto; word-break: break-all;
@@ -119,6 +159,34 @@
       <button id="reload" disabled>reload</button>
       <button id="save" class="primary" disabled>save</button>
     </div>
+
+    <!-- CUSTOM kind 専用のシェーダ参照フォーム (geometry.kind == "custom" のときだけ表示) -->
+    <section id="shaderForm">
+      <div class="head" id="shaderFormHead">
+        <h2>⚙ Custom Shader (CUSTOM kind)</h2>
+        <span class="hint">geometry.shader_stages — vert/frag は固定描画に必須</span>
+      </div>
+      <div class="body">
+        <div class="stage-row">
+          <label class="req" for="stageVert">vert</label>
+          <input id="stageVert" placeholder="shaders/custom.vert.spv (compiled SPIR-V)">
+        </div>
+        <div class="stage-row">
+          <label class="req" for="stageFrag">frag</label>
+          <input id="stageFrag" placeholder="shaders/custom.frag.spv (compiled SPIR-V)">
+        </div>
+        <div class="stage-row">
+          <label for="stageComp">comp</label>
+          <input id="stageComp" placeholder="(phase 2) compute stage SPIR-V — 任意">
+        </div>
+        <div class="stage-row">
+          <label for="shaderHandle">handle</label>
+          <input id="shaderHandle" placeholder='geometry.shader — "none" または "handle:&lt;u32&gt;"'>
+        </div>
+        <div class="formNote" id="shaderFormNote">—</div>
+      </div>
+    </section>
+
     <textarea id="editor" spellcheck="false" disabled placeholder="左で .visus.json を選択するとここで編集できます"></textarea>
     <footer><span id="parseStatus">—</span></footer>
   </main>
@@ -137,8 +205,17 @@
   const btnRescan= $("rescan");
   const parseEl  = $("parseStatus");
 
+  const shaderForm     = $("shaderForm");
+  const shaderFormHead = $("shaderFormHead");
+  const stageVert      = $("stageVert");
+  const stageFrag      = $("stageFrag");
+  const stageComp      = $("stageComp");
+  const shaderHandle   = $("shaderHandle");
+  const shaderFormNote = $("shaderFormNote");
+
   let current = null;   // { root_index, rel_path, content }
   let dirty   = false;
+  let syncing = false;  // form ↔ editor の相互更新ループ防止
 
   function setStatus(text, kind) {
     statusEl.textContent = text;
@@ -220,6 +297,7 @@
       btnSave.disabled   = false;
       dirty = false;
       validateJson();
+      syncFormFromEditor();
       setStatus("loaded", "ok");
       // select highlight
       for (const el of listEl.querySelectorAll(".file")) {
@@ -275,6 +353,104 @@
     }
   }
 
+  // ════════════════════════════════════════════════════════════════
+  //  CUSTOM kind 構造化フォーム
+  //
+  //  Visus の CUSTOM kind は固定 vert+frag のカスタムシェーダを選んで
+  //  描画に反映する seam (Pictor `spec/rendering-extensibility-design.md`
+  //  §2 phase 1)。 render_pipeline プラグインの構造化フォーム方式に倣い、
+  //  生 JSON を直接いじらず geometry.shader_stages / geometry.shader を
+  //  フォームで編集する。 phase 1 のスコープは「シェーダ参照の選択/編集」
+  //  のみ — それ以外のフィールドは従来どおり下の生エディタで触る。
+  // ════════════════════════════════════════════════════════════════
+
+  /// 現在のエディタ JSON が CUSTOM kind かを見てフォームの表示/値を更新する。
+  function syncFormFromEditor() {
+    let obj;
+    try { obj = JSON.parse(editor.value); }
+    catch { shaderForm.classList.remove("visible"); return; }
+
+    const kind = String(obj?.geometry?.kind ?? "none");
+    const isCustom = kind === "custom";
+    shaderForm.classList.toggle("visible", isCustom);
+    if (!isCustom) return;
+
+    const stages = obj?.geometry?.shader_stages ?? {};
+    syncing = true;
+    stageVert.value    = String(stages?.vert?.local_path ?? "");
+    stageFrag.value    = String(stages?.frag?.local_path ?? "");
+    stageComp.value    = String(stages?.comp?.local_path ?? "");
+    shaderHandle.value = String(obj?.geometry?.shader ?? "none");
+    syncing = false;
+    refreshFormNote();
+  }
+
+  /// フォームの値をエディタ JSON に書き戻す。 既存の他フィールドは保持。
+  function syncEditorFromForm() {
+    if (syncing) return;
+    let obj;
+    try { obj = JSON.parse(editor.value); }
+    catch {
+      shaderFormNote.textContent =
+        "エディタの JSON が壊れているためフォーム反映を保留中";
+      shaderFormNote.className = "formNote warn";
+      return;
+    }
+    obj.geometry = obj.geometry ?? {};
+    obj.geometry.shader_stages = obj.geometry.shader_stages ?? {};
+    const ss = obj.geometry.shader_stages;
+
+    // ResourceRef の最小形。 Pictor の serializer は欠けたキーを既定値で
+    // 補完するので local_path だけ書けば足りる (remote 設定は生エディタで)。
+    const setStage = (name, path) => {
+      const p = path.trim();
+      const prev = ss[name] && typeof ss[name] === "object" ? ss[name] : {};
+      ss[name] = { ...prev, local_path: p };
+    };
+    setStage("vert", stageVert.value);
+    setStage("frag", stageFrag.value);
+    setStage("comp", stageComp.value);
+
+    const h = shaderHandle.value.trim();
+    obj.geometry.shader = h === "" ? "none" : h;
+
+    syncing = true;
+    editor.value = JSON.stringify(obj, null, 2);
+    syncing = false;
+    dirty = current && (editor.value !== current.content);
+    validateJson();
+    refreshFormNote();
+  }
+
+  /// vert/frag の充足とハンドル整合をフォーム下に表示する。
+  function refreshFormNote() {
+    const v = stageVert.value.trim();
+    const f = stageFrag.value.trim();
+    const h = shaderHandle.value.trim();
+    const handleOk = h === "" || h === "none" || /^handle:\d+$/.test(h);
+
+    if (!handleOk) {
+      shaderFormNote.textContent =
+        'handle は "none" または "handle:<u32>" の形式で指定してください';
+      shaderFormNote.className = "formNote warn";
+    } else if (v && f) {
+      shaderFormNote.textContent =
+        "vert+frag 揃い — phase 1 のカスタムシェーダ pipeline で描画されます";
+      shaderFormNote.className = "formNote good";
+    } else {
+      shaderFormNote.textContent =
+        "vert / frag が未設定 — 両方の SPIR-V を指定すると CUSTOM 描画が有効になります";
+      shaderFormNote.className = "formNote warn";
+    }
+  }
+
+  for (const el of [stageVert, stageFrag, stageComp, shaderHandle]) {
+    el.addEventListener("input", syncEditorFromForm);
+  }
+  shaderFormHead.addEventListener("click", () => {
+    shaderForm.classList.toggle("collapsed");
+  });
+
   rootSel.addEventListener("change", rescan);
   btnRescan.addEventListener("click", rescan);
   btnSave.addEventListener("click", save);
@@ -282,6 +458,7 @@
   editor.addEventListener("input", () => {
     dirty = current && (editor.value !== current.content);
     validateJson();
+    syncFormFromEditor();
   });
 
   // 別クライアントの save を WS で拾って、 現在開いてるファイルなら status を出す
