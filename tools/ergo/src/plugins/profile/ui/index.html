@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ergo — Profile Timeline</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header>
+  <h1>⏱ Profile Timeline</h1>
+  <span class="status" id="status">トレース未選択</span>
+</header>
+
+<main>
+  <div class="dropzone" id="dropzone">
+    <p>
+      ここに <code>ergo_profile</code> の Chrome トレース
+      (<code>.json</code>) をドロップ<br>
+      または <button id="file_btn" type="button">ファイルを開く</button>
+    </p>
+    <input type="file" id="file_input" accept=".json,application/json" hidden>
+  </div>
+
+  <div class="toolbar">
+    <button id="fit_btn" type="button" disabled>全体表示</button>
+    <span class="hint">ホイール = ズーム / ドラッグ = パン</span>
+    <span class="summary" id="summary"></span>
+  </div>
+
+  <div class="canvas-wrap" id="canvas_wrap">
+    <canvas id="timeline"></canvas>
+    <div class="tooltip" id="tooltip" hidden></div>
+  </div>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
