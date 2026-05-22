@@ -9,6 +9,7 @@
   --warn:     #f0c050;
   --ok:       #5cd07a;
   --editor:   #c08af0;
+  --timeline: #4fd1c5;
 }
 
 * { box-sizing: border-box; }
@@ -36,6 +37,7 @@ header button:hover { border-color: var(--accent); }
 }
 .mode-switch button .mode-sub { font-size: 0.62rem; color: var(--text-2); }
 .mode-switch button.active { border-color: var(--accent); color: var(--accent); }
+#mode_timeline.active { border-color: var(--timeline); color: var(--timeline); }
 #mode_editor.active { border-color: var(--editor); color: var(--editor); }
 
 /* ── mode banner (キャプション) ───────────────────────────────────── */
@@ -46,8 +48,9 @@ header button:hover { border-color: var(--accent); }
 }
 .mode-banner strong { color: var(--text); }
 .mode-banner code { color: var(--accent); font-size: 0.76rem; }
-.mode-banner.scanner { background: rgba(90,169,255,0.08); border: 1px solid rgba(90,169,255,0.25); }
-.mode-banner.editor  { background: rgba(192,138,240,0.08); border: 1px solid rgba(192,138,240,0.3); }
+.mode-banner.scanner  { background: rgba(90,169,255,0.08); border: 1px solid rgba(90,169,255,0.25); }
+.mode-banner.timeline { background: rgba(79,209,197,0.08); border: 1px solid rgba(79,209,197,0.28); }
+.mode-banner.editor   { background: rgba(192,138,240,0.08); border: 1px solid rgba(192,138,240,0.3); }
 .mode-banner button { margin-left: auto; }
 
 main { padding: 12px 14px; height: calc(100vh - 47px); display: flex; flex-direction: column; overflow: hidden; }
@@ -257,3 +260,142 @@ button.mini:hover { border-color: var(--editor); }
 #json_preview { display: block; background: #0a0d12; border: 1px solid var(--line);
                 border-radius: 4px; padding: 10px; font: 11.5px ui-monospace, Consolas, monospace;
                 max-height: 320px; overflow: auto; white-space: pre; }
+
+/* ══════ Timeline view (ガントチャート) ═════════════════════════════ */
+.timeline-grid {
+  display: grid; grid-template-columns: 1fr 320px; gap: 14px;
+  flex: 1; min-height: 0; overflow: hidden;
+}
+.tl-card, .tl-detail-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px 14px; display: flex; flex-direction: column; min-height: 0;
+}
+.tl-card h2, .tl-detail-card h2 {
+  font-size: 0.78rem; margin: 0 0 8px; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.tl-meta { color: var(--text-2); font-size: 0.72rem; text-transform: none;
+           letter-spacing: 0; font-weight: 400; margin-left: 8px; }
+
+.tl-toolbar { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.tl-opt { font-size: 0.72rem; color: var(--text-2); display: flex; gap: 4px;
+          align-items: center; cursor: pointer; }
+.tl-timing-state {
+  font-size: 0.68rem; color: var(--text-2); font-family: ui-monospace, monospace;
+  border: 1px solid var(--line); border-radius: 3px; padding: 1px 6px;
+}
+.tl-timing-state.live { color: var(--timeline); border-color: rgba(79,209,197,0.4); }
+
+/* timeline canvas — horizontal scroll, vertical lanes */
+.timeline-canvas {
+  flex: 1; min-height: 280px; background: #0a0d12; border: 1px solid var(--line);
+  border-radius: 4px; overflow: auto; position: relative; padding: 0;
+}
+.tl-empty { color: var(--text-2); font-size: 0.82rem; padding: 24px; margin: 0; }
+
+/* the scaled inner stage — width is set in JS (px) */
+.tl-stage { position: relative; min-width: 100%; }
+
+/* execution-order column header (level ticks) */
+.tl-axis { position: sticky; top: 0; z-index: 3; height: 22px;
+           background: #11151b; border-bottom: 1px solid var(--line); }
+.tl-tick { position: absolute; top: 0; height: 100%;
+           border-left: 1px dashed var(--line); }
+.tl-tick span { font-size: 0.62rem; color: var(--text-2); padding: 3px 5px;
+                font-family: ui-monospace, monospace; white-space: nowrap; }
+.tl-gridline { position: absolute; top: 22px; bottom: 0;
+               border-left: 1px dashed rgba(44,51,61,0.55); z-index: 0; }
+
+/* lane rows */
+.tl-lanes { position: relative; }
+.tl-lane { position: relative; border-bottom: 1px solid rgba(44,51,61,0.5); }
+.tl-lane-label {
+  position: sticky; left: 0; z-index: 2; display: inline-block;
+  font-size: 0.6rem; color: var(--text-2); font-family: ui-monospace, monospace;
+  background: #11151b; padding: 1px 6px; border-bottom-right-radius: 3px;
+}
+
+/* pass bar */
+.tl-bar {
+  position: absolute; box-sizing: border-box;
+  border-radius: 5px; cursor: pointer; overflow: hidden;
+  border: 1px solid var(--accent);
+  background: linear-gradient(180deg, #243240, #1a232e);
+  transition: border-color 0.1s, filter 0.1s;
+}
+.tl-bar:hover { filter: brightness(1.18); }
+.tl-bar.selected { border-color: #7fbfff; box-shadow: 0 0 0 1px rgba(127,191,255,0.45); }
+.tl-bar.chain {
+  border-color: var(--warn);
+  background: linear-gradient(180deg, #2e2a1c, #221f15);
+}
+.tl-bar.chain.selected { border-color: #f5d27a; box-shadow: 0 0 0 1px rgba(240,192,80,0.45); }
+.tl-bar-label {
+  font-size: 0.72rem; color: var(--text); padding: 4px 7px 2px;
+  font-family: ui-monospace, Consolas, monospace; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.tl-bar-sub {
+  font-size: 0.6rem; color: var(--text-2); padding: 0 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* sub-pass (draws inside a chain bar) */
+.tl-subrow { position: absolute; left: 4px; right: 4px; bottom: 4px;
+             display: flex; gap: 3px; }
+.tl-sub {
+  flex: 1; min-width: 0; height: 13px; border-radius: 3px;
+  background: rgba(79,209,197,0.22); border: 1px solid rgba(79,209,197,0.5);
+  font-size: 0.56rem; color: var(--timeline); line-height: 11px;
+  text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+/* measured GPU time overlay (Phase 2) */
+.tl-timing {
+  position: absolute; height: 4px; bottom: -1px; left: 0;
+  background: var(--timeline); border-radius: 2px; z-index: 4;
+}
+.tl-timing-tag {
+  position: absolute; top: 2px; right: 4px; font-size: 0.58rem;
+  color: var(--timeline); font-family: ui-monospace, monospace;
+}
+
+/* attachment lifetime track */
+.tl-att-section { position: relative; border-top: 2px solid var(--line);
+                  background: #0c1014; }
+.tl-att-head { font-size: 0.6rem; color: var(--text-2); padding: 3px 6px;
+               font-family: ui-monospace, monospace; }
+.tl-att-row { position: relative; height: 20px; }
+.tl-att-bar {
+  position: absolute; height: 11px; top: 4px; border-radius: 3px;
+  background: repeating-linear-gradient(45deg,
+              rgba(240,192,80,0.28) 0 6px, rgba(240,192,80,0.12) 6px 12px);
+  border: 1px solid rgba(240,192,80,0.5);
+}
+.tl-att-bar span {
+  position: absolute; left: 5px; top: -1px; font-size: 0.58rem;
+  color: var(--warn); font-family: ui-monospace, monospace; white-space: nowrap;
+}
+
+/* legend */
+.tl-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px;
+             font-size: 0.68rem; color: var(--text-2); }
+.tl-legend span { display: flex; align-items: center; gap: 5px; }
+.lg-swatch { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.lg-swatch.lg-pass   { background: linear-gradient(180deg,#243240,#1a232e); border: 1px solid var(--accent); }
+.lg-swatch.lg-chain  { background: linear-gradient(180deg,#2e2a1c,#221f15); border: 1px solid var(--warn); }
+.lg-swatch.lg-sub    { background: rgba(79,209,197,0.22); border: 1px solid rgba(79,209,197,0.5); }
+.lg-swatch.lg-att    { background: repeating-linear-gradient(45deg,
+                       rgba(240,192,80,0.28) 0 4px, rgba(240,192,80,0.12) 4px 8px);
+                       border: 1px solid rgba(240,192,80,0.5); }
+.lg-swatch.lg-timing { background: var(--timeline); }
+
+/* timeline detail pane */
+#tl_detail_body { font-size: 0.85rem; color: var(--text); overflow-y: auto;
+                  font-family: ui-monospace, Consolas, monospace; }
+#tl_detail_body table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+#tl_detail_body th, #tl_detail_body td { padding: 3px 8px;
+                  border-bottom: 1px solid var(--line); text-align: left; }
+#tl_detail_body th { background: var(--panel-2); color: var(--text-2);
+                  font-weight: 500; white-space: nowrap; }
+#tl_detail_body code { color: var(--accent); }

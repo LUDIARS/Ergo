@@ -17,11 +17,15 @@
 
 <header>
   <h1>Render Pipeline</h1>
-  <!-- 現状ビュー (scanner, read-only) と 編集ビュー (profile, read/write) の切替 -->
+  <!-- 現状ビュー (scanner) / タイムライン / 編集ビュー (profile) の 3 モード切替 -->
   <nav class="mode-switch">
     <button id="mode_scanner" class="active" type="button"
-            title="Pictor の実コード (系統B) が今どう描いているか — 読み取り専用">
-      📷 Scanner <span class="mode-sub">現状・読取専用</span>
+            title="Pictor の実コード (系統B) が今どう描いているか — DAG・読み取り専用">
+      📷 Scanner <span class="mode-sub">DAG・読取専用</span>
+    </button>
+    <button id="mode_timeline" type="button"
+            title="scanner の pass を実行順タイムライン (ガント) で表示 — 読み取り専用">
+      ▦ Timeline <span class="mode-sub">実行順・読取専用</span>
     </button>
     <button id="mode_editor" type="button"
             title="*.profile.json を編集 — Pictor にどう描かせたいか (系統A)">
@@ -93,6 +97,42 @@
         </table>
         <p class="meta">Producer / Consumer は DAG 側の pass ノードに矢印で表示される。</p>
       </div>
+    </section>
+  </div>
+</main>
+
+<!-- ════════ MODE T: Timeline view (read-only) ═══════════════════════ -->
+<main id="view_timeline" style="display:none">
+  <div class="mode-banner timeline">
+    タイムラインビュー — scanner の <code>passes[]</code> を <strong>実行順</strong>のガントチャートで表示。
+    依存の無い pass はレーン分け、 <code>graphics_chain</code> は内部 sub-pass をネスト表示。<strong>読み取り専用。</strong>
+    <span class="tl-toolbar">
+      <label class="tl-opt" title="バー幅を draws 本数で重み付け">
+        <input type="checkbox" id="tl_weight"> draws で重み付け
+      </label>
+      <label class="tl-opt" title="attachment のライフタイム (produce〜最後の consume) を併記">
+        <input type="checkbox" id="tl_lifetimes" checked> attachment ライフタイム
+      </label>
+      <span class="tl-timing-state" id="tl_timing_state" title="Phase 2: 実測 GPU timestamp の注入状態">timing: 静的</span>
+    </span>
+  </div>
+  <div class="timeline-grid">
+    <section class="card tl-card">
+      <h2>Pass Timeline <span class="tl-meta" id="tl_meta">—</span></h2>
+      <div id="timeline" class="timeline-canvas">
+        <p class="tl-empty" id="tl_empty">scanner snapshot 未取得 — Scanner モードで読み込むか Rescan を実行。</p>
+      </div>
+      <div class="tl-legend">
+        <span><i class="lg-swatch lg-pass"></i>pass バー (実行順)</span>
+        <span><i class="lg-swatch lg-chain"></i>graphics_chain</span>
+        <span><i class="lg-swatch lg-sub"></i>sub-pass (draw)</span>
+        <span><i class="lg-swatch lg-att"></i>attachment ライフタイム</span>
+        <span><i class="lg-swatch lg-timing"></i>実測 GPU 時間 (Phase 2)</span>
+      </div>
+    </section>
+    <section class="card tl-detail-card">
+      <h2 id="tl_detail_title">選択待ち</h2>
+      <div id="tl_detail_body">タイムラインの pass バーをクリックして詳細を見る。</div>
     </section>
   </div>
 </main>
