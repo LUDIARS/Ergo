@@ -219,20 +219,39 @@ normalize / serialize は C++ シリアライザの前方互換挙動 (§2 / §6
 未知キーは破棄、 欠落キーは既定値、 未知 enum 文字列は既定値フォールバック。
 値域検証はしない (C++ 側と同じく `msaa_samples: 3` 等も格納される)。
 
-## Phase 2 (実行時 GPU timing) 設計メモ
+## Phase 2 (実行時 GPU timing) — 実装済み (2026-05-22, `feat/gpu-timestamp`)
 
-Pictor 側に VkQueryPool + timestamp を入れて、 各 pass の end_render_pass
-で `vkCmdWriteTimestamp` を呼ぶ。 1 frame ぶんの timestamp 配列を読み戻して
+Pictor 側に `VkQueryPool` + timestamp が入り、 各 pass の begin/end で
+`vkCmdWriteTimestamp` を呼ぶ。 1 frame ぶんの timestamp 配列を読み戻して
 `{op:"timing", frame:N, passes:[{id, us}]}` を WS で publish する。
 
-### UI 側に用意済みの接続余地 (今回実装)
+### 実装内訳 (3 リポ横断)
 
-Timeline モードが実測 timestamp の注入先として既に配線済み。 今回は静的
-データだけで動くが、 view 側は以下の seam を持つ:
+- **Pictor** — `GpuTimerManager` (`profiler/gpu_timer.{h,cpp}`) を実 Vulkan
+  実装に置換。 `initialize_vulkan()` で `flight_count` 枚の `VkQueryPool`
+  (TIMESTAMP) を生成し `VkPhysicalDeviceLimits::timestampPeriod` を取得。
+  `begin_region/end_region/write_timestamp` に `VkCommandBuffer` 付き
+  オーバーロードを追加し `vkCmdWriteTimestamp` を発行、 `collect_results()`
+  が flight 遅延で `vkGetQueryPoolResults` を非ブロッキング読み出し。
+  既存インタフェースと `flight_count` バッファリング枠は維持、 Vulkan
+  非対応 GPU はシミュレーション経路へフォールバック。
+- **KuzuSurvivors** — `GameRenderer` が `pictor::GpuTimerManager` を所有し
+  (`KuzuRenderContext::gpu_timer`)、 FrameComposer hook で per-pass の
+  計測点を打つ。 `frame_begin` hook → `scene_hdr` 開始、 HUD パス pre-pass
+  hook → `scene_hdr` 終了 + `decal_compose` / `postprocess` を実合成
+  コマンドの前後で計測 + `hud_load` 開始、 `HudLayer::record` 末尾で
+  `hud_load` (route B は `scene_hdr`) 終了。 `TimingRelay`
+  (`diagnostics/timing_relay.{h,cpp}`) が結果を WS で push する
+  (`rive_player_ws_client` を再利用)。
+- **Ergo render_pipeline** — `index.ts` の `onUpgrade` が `{op:"timing"}`
+  を受けたら全 UI クライアントへ `broadcast`。
 
-- `index.ts` の WS `onUpgrade` ハンドラは予約コメント通り `{op:"timing"}`
-  を受ける形 (Phase 1 は ping のみ ack)。 Pictor が publish を始めたら
-  ここで `clients` へ relay するだけ
+### UI 側に用意済みだった接続余地
+
+Timeline モードが実測 timestamp の注入先として既に配線済みだった:
+
+- `index.ts` の WS `onUpgrade` ハンドラが `{op:"timing"}` を `broadcast`
+  へ relay (上記)
 - `app.js` の WS クライアント (`connectWs()`) は `op:"timing"` を受けると
   `applyTimingMessage(msg)` を呼ぶ。 `{op:"timing", frame, passes:[{id,us}]}`
   と単発の `{op:"timing", pass, us}` の両形を受理する
@@ -242,9 +261,9 @@ Timeline モードが実測 timestamp の注入先として既に配線済み。
 - timing 注入後はツールバーの状態表示が `timing: 実測 (frame N)` に変わり、
   pass 詳細ペインに `GPU 実測` 行が出る
 
-つまり Phase 2 で必要なのは **Pictor 側の VkQueryPool 実装 + index.ts の
-relay 1 行**だけで、 Timeline view 自体は構造変更不要。 静的タイムラインと
-実測オーバレイは同じバー上に共存する設計。
+静的タイムラインと実測オーバレイは同じバー上に共存する設計。 pass id は
+scanner の `PASS_DAG` (`scene_hdr` / `decal_compose` / `postprocess` /
+`hud_load`) にそのまま一致させてある。
 
 ## 既知の制限
 
