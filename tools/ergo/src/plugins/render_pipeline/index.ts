@@ -27,7 +27,9 @@
 ///   POST /render_pipeline/api/profile           → write a profile to disk
 ///   --- WS ---
 ///   WS   /render_pipeline/ws                    → broadcasts {op:"profiles-changed"}
-///                                                 on save + Phase-2 timing relay
+///                                                 on save; relays {op:"timing"}
+///                                                 (Phase-2 GPU timestamp) to all
+///                                                 connected UI clients
 
 import { Hono } from "hono";
 import { WebSocket as WS } from "ws";
@@ -204,11 +206,18 @@ const factory: PluginFactory = () => {
         onUpgrade(_req, ws: WS, _ctx) {
             clients.add(ws);
             ws.on("message", (raw: any) => {
-                // Phase 2 で {op:"timing", pass:"scene_hdr", us:1234} を受け取って relay。
-                // Phase 1 は ping だけ ack 返す。
+                // Phase 2 GPU timestamp relay。 Pictor/KS の計測経路 (KS の
+                // TimingRelay WS クライアント) が `{op:"timing", frame,
+                // passes:[{id,us}]}` を 1 本送ってくる。 そのまま全 UI クライアント
+                // へ broadcast すると、 Timeline ビューの applyTimingMessage()
+                // が実測オーバーレイを点灯する。 ping は ack を返す。
                 let msg: any;
                 try { msg = JSON.parse(raw.toString()); } catch { return; }
-                if (msg?.op === "ping") ws.send(JSON.stringify({ op: "ack" }));
+                if (msg?.op === "ping") {
+                    ws.send(JSON.stringify({ op: "ack" }));
+                } else if (msg?.op === "timing") {
+                    broadcast(msg);
+                }
             });
             ws.on("close", () => clients.delete(ws));
             ws.on("error", () => {});
