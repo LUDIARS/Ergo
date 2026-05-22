@@ -47,6 +47,23 @@ export type OverlayMode = (typeof OVERLAY_MODES)[number];
 /** Valid `msaa_samples` values (0 = disabled). */
 export const MSAA_SAMPLES = [0, 2, 4, 8] as const;
 
+/**
+ * `PostProcessDef::kind` — the effect-type tag (spec §3.4).
+ * `Unknown` covers effects with no host-driven implementation in
+ * `PostProcessPipeline` (SSAO / TAA / FXAA / VolumetricFog …): they
+ * round-trip but the C++ bridge ignores them (系統B phase 2).
+ */
+export const POST_PROCESS_KINDS = [
+    "Unknown", "Bloom", "ToneMapping", "Vignette", "ColorGrading", "DepthOfField",
+] as const;
+export type PostProcessKind = (typeof POST_PROCESS_KINDS)[number];
+
+/** `ToneMappingConfig::op` (mirror `pictor::ToneMapOperator`). */
+export const TONE_MAP_OPERATORS = [
+    "ACES_FILMIC", "REINHARD", "REINHARD_EXT", "UNCHARTED2", "LINEAR_CLAMP",
+] as const;
+export type ToneMapOperator = (typeof TONE_MAP_OPERATORS)[number];
+
 // ---- per-element structs -------------------------------------------------
 
 /** `RenderPassDef` — one entry of `render_passes[]` (spec §3.2). */
@@ -63,19 +80,74 @@ export interface RenderPassDef {
     required_streams: string[];
 }
 
+/** `BloomConfig` — `post_process[].bloom` (spec §3.4). */
+export interface BloomParams {
+    threshold:      number;
+    soft_threshold: number;
+    intensity:      number;
+    radius:         number;
+    mip_levels:     number;
+    scatter:        number;
+}
+
+/** `ToneMappingConfig` — `post_process[].tone_mapping` (spec §3.4). */
+export interface ToneMappingParams {
+    op:          ToneMapOperator;
+    exposure:    number;
+    gamma:       number;
+    white_point: number;
+    saturation:  number;
+}
+
+/** `VignetteConfig` — `post_process[].vignette` (spec §3.4). */
+export interface VignetteParams {
+    intensity: number;
+    radius:    number;
+    softness:  number;
+    color:     [number, number, number];
+}
+
+/** `ColorGradingConfig` — `post_process[].color_grading` (spec §3.4). */
+export interface ColorGradingParams {
+    lut_path:      string;
+    lut_intensity: number;
+    lut_size:      number;
+}
+
+/** `DepthOfFieldConfig` — `post_process[].depth_of_field` (spec §3.4). */
+export interface DepthOfFieldParams {
+    focus_distance: number;
+    focus_range:    number;
+    bokeh_radius:   number;
+    near_start:     number;
+    near_end:       number;
+    far_start:      number;
+    far_end:        number;
+    sample_count:   number;
+}
+
 /**
  * `PostProcessDef` — one entry of `post_process[]` (spec §3.3 / §3.4).
  *
- * `PostProcessDef` only has `name` / `enabled` in C++. Any extra keys are
- * silently dropped by the C++ serializer (spec §3.4, forward-compat), so
- * `params` is an editor-only round-trip bag that this plugin preserves on
- * disk but the engine ignores.
+ * Besides `name` / `enabled`, the def carries a typed `kind` and one
+ * parameter struct per supported effect. The C++ serializer round-trips the
+ * parameter block matching `kind` and `build_post_process_config()` folds
+ * the stack into the real `PostProcessConfig`. Only the block matching
+ * `kind` is consumed; the others are kept at defaults for the editor.
+ *
+ * `kind` is normally derived from `name` (case-insensitive); an explicit
+ * `kind` overrides the inference. Effects with no host-driven
+ * implementation resolve to `Unknown` and carry no parameter block.
  */
 export interface PostProcessDef {
-    name:    string;
-    enabled: boolean;
-    /** Editor-only effect parameters. Not consumed by C++ (spec §3.4). */
-    params?: Record<string, number | string | boolean>;
+    name:            string;
+    enabled:         boolean;
+    kind:            PostProcessKind;
+    bloom:           BloomParams;
+    tone_mapping:    ToneMappingParams;
+    vignette:        VignetteParams;
+    color_grading:   ColorGradingParams;
+    depth_of_field:  DepthOfFieldParams;
 }
 
 /** `ShadowConfig` — top-level `shadow` object (spec §3.5). */
@@ -215,10 +287,76 @@ export const DEFAULT_RENDER_PASS: RenderPassDef = {
     required_streams: [],
 };
 
-export const DEFAULT_POST_PROCESS: PostProcessDef = {
-    name:    "",
-    enabled: true,
+// Per-effect parameter defaults — mirror the C++ structs in
+// `include/pictor/postprocess/postprocess_effect.h`.
+export const DEFAULT_BLOOM: BloomParams = {
+    threshold:      1.0,
+    soft_threshold: 0.5,
+    intensity:      0.8,
+    radius:         5.0,
+    mip_levels:     5,
+    scatter:        0.7,
 };
+
+export const DEFAULT_TONE_MAPPING: ToneMappingParams = {
+    op:          "ACES_FILMIC",
+    exposure:    1.0,
+    gamma:       2.2,
+    white_point: 4.0,
+    saturation:  1.0,
+};
+
+export const DEFAULT_VIGNETTE: VignetteParams = {
+    intensity: 0.35,
+    radius:    0.75,
+    softness:  0.45,
+    color:     [0, 0, 0],
+};
+
+export const DEFAULT_COLOR_GRADING: ColorGradingParams = {
+    lut_path:      "",
+    lut_intensity: 1.0,
+    lut_size:      16,
+};
+
+export const DEFAULT_DEPTH_OF_FIELD: DepthOfFieldParams = {
+    focus_distance: 10.0,
+    focus_range:    5.0,
+    bokeh_radius:   4.0,
+    near_start:     0.0,
+    near_end:       3.0,
+    far_start:      15.0,
+    far_end:        50.0,
+    sample_count:   16,
+};
+
+export const DEFAULT_POST_PROCESS: PostProcessDef = {
+    name:           "",
+    enabled:        true,
+    kind:           "Unknown",
+    bloom:          DEFAULT_BLOOM,
+    tone_mapping:   DEFAULT_TONE_MAPPING,
+    vignette:       DEFAULT_VIGNETTE,
+    color_grading:  DEFAULT_COLOR_GRADING,
+    depth_of_field: DEFAULT_DEPTH_OF_FIELD,
+};
+
+/**
+ * Map an effect name to a `PostProcessKind` (mirrors C++
+ * `post_process_kind_from_name()`). Case-insensitive; accepts the canonical
+ * spellings plus common aliases. Returns `"Unknown"` for unmapped names.
+ */
+export function postProcessKindFromName(name: string): PostProcessKind {
+    const n = name.trim().toLowerCase();
+    if (n === "bloom") return "Bloom";
+    if (n === "tonemapping" || n === "tonemap" || n === "tone_mapping") return "ToneMapping";
+    if (n === "vignette") return "Vignette";
+    if (n === "colorgrading" || n === "color_grading" || n === "lut" || n === "grade") {
+        return "ColorGrading";
+    }
+    if (n === "dof" || n === "depthoffield" || n === "depth_of_field") return "DepthOfField";
+    return "Unknown";
+}
 
 export const DEFAULT_SHADOW: ShadowConfig = {
     cascade_count: 3,
@@ -383,22 +521,86 @@ function normRenderPass(raw: unknown): RenderPassDef {
     };
 }
 
+function normBloom(raw: unknown): BloomParams {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const d = DEFAULT_BLOOM;
+    return {
+        threshold:      asNumber(r.threshold, d.threshold),
+        soft_threshold: asNumber(r.soft_threshold, d.soft_threshold),
+        intensity:      asNumber(r.intensity, d.intensity),
+        radius:         asNumber(r.radius, d.radius),
+        mip_levels:     asNumber(r.mip_levels, d.mip_levels),
+        scatter:        asNumber(r.scatter, d.scatter),
+    };
+}
+
+function normToneMapping(raw: unknown): ToneMappingParams {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const d = DEFAULT_TONE_MAPPING;
+    return {
+        op:          pickEnum(TONE_MAP_OPERATORS, r.op, d.op),
+        exposure:    asNumber(r.exposure, d.exposure),
+        gamma:       asNumber(r.gamma, d.gamma),
+        white_point: asNumber(r.white_point, d.white_point),
+        saturation:  asNumber(r.saturation, d.saturation),
+    };
+}
+
+function normVignette(raw: unknown): VignetteParams {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const d = DEFAULT_VIGNETTE;
+    return {
+        intensity: asNumber(r.intensity, d.intensity),
+        radius:    asNumber(r.radius, d.radius),
+        softness:  asNumber(r.softness, d.softness),
+        color:     asVec3(r.color, d.color),
+    };
+}
+
+function normColorGrading(raw: unknown): ColorGradingParams {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const d = DEFAULT_COLOR_GRADING;
+    return {
+        lut_path:      asString(r.lut_path, d.lut_path),
+        lut_intensity: asNumber(r.lut_intensity, d.lut_intensity),
+        lut_size:      asNumber(r.lut_size, d.lut_size),
+    };
+}
+
+function normDepthOfField(raw: unknown): DepthOfFieldParams {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const d = DEFAULT_DEPTH_OF_FIELD;
+    return {
+        focus_distance: asNumber(r.focus_distance, d.focus_distance),
+        focus_range:    asNumber(r.focus_range, d.focus_range),
+        bokeh_radius:   asNumber(r.bokeh_radius, d.bokeh_radius),
+        near_start:     asNumber(r.near_start, d.near_start),
+        near_end:       asNumber(r.near_end, d.near_end),
+        far_start:      asNumber(r.far_start, d.far_start),
+        far_end:        asNumber(r.far_end, d.far_end),
+        sample_count:   asNumber(r.sample_count, d.sample_count),
+    };
+}
+
 function normPostProcess(raw: unknown): PostProcessDef {
     const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-    const out: PostProcessDef = {
-        name:    asString(r.name, DEFAULT_POST_PROCESS.name),
-        enabled: asBool(r.enabled, DEFAULT_POST_PROCESS.enabled),
+    const name = asString(r.name, DEFAULT_POST_PROCESS.name);
+    // Explicit `kind` wins; otherwise infer from `name` (preset spelling).
+    const kind = typeof r.kind === "string"
+                     && (POST_PROCESS_KINDS as readonly string[]).includes(r.kind)
+                     && r.kind !== "Unknown"
+                 ? (r.kind as PostProcessKind)
+                 : postProcessKindFromName(name);
+    return {
+        name,
+        enabled:        asBool(r.enabled, DEFAULT_POST_PROCESS.enabled),
+        kind,
+        bloom:          normBloom(r.bloom),
+        tone_mapping:   normToneMapping(r.tone_mapping),
+        vignette:       normVignette(r.vignette),
+        color_grading:  normColorGrading(r.color_grading),
+        depth_of_field: normDepthOfField(r.depth_of_field),
     };
-    // Keep any extra keys as editor-only params (spec §3.4 round-trip).
-    const params: Record<string, number | string | boolean> = {};
-    for (const [k, v] of Object.entries(r)) {
-        if (k === "name" || k === "enabled") continue;
-        if (typeof v === "number" || typeof v === "string" || typeof v === "boolean") {
-            params[k] = v;
-        }
-    }
-    if (Object.keys(params).length) out.params = params;
-    return out;
 }
 
 function normShadow(raw: unknown): ShadowConfig {
@@ -562,13 +764,36 @@ export function normalizeProfile(raw: unknown): PipelineProfileDef {
 }
 
 /**
+ * Serialize one `PostProcessDef` to its on-disk JSON object.
+ *
+ * Mirrors the C++ encoder (`pipeline_profile_serializer.cpp`): emits
+ * `name` / `enabled` / `kind`, then only the parameter block matching
+ * `kind`. `Unknown` effects (SSAO / TAA …) carry name/enabled/kind only.
+ */
+export function serializePostProcess(pp: PostProcessDef): Record<string, unknown> {
+    const out: Record<string, unknown> = {
+        name:    pp.name,
+        enabled: pp.enabled,
+        kind:    pp.kind,
+    };
+    switch (pp.kind) {
+        case "Bloom":         out.bloom          = { ...pp.bloom }; break;
+        case "ToneMapping":   out.tone_mapping   = { ...pp.tone_mapping }; break;
+        case "Vignette":      out.vignette       = { ...pp.vignette, color: [...pp.vignette.color] }; break;
+        case "ColorGrading":  out.color_grading  = { ...pp.color_grading }; break;
+        case "DepthOfField":  out.depth_of_field = { ...pp.depth_of_field }; break;
+        case "Unknown":       break;
+    }
+    return out;
+}
+
+/**
  * Serialize a profile to the JSON text written to `*.profile.json`.
  *
  * Emits the full canonical shape (spec §3) with 2-space indentation, a
  * trailing newline, and `version` first — matching the hand-authored
- * presets in `Pictor/profiles/`. `post_process[].params` is spread back
- * onto each effect object so editor-only params round-trip on disk
- * (C++ drops them on read — spec §3.4).
+ * presets in `Pictor/profiles/`. Each `post_process[]` entry carries its
+ * typed `kind` + the matching effect parameter block (spec §3.4).
  */
 export function serializeProfile(p: PipelineProfileDef): string {
     const out: Record<string, unknown> = {
@@ -580,10 +805,7 @@ export function serializeProfile(p: PipelineProfileDef): string {
         gpu_driven_enabled:     p.gpu_driven_enabled,
         compute_update_enabled: p.compute_update_enabled,
         render_passes:          p.render_passes.map((rp) => ({ ...rp })),
-        post_process:           p.post_process.map((pp) => {
-            const { params, ...rest } = pp;
-            return params ? { ...rest, ...params } : { ...rest };
-        }),
+        post_process:           p.post_process.map(serializePostProcess),
         shadow:                 { ...p.shadow },
         gi:                     {
             shadow_enabled:    p.gi.shadow_enabled,
