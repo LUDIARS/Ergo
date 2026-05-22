@@ -678,7 +678,63 @@ const ENUMS = {
     filter_mode:    ["NONE", "PCF", "PCSS"],
     overlay_mode:   ["OFF", "MINIMAL", "STANDARD", "DETAILED", "TIMELINE"],
     msaa_samples:   [0, 2, 4, 8],
+    pp_kind:        ["Unknown", "Bloom", "ToneMapping", "Vignette", "ColorGrading", "DepthOfField"],
+    tone_map_op:    ["ACES_FILMIC", "REINHARD", "REINHARD_EXT", "UNCHARTED2", "LINEAR_CLAMP"],
 };
+
+// post-process per-effect parameter defaults — mirror profile_schema.ts
+// (DEFAULT_BLOOM …) and Pictor's postprocess_effect.h.
+const PP_DEFAULTS = {
+    bloom: { threshold: 1.0, soft_threshold: 0.5, intensity: 0.8, radius: 5.0,
+             mip_levels: 5, scatter: 0.7 },
+    tone_mapping: { op: "ACES_FILMIC", exposure: 1.0, gamma: 2.2,
+                    white_point: 4.0, saturation: 1.0 },
+    vignette: { intensity: 0.35, radius: 0.75, softness: 0.45, color: [0, 0, 0] },
+    color_grading: { lut_path: "", lut_intensity: 1.0, lut_size: 16 },
+    depth_of_field: { focus_distance: 10.0, focus_range: 5.0, bokeh_radius: 4.0,
+                      near_start: 0.0, near_end: 3.0, far_start: 15.0,
+                      far_end: 50.0, sample_count: 16 },
+};
+
+// Map an effect name to a PostProcessKind — mirror profile_schema.ts
+// postProcessKindFromName() / Pictor post_process_kind_from_name().
+function ppKindFromName(name) {
+    const n = String(name || "").trim().toLowerCase();
+    if (n === "bloom") return "Bloom";
+    if (n === "tonemapping" || n === "tonemap" || n === "tone_mapping") return "ToneMapping";
+    if (n === "vignette") return "Vignette";
+    if (n === "colorgrading" || n === "color_grading" || n === "lut" || n === "grade") {
+        return "ColorGrading";
+    }
+    if (n === "dof" || n === "depthoffield" || n === "depth_of_field") return "DepthOfField";
+    return "Unknown";
+}
+
+// Blank PostProcessDef for "+ effect 追加" — mirror DEFAULT_POST_PROCESS.
+function blankPostProcess() {
+    return {
+        name: "", enabled: true, kind: "Unknown",
+        bloom:          { ...PP_DEFAULTS.bloom },
+        tone_mapping:   { ...PP_DEFAULTS.tone_mapping },
+        vignette:       { ...PP_DEFAULTS.vignette, color: [...PP_DEFAULTS.vignette.color] },
+        color_grading:  { ...PP_DEFAULTS.color_grading },
+        depth_of_field: { ...PP_DEFAULTS.depth_of_field },
+    };
+}
+
+// Ensure a PostProcessDef has every typed slot (defensive against profiles
+// authored before the typed schema). The server normalizes on load, so this
+// is mostly a belt-and-braces fill for in-memory edits.
+function ensurePpSlots(pp) {
+    if (typeof pp.kind !== "string") pp.kind = ppKindFromName(pp.name);
+    if (!pp.bloom)          pp.bloom = { ...PP_DEFAULTS.bloom };
+    if (!pp.tone_mapping)   pp.tone_mapping = { ...PP_DEFAULTS.tone_mapping };
+    if (!pp.vignette)       pp.vignette = { ...PP_DEFAULTS.vignette, color: [...PP_DEFAULTS.vignette.color] };
+    if (!pp.color_grading)  pp.color_grading = { ...PP_DEFAULTS.color_grading };
+    if (!pp.depth_of_field) pp.depth_of_field = { ...PP_DEFAULTS.depth_of_field };
+    if (!Array.isArray(pp.vignette.color)) pp.vignette.color = [...PP_DEFAULTS.vignette.color];
+    return pp;
+}
 
 // A blank profile used by "+ new". Mirrors profile_schema.ts DEFAULT_PROFILE.
 function blankProfile() {
@@ -1071,10 +1127,85 @@ function movePass(i, dir) {
 // ── post_process editor ───────────────────────────────────────────────
 $("btn_add_pp").addEventListener("click", () => {
     if (!CURRENT) return;
-    CURRENT.post_process.push({ name: "", enabled: true });
+    CURRENT.post_process.push(blankPostProcess());
     renderPostProcess();
     markDirty();
 });
+
+// Build the typed parameter editor for the effect matching `pp.kind`.
+// Effects with no host-driven implementation (kind=Unknown — SSAO / TAA /
+// FXAA …) get a note instead: their params live nowhere the engine reads.
+function ppParamGrid(pp) {
+    const grid = document.createElement("div");
+    grid.className = "field-grid";
+    const fnum  = (obj, key, hint) => grid.appendChild(
+        fieldNum(key, obj[key], (v) => { obj[key] = v; markDirty(); }, true, hint));
+    const fint  = (obj, key, hint) => grid.appendChild(
+        fieldInt(key, obj[key], (v) => { obj[key] = v; markDirty(); }, hint));
+
+    switch (pp.kind) {
+        case "Bloom": {
+            const b = pp.bloom;
+            fnum(b, "threshold", "bloom 抽出輝度しきい値");
+            fnum(b, "soft_threshold", "ソフトニー幅");
+            fnum(b, "intensity");
+            fnum(b, "radius", "ブラー半径 (px @half-res)");
+            fint(b, "mip_levels", "ダウンサンプル段数");
+            fnum(b, "scatter", "mip 散乱重み");
+            break;
+        }
+        case "ToneMapping": {
+            const t = pp.tone_mapping;
+            grid.appendChild(fieldEnum("op", ENUMS.tone_map_op, t.op,
+                (v) => { t.op = v; markDirty(); }, "トーンマップ演算子"));
+            fnum(t, "exposure");
+            fnum(t, "gamma");
+            fnum(t, "white_point", "REINHARD_EXT で使用");
+            fnum(t, "saturation", "1.0 = 変化なし");
+            break;
+        }
+        case "Vignette": {
+            const v = pp.vignette;
+            fnum(v, "intensity", "0 = なし, 1 = 強い縁暗化");
+            fnum(v, "radius", "減衰が始まる正規化距離");
+            fnum(v, "softness", "減衰幅");
+            grid.appendChild(fieldVec3("color", v.color, (arr) => {
+                v.color = arr; markDirty();
+            }));
+            break;
+        }
+        case "ColorGrading": {
+            const c = pp.color_grading;
+            grid.appendChild(fieldText("lut_path", c.lut_path,
+                (v) => { c.lut_path = v; markDirty(); }, "PNG LUT strip; 空で LUT 無効"));
+            fnum(c, "lut_intensity", "0..1 ブレンド");
+            fint(c, "lut_size", "LUT cube 辺長");
+            break;
+        }
+        case "DepthOfField": {
+            const d = pp.depth_of_field;
+            fnum(d, "focus_distance");
+            fnum(d, "focus_range");
+            fnum(d, "bokeh_radius");
+            fnum(d, "near_start");
+            fnum(d, "near_end");
+            fnum(d, "far_start");
+            fnum(d, "far_end");
+            fint(d, "sample_count");
+            break;
+        }
+        default: {
+            const note = document.createElement("p");
+            note.className = "pep-note";
+            note.textContent =
+                "host-driven な PostProcessPipeline に実装の無いエフェクト "
+                + "(SSAO / TAA / FXAA / VolumetricFog 等)。 name / enabled / kind は "
+                + "round-trip するが、 C++ ブリッジは無視する (系統B phase 2)。";
+            grid.appendChild(note);
+        }
+    }
+    return grid;
+}
 
 function renderPostProcess() {
     const host = $("pp_list");
@@ -1084,6 +1215,7 @@ function renderPostProcess() {
         host.innerHTML = `<p class="pep-note">effect 無し — preset の post-process スタックがそのまま使われる。</p>`;
     }
     stack.forEach((pp, i) => {
+        ensurePpSlots(pp);
         const card = document.createElement("div");
         card.className = "pp-card";
 
@@ -1095,7 +1227,6 @@ function renderPostProcess() {
         nameInput.value = pp.name;
         nameInput.placeholder = "Bloom / SSAO / Tonemapping / TAA / FXAA …";
         nameInput.style.flex = "1";
-        nameInput.addEventListener("input", () => { pp.name = nameInput.value; markDirty(); });
         head.appendChild(nameInput);
         head.appendChild(fieldBoolInline("enabled", pp.enabled, (v) => { pp.enabled = v; markDirty(); }));
         head.appendChild(makeBtn("▲", "pc-btn", i === 0, () => movePp(i, -1)));
@@ -1105,26 +1236,29 @@ function renderPostProcess() {
         }));
         card.appendChild(head);
 
-        // editor-only params (spec §3.4) — round-tripped on disk, ignored by C++
-        const paramKeys = pp.params ? Object.keys(pp.params) : [];
-        if (paramKeys.length) {
-            const grid = document.createElement("div");
-            grid.className = "field-grid";
-            for (const k of paramKeys) {
-                const val = pp.params[k];
-                if (typeof val === "number") {
-                    grid.appendChild(fieldNum(`params.${k}`, val,
-                        (v) => { pp.params[k] = v; markDirty(); }, true, "editor 専用"));
-                } else if (typeof val === "boolean") {
-                    grid.appendChild(fieldBool(`params.${k}`, val,
-                        (v) => { pp.params[k] = v; markDirty(); }));
-                } else {
-                    grid.appendChild(fieldText(`params.${k}`, String(val),
-                        (v) => { pp.params[k] = v; markDirty(); }, "editor 専用"));
-                }
+        // kind selector — drives which typed parameter editor is shown.
+        const kindRow = document.createElement("div");
+        kindRow.className = "field-grid";
+        const kindField = fieldEnum("kind", ENUMS.pp_kind, pp.kind, (v) => {
+            pp.kind = v;
+            renderPostProcess();   // re-render to swap the parameter editor
+            markDirty();
+        }, "エフェクト種別 — 対応パラメータのみ C++ に届く");
+        kindRow.appendChild(kindField);
+        card.appendChild(kindRow);
+
+        // Editing the name re-infers kind unless the user pinned it.
+        nameInput.addEventListener("input", () => {
+            pp.name = nameInput.value;
+            const inferred = ppKindFromName(pp.name);
+            if (inferred !== "Unknown") {
+                pp.kind = inferred;
+                renderPostProcess();
             }
-            card.appendChild(grid);
-        }
+            markDirty();
+        });
+
+        card.appendChild(ppParamGrid(pp));
         host.appendChild(card);
     });
 }
@@ -1148,8 +1282,23 @@ function refreshJsonPreview() {
     if (window.hljs) hljs.highlightElement(el);
 }
 
-// Mirror profile_schema.ts serializeProfile(): version first,
-// post_process params spread back onto each effect.
+// Mirror profile_schema.ts serializePostProcess(): name/enabled/kind +
+// only the parameter block matching `kind`.
+function serializePpForPreview(pp) {
+    const out = { name: pp.name, enabled: pp.enabled, kind: pp.kind };
+    switch (pp.kind) {
+        case "Bloom":        out.bloom = { ...pp.bloom }; break;
+        case "ToneMapping":  out.tone_mapping = { ...pp.tone_mapping }; break;
+        case "Vignette":     out.vignette = { ...pp.vignette, color: [...pp.vignette.color] }; break;
+        case "ColorGrading": out.color_grading = { ...pp.color_grading }; break;
+        case "DepthOfField": out.depth_of_field = { ...pp.depth_of_field }; break;
+        default: break;
+    }
+    return out;
+}
+
+// Mirror profile_schema.ts serializeProfile(): version first, each
+// post_process entry carrying its typed kind + matching effect block.
 function serializeForPreview(p) {
     return {
         version: 1,
@@ -1160,10 +1309,7 @@ function serializeForPreview(p) {
         gpu_driven_enabled: p.gpu_driven_enabled,
         compute_update_enabled: p.compute_update_enabled,
         render_passes: p.render_passes.map((rp) => ({ ...rp })),
-        post_process: p.post_process.map((pp) => {
-            const { params, ...rest } = pp;
-            return params ? { ...rest, ...params } : { ...rest };
-        }),
+        post_process: p.post_process.map(serializePpForPreview),
         shadow: { ...p.shadow },
         gi: {
             shadow_enabled: p.gi.shadow_enabled,
