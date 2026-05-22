@@ -4,6 +4,13 @@
 /// 1 単位の作り方レシピ)。 各 LUDIARS ゲームは `assets/visus/{name}.visus.json` を
 /// 持ち、 起動時に Pictor の `VisusRegistry` へロードする。
 ///
+/// CUSTOM kind:
+///   `geometry.kind == "custom"` の visus は、 固定 PBR ではなくカスタムシェーダで
+///   描画される (Pictor `spec/rendering-extensibility-design.md` §2 phase 1)。
+///   `geometry.shader_stages` (vert/frag/comp 各 ResourceRef) と `geometry.shader`
+///   (ShaderHandle) を持つ。 UI 側はこの CUSTOM kind を構造化フォームで編集できる
+///   (それ以外のフィールドは従来どおり生 JSON エディタ)。
+///
 /// プロトコル (Phase 1):
 ///   GET  /visus/api/roots                       → 設定済 project root の一覧
 ///   GET  /visus/api/scan?root=<idx>             → root 内の *.visus.json をリスト
