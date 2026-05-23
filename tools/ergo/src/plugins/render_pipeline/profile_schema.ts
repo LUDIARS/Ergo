@@ -334,6 +334,15 @@ export interface ProfilerConfig {
  * `PipelineProfileDef` — the whole profile (spec §3). This is the unit the
  * editor reads from / writes to one `<lowercased-name>.profile.json` file.
  */
+/** Editor-only UI state. Pictor の serializer は unknown key を skip するので
+ *  profile.json に書き戻しても本体ロジックには影響しない。 Ergo の editor
+ *  だけが読み書きし、 node 位置などの UI 状態を round-trip させる。 */
+export interface ProfileEditorMeta {
+    /** GraphView の node 位置 (pass_name → {x, y})。 未指定の pass は
+     *  hierarchical layout の自動配置にフォールバック。 */
+    nodePositions?: Record<string, { x: number; y: number }>;
+}
+
 export interface PipelineProfileDef {
     version:                number;
     profile_name:           string;
@@ -354,6 +363,8 @@ export interface PipelineProfileDef {
     gpu_driven:             GPUDrivenConfig;
     update:                 UpdateConfig;
     profiler:               ProfilerConfig;
+    /** Phase 4 editor extension — 任意の UI 状態。 Pictor 側は無視する。 */
+    _editor?:               ProfileEditorMeta;
 }
 
 // ---- defaults (mirror PipelineProfileDef C++ defaults, spec §3) ----------
@@ -939,7 +950,32 @@ export function normalizeProfile(raw: unknown): PipelineProfileDef {
         gpu_driven:             normGpuDriven(r.gpu_driven),
         update:                 normUpdate(r.update),
         profiler:               normProfiler(r.profiler),
+        _editor:                normEditorMeta(r._editor),
     };
+}
+
+/** Editor-only `_editor` block の正規化。 不正な値はすべて drop し、 健全な
+ *  形に整える。 Pictor 側は本フィールドを skip するため、 round-trip 時に
+ *  残せれば充分。 */
+function normEditorMeta(raw: unknown): ProfileEditorMeta | undefined {
+    if (!raw || typeof raw !== "object") return undefined;
+    const r = raw as Record<string, unknown>;
+    const out: ProfileEditorMeta = {};
+    if (r.nodePositions && typeof r.nodePositions === "object") {
+        const pos: Record<string, { x: number; y: number }> = {};
+        for (const [k, v] of Object.entries(r.nodePositions as Record<string, unknown>)) {
+            if (v && typeof v === "object") {
+                const vv = v as Record<string, unknown>;
+                const x = Number(vv.x);
+                const y = Number(vv.y);
+                if (Number.isFinite(x) && Number.isFinite(y)) {
+                    pos[k] = { x, y };
+                }
+            }
+        }
+        if (Object.keys(pos).length) out.nodePositions = pos;
+    }
+    return Object.keys(out).length ? out : undefined;
 }
 
 /**
@@ -1043,6 +1079,17 @@ export function serializeProfile(p: PipelineProfileDef): string {
         update:                 { ...p.update },
         profiler:               { ...p.profiler },
     };
+    // Editor-only meta: 含まれていれば末尾に付ける。 Pictor 側は unknown key を
+    // skip するので C++ runtime には影響しない (Phase 4 editor 機能)。
+    if (p._editor && Object.keys(p._editor).length) {
+        const meta: Record<string, unknown> = {};
+        if (p._editor.nodePositions && Object.keys(p._editor.nodePositions).length) {
+            meta.nodePositions = { ...p._editor.nodePositions };
+        }
+        if (Object.keys(meta).length) {
+            out._editor = meta;
+        }
+    }
     return JSON.stringify(out, null, 2) + "\n";
 }
 
