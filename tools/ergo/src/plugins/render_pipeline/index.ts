@@ -1,31 +1,16 @@
-/// render_pipeline plugin — two clearly separated halves:
+/// render_pipeline plugin — Phase 3 単一グラフエディタ。
 ///
-///   A) Scanner view ("現状ビュー", read-only)
-///      How Pictor's hard-coded Vulkan code (系統B) actually renders today.
-///      A Python scanner (`scanner/render_pipeline_scan.py`) statically
-///      scans Pictor sources into `render_pipeline.json`; the UI draws a
-///      pass DAG + pipeline / shader / attachment tables. Never edited.
-///
-///   B) Profile editor ("編集ビュー", read/write + disk-persisted)
-///      How you *want* Pictor to render (系統A). Reads & writes the
-///      canonical `Pictor/profiles/*.profile.json` files which Pictor
-///      consumes via `register_presets_from_dir()`. Full CRUD on the
-///      `PipelineProfileDef` schema (spec: Pictor/spec/pipeline-profile-config.md).
-///
-/// The two halves share no state and address different artifacts on disk.
-/// The UI surfaces them as two distinct top-level modes so "what Pictor
-/// does" and "what Pictor is told to do" are never conflated.
+/// `spec/tool/render_pipeline_system_b.md` 参照。 Pictor 系統B 解体 (Phase 3
+/// `LUDIARS/Pictor#60`) で **ハードコード描画パスが消える** ため、 旧 Scanner
+/// モード (Python regex で C++ をスキャンする) は不要になった。 本プラグインは
+/// `Pictor/profiles/*.profile.json` を single source of truth とし、 単一の
+/// NodeGraph エディタ画面で表示・編集する。
 ///
 /// Protocol:
-///   --- Scanner view (A) — read-only ---
-///   GET  /render_pipeline/api/snapshot          → scanner JSON snapshot
-///   GET  /render_pipeline/api/health            → snapshot stats + profile dir info
-///   POST /render_pipeline/api/rescan            → run the Python scanner
-///   --- Profile editor (B) — read/write ---
 ///   GET  /render_pipeline/api/profiles          → list *.profile.json
 ///   GET  /render_pipeline/api/profile/:file     → one profile (normalized)
 ///   POST /render_pipeline/api/profile           → write a profile to disk
-///   --- WS ---
+///   GET  /render_pipeline/api/health            → profile dir / count + clients
 ///   WS   /render_pipeline/ws                    → broadcasts {op:"profiles-changed"}
 ///                                                 on save; relays {op:"timing"}
 ///                                                 (Phase-2 GPU timestamp) to all
@@ -33,9 +18,6 @@
 
 import { Hono } from "hono";
 import { WebSocket as WS } from "ws";
-import { spawn } from "node:child_process";
-import { readFileSync, existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
 
 import type { Plugin, PluginContext, PluginFactory } from "../../core/plugin.js";
 import { normalizeProfile, PROFILE_SCHEMA_VERSION } from "./profile_schema.js";
@@ -43,21 +25,7 @@ import {
     listProfiles, loadProfile, saveProfile, resolveProfileDir,
 } from "./profile_store.js";
 
-const SCHEMA_VERSION = 1;
-
-function snapshotPath(): string {
-    return resolve(process.cwd(), "scanner", "render_pipeline.json");
-}
-
-function loadSnapshot(): any {
-    const p = snapshotPath();
-    if (!existsSync(p)) return null;
-    try {
-        return JSON.parse(readFileSync(p, "utf-8"));
-    } catch {
-        return null;
-    }
-}
+const SCHEMA_VERSION = 2;
 
 const factory: PluginFactory = () => {
     const clients = new Set<WS>();
@@ -73,40 +41,20 @@ const factory: PluginFactory = () => {
         id:          "render_pipeline",
         title:       "Render Pipeline",
         icon:        "🔲",
-        description: "Pictor の render pass を可視化 (scanner) + パイプラインプロファイル *.profile.json を編集。",
+        description: "Pictor の *.profile.json を単一グラフで編集 (Phase 3)。",
         staticRoot:  "./src/plugins/render_pipeline/ui",
 
         routes(ctx: PluginContext) {
             const app = new Hono();
 
-            // ───── Scanner view (A) — read-only ─────────────────────────
-            app.get("/api/snapshot", (c) => {
-                const snap = loadSnapshot();
-                if (!snap) return c.json({ ok: false, err: "snapshot not found — run scanner/render_pipeline_scan.py" }, 404);
-                return c.json(snap);
-            });
-
+            // ───── Profile editor — read/write ─────────────────────────
             app.get("/api/health", (c) => {
-                const p = snapshotPath();
-                const ok = existsSync(p);
-                const meta: any = { ok, version: SCHEMA_VERSION, clients: clients.size };
-                if (ok) {
-                    try {
-                        const st = statSync(p);
-                        meta.snapshot_bytes = st.size;
-                        meta.snapshot_mtime = st.mtime.toISOString();
-                    } catch {}
-                    const snap = loadSnapshot();
-                    if (snap) {
-                        meta.passes      = snap.passes?.length ?? 0;
-                        meta.pipelines   = snap.pipelines?.length ?? 0;
-                        meta.shaders     = snap.shaders?.length ?? 0;
-                        meta.attachments = snap.attachments?.length ?? 0;
-                        meta.scanned_at  = snap.scanned_at;
-                    }
-                }
-                // Profile-editor side health.
-                meta.profile_schema_version = PROFILE_SCHEMA_VERSION;
+                const meta: any = {
+                    ok:                     true,
+                    version:                SCHEMA_VERSION,
+                    clients:                clients.size,
+                    profile_schema_version: PROFILE_SCHEMA_VERSION,
+                };
                 try {
                     const dir = resolveProfileDir();
                     meta.profile_dir   = dir;
@@ -117,38 +65,6 @@ const factory: PluginFactory = () => {
                 return c.json(meta);
             });
 
-            app.post("/api/rescan", async (c) => {
-                // scanner を別 process で起動。 完了を待ってから snapshot を返す。
-                const script = resolve(process.cwd(), "scanner", "render_pipeline_scan.py");
-                if (!existsSync(script)) {
-                    return c.json({ ok: false, err: `scanner not found: ${script}` }, 500);
-                }
-                interface ScanResult { ok: boolean; exit?: number | null; stdout: string; stderr?: string; err?: string; snapshot?: unknown; }
-                const result = await new Promise<ScanResult>((res) => {
-                    const proc = spawn("python", [script], { cwd: resolve(process.cwd()) });
-                    let out = "";
-                    let err = "";
-                    proc.stdout.on("data", (b) => { out += b.toString(); });
-                    proc.stderr.on("data", (b) => { err += b.toString(); });
-                    proc.on("close", (code) => {
-                        if (code !== 0) {
-                            ctx.log("warn", `[render_pipeline] rescan exit=${code} stderr=${err.trim()}`);
-                            res({ ok: false, exit: code, stdout: out, stderr: err });
-                            return;
-                        }
-                        ctx.log("info", `[render_pipeline] rescan ok: ${out.trim()}`);
-                        res({ ok: true, stdout: out, snapshot: loadSnapshot() });
-                    });
-                    proc.on("error", (e) => {
-                        ctx.log("warn", `[render_pipeline] rescan spawn 失敗: ${e}`);
-                        res({ ok: false, stdout: "", err: String(e) });
-                    });
-                });
-                return c.json(result, result.ok ? 200 : 500);
-            });
-
-            // ───── Profile editor (B) — read/write ──────────────────────
-            // List every *.profile.json the editor can open.
             app.get("/api/profiles", (c) => {
                 try {
                     const dir = resolveProfileDir();
@@ -163,7 +79,6 @@ const factory: PluginFactory = () => {
                 }
             });
 
-            // Load one profile, normalized to the full schema.
             app.get("/api/profile/:file", (c) => {
                 const file = c.req.param("file");
                 try {
@@ -206,11 +121,9 @@ const factory: PluginFactory = () => {
         onUpgrade(_req, ws: WS, _ctx) {
             clients.add(ws);
             ws.on("message", (raw: any) => {
-                // Phase 2 GPU timestamp relay。 Pictor/KS の計測経路 (KS の
-                // TimingRelay WS クライアント) が `{op:"timing", frame,
-                // passes:[{id,us}]}` を 1 本送ってくる。 そのまま全 UI クライアント
-                // へ broadcast すると、 Timeline ビューの applyTimingMessage()
-                // が実測オーバーレイを点灯する。 ping は ack を返す。
+                // Phase 2 GPU timestamp relay (`{op:"timing", frame, passes:[{id,us}]}`)。
+                // KS の TimingRelay WS クライアントが送ってくるのをそのまま全 UI へ
+                // broadcast。 GraphView の timing オーバーレイがノード着色に使う。
                 let msg: any;
                 try { msg = JSON.parse(raw.toString()); } catch { return; }
                 if (msg?.op === "ping") {
@@ -224,8 +137,6 @@ const factory: PluginFactory = () => {
         },
 
         health() {
-            const p = snapshotPath();
-            const ok = existsSync(p);
             let profileDir = "";
             let profileCount = 0;
             try {
@@ -235,7 +146,6 @@ const factory: PluginFactory = () => {
             return {
                 ok:                     true,
                 version:                SCHEMA_VERSION,
-                snapshot_present:       ok,
                 clients:                clients.size,
                 profile_schema_version: PROFILE_SCHEMA_VERSION,
                 profile_dir:            profileDir,
