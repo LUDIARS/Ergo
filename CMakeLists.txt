@@ -33,6 +33,7 @@ option(ERGO_BUILD_COMBO_COUNTER "Build ergo_combo_counter" ON)
 option(ERGO_BUILD_TIMING_JUDGE "Build ergo_timing_judge"  ON)
 option(ERGO_BUILD_UI_KIT       "Build ergo_ui_kit (retained-mode UI framework)" ON)
 option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shuriken → ergo_particle migrator + CLI)" ON)
+option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -687,6 +688,87 @@ if(ERGO_BUILD_SHURIKEN_MIGRATOR AND ERGO_BUILD_PARTICLE AND ERGO_BUILD_GPU_PARTI
         add_executable(test_shuriken_migrator tests/shuriken_migrator/test_shuriken_migrator.cpp)
         target_link_libraries(test_shuriken_migrator PRIVATE ergo_shuriken_migrator ergo_gtest_main)
         add_test(NAME test_shuriken_migrator COMMAND test_shuriken_migrator)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_render — Pictor の上・ゲームの下に入る横断オーケストレーション層。
+#   * RenderContext  — Pictor ハンドル束
+#   * IRenderLayer   — サブレンダラ統一インターフェース
+#   * FrameContext   — 毎フレーム可変データ + カメラ math (look_at / perspective)
+#   * FrameComposer  — パス構成 + フレームループ (acquire→update→record→submit→present)
+#   * ScreenshotBridge — HTTP↔レンダースレッドのスクリーンショット同期
+#   * asset_paths    — シェーダ/アセットルートの上方探索ユーティリティ
+#   * StageRenderer  — 色キューブ描画の共通レイヤー (KS から移植)
+#
+# Vulkan 非依存部分 (カメラ math / asset path / ScreenshotBridge /
+# FrameComposer のパス列管理) は常にビルドする。 Vulkan 依存の実描画経路は
+# `pictor` ターゲットが存在し Vulkan SDK が見つかったときだけ有効化する
+# (ergo_particle の renderer と同じパターン)。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_RENDER)
+    add_library(ergo_render STATIC
+        src/render/frame_context.cpp
+        src/render/frame_composer.cpp
+        src/render/screenshot_bridge.cpp
+        src/render/asset_paths.cpp
+        src/render/stage_renderer.cpp
+    )
+    target_include_directories(ergo_render PUBLIC include)
+    target_link_libraries(ergo_render PUBLIC Threads::Threads)
+    # MSVC は BOM なし UTF-8 を CodePage 932 として読むので /utf-8 を渡す。
+    if(MSVC)
+        target_compile_options(ergo_render PUBLIC /utf-8)
+    endif()
+
+    # Pictor + Vulkan が揃っていれば実描画経路 (FrameComposer の run_frame、
+    # StageRenderer の pipeline 構築) を有効化する。 揃わない場合でも上記
+    # 5 ソースは Vulkan 非依存部分としてビルドできる (ヘッダの互換型で縮退)。
+    if(TARGET pictor)
+        find_package(Vulkan QUIET)
+        if(Vulkan_FOUND)
+            target_link_libraries(ergo_render PUBLIC pictor Vulkan::Vulkan)
+            target_compile_definitions(ergo_render PUBLIC ERGO_RENDER_HAS_VULKAN=1)
+            # StageRenderer 用 SPIR-V を bake (glslc がある環境のみ)。
+            if(Vulkan_GLSLC_EXECUTABLE)
+                set(_RENDER_SHADERS
+                    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/stage.vert
+                    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/stage.frag
+                )
+                set(_RENDER_SPIRV)
+                foreach(SHADER ${_RENDER_SHADERS})
+                    get_filename_component(N ${SHADER} NAME)
+                    set(OUT ${CMAKE_BINARY_DIR}/shaders/${N}.spv)
+                    add_custom_command(
+                        OUTPUT ${OUT}
+                        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
+                        COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${SHADER} -o ${OUT}
+                        DEPENDS ${SHADER}
+                        COMMENT "ergo_render: compiling ${N} -> SPIR-V")
+                    list(APPEND _RENDER_SPIRV ${OUT})
+                endforeach()
+                add_custom_target(ergo_render_shaders ALL DEPENDS ${_RENDER_SPIRV})
+                add_dependencies(ergo_render ergo_render_shaders)
+            endif()
+            message(STATUS "ergo_render: real render path enabled (Pictor + Vulkan)")
+        else()
+            message(STATUS "ergo_render: Vulkan not found — Vulkan-free build only")
+        endif()
+    else()
+        message(STATUS "ergo_render: pictor target absent — Vulkan-free build only")
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME
+                test_frame_context test_asset_paths
+                test_screenshot_bridge test_frame_composer)
+            add_executable(${NAME} tests/render/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_render ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(${NAME} PRIVATE /utf-8)
+            endif()
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
     endif()
 endif()
 
