@@ -17,7 +17,7 @@
 /// (系統A) — i.e. how you *want* it to render. The two are deliberately
 /// kept separate in both API and UI.
 
-export const PROFILE_SCHEMA_VERSION = 1;
+export const PROFILE_SCHEMA_VERSION = 2;
 
 // ---- enums (mirror the C++ enum string tokens) ---------------------------
 
@@ -66,11 +66,86 @@ export type ToneMapOperator = (typeof TONE_MAP_OPERATORS)[number];
 
 // ---- per-element structs -------------------------------------------------
 
+// ---- Phase 3 (schema v2): attachments + per-pass attachment_ops ----------
+
+/** `AttachmentDef::kind` (Pictor `pictor::AttachmentKind`). */
+export const ATTACHMENT_KINDS = ["COLOR", "DEPTH", "SWAPCHAIN_COLOR"] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+/** `AttachmentDef::sizing`. */
+export const ATTACHMENT_SIZINGS = ["SWAPCHAIN_RELATIVE", "ABSOLUTE"] as const;
+export type AttachmentSizing = (typeof ATTACHMENT_SIZINGS)[number];
+
+/** `AttachmentDef::format` — subset of Vulkan formats (matches `pictor::AttachmentFormat`). */
+export const ATTACHMENT_FORMATS = [
+    "UNDEFINED",
+    "R8G8B8A8_UNORM", "R8G8B8A8_SRGB", "B8G8R8A8_UNORM", "B8G8R8A8_SRGB",
+    "R16G16B16A16_SFLOAT", "R32G32B32A32_SFLOAT", "R11G11B10_UFLOAT",
+    "D16_UNORM", "D24_UNORM_S8_UINT", "D32_SFLOAT", "D32_SFLOAT_S8_UINT",
+] as const;
+export type AttachmentFormat = (typeof ATTACHMENT_FORMATS)[number];
+
+/** `AttachmentUsageBits` — `AttachmentDef::usage` flag names. */
+export const ATTACHMENT_USAGE_FLAGS = [
+    "TRANSFER_SRC", "TRANSFER_DST", "SAMPLED", "STORAGE",
+    "COLOR_ATTACHMENT", "DEPTH_STENCIL_ATTACHMENT",
+    "TRANSIENT_ATTACHMENT", "INPUT_ATTACHMENT",
+] as const;
+export type AttachmentUsageFlag = (typeof ATTACHMENT_USAGE_FLAGS)[number];
+
+/** `AttachmentLoadOp`. */
+export const ATTACHMENT_LOAD_OPS = ["LOAD", "CLEAR", "DONT_CARE", "NONE"] as const;
+export type AttachmentLoadOp = (typeof ATTACHMENT_LOAD_OPS)[number];
+
+/** `AttachmentStoreOp`. */
+export const ATTACHMENT_STORE_OPS = ["STORE", "DONT_CARE", "NONE"] as const;
+export type AttachmentStoreOp = (typeof ATTACHMENT_STORE_OPS)[number];
+
+/** `ImageLayout` — subset of VkImageLayout (matches `pictor::ImageLayout`). */
+export const IMAGE_LAYOUTS = [
+    "UNDEFINED", "GENERAL",
+    "COLOR_ATTACHMENT_OPTIMAL",
+    "DEPTH_STENCIL_ATTACHMENT_OPTIMAL", "DEPTH_STENCIL_READ_ONLY_OPTIMAL",
+    "SHADER_READ_ONLY_OPTIMAL",
+    "TRANSFER_SRC_OPTIMAL", "TRANSFER_DST_OPTIMAL",
+    "PRESENT_SRC_KHR",
+] as const;
+export type ImageLayout = (typeof IMAGE_LAYOUTS)[number];
+
+/**
+ * Named GPU attachment (Phase 3, schema v2). Mirrors C++
+ * `pictor::AttachmentDef`. The reserved name `"swapchain"` always has
+ * `kind === "SWAPCHAIN_COLOR"`; the Pictor runtime injects per-image
+ * views regardless of `format` (the field is metadata for the editor).
+ */
+export interface AttachmentDef {
+    name:           string;
+    kind:           AttachmentKind;
+    format:         AttachmentFormat;
+    sizing:         AttachmentSizing;
+    scale?:         number;      // sizing === "SWAPCHAIN_RELATIVE"
+    width?:         number;      // sizing === "ABSOLUTE"
+    height?:        number;
+    usage:          AttachmentUsageFlag[];
+    clear_color?:   [number, number, number, number]; // kind === "COLOR" / "SWAPCHAIN_COLOR"
+    clear_depth?:   number;      // kind === "DEPTH"
+    clear_stencil?: number;
+}
+
+/** Per-pass override of how an attachment is used (`attachment_ops[]`). */
+export interface AttachmentOpsDef {
+    attachment:     string;       // must match attachments[].name
+    load:           AttachmentLoadOp;
+    store:          AttachmentStoreOp;
+    initial_layout: ImageLayout;
+    final_layout:   ImageLayout;
+}
+
 /** `RenderPassDef` — one entry of `render_passes[]` (spec §3.2). */
 export interface RenderPassDef {
     pass_name:        string;
     pass_type:        PassType;
-    /** `"none"` or `"handle:<u32>"`. Scheduler does not consume it yet. */
+    /** `"none"` or `"handle:<u32>"`. */
     shader_override:  string;
     render_targets:   string[];
     input_textures:   string[];
@@ -78,6 +153,10 @@ export interface RenderPassDef {
     filter_mask:      number;
     gpu_driven_pass:  boolean;
     required_streams: string[];
+    /** Phase 3: per-attachment load/store overrides, in `render_targets` order.
+     *  Empty array = runtime infers defaults (CLEAR/STORE for color,
+     *  CLEAR/DONT_CARE for depth, CLEAR/STORE → PRESENT_SRC_KHR for swapchain). */
+    attachment_ops:   AttachmentOpsDef[];
 }
 
 /** `BloomConfig` — `post_process[].bloom` (spec §3.4). */
@@ -263,6 +342,10 @@ export interface PipelineProfileDef {
     msaa_samples:           number;
     gpu_driven_enabled:     boolean;
     compute_update_enabled: boolean;
+    /** Phase 3 (schema v2): named attachments. Empty array on v1 profiles —
+     *  the loader fills in the built-in defaults (scene_hdr_color / scene_depth
+     *  / swapchain) when this array is empty. */
+    attachments:            AttachmentDef[];
     render_passes:          RenderPassDef[];
     post_process:           PostProcessDef[];
     shadow:                 ShadowConfig;
@@ -285,6 +368,7 @@ export const DEFAULT_RENDER_PASS: RenderPassDef = {
     filter_mask:      65535,
     gpu_driven_pass:  false,
     required_streams: [],
+    attachment_ops:   [],
 };
 
 // Per-effect parameter defaults — mirror the C++ structs in
@@ -455,6 +539,7 @@ export const DEFAULT_PROFILE: PipelineProfileDef = {
     msaa_samples:           0,
     gpu_driven_enabled:     true,
     compute_update_enabled: true,
+    attachments:            [],   // filled in by normalizeProfile() / defaultAttachments()
     render_passes:          [],
     post_process:           [],
     shadow:                 DEFAULT_SHADOW,
@@ -518,7 +603,57 @@ function normRenderPass(raw: unknown): RenderPassDef {
         filter_mask:      asNumber(r.filter_mask, DEFAULT_RENDER_PASS.filter_mask),
         gpu_driven_pass:  asBool(r.gpu_driven_pass, DEFAULT_RENDER_PASS.gpu_driven_pass),
         required_streams: asStringArray(r.required_streams),
+        attachment_ops:   Array.isArray(r.attachment_ops)
+                              ? r.attachment_ops.map(normAttachmentOps)
+                              : [],
     };
+}
+
+function normAttachmentOps(raw: unknown): AttachmentOpsDef {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    return {
+        attachment:     asString(r.attachment, ""),
+        load:           pickEnum(ATTACHMENT_LOAD_OPS,  r.load,           "CLEAR"),
+        store:          pickEnum(ATTACHMENT_STORE_OPS, r.store,          "STORE"),
+        initial_layout: pickEnum(IMAGE_LAYOUTS,         r.initial_layout, "UNDEFINED"),
+        final_layout:   pickEnum(IMAGE_LAYOUTS,         r.final_layout,   "SHADER_READ_ONLY_OPTIMAL"),
+    };
+}
+
+/** v2 attachments[] normalization — single AttachmentDef element. */
+function normAttachment(raw: unknown): AttachmentDef {
+    const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const usageRaw = Array.isArray(r.usage) ? (r.usage as unknown[]) : [];
+    const usage: AttachmentUsageFlag[] = usageRaw
+        .filter((v): v is string => typeof v === "string")
+        .filter((v): v is AttachmentUsageFlag =>
+            (ATTACHMENT_USAGE_FLAGS as readonly string[]).includes(v));
+    const out: AttachmentDef = {
+        name:   asString(r.name, ""),
+        kind:   pickEnum(ATTACHMENT_KINDS,   r.kind,   "COLOR"),
+        format: pickEnum(ATTACHMENT_FORMATS, r.format, "R16G16B16A16_SFLOAT"),
+        sizing: pickEnum(ATTACHMENT_SIZINGS, r.sizing, "SWAPCHAIN_RELATIVE"),
+        usage,
+    };
+    if (out.sizing === "SWAPCHAIN_RELATIVE") {
+        out.scale = asNumber(r.scale, 1.0);
+    } else {
+        out.width  = asNumber(r.width,  0);
+        out.height = asNumber(r.height, 0);
+    }
+    if (out.kind === "DEPTH") {
+        out.clear_depth   = asNumber(r.clear_depth, 1.0);
+        out.clear_stencil = asNumber(r.clear_stencil, 0);
+    } else if (Array.isArray(r.clear_color)) {
+        const c = r.clear_color as unknown[];
+        out.clear_color = [
+            asNumber(c[0], 0), asNumber(c[1], 0),
+            asNumber(c[2], 0), asNumber(c[3], 1),
+        ];
+    } else {
+        out.clear_color = [0, 0, 0, 1];
+    }
+    return out;
 }
 
 function normBloom(raw: unknown): BloomParams {
@@ -737,9 +872,52 @@ function normProfiler(raw: unknown): ProfilerConfig {
  * enum strings fall back to defaults. The only thing that can fail is JSON
  * syntax itself (handled by the caller before this is reached).
  */
+/**
+ * Built-in attachment defaults — kept bit-equivalent to Pictor's
+ * `default_attachments()` in `src/pipeline/attachment_def.cpp`. Used to
+ * upgrade v1 profiles (no `attachments[]`) so the editor always shows
+ * the canonical three nodes (HDR / depth / swapchain).
+ */
+export function defaultAttachments(): AttachmentDef[] {
+    return [
+        {
+            name:   "scene_hdr_color",
+            kind:   "COLOR",
+            format: "R16G16B16A16_SFLOAT",
+            sizing: "SWAPCHAIN_RELATIVE",
+            scale:  1.0,
+            usage:  ["COLOR_ATTACHMENT", "SAMPLED"],
+            clear_color: [0.0, 0.0, 0.0, 1.0],
+        },
+        {
+            name:   "scene_depth",
+            kind:   "DEPTH",
+            format: "D32_SFLOAT",
+            sizing: "SWAPCHAIN_RELATIVE",
+            scale:  1.0,
+            usage:  ["DEPTH_STENCIL_ATTACHMENT"],
+            clear_depth:   1.0,
+            clear_stencil: 0,
+        },
+        {
+            name:   "swapchain",
+            kind:   "SWAPCHAIN_COLOR",
+            format: "B8G8R8A8_SRGB",
+            sizing: "SWAPCHAIN_RELATIVE",
+            scale:  1.0,
+            usage:  ["COLOR_ATTACHMENT"],
+            clear_color: [0.0, 0.0, 0.0, 1.0],
+        },
+    ];
+}
+
 export function normalizeProfile(raw: unknown): PipelineProfileDef {
     const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const d = DEFAULT_PROFILE;
+    const attachments = Array.isArray(r.attachments)
+        ? r.attachments.map(normAttachment)
+        : [];
+    // v1 compatibility: a profile without attachments[] gets the built-in 3.
     return {
         version:                PROFILE_SCHEMA_VERSION,
         profile_name:           asString(r.profile_name, d.profile_name),
@@ -748,6 +926,7 @@ export function normalizeProfile(raw: unknown): PipelineProfileDef {
         msaa_samples:           asNumber(r.msaa_samples, d.msaa_samples),
         gpu_driven_enabled:     asBool(r.gpu_driven_enabled, d.gpu_driven_enabled),
         compute_update_enabled: asBool(r.compute_update_enabled, d.compute_update_enabled),
+        attachments:            attachments.length ? attachments : defaultAttachments(),
         render_passes:          Array.isArray(r.render_passes)
                                     ? r.render_passes.map(normRenderPass)
                                     : [],
@@ -795,6 +974,49 @@ export function serializePostProcess(pp: PostProcessDef): Record<string, unknown
  * presets in `Pictor/profiles/`. Each `post_process[]` entry carries its
  * typed `kind` + the matching effect parameter block (spec §3.4).
  */
+/** v2 attachments[] one element. */
+export function serializeAttachment(a: AttachmentDef): Record<string, unknown> {
+    const out: Record<string, unknown> = {
+        name:   a.name,
+        kind:   a.kind,
+        format: a.format,
+        sizing: a.sizing,
+        usage:  [...a.usage],
+    };
+    if (a.sizing === "SWAPCHAIN_RELATIVE") {
+        out.scale = a.scale ?? 1.0;
+    } else {
+        out.width  = a.width  ?? 0;
+        out.height = a.height ?? 0;
+    }
+    if (a.kind === "DEPTH") {
+        out.clear_depth   = a.clear_depth   ?? 1.0;
+        out.clear_stencil = a.clear_stencil ?? 0;
+    } else if (a.clear_color) {
+        out.clear_color = [...a.clear_color];
+    }
+    return out;
+}
+
+/** RenderPassDef one element (includes attachment_ops). */
+export function serializeRenderPass(rp: RenderPassDef): Record<string, unknown> {
+    const out: Record<string, unknown> = {
+        pass_name:        rp.pass_name,
+        pass_type:        rp.pass_type,
+        shader_override:  rp.shader_override,
+        render_targets:   [...rp.render_targets],
+        input_textures:   [...rp.input_textures],
+        sort_mode:        rp.sort_mode,
+        filter_mask:      rp.filter_mask,
+        gpu_driven_pass:  rp.gpu_driven_pass,
+        required_streams: [...rp.required_streams],
+    };
+    if (rp.attachment_ops && rp.attachment_ops.length) {
+        out.attachment_ops = rp.attachment_ops.map((o) => ({ ...o }));
+    }
+    return out;
+}
+
 export function serializeProfile(p: PipelineProfileDef): string {
     const out: Record<string, unknown> = {
         version:                PROFILE_SCHEMA_VERSION,
@@ -804,7 +1026,8 @@ export function serializeProfile(p: PipelineProfileDef): string {
         msaa_samples:           p.msaa_samples,
         gpu_driven_enabled:     p.gpu_driven_enabled,
         compute_update_enabled: p.compute_update_enabled,
-        render_passes:          p.render_passes.map((rp) => ({ ...rp })),
+        attachments:            p.attachments.map(serializeAttachment),
+        render_passes:          p.render_passes.map(serializeRenderPass),
         post_process:           p.post_process.map(serializePostProcess),
         shadow:                 { ...p.shadow },
         gi:                     {

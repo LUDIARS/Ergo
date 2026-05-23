@@ -1,300 +1,84 @@
-# render_pipeline plugin — Render Pipeline Visualizer + Profile Editor
+# render_pipeline plugin — Profile Graph Editor
 
-## 概要
+`tools/ergo` 統合開発者ツールの組み込みプラグイン。 Pictor の **パイプラインプロファイル** (`Pictor/profiles/*.profile.json`) を単一の **NodeGraph** で表示・編集する。
 
-Ergo 統合開発者ツールの組み込みプラグイン。 **3 つのモード**を持つ:
+Phase 3 (`feat/render-pipeline-graph-ui`) で旧 Scanner / Timeline / Profile Editor の 3 モードを廃止して **単一のグラフエディタ画面に統合**。 Pictor 系統B 解体 (LUDIARS/Pictor PR #60 系列) で「ハードコードされた描画パス」 が消えるため、 静的 scan は不要になり、 Profile が single source of truth になった。
 
-| モード | 何 | 種別 |
-|--------|----|------|
-| **Scanner** (現状ビュー) | Pictor のハードコードされた Vulkan 実装 (系統B) を静的スキャンした render pass **DAG** / pipeline / shader / attachment | **読み取り専用** |
-| **Timeline** (実行順ビュー) | Scanner と同じ snapshot の `passes[]` を **実行順のガントチャート**で表示 | **読み取り専用** |
-| **Profile Editor** (編集ビュー) | `Pictor/profiles/*.profile.json` (系統A の `PipelineProfileDef`) の編集 | **読み書き + ディスク永続化** |
-
-Scanner と Timeline は同じ scanner snapshot (`render_pipeline.json`) を読む
-別表現で、 前者は依存グラフ (DAG)、 後者は実行順タイムライン。 Profile Editor は
-「Pictor にどう描かせたいか」という別物であり、 **API 名前空間も対象ファイルも
-完全に分離**している。 UI はヘッダのモード切替ボタンで 3 つの `<main>` を
-排他表示する (Scanner = 青 / Timeline = ティール / Editor = 紫 で色分け)。
-
-> 系統A / 系統B の区別は Pictor 側正本 `Pictor/spec/pipeline-profile-config.md` §1 を参照。
-> `PipelineProfileDef` (系統A) は宣言的プロファイルデータ、 実 `VkRenderPass` チェーン
-> (系統B) はハードコード。 Editor は系統A を編集し、 Scanner は系統B を可視化する。
+> 設計詳細: `spec/tool/render_pipeline_system_b.md`。 Pictor 側の正本スキーマ: `Pictor/spec/pipeline-profile-config.md` と `Pictor/spec/pipeline-system-b-config.md` (Phase 3 = schema v2)。
 
 ---
 
-## モード A: Scanner (現状ビュー・読み取り専用)
+## UI 概要
 
-データ源はハイブリッド構成:
-
-- **静的 scan**: `scanner/render_pipeline_scan.py` (Python) が Pictor の
-  ソースを走査し、 pipeline 生成箇所から blend/cull/depth/topology +
-  使用シェーダを抜き出して JSON 化。 同時に Pictor/ergo の全シェーダを
-  source 込みで snapshot に embed
-- **render pass DAG**: pass 同士の依存関係は scanner では追えないので、
-  `scanner/render_pipeline_scan.py` 内に Pictor の設計を人手宣言。
-  attachments の produces/consumes を辿ると DAG が自動で組まれる
-- **将来 (Phase 2)**: 実行時 GPU timestamp を Pictor が WS で
-  `{op:"timing", pass:..., us:...}` として publish → 各ノードに重ねる
-
-### 表示要素
-
-- **Pass DAG** — vis.js Network。 ノードは pass、 エッジは attachment 引き渡し。
-  ノードクリックで詳細 (consumes / produces / draws / description)
-- **Pipelines タブ** — scanner が抜き出した pipeline 一覧表 (blend / cull /
-  depth / topology / shaders)、 filter 付き
-- **Shaders タブ** — シェーダ一覧 + 選択シェーダの source (highlight.js GLSL)
-  と layout 抜粋
-- **Attachments タブ** — attachment の format / usage / owner / 用途
-
-このモードは「Pictor の現コードが実際どう描いているか」を映すだけで、
-**一切編集できない**。 `↻ Rescan` ボタンで scanner を再実行できる。
-
----
-
-## モード T: Timeline (実行順ビュー・読み取り専用)
-
-Scanner と同じ snapshot を**実行順のガントチャート**で描く 3 つ目のモード。
-DAG が「依存の形」を見せるのに対し、 Timeline は「pass がどの順で・どこが
-並列で流れるか」を時系列バーで見せる。 編集は一切できず、 snapshot 取得 /
-Rescan は Scanner モードと共有する (Timeline に切り替えた時に未取得なら自動取得)。
-
-### モデルの組み立て方
-
-UI 側 (`app.js` の `buildTimelineModel()`) が snapshot から純粋計算で組む:
-
-- **実行順 (X 軸)** — `passes[]` の配列順が実行順。 さらに各 pass を
-  **topological level** に割る。 `level(p) = max(level(各 consume 先 attachment
-  の producer)) + 1`。 `renderDag()` が暗黙に使う level 計算を明示化したもので、
-  依存の無い pass は同じ level に並ぶ。 1 level = 横 `TL_LEVEL_W` px。
-- **pass バー** — pass 1 本につき 1 バー。 幅は既定で均等。 「draws で重み付け」
-  トグルで `draws[]` 本数に比例 (0.5〜2.0× にクランプ)。
-- **レーン分け** — 配列順に走査し、 X 区間が既存レーンと重ならない最初の
-  レーンに pass を置く。 並列 pass (依存が無く同 level の pass) は別レーンに
-  落ちて視覚的に衝突しない。 現 snapshot は直列 4 pass なので 1 レーンだが、
-  将来 snapshot が独立 pass を持てば自動でレーンが増える。
-- **sub-pass ネスト** — `kind == "graphics_chain"` の pass (postprocess 等) は
-  内部の `draws[]` 各要素を pass バー内に小バーとしてネスト表示する
-  (Bloom Extract / Blur / ColorGrade / ToneMap など)。 `graphics` kind の
-  pass はネストせず draws 本数のみ表示。
-- **attachment ライフタイム** — 各 attachment について
-  produce する pass の level 〜 最後に consume する pass の level の区間を
-  斜縞バーで併記 (下段の専用バンド)。 「attachment ライフタイム」トグルで
-  ON/OFF。 ライフタイムバーもレーンパックして横方向に重ねない。
-
-### 表示要素
-
-- **Pass Timeline** — 自前 SVG/div ベースのガントチャート (横スクロール)。
-  上端に level 目盛 (`lv 0`, `lv 1` …)、 pass バーをレーンに配置、 下段に
-  attachment ライフタイムバンド。 pass バークリックで右ペインに詳細
-  (id / kind / consumes / produces / draws / GPU 実測 / description)
-- **凡例** — pass バー / graphics_chain / sub-pass / attachment ライフタイム /
-  実測 GPU 時間 (Phase 2) の色見本
-- **ツールバー** — 「draws で重み付け」「attachment ライフタイム」トグル +
-  timing 状態表示 (`timing: 静的` / `timing: 実測 (frame N)`)
-
-ガント描画は外部ライブラリ (vis-timeline 等) を使わず、 絶対配置の `div`
-バーで自前実装している (level→px の単純な線形変換だけで足り、 依存追加を
-避けるため)。 vis.js は Scanner の DAG だけが使う。
-
----
-
-## モード B: Profile Editor (編集ビュー・読み書き)
-
-`Pictor/profiles/*.profile.json` を読み書きする宣言的プロファイルエディタ。
-正本スキーマは `Pictor/spec/pipeline-profile-config.md` (schema v1)。
-保存すると即ディスクへ書き込まれる — このファイル群が Pictor 側で
-`register_presets_from_dir()` に読まれる正本。
-
-### プロファイルディレクトリの解決
-
-`profile_store.ts` の `resolveProfileDir()` が以下の順で決定する:
-
-1. 環境変数 `ERGO_PICTOR_PROFILE_DIR` (絶対 / `cwd` 相対)
-2. `<cwd>/../../../Pictor/profiles` (ergo と Pictor が sibling の標準配置。
-   `cwd` は `tools/ergo` なので `E:/Document/Ars/Pictor/profiles` に解決)
-3. `<cwd>/profiles` (最終フォールバック)
-
-### 編集対象
-
-| セクション | UI | 対応スキーマ |
-|-----------|----|--------------|
-| プロファイル基本 | スカラフィールド | §3.1 (`profile_name` / `rendering_path` / `max_lights` / `msaa_samples` / `gpu_driven_enabled` / `compute_update_enabled`) |
-| Render Passes | pass カード列 (追加 / 削除 / ▲▼並べ替え) | §3.2 `RenderPassDef[]` 全フィールド |
-| Post Process Stack | effect カード列 (追加 / 削除 / 並べ替え) + kind 別パラメータ編集 | §3.3 / §3.4 `PostProcessDef[]` (typed) |
-| Shadow | フィールドグリッド | §3.5 `ShadowConfig` |
-| GI / Lighting | フィールドグリッド + 3 サブグループ | §3.6 `GIConfig` / `ShadowMapConfig` / `SSAOConfig` / `GIProbeConfig` |
-| Memory | フィールドグリッド + gpu サブグループ | §3.7 `MemoryConfig` / `GpuMemoryAllocator::Config` |
-| GPU Driven | フィールドグリッド | §3.8 `GPUDrivenConfig` |
-| Update | フィールドグリッド | §3.9 `UpdateConfig` |
-| Profiler | フィールドグリッド | §3.10 `ProfilerConfig` |
-
-最下部に「保存される JSON プレビュー」を常時表示。
-
-### Post-process の typed パラメータ (方針2 phase 1)
-
-`PostProcessDef` は `kind` (種別タグ) + エフェクトごとのパラメータ構造体を
-持つ (Pictor `pipeline-profile-config.md` §3.4)。Editor は各 effect カードに
-`kind` セレクタを置き、選択中の kind に対応する typed なパラメータグリッド
-(Bloom / ToneMapping / Vignette / ColorGrading / DepthOfField) を表示する。
-`name` 入力からは `kind` を自動推論 (`Bloom` / `Tonemapping` / `LUT` 等)。
-`kind` 別パラメータは Pictor の `build_post_process_config()` ブリッジ経由で
-実 `PostProcessPipeline` に届く。`SSAO` / `TAA` / `FXAA` / `VolumetricFog`
-等は `kind=Unknown` に解決され、パラメータブロックを持たない (host-driven な
-`PostProcessPipeline` に実装が無く、ブリッジが無視する = 系統B phase 2)。
-保存時は `serializePostProcess()` が `kind` に一致するブロックのみ書き出す。
-
-### 編集フロー
-
-1. 左ペインの一覧から `*.profile.json` を選択 → フォームにロード
-2. 各フィールドを編集 (変更で「未保存」フラグ + 保存ボタン有効化)
-3. `💾 保存` → `POST /api/profile` でディスクへ書き込み
-4. `＋` で新規プロファイル作成 (`profile_name` から
-   `<lowercased-name>.profile.json` のファイル名が保存時に導出される)
-
-別クライアントが保存すると WS で `{op:"profiles-changed"}` がブロードキャスト
-され、 未保存の編集が無いクライアントは一覧を静かに再読込する。
-
----
-
-## 場所
-
-- 実装: `tools/ergo/src/plugins/render_pipeline/`
-  - `index.ts` — Hono routes (Scanner API + Profile API) + WS
-  - `profile_schema.ts` — `PipelineProfileDef` の TS スキーマ + normalize / serialize
-  - `profile_store.ts` — `*.profile.json` のディスク I/O (list / load / save)
-  - `ui/index.html` — 3 モード (Scanner + Timeline + Editor) の UI
-  - `ui/styles.css`
-  - `ui/app.js` — vis.js Network (Scanner) + 自前ガント (Timeline) +
-    プロファイルフォーム (Editor)
-- Scanner: `tools/ergo/scanner/render_pipeline_scan.py`
-- Snapshot: `tools/ergo/scanner/render_pipeline.json` (生成物、 commit する)
-- 登録: `tools/ergo/src/core/registry.ts` の `PLUGIN_FACTORIES`
-
-## URL
-
-| URL | モード | 役割 |
-|-----|--------|------|
-| `…/render_pipeline/` | — | UI (Scanner がデフォルト、 Timeline / Editor へ切替可) |
-| `…/render_pipeline/api/snapshot` | A | scanner スナップショット JSON |
-| `…/render_pipeline/api/health` | A+B | snapshot 統計 + プロファイルディレクトリ情報 |
-| `…/render_pipeline/api/rescan` | A | scanner を子プロセス起動 |
-| `…/render_pipeline/api/profiles` | B | `*.profile.json` の一覧 + ディレクトリ |
-| `…/render_pipeline/api/profile/:file` | B | 1 プロファイル読み込み (normalize 済) |
-| `…/render_pipeline/api/profile` (POST) | B | プロファイルをディスクへ保存 |
-| `ws://…/render_pipeline/ws` | A+B | 保存通知 `{op:"profiles-changed"}` + Phase 2 timing relay |
-
-`POST /api/profile` のボディ: `{ profile, file? }`。 `file` 省略時は
-`profile_name` から `<lowercased-name>.profile.json` を導出する。
-
-## 使い方
-
-```sh
-# Scanner: Pictor / ergo の現状を JSON 化
-cd tools/ergo/scanner
-python render_pipeline_scan.py
-
-# ツール起動
-cd ../
-npm run dev
-# → http://localhost:5170/render_pipeline/
-
-# 起動後ヘッダで Scanner / Profile Editor を切り替え
-# Profile Editor は Pictor/profiles/*.profile.json を直接編集 + 保存
+```
+[Profile 選択 ▼] [保存] [再読込] ●  [✓ GPU timing]
+┌───────────────┬─────────────────────────────────┬───────────────┐
+│ Attachments   │  GraphView (vis-network)         │ Inspector     │
+│               │                                  │               │
+│ + attachment  │   ┌────┐   ┌────┐                │ pass_name     │
+│ scene_hdr…    │   │ P1 │──►│ P2 │                │ pass_type ▼   │
+│ scene_depth   │   └────┘   └────┘                │ render_targets│
+│ swapchain     │                                  │ input_textures│
+│               │                                  │ attachment_ops│
+└───────────────┴─────────────────────────────────┴───────────────┘
 ```
 
-プロファイルディレクトリを明示する場合:
+- **左 (AttachmentPanel)**: `attachments[]` のリスト。 + ボタンで追加、 × で削除 (参照していた pass の `render_targets` / `input_textures` から自動除去)。 kind (COLOR / DEPTH / SWAPCHAIN_COLOR) を色帯で表示。
+- **中央 (GraphView)**: 各ノード = 1 つの `RenderPass`、エッジ = "B の `input_textures` が A の `render_targets` を参照している" 関係。 vis-network の `physics:false / smooth:false` でアニメは無効、 `hierarchical` (LR) を既定。 ノードはドラッグで再配置可能 (永続化なし)。
+- **右 (InspectorPanel)**: 選択中の pass の全フィールド (pass_name / pass_type / sort_mode / filter_mask / shader_override) + `render_targets` / `input_textures` のドロップダウン編集 + `attachment_ops` グリッド (load / store / initial_layout / final_layout)。 「Auto-fill from targets」 ボタンで Pictor 側既定推論 (color=CLEAR/STORE/SHADER_READ_ONLY、 depth=CLEAR/DONT_CARE/DSV、 swapchain=CLEAR/STORE/PRESENT_SRC_KHR) を 1 クリック適用。
 
-```sh
-ERGO_PICTOR_PROFILE_DIR=/path/to/profiles npm run dev
+## 操作
+
+| 操作 | 効果 |
+|------|------|
+| ヘッダの **+ Pass** | 新規 RenderPass を追加 (pass_type=OPAQUE 既定) |
+| ノードを選択 | InspectorPanel に pass プロパティを開く |
+| ノードを右クリック → addEdge (ダブルクリック→edit edge mode) | 出力ノード → 入力ノードへエッジを描き、 producer の最初の `render_targets[0]` を consumer の `input_textures[]` に追加 |
+| InspectorPanel の `× pass を削除` | pass を消す (他の pass の参照は手動で掃除) |
+| AttachmentPanel の × | attachment を消す + 全 pass の `render_targets` / `input_textures` / `attachment_ops` から該当名を除去 |
+| Ctrl+S | 保存 (POST /api/profile)。 ファイル名は `<lowercased-profile_name>.profile.json` の規約で再導出 |
+
+## エンドポイント
+
+```
+GET  /render_pipeline/api/profiles              → list *.profile.json
+GET  /render_pipeline/api/profile/:file         → 1 profile (normalized to schema v2)
+POST /render_pipeline/api/profile               → save (body: {profile, file?})
+GET  /render_pipeline/api/health                → status
+WS   /render_pipeline/ws                        → 双方向 (下記)
 ```
 
-## スキーマ同期
+WS 経路:
+- サーバ → 全 UI クライアント: `{op:"profiles-changed", file}` (別クライアントの保存通知)
+- クライアント (KS) → サーバ → 全 UI: `{op:"timing", frame, passes:[{id, us}]}` の relay (Phase 2 §6.1 GPU timestamp)
 
-`profile_schema.ts` と `ui/app.js` の `ENUMS` / `blankProfile()` は
-`Pictor/spec/pipeline-profile-config.md` (schema v1) と
-`Pictor/profiles/*.profile.json` のミラー。 Pictor 側スキーマが変わったら
-3 箇所 (`profile_schema.ts` / `app.js` / 本ドキュメント) を同時に更新する。
+## timing オーバーレイ
 
-normalize / serialize は C++ シリアライザの前方互換挙動 (§2 / §6) を踏襲:
-未知キーは破棄、 欠落キーは既定値、 未知 enum 文字列は既定値フォールバック。
-値域検証はしない (C++ 側と同じく `msaa_samples: 3` 等も格納される)。
+WS で `{op:"timing"}` を受けると `state.timing[pass_id] = us` に格納し、 GraphView のノード背景色を「最遅 pass を 100% とした相対比」 で warm-shift する。 ノード位置はアニメせず、 色だけが変わる。 上部の `GPU timing オーバーレイ` チェックボックスでオン/オフ。 pass id は Pictor 側の `pass_name` (= scanner の旧 PASS_DAG 名前) にそのまま一致させる。
 
-## Phase 2 (実行時 GPU timing) — 実装済み (2026-05-22, `feat/gpu-timestamp`)
+## ファイルマップ
 
-Pictor 側に `VkQueryPool` + timestamp が入り、 各 pass の begin/end で
-`vkCmdWriteTimestamp` を呼ぶ。 1 frame ぶんの timestamp 配列を読み戻して
-`{op:"timing", frame:N, passes:[{id, us}]}` を WS で publish する。
+```
+tools/ergo/src/plugins/render_pipeline/
+├── index.ts            # plugin factory (Hono + WS)
+├── profile_schema.ts   # schema v2 (TypeScript mirror of pictor::PipelineProfileDef)
+├── profile_store.ts    # disk-backed list / load / save
+└── ui/
+    ├── index.html      # シェル DOM
+    ├── styles.css      # 3 ペイン + GraphView スタイル
+    └── app.js          # 単一 GraphView 実装
+```
 
-### 実装内訳 (3 リポ横断)
+旧 `scanner/render_pipeline_scan.py` / `scanner/render_pipeline.json` は Phase 3 で撤去。 plugin 側の `/api/snapshot` / `/api/rescan` も撤去。
 
-- **Pictor** — `GpuTimerManager` (`profiler/gpu_timer.{h,cpp}`) を実 Vulkan
-  実装に置換。 `initialize_vulkan()` で `flight_count` 枚の `VkQueryPool`
-  (TIMESTAMP) を生成し `VkPhysicalDeviceLimits::timestampPeriod` を取得。
-  `begin_region/end_region/write_timestamp` に `VkCommandBuffer` 付き
-  オーバーロードを追加し `vkCmdWriteTimestamp` を発行、 `collect_results()`
-  が flight 遅延で `vkGetQueryPoolResults` を非ブロッキング読み出し。
-  既存インタフェースと `flight_count` バッファリング枠は維持、 Vulkan
-  非対応 GPU はシミュレーション経路へフォールバック。
-- **KuzuSurvivors** — `GameRenderer` が `pictor::GpuTimerManager` を所有し
-  (`KuzuRenderContext::gpu_timer`)、 FrameComposer hook で per-pass の
-  計測点を打つ。 `frame_begin` hook → `scene_hdr` 開始、 HUD パス pre-pass
-  hook → `scene_hdr` 終了 + `decal_compose` / `postprocess` を実合成
-  コマンドの前後で計測 + `hud_load` 開始、 `HudLayer::record` 末尾で
-  `hud_load` (route B は `scene_hdr`) 終了。 `TimingRelay`
-  (`diagnostics/timing_relay.{h,cpp}`) が結果を WS で push する
-  (`rive_player_ws_client` を再利用)。
-- **Ergo render_pipeline** — `index.ts` の `onUpgrade` が `{op:"timing"}`
-  を受けたら全 UI クライアントへ `broadcast`。
+## schema v2 (Phase 3)
 
-### UI 側に用意済みだった接続余地
+`PipelineProfileDef` に `attachments: AttachmentDef[]` を追加、 `RenderPassDef` に `attachment_ops: AttachmentOpsDef[]` を追加。 v1 profile (attachments 未宣言) は読み込み時に組み込み既定の 3 件 (`scene_hdr_color` / `scene_depth` / `swapchain`) を補完して開く (Pictor 側 `default_attachments()` と同一テーブル)。 詳細フィールドは `spec/tool/render_pipeline_system_b.md` §3 を参照。
 
-Timeline モードが実測 timestamp の注入先として既に配線済みだった:
+## 既知の制限 (Phase 3 時点)
 
-- `index.ts` の WS `onUpgrade` ハンドラが `{op:"timing"}` を `broadcast`
-  へ relay (上記)
-- `app.js` の WS クライアント (`connectWs()`) は `op:"timing"` を受けると
-  `applyTimingMessage(msg)` を呼ぶ。 `{op:"timing", frame, passes:[{id,us}]}`
-  と単発の `{op:"timing", pass, us}` の両形を受理する
-- `applyTimingMessage` → `injectTiming(passId, micros)` が `TL_TIMING`
-  マップへ格納し、 該当 pass バーに実測時間バー + `1.23 ms` タグを重ねる
-  (`applyTimingToBar`)。 最遅 pass を 100% とした相対幅で描画
-- timing 注入後はツールバーの状態表示が `timing: 実測 (frame N)` に変わり、
-  pass 詳細ペインに `GPU 実測` 行が出る
-
-静的タイムラインと実測オーバレイは同じバー上に共存する設計。 pass id は
-scanner の `PASS_DAG` (`scene_hdr` / `decal_compose` / `postprocess` /
-`hud_load`) にそのまま一致させてある。
-
-## 既知の制限
-
-### Scanner (モード A)
-
-- scanner の C++ 解析は正規表現ベースなので、 関数境界の判定が雑
-- compute pipeline (`vkCreateComputePipelines`) は今は scan していない
-- ergo 側の C++ pipeline (gpu_particle 等) も今は scan 対象外
-- DAG は `scanner.py` の `PASS_DAG` を編集して手動更新する必要がある
-
-### Timeline (モード T)
-
-- バー幅は実測時間ではなく **論理量** (均等 or `draws[]` 本数)。 実時間軸に
-  なるのは Phase 2 で GPU timestamp が入ってから。 X 軸の目盛は実行 level で
-  あって時間ではない
-- topological level は `consumes`/`produces` の attachment 一致だけで判定する。
-  attachment を介さない暗黙の順序依存 (同 attachment への LOAD 順など) は
-  level に反映されない — `PASS_DAG` の配列順は保たれるが level は同値になりうる
-- attachment ライフタイムは level 粒度。 同一 level 内での produce→consume の
-  細かい前後関係は表現しない
-
-### Profile Editor (モード B)
-
-- **系統B 未配線**: `render_targets` / `input_textures` / `shader_override`
-  はファイルに保存されるが Pictor の実 framebuffer / scheduler に届かない
-  (Pictor 側正本 §1.2 / §6)。 UI 上もその旨をフィールドヒントに明記
-- **post-process パラメータは C++ に届く** (方針2 phase 1): §3.4 の typed な
-  `kind` 別パラメータは `build_post_process_config()` ブリッジ経由で実
-  `PostProcessPipeline` に反映される。残るのは任意 pass 挿入 (SSAO/TAA 等の
-  固定 4-pass 解体 = 系統B phase 2)
-- **値域検証なし**: `msaa_samples` のドロップダウンが `0/2/4/8` を提示する程度。
-  無意味値の保存自体は弾かない (C++ シリアライザと同じ方針)
-- 並行編集の競合解決はしない。 別クライアントの保存通知で未保存でない側を
-  静かに再読込するのみ (last-write-wins)
+- multiple subpass (1 VkRenderPass 内の複数 subpass) は schema v2 で未対応 (Phase 4)
+- subpass dependency の明示は UI で編集できず、 Pictor 側が `attachment_ops` の `final_layout` ↔ 次 pass の `initial_layout` から自動生成する
+- attachment usage ビットの組み合わせ検証なし (SAMPLED 無しでも他 pass が input として参照可能 — 実行時 validation 任せ)
+- ノードの自動レイアウトは hierarchical (LR) のみ。 ドラッグで動かした位置は永続化しない (Phase 4)
+- 並行編集の競合解決は last-write-wins。 別クライアントの保存通知で未保存差分なし時は静かに再読込
