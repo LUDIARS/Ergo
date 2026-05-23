@@ -315,6 +315,20 @@ function buildGraph() {
         }
     }
 
+    // Phase 4 editor: profile._editor.nodePositions から位置を復元。
+    //   1 つでも node に保存位置があれば hierarchical を切り、 全 node を free
+    //   placement で表示する (vis-network 仕様)。 保存位置の無い node は自動
+    //   配置に任せる (vis が空 x/y を自動で動かす)。
+    const savedPositions = (state.profile._editor && state.profile._editor.nodePositions) || {};
+    const hasAnyPositions = Object.keys(savedPositions).some((n) =>
+        passes.some((p) => p.pass_name === n));
+    if (hasAnyPositions) {
+        for (const n of nodes) {
+            const pos = savedPositions[n.id];
+            if (pos) { n.x = pos.x; n.y = pos.y; n.fixed = false; }
+        }
+    }
+
     if (!network) {
         nodesDS = new vis.DataSet(nodes);
         edgesDS = new vis.DataSet(edges);
@@ -322,15 +336,17 @@ function buildGraph() {
             physics:  { enabled: false },
             edges:    { smooth: false },
             nodes:    { borderWidth: 1 },
-            layout:   {
-                hierarchical: {
-                    enabled: true,
-                    direction: "LR",
-                    sortMethod: "directed",
-                    nodeSpacing: 150,
-                    levelSeparation: 220,
+            layout:   hasAnyPositions
+                ? { hierarchical: { enabled: false } }
+                : {
+                    hierarchical: {
+                        enabled: true,
+                        direction: "LR",
+                        sortMethod: "directed",
+                        nodeSpacing: 150,
+                        levelSeparation: 220,
+                    },
                 },
-            },
             interaction: {
                 dragNodes:  true,
                 dragView:   true,
@@ -356,6 +372,19 @@ function buildGraph() {
         });
         network.on("doubleClick", (params) => {
             if (params.nodes.length) network.editEdgeMode();
+        });
+        // Drag 完了で位置を profile._editor.nodePositions に保存。 setDirty
+        // して通常の保存フロー (Ctrl+S / 保存ボタン) で disk へ。
+        network.on("dragEnd", (params) => {
+            if (!params.nodes || !params.nodes.length) return;
+            const pos = network.getPositions(params.nodes);
+            if (!state.profile._editor) state.profile._editor = {};
+            if (!state.profile._editor.nodePositions) state.profile._editor.nodePositions = {};
+            for (const id of params.nodes) {
+                const p = pos[id];
+                if (p) state.profile._editor.nodePositions[id] = { x: p.x, y: p.y };
+            }
+            setDirty();
         });
     } else {
         nodesDS.clear();
