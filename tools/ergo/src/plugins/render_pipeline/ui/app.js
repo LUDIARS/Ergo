@@ -1,1533 +1,729 @@
-// Render Pipeline — three modes:
+// Render Pipeline — single NodeGraph editor (Phase 3).
 //
-//   Scanner (現状ビュー, read-only)   — how Pictor's hard-coded Vulkan code
-//                                       actually renders today (系統B), as a
-//                                       vis.js DAG.
-//   Timeline (実行順ビュー, read-only)— the same scanner passes laid out as a
-//                                       static execution-order Gantt chart.
-//   Profile Editor (編集ビュー, R/W)  — *.profile.json files = how you want
-//                                       Pictor to render (系統A).
+// `spec/tool/render_pipeline_system_b.md`。 旧 3 モード (Scanner / Timeline /
+// Profile Editor) を廃止し、 *.profile.json を唯一の真理として単一の
+// vis-network グラフで表示・編集する。
 //
-// Scanner & Timeline both read the same scanner snapshot (`SNAPSHOT`); the
-// editor is fully separate (own API namespace, own on-disk artifacts). The
-// header mode-switch toggles which <main> is visible.
+//   nodes  = render_passes[]                  (1 pass = 1 node)
+//   edges  = attachment-mediated dependencies (A.render_targets ∩ B.input_textures)
+//   left   = AttachmentPanel (attachments[] 編集)
+//   right  = InspectorPanel  (選択 pass のフィールド編集)
+//   overlay= Phase 2 §6.1 GPU timing を node 着色 + ラベル
+//
+// vis-network は physics:false / smooth:false でアニメ無効。 hierarchical
+// レイアウト (LR) を既定とし、 ノードはドラッグで再配置可能 (永続化なし)。
+
+(() => {
+"use strict";
+
+// --------------------------------------------------------------------------
+// State
+// --------------------------------------------------------------------------
+
+const state = {
+    profiles:    [],          // [{file, profile_name, ...}]
+    file:        null,        // currently loaded file
+    profile:     null,        // PipelineProfileDef
+    dirty:       false,
+    timing:      Object.create(null), // pass_name -> microseconds (latest frame)
+    timingFrame: -1,
+    timingEnabled: true,
+    selectedPass: null,       // pass_name
+    selectedAttachment: null, // name
+    ws:          null,
+};
 
 const $ = (id) => document.getElementById(id);
-const statusEl = $("status");
 
-// ════════════════════════════════════════════════════════════════════
-//  Mode switch
-// ════════════════════════════════════════════════════════════════════
-const viewScanner  = $("view_scanner");
-const viewTimeline = $("view_timeline");
-const viewEditor   = $("view_editor");
-const btnModeScanner  = $("mode_scanner");
-const btnModeTimeline = $("mode_timeline");
-const btnModeEditor   = $("mode_editor");
+// --------------------------------------------------------------------------
+// API
+// --------------------------------------------------------------------------
 
-let scannerLoaded  = false;   // scanner snapshot fetched at least once
-let editorLoaded   = false;
-let timelineDrawn  = false;   // timeline rendered for the current SNAPSHOT
-
-function setMode(mode) {
-    const views = { scanner: viewScanner, timeline: viewTimeline, editor: viewEditor };
-    const btns  = { scanner: btnModeScanner, timeline: btnModeTimeline, editor: btnModeEditor };
-    for (const k of Object.keys(views)) {
-        views[k].style.display = k === mode ? "" : "none";
-        btns[k].classList.toggle("active", k === mode);
+async function api(path, opts) {
+    const r = await fetch(`/render_pipeline/api${path}`, opts || {});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) {
+        throw new Error(j.err || `HTTP ${r.status}`);
     }
-    if (mode === "editor") {
-        if (!editorLoaded) { editorLoaded = true; loadProfileList(); }
-        else updateStatusEditor();
-        return;
-    }
-    if (mode === "timeline") {
-        // Timeline shares the scanner snapshot. Fetch it once if needed,
-        // then (re)draw the Gantt chart for whatever SNAPSHOT we hold.
-        if (!scannerLoaded) { scannerLoaded = true; loadScanner(); }
-        else { ensureTimeline(); updateStatusTimeline(); }
-        return;
-    }
-    // scanner
-    if (!scannerLoaded) { scannerLoaded = true; loadScanner(); }
-    else updateStatusScanner();
+    return j;
 }
-btnModeScanner.addEventListener("click",  () => setMode("scanner"));
-btnModeTimeline.addEventListener("click", () => setMode("timeline"));
-btnModeEditor.addEventListener("click",   () => setMode("editor"));
 
-// ════════════════════════════════════════════════════════════════════
-//  MODE A — Scanner view (read-only). Logic preserved from Phase 1.
-// ════════════════════════════════════════════════════════════════════
-const btnRescan   = $("btn_rescan");
-const dagMeta     = $("dag_meta");
-const dagEl       = $("dag");
-const detailTitle = $("detail_title");
-const detailBody  = $("detail_body");
+async function reloadProfileList() {
+    const r = await api("/profiles");
+    state.profiles = r.profiles || [];
+    renderProfileSelect();
+}
 
-document.querySelectorAll(".tabs button").forEach((b) => {
-    b.addEventListener("click", () => {
-        document.querySelectorAll(".tabs button").forEach((x) => x.classList.remove("active"));
-        b.classList.add("active");
-        document.querySelectorAll(".tab-body").forEach((t) => t.style.display = "none");
-        const tab = $(`tab_${b.dataset.tab}`);
-        if (tab) tab.style.display = "";
+async function loadProfile(file) {
+    const r = await api(`/profile/${encodeURIComponent(file)}`);
+    state.file    = r.file;
+    state.profile = r.profile;
+    state.dirty   = false;
+    state.selectedPass = null;
+    state.selectedAttachment = null;
+    syncDirty();
+    renderAll();
+    setStatus(`loaded ${r.file}`, "ok");
+}
+
+async function saveProfile() {
+    if (!state.profile) return;
+    try {
+        const r = await api("/profile", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ profile: state.profile, file: state.file }),
+        });
+        state.dirty = false;
+        state.file  = r.file;
+        syncDirty();
+        await reloadProfileList();
+        setStatus(`saved ${r.file}`, "ok");
+    } catch (e) {
+        setStatus(`save failed: ${e.message}`, "err");
+    }
+}
+
+// --------------------------------------------------------------------------
+// Status helpers
+// --------------------------------------------------------------------------
+
+function setStatus(text, level) {
+    const el = $("status-msg");
+    el.textContent = text;
+    el.className = "status-msg" + (level ? " " + level : "");
+    if (text && level === "ok") {
+        setTimeout(() => {
+            if (el.textContent === text) { el.textContent = ""; el.className = "status-msg"; }
+        }, 3500);
+    }
+}
+
+function setWs(text, level) {
+    const el = $("ws-status");
+    el.textContent = text;
+    el.className = "ws-status" + (level ? " " + level : "");
+}
+
+function setDirty() {
+    if (!state.dirty) {
+        state.dirty = true;
+        syncDirty();
+    }
+}
+
+function syncDirty() {
+    $("dirty-indicator").classList.toggle("hidden", !state.dirty);
+    $("save-btn").disabled = !state.dirty;
+}
+
+// --------------------------------------------------------------------------
+// Profile <select>
+// --------------------------------------------------------------------------
+
+function renderProfileSelect() {
+    const sel = $("profile-select");
+    sel.innerHTML = "";
+    if (!state.profiles.length) {
+        const o = document.createElement("option");
+        o.value = "";
+        o.textContent = "(no profiles)";
+        sel.appendChild(o);
+        sel.disabled = true;
+        return;
+    }
+    sel.disabled = false;
+    for (const p of state.profiles) {
+        const o = document.createElement("option");
+        o.value = p.file;
+        o.textContent = `${p.profile_name} (${p.file})`;
+        if (p.file === state.file) o.selected = true;
+        sel.appendChild(o);
+    }
+}
+
+$("profile-select").addEventListener("change", async (e) => {
+    if (state.dirty && !confirm("未保存の変更があります。 破棄しますか?")) {
+        $("profile-select").value = state.file;
+        return;
+    }
+    await loadProfile(e.target.value);
+});
+
+$("save-btn").addEventListener("click", saveProfile);
+$("reload-btn").addEventListener("click", async () => {
+    if (state.dirty && !confirm("未保存の変更があります。 破棄しますか?")) return;
+    if (state.file) await loadProfile(state.file);
+});
+
+document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        saveProfile();
+    }
+});
+
+// --------------------------------------------------------------------------
+// AttachmentPanel
+// --------------------------------------------------------------------------
+
+const ATTACHMENT_KINDS  = ["COLOR", "DEPTH", "SWAPCHAIN_COLOR"];
+const ATTACHMENT_FORMATS = [
+    "R16G16B16A16_SFLOAT", "R32G32B32A32_SFLOAT", "R11G11B10_UFLOAT",
+    "R8G8B8A8_UNORM", "R8G8B8A8_SRGB", "B8G8R8A8_UNORM", "B8G8R8A8_SRGB",
+    "D16_UNORM", "D24_UNORM_S8_UINT", "D32_SFLOAT", "D32_SFLOAT_S8_UINT",
+];
+
+function renderAttachmentPanel() {
+    const list = $("attachment-list");
+    list.innerHTML = "";
+    if (!state.profile) return;
+    for (let i = 0; i < state.profile.attachments.length; ++i) {
+        const a = state.profile.attachments[i];
+        const li = document.createElement("li");
+        li.className = `attachment-item kind-${a.kind}`;
+        li.innerHTML = `
+          <span class="name" title="${escapeAttr(a.format)}">${escapeText(a.name)}</span>
+          <span class="badge">${a.kind === "SWAPCHAIN_COLOR" ? "swap" : a.kind.toLowerCase()}</span>
+          <button class="delete-btn" title="削除" data-i="${i}">×</button>
+        `;
+        li.querySelector(".delete-btn").addEventListener("click", () => removeAttachment(i));
+        list.appendChild(li);
+    }
+}
+
+function removeAttachment(i) {
+    const a = state.profile.attachments[i];
+    if (!a) return;
+    if (!confirm(`attachment "${a.name}" を削除しますか?\n参照している pass の render_targets / input_textures からも除去されます。`)) return;
+    const name = a.name;
+    state.profile.attachments.splice(i, 1);
+    // Strip references in render_passes.
+    for (const rp of state.profile.render_passes) {
+        rp.render_targets = rp.render_targets.filter((n) => n !== name);
+        rp.input_textures = rp.input_textures.filter((n) => n !== name);
+        rp.attachment_ops = (rp.attachment_ops || []).filter((o) => o.attachment !== name);
+    }
+    setDirty();
+    renderAll();
+}
+
+$("att-add-btn").addEventListener("click", () => {
+    if (!state.profile) return;
+    let name = "new_attachment";
+    let n = 1;
+    while (state.profile.attachments.some((a) => a.name === name)) {
+        n++;
+        name = `new_attachment_${n}`;
+    }
+    state.profile.attachments.push({
+        name,
+        kind:   "COLOR",
+        format: "R16G16B16A16_SFLOAT",
+        sizing: "SWAPCHAIN_RELATIVE",
+        scale:  1.0,
+        usage:  ["COLOR_ATTACHMENT", "SAMPLED"],
+        clear_color: [0, 0, 0, 1],
     });
+    setDirty();
+    renderAll();
 });
 
-let SNAPSHOT = null;
-let DAG_NETWORK = null;
+// --------------------------------------------------------------------------
+// GraphView (vis-network)
+// --------------------------------------------------------------------------
 
-function updateStatusScanner() {
-    if (!SNAPSHOT) { statusEl.textContent = "scanner: snapshot 未取得"; return; }
-    statusEl.textContent =
-        `scanner · passes=${SNAPSHOT.passes.length} pipelines=${SNAPSHOT.pipelines.length} ` +
-        `shaders=${SNAPSHOT.shaders.length} attachments=${SNAPSHOT.attachments.length} ` +
-        `· scanned ${SNAPSHOT.scanned_at}`;
+let network = null;
+let nodesDS = null;
+let edgesDS = null;
+
+function passNodeColor(pass, latestUs, maxUs) {
+    // Base color by pass_type, modulated by timing (red shift if slow).
+    const base = {
+        OPAQUE:       "#1c2a40",
+        TRANSPARENT:  "#1c4040",
+        DEPTH_ONLY:   "#2a1c40",
+        SHADOW:       "#402a1c",
+        POST_PROCESS: "#40341c",
+        COMPUTE:      "#3a1c40",
+        CUSTOM:       "#1c4030",
+    }[pass.pass_type] || "#202833";
+
+    if (!state.timingEnabled || !maxUs || latestUs == null) return { background: base, border: "#465264" };
+    const ratio = Math.min(1, latestUs / Math.max(1, maxUs));
+    // Mix base toward warm color when slow.
+    const r = Math.round(60 + ratio * 195);
+    const g = Math.round(60 + (1 - ratio) * 100);
+    return { background: `rgb(${r},${g},80)`, border: "#9ece6a" };
 }
 
-async function loadScanner() {
-    statusEl.textContent = "fetching snapshot…";
-    try {
-        let r = await fetch("./api/snapshot", { cache: "no-cache" });
-        if (!r.ok) r = await fetch("./snapshot.json", { cache: "no-cache" });
-        if (!r.ok) throw new Error("snapshot 404 — run scanner");
-        SNAPSHOT = await r.json();
-    } catch (e) {
-        statusEl.textContent = "load 失敗: " + e.message;
+function makeNodeLabel(pass) {
+    const us = state.timing[pass.pass_name];
+    const tag = (us != null) ? `\n${(us/1000).toFixed(2)} ms` : "";
+    return `${pass.pass_name}\n[${pass.pass_type}]${tag}`;
+}
+
+function computeMaxTiming() {
+    let max = 0;
+    for (const v of Object.values(state.timing)) if (v > max) max = v;
+    return max;
+}
+
+function buildGraph() {
+    if (!state.profile) {
+        if (network) { network.destroy(); network = null; }
         return;
     }
-    updateStatusScanner();
-    dagMeta.textContent = `Pictor: ${SNAPSHOT.pictor_root} · ergo: ${SNAPSHOT.ergo_root}`;
-    renderDag(SNAPSHOT);
-    renderPipelineTable(SNAPSHOT);
-    renderShaders(SNAPSHOT);
-    renderAttachments(SNAPSHOT);
-    timelineDrawn = false;          // new snapshot — timeline must redraw
-    // If the user is already on the Timeline tab, draw it right away.
-    if (btnModeTimeline.classList.contains("active")) ensureTimeline();
-}
+    const passes = state.profile.render_passes;
+    const maxUs = computeMaxTiming();
 
-btnRescan.addEventListener("click", async () => {
-    statusEl.textContent = "rescanning…";
-    try {
-        const r = await fetch("./api/rescan", { method: "POST" });
-        const data = await r.json();
-        if (data && data.snapshot) {
-            SNAPSHOT = data.snapshot;
-            renderDag(SNAPSHOT);
-            renderPipelineTable(SNAPSHOT);
-            renderShaders(SNAPSHOT);
-            renderAttachments(SNAPSHOT);
-            timelineDrawn = false;
-            if (btnModeTimeline.classList.contains("active")) ensureTimeline();
-        }
-        statusEl.textContent = data.ok ? `rescan 完了 (${data.stdout?.trim() ?? ""})` : `rescan 失敗: ${data.err ?? ""}`;
-    } catch (e) {
-        statusEl.textContent = "rescan 失敗: " + e.message;
-    }
-});
-
-function renderDag(snap) {
-    const nodes = [];
-    const edges = [];
-    const passById = {};
-    snap.passes.forEach((p) => { passById[p.id] = p; });
-
-    snap.passes.forEach((p, i) => {
-        nodes.push({
-            id: `pass:${p.id}`,
-            label: p.label,
+    const nodes = passes.map((pass) => {
+        const col = passNodeColor(pass, state.timing[pass.pass_name], maxUs);
+        return {
+            id:    pass.pass_name,
+            label: makeNodeLabel(pass),
             shape: "box",
-            color: { background: "#1c2530", border: "#5aa9ff", highlight: { background: "#243240", border: "#7fbfff" } },
-            font: { color: "#e6e8eb", face: "ui-monospace, Consolas" },
-            margin: 10,
-            level: i,
-        });
+            color: { background: col.background, border: col.border, highlight: { background: col.background, border: "#7aa2f7" } },
+            font:  { color: "#e6edf3", size: 12, multi: false, face: "monospace" },
+            margin: 8,
+            shapeProperties: { borderRadius: 4 },
+        };
     });
 
-    snap.passes.forEach((p) => {
-        (p.consumes || []).forEach((att) => {
-            const producers = snap.passes.filter((q) => (q.produces || []).includes(att));
-            producers.forEach((src) => {
-                edges.push({
-                    from: `pass:${src.id}`,
-                    to:   `pass:${p.id}`,
-                    label: att,
-                    font: { color: "#9aa3ad", size: 10, face: "ui-monospace" },
-                    color: { color: "#4a5160", highlight: "#5aa9ff" },
-                    arrows: "to",
-                });
+    // Edges: producer -> consumer per shared attachment name.
+    const edges = [];
+    let eid = 0;
+    for (const consumer of passes) {
+        for (const inAtt of consumer.input_textures) {
+            const producer = passes.find((p) => p.render_targets.includes(inAtt));
+            if (!producer || producer.pass_name === consumer.pass_name) continue;
+            // Color by attachment kind.
+            const att = (state.profile.attachments || []).find((a) => a.name === inAtt);
+            const stroke = att && att.kind === "DEPTH"           ? "#bb9af7"
+                         : att && att.kind === "SWAPCHAIN_COLOR" ? "#9ece6a"
+                         : "#7aa2f7";
+            edges.push({
+                id:    `e${++eid}`,
+                from:  producer.pass_name,
+                to:    consumer.pass_name,
+                label: inAtt,
+                font:  { color: "#99a3ad", size: 10, strokeWidth: 0, align: "horizontal" },
+                color: { color: stroke, highlight: "#e0af68" },
+                arrows: "to",
+                smooth: false,
             });
+        }
+    }
+
+    if (!network) {
+        nodesDS = new vis.DataSet(nodes);
+        edgesDS = new vis.DataSet(edges);
+        network = new vis.Network($("graph"), { nodes: nodesDS, edges: edgesDS }, {
+            physics:  { enabled: false },
+            edges:    { smooth: false },
+            nodes:    { borderWidth: 1 },
+            layout:   {
+                hierarchical: {
+                    enabled: true,
+                    direction: "LR",
+                    sortMethod: "directed",
+                    nodeSpacing: 150,
+                    levelSeparation: 220,
+                },
+            },
+            interaction: {
+                dragNodes:  true,
+                dragView:   true,
+                zoomView:   true,
+                hover:      true,
+                selectable: true,
+            },
+            manipulation: {
+                enabled: false,
+                addEdge: (edgeData, callback) => {
+                    onEdgeDrawn(edgeData);
+                    callback(null); // we apply via state, not vis-network's edges
+                },
+            },
         });
+        network.on("selectNode", (params) => {
+            const id = params.nodes[0];
+            if (id) showInspector(id);
+        });
+        network.on("deselectNode", () => {
+            state.selectedPass = null;
+            renderInspector();
+        });
+        network.on("doubleClick", (params) => {
+            if (params.nodes.length) network.editEdgeMode();
+        });
+    } else {
+        nodesDS.clear();
+        nodesDS.add(nodes);
+        edgesDS.clear();
+        edgesDS.add(edges);
+    }
+}
+
+function onEdgeDrawn(edge) {
+    if (!edge.from || !edge.to || edge.from === edge.to) return;
+    const producer = state.profile.render_passes.find((p) => p.pass_name === edge.from);
+    const consumer = state.profile.render_passes.find((p) => p.pass_name === edge.to);
+    if (!producer || !consumer) return;
+    let att = producer.render_targets[0];
+    if (!att) {
+        setStatus(`'${producer.pass_name}' has no render_targets — set one first`, "warn");
+        return;
+    }
+    if (!state.profile.attachments.some((a) => a.name === att)) {
+        setStatus(`attachment "${att}" not declared`, "warn");
+        return;
+    }
+    if (!consumer.input_textures.includes(att)) {
+        consumer.input_textures.push(att);
+        setDirty();
+        buildGraph();
+        if (state.selectedPass === consumer.pass_name) renderInspector();
+        setStatus(`linked ${producer.pass_name} → ${consumer.pass_name} (${att})`, "ok");
+    }
+    network.disableEditMode();
+}
+
+$("pass-add-btn").addEventListener("click", () => {
+    if (!state.profile) return;
+    let name = "NewPass";
+    let n = 1;
+    while (state.profile.render_passes.some((p) => p.pass_name === name)) {
+        n++;
+        name = `NewPass_${n}`;
+    }
+    state.profile.render_passes.push({
+        pass_name:        name,
+        pass_type:        "OPAQUE",
+        shader_override:  "none",
+        render_targets:   [],
+        input_textures:   [],
+        sort_mode:        "FRONT_TO_BACK",
+        filter_mask:      65535,
+        gpu_driven_pass:  false,
+        required_streams: [],
+        attachment_ops:   [],
+    });
+    setDirty();
+    renderAll();
+});
+
+$("auto-layout-btn").addEventListener("click", () => {
+    if (network) {
+        network.setOptions({ layout: { hierarchical: { enabled: false } } });
+        network.setOptions({ layout: { hierarchical: {
+            enabled: true, direction: "LR", sortMethod: "directed",
+            nodeSpacing: 150, levelSeparation: 220,
+        }}});
+        network.fit({ animation: false });
+    }
+});
+
+// --------------------------------------------------------------------------
+// InspectorPanel
+// --------------------------------------------------------------------------
+
+const PASS_TYPES = ["DEPTH_ONLY", "OPAQUE", "TRANSPARENT", "SHADOW",
+                    "POST_PROCESS", "COMPUTE", "CUSTOM"];
+const SORT_MODES = ["FRONT_TO_BACK", "BACK_TO_FRONT", "NONE"];
+const LOAD_OPS   = ["LOAD", "CLEAR", "DONT_CARE", "NONE"];
+const STORE_OPS  = ["STORE", "DONT_CARE", "NONE"];
+const LAYOUTS    = [
+    "UNDEFINED", "GENERAL",
+    "COLOR_ATTACHMENT_OPTIMAL",
+    "DEPTH_STENCIL_ATTACHMENT_OPTIMAL", "DEPTH_STENCIL_READ_ONLY_OPTIMAL",
+    "SHADER_READ_ONLY_OPTIMAL",
+    "TRANSFER_SRC_OPTIMAL", "TRANSFER_DST_OPTIMAL",
+    "PRESENT_SRC_KHR",
+];
+
+function showInspector(passName) {
+    state.selectedPass = passName;
+    renderInspector();
+}
+
+function renderInspector() {
+    const title = $("inspector-title");
+    const body  = $("inspector-body");
+    if (!state.profile || !state.selectedPass) {
+        title.textContent = "Inspector";
+        body.className = "panel-hint";
+        body.innerHTML = "ノードをクリックすると pass プロパティをここで編集できます。";
+        return;
+    }
+    const pass = state.profile.render_passes.find((p) => p.pass_name === state.selectedPass);
+    if (!pass) {
+        state.selectedPass = null;
+        renderInspector();
+        return;
+    }
+    title.textContent = `Pass: ${pass.pass_name}`;
+    body.className = "";
+
+    const attNames = state.profile.attachments.map((a) => a.name);
+
+    body.innerHTML = `
+      <div class="field">
+        <label>pass_name</label>
+        <input type="text" id="inp-name" value="${escapeAttr(pass.pass_name)}">
+      </div>
+      <div class="field">
+        <label>pass_type</label>
+        <select id="inp-type">${PASS_TYPES.map((t) =>
+          `<option value="${t}" ${t === pass.pass_type ? "selected" : ""}>${t}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>sort_mode</label>
+        <select id="inp-sort">${SORT_MODES.map((s) =>
+          `<option value="${s}" ${s === pass.sort_mode ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>filter_mask</label>
+        <input type="number" id="inp-mask" value="${pass.filter_mask}">
+      </div>
+      <div class="field">
+        <label>shader_override</label>
+        <input type="text" id="inp-shader" value="${escapeAttr(pass.shader_override)}">
+      </div>
+
+      <h4>render_targets</h4>
+      <div id="targets-list"></div>
+      <button id="targets-add" type="button">+ target</button>
+
+      <h4>input_textures</h4>
+      <div id="inputs-list"></div>
+      <button id="inputs-add" type="button">+ input</button>
+
+      <h4>attachment_ops</h4>
+      <table class="ops-grid"><tbody id="ops-body"></tbody></table>
+      <div class="panel-hint" style="margin:0;">
+        空のとき Pictor が既定で推論 (color=CLEAR/STORE/SHADER_READ_ONLY、
+        depth=CLEAR/DONT_CARE/DSV、 swapchain=CLEAR/STORE/PRESENT_SRC_KHR)。
+      </div>
+      <button id="ops-fill" type="button" style="margin-top:6px;">Auto-fill from targets</button>
+
+      <div class="danger-zone">
+        <button id="pass-delete" type="button">この pass を削除</button>
+      </div>
+    `;
+
+    // Bind basic fields.
+    $("inp-name").addEventListener("change", (e) => {
+        const newName = e.target.value.trim();
+        if (!newName || newName === pass.pass_name) return;
+        if (state.profile.render_passes.some((p) => p.pass_name === newName)) {
+            setStatus(`pass name '${newName}' duplicates an existing pass`, "warn");
+            e.target.value = pass.pass_name;
+            return;
+        }
+        pass.pass_name = newName;
+        state.selectedPass = newName;
+        setDirty();
+        renderAll();
+    });
+    $("inp-type").addEventListener("change",  (e) => { pass.pass_type = e.target.value; setDirty(); buildGraph(); });
+    $("inp-sort").addEventListener("change",  (e) => { pass.sort_mode = e.target.value; setDirty(); });
+    $("inp-mask").addEventListener("change",  (e) => { pass.filter_mask = parseInt(e.target.value, 10) || 0; setDirty(); });
+    $("inp-shader").addEventListener("change", (e) => { pass.shader_override = e.target.value.trim() || "none"; setDirty(); });
+
+    // render_targets / input_textures lists.
+    const tgtList = $("targets-list");
+    pass.render_targets.forEach((name, i) => {
+        const row = document.createElement("div");
+        row.className = "target-row";
+        row.innerHTML = `<select>${attNames.map((n) =>
+            `<option value="${escapeAttr(n)}" ${n === name ? "selected" : ""}>${escapeText(n)}</option>`).join("")}
+          </select><button type="button" data-i="${i}">×</button>`;
+        row.querySelector("select").addEventListener("change", (e) => {
+            pass.render_targets[i] = e.target.value;
+            setDirty(); renderInspector(); buildGraph();
+        });
+        row.querySelector("button").addEventListener("click", () => {
+            pass.render_targets.splice(i, 1);
+            setDirty(); renderInspector(); buildGraph();
+        });
+        tgtList.appendChild(row);
+    });
+    $("targets-add").addEventListener("click", () => {
+        if (!attNames.length) { setStatus("先に Attachments を追加してください", "warn"); return; }
+        pass.render_targets.push(attNames[0]);
+        setDirty(); renderInspector(); buildGraph();
     });
 
-    const options = {
-        layout: { hierarchical: { direction: "UD", sortMethod: "directed", nodeSpacing: 180, levelSeparation: 90 } },
-        physics: false,
-        interaction: { hover: true },
-        edges: { smooth: { type: "cubicBezier", roundness: 0.4 } },
-    };
-    if (DAG_NETWORK) DAG_NETWORK.destroy();
-    DAG_NETWORK = new vis.Network(dagEl, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, options);
-
-    DAG_NETWORK.on("selectNode", (ev) => {
-        const id = ev.nodes[0];
-        if (!id) return;
-        if (id.startsWith("pass:")) showPassDetail(passById[id.slice(5)]);
+    const inList = $("inputs-list");
+    pass.input_textures.forEach((name, i) => {
+        const row = document.createElement("div");
+        row.className = "target-row";
+        row.innerHTML = `<select>${attNames.map((n) =>
+            `<option value="${escapeAttr(n)}" ${n === name ? "selected" : ""}>${escapeText(n)}</option>`).join("")}
+          </select><button type="button" data-i="${i}">×</button>`;
+        row.querySelector("select").addEventListener("change", (e) => {
+            pass.input_textures[i] = e.target.value;
+            setDirty(); renderInspector(); buildGraph();
+        });
+        row.querySelector("button").addEventListener("click", () => {
+            pass.input_textures.splice(i, 1);
+            setDirty(); renderInspector(); buildGraph();
+        });
+        inList.appendChild(row);
     });
-}
+    $("inputs-add").addEventListener("click", () => {
+        if (!attNames.length) { setStatus("先に Attachments を追加してください", "warn"); return; }
+        pass.input_textures.push(attNames[0]);
+        setDirty(); renderInspector(); buildGraph();
+    });
 
-function showPassDetail(p) {
-    if (!p) return;
-    detailTitle.textContent = `Pass — ${p.label}`;
-    const drawsHtml = (p.draws || []).map((d) => `<code>${d}</code>`).join(", ") || "<em>(none)</em>";
-    const consumes = (p.consumes || []).map((a) => `<code>${a}</code>`).join(", ") || "<em>(none)</em>";
-    const produces = (p.produces || []).map((a) => `<code>${a}</code>`).join(", ") || "<em>(none)</em>";
-    detailBody.innerHTML =
-        `<table>
-           <tr><th>id</th>          <td>${p.id}</td></tr>
-           <tr><th>kind</th>        <td>${p.kind}</td></tr>
-           <tr><th>consumes</th>    <td>${consumes}</td></tr>
-           <tr><th>produces</th>    <td>${produces}</td></tr>
-           <tr><th>draws</th>       <td>${drawsHtml}</td></tr>
-           <tr><th>description</th> <td>${p.description || ""}</td></tr>
-         </table>`;
-}
-
-function renderPipelineTable(snap) {
-    const tbody = $("pipeline_rows");
-    const draw = (filter = "") => {
-        const f = filter.toLowerCase();
-        tbody.innerHTML = "";
-        for (const pl of snap.pipelines) {
-            const blob = (pl.function + " " + (pl.shaders || []).join(" ")).toLowerCase();
-            if (f && !blob.includes(f)) continue;
-            const blend = pl.blend?.enabled
-                ? `<span class="tag on">on</span> ${pl.blend.op || ""} <br><span class="small">${pl.blend.src_factor || ""} / ${pl.blend.dst_factor || ""}</span>`
-                : `<span class="tag off">off</span>`;
-            const cull   = pl.raster?.cull   ? `<code>${pl.raster.cull}</code>`   : "—";
-            const depth  = `${pl.depth?.test ? `<span class="tag on">test</span>` : `<span class="tag off">test</span>`}
-                            ${pl.depth?.write ? `<span class="tag on">write</span>` : `<span class="tag off">write</span>`}
-                            <br><span class="small">${pl.depth?.compare || ""}</span>`;
-            const topo   = pl.raster?.topology ? `<code>${pl.raster.topology}</code>` : "—";
-            const shaders= (pl.shaders || []).map((s) => `<code>${s}</code>`).join("<br>") || "—";
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td><code>${pl.function}</code><br><span class="small">${pl.source}</span></td>
-                <td>${blend}</td>
-                <td>${cull}</td>
-                <td>${depth}</td>
-                <td>${topo}</td>
-                <td>${shaders}</td>`;
-            tbody.appendChild(tr);
-        }
-    };
-    draw();
-    $("pipeline_filter").addEventListener("input", (e) => draw(e.target.value));
-}
-
-function renderShaders(snap) {
-    const listEl  = $("shader_list");
-    const titleEl = $("shader_view_title");
-    const metaEl  = $("shader_view_meta");
-    const codeEl  = $("shader_view_code");
-
-    function paint(filter = "") {
-        const f = filter.toLowerCase();
-        listEl.innerHTML = "";
-        for (const sh of snap.shaders) {
-            const blob = (sh.rel_path + " " + sh.stage + " " + sh.label).toLowerCase();
-            if (f && !blob.includes(f)) continue;
-            const li = document.createElement("li");
-            li.innerHTML = `<span>${sh.rel_path}</span>
-                            <span class="sub">${sh.stage} · ${sh.lines}L</span>`;
-            li.addEventListener("click", () => show(sh, li));
-            listEl.appendChild(li);
-        }
-        const first = listEl.firstChild;
-        if (first) first.click();
-    }
-    function show(sh, li) {
-        listEl.querySelectorAll("li").forEach((x) => x.classList.remove("active"));
-        li.classList.add("active");
-        titleEl.textContent = `${sh.label}/${sh.rel_path}`;
-        const sum = sh.summary || {};
-        const layoutInfo = (label, list) => list && list.length
-            ? `${label}: ` + list.map((e) => `${e.layout ? `[${e.layout}]` : ""}${e.type ? ` ${e.type}` : ""}${e.name ? ` ${e.name}` : ""}`.trim()).join("; ")
-            : "";
-        metaEl.textContent =
-            `stage=${sh.stage} GLSL ${sum.version || "—"} · ` +
-            `${sh.size}B · ${sh.lines}L · ` + [
-                layoutInfo("in",      sum.ins),
-                layoutInfo("out",     sum.outs),
-                layoutInfo("uniform", sum.uniforms),
-                layoutInfo("buffer",  sum.buffers),
-            ].filter(Boolean).join(" | ");
-        codeEl.textContent = sh.source || "";
-        codeEl.className = "language-glsl";
-        if (window.hljs) hljs.highlightElement(codeEl);
-    }
-    paint();
-    $("shader_filter").addEventListener("input", (e) => paint(e.target.value));
-}
-
-function renderAttachments(snap) {
-    const tbody = $("attachment_rows");
-    tbody.innerHTML = "";
-    for (const a of snap.attachments) {
+    // attachment_ops grid.
+    const opsBody = $("ops-body");
+    const headerRow = document.createElement("tr");
+    headerRow.innerHTML = "<th>attachment</th><th>load</th><th>store</th><th>initial</th><th>final</th>";
+    opsBody.appendChild(headerRow);
+    (pass.attachment_ops || []).forEach((op, i) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td><code>${a.id}</code></td>
-            <td>${a.label}</td>
-            <td><code>${a.format}</code></td>
-            <td><code>${a.usage}</code></td>
-            <td>${a.owner || "—"}<br><span class="small">${a.note || ""}</span></td>`;
-        tbody.appendChild(tr);
-    }
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  MODE T — Timeline view (static execution-order Gantt, read-only)
-// ════════════════════════════════════════════════════════════════════
-//
-// Reuses the scanner SNAPSHOT. The model:
-//
-//   • X axis  = execution order. `passes[]` array order *is* the order,
-//     but we group passes into topological "levels" (same level = no
-//     dependency between them → drawn side by side at the same X span).
-//   • Bars    = one per pass. Width is uniform, or weighted by draws[]
-//     count when the "draws で重み付け" toggle is on.
-//   • Lanes   = parallel passes (independent ones at the same level, or
-//     overlapping spans) are pushed to separate horizontal lanes so they
-//     never visually collide.
-//   • Sub-bars= a `graphics_chain` pass nests one small bar per draws[]
-//     entry inside its pass bar (the post-process sub-steps).
-//   • Attachment lifetime = a striped bar from the level where the
-//     attachment is first produced to the level of its last consume.
-//
-// Phase 2 hook: `injectTiming(passId, micros)` overlays a measured GPU
-// timestamp bar + label onto a pass. `applyTimingMessage()` accepts the
-// reserved WS `{op:"timing", ...}` payload. Today nothing feeds it, so
-// the chart is purely static — but the view never needs structural
-// changes to light up once Pictor starts publishing timestamps.
-
-const tlEl          = $("timeline");
-const tlMeta        = $("tl_meta");
-const tlDetailTitle = $("tl_detail_title");
-const tlDetailBody  = $("tl_detail_body");
-const tlEmpty       = $("tl_empty");
-const tlWeightCb    = $("tl_weight");
-const tlLifetimesCb = $("tl_lifetimes");
-const tlTimingState = $("tl_timing_state");
-
-// Layout constants (px). LEVEL_W = horizontal span of one topo level.
-const TL_LEVEL_W  = 200;
-const TL_BAR_H    = 52;
-const TL_LANE_GAP = 8;
-const TL_PAD_X    = 12;
-
-// Measured GPU timings, keyed by pass id → microseconds. Phase 2 fills this.
-const TL_TIMING = Object.create(null);
-let   TL_TIMING_FRAME = null;
-
-// Last computed layout model — kept so toggles / timing can repaint.
-let TL_MODEL = null;
-let TL_SELECTED = null;
-
-tlWeightCb.addEventListener("change",    () => { timelineDrawn = false; ensureTimeline(); });
-tlLifetimesCb.addEventListener("change", () => { timelineDrawn = false; ensureTimeline(); });
-
-function updateStatusTimeline() {
-    if (!SNAPSHOT) { statusEl.textContent = "timeline: snapshot 未取得"; return; }
-    const t = TL_TIMING_FRAME != null ? ` · timing frame ${TL_TIMING_FRAME}` : "";
-    statusEl.textContent =
-        `timeline · passes=${SNAPSHOT.passes.length} ` +
-        `attachments=${SNAPSHOT.attachments.length}${t}`;
-}
-
-// Draw the timeline once per SNAPSHOT (or after a toggle change).
-function ensureTimeline() {
-    if (timelineDrawn) return;
-    if (!SNAPSHOT) { tlEl.innerHTML = `<p class="tl-empty">scanner snapshot 未取得。</p>`; return; }
-    TL_MODEL = buildTimelineModel(SNAPSHOT);
-    renderTimeline(TL_MODEL);
-    timelineDrawn = true;
-    updateStatusTimeline();
-}
-
-// ── model build ────────────────────────────────────────────────────────
-//
-// Returns { passes:[{pass, level, lane, x, w, subs:[...]}],
-//           attachments:[{id, fromLevel, toLevel, lane}],
-//           levelCount, laneCount, attLaneCount }.
-function buildTimelineModel(snap) {
-    const passes = snap.passes || [];
-    const byId = {};
-    passes.forEach((p) => { byId[p.id] = p; });
-
-    // producer attachment → list of producing pass ids
-    const producersOf = {};
-    passes.forEach((p) => {
-        (p.produces || []).forEach((att) => {
-            (producersOf[att] = producersOf[att] || []).push(p.id);
-        });
-    });
-
-    // Topological level per pass — same recurrence as renderDag()'s intent,
-    // but computed explicitly so independent passes share a level.
-    // level(p) = max(level(producer of each consumed attachment)) + 1.
-    const level = {};
-    function levelOf(id, seen) {
-        if (id in level) return level[id];
-        if (seen.has(id)) return 0;           // cycle guard
-        seen.add(id);
-        const p = byId[id];
-        let lv = 0;
-        (p.consumes || []).forEach((att) => {
-            (producersOf[att] || []).forEach((src) => {
-                if (src === id) return;       // self-produce (e.g. swapchain R/W)
-                lv = Math.max(lv, levelOf(src, seen) + 1);
+          <td><select data-k="attachment">${attNames.map((n) =>
+            `<option value="${escapeAttr(n)}" ${n === op.attachment ? "selected" : ""}>${escapeText(n)}</option>`).join("")}</select></td>
+          <td><select data-k="load">${LOAD_OPS.map((v) =>
+            `<option value="${v}" ${v === op.load ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+          <td><select data-k="store">${STORE_OPS.map((v) =>
+            `<option value="${v}" ${v === op.store ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+          <td><select data-k="initial_layout">${LAYOUTS.map((v) =>
+            `<option value="${v}" ${v === op.initial_layout ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+          <td><select data-k="final_layout">${LAYOUTS.map((v) =>
+            `<option value="${v}" ${v === op.final_layout ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+        `;
+        tr.querySelectorAll("select").forEach((sel) => {
+            sel.addEventListener("change", () => {
+                op[sel.dataset.k] = sel.value;
+                setDirty();
             });
         });
-        seen.delete(id);
-        level[id] = lv;
-        return lv;
-    }
-    passes.forEach((p) => levelOf(p.id, new Set()));
-
-    // Bar width: uniform, or weighted by draws[] count (clamped 0.5–2.0×).
-    const weight = tlWeightCb.checked;
-    const maxDraws = Math.max(1, ...passes.map((p) => (p.draws || []).length));
-
-    // Lane assignment: scan passes in execution (array) order; a pass goes
-    // into the first lane whose current X-extent does not overlap it.
-    const laneEndX = [];   // laneEndX[lane] = right edge currently occupied
-    const placed = [];
-    let levelCount = 0;
-
-    passes.forEach((p) => {
-        const lv = level[p.id];
-        levelCount = Math.max(levelCount, lv + 1);
-        const wFactor = weight
-            ? 0.5 + 1.5 * ((p.draws || []).length / maxDraws)
-            : 1;
-        const x = TL_PAD_X + lv * TL_LEVEL_W;
-        const w = Math.max(70, (TL_LEVEL_W - 16) * wFactor);
-
-        let lane = laneEndX.findIndex((end) => x >= end);
-        if (lane === -1) { lane = laneEndX.length; laneEndX.push(0); }
-        laneEndX[lane] = x + w + 14;
-
-        // sub-passes — only graphics_chain nests its draws
-        const subs = (p.kind === "graphics_chain")
-            ? (p.draws || []).map((d) => ({ label: d }))
-            : [];
-
-        placed.push({ pass: p, level: lv, lane, x, w, subs });
+        opsBody.appendChild(tr);
     });
 
-    // Attachment lifetimes: produce level → last consume level.
-    const attModel = [];
-    (snap.attachments || []).forEach((a) => {
-        const producers = passes.filter((p) => (p.produces || []).includes(a.id));
-        const consumers = passes.filter((p) => (p.consumes || []).includes(a.id));
-        if (!producers.length && !consumers.length) return;
-        const lvls = [...producers, ...consumers].map((p) => level[p.id]);
-        attModel.push({
-            id:        a.id,
-            label:     a.label || a.id,
-            fromLevel: Math.min(...lvls),
-            toLevel:   Math.max(...lvls),
+    $("ops-fill").addEventListener("click", () => {
+        pass.attachment_ops = pass.render_targets.map((tgt) => {
+            const att = state.profile.attachments.find((a) => a.name === tgt);
+            if (att && att.kind === "DEPTH") {
+                return { attachment: tgt, load: "CLEAR", store: "DONT_CARE",
+                         initial_layout: "UNDEFINED",
+                         final_layout: "DEPTH_STENCIL_ATTACHMENT_OPTIMAL" };
+            }
+            if (att && att.kind === "SWAPCHAIN_COLOR") {
+                return { attachment: tgt, load: "CLEAR", store: "STORE",
+                         initial_layout: "UNDEFINED",
+                         final_layout: "PRESENT_SRC_KHR" };
+            }
+            return { attachment: tgt, load: "CLEAR", store: "STORE",
+                     initial_layout: "UNDEFINED",
+                     final_layout: "SHADER_READ_ONLY_OPTIMAL" };
         });
-    });
-    // pack attachment bars into lanes too (no horizontal overlap per lane)
-    attModel.sort((x, y) => x.fromLevel - y.fromLevel);
-    const attLaneEnd = [];
-    attModel.forEach((a) => {
-        let lane = attLaneEnd.findIndex((end) => a.fromLevel > end);
-        if (lane === -1) { lane = attLaneEnd.length; attLaneEnd.push(0); }
-        attLaneEnd[lane] = a.toLevel;
-        a.lane = lane;
+        setDirty(); renderInspector();
     });
 
-    return {
-        passes:      placed,
-        attachments: attModel,
-        levelCount:  Math.max(1, levelCount),
-        laneCount:   Math.max(1, laneEndX.length),
-        attLaneCount: attLaneEnd.length,
-    };
-}
-
-// ── render ──────────────────────────────────────────────────────────────
-function renderTimeline(model) {
-    tlEl.innerHTML = "";
-    if (!model.passes.length) {
-        tlEl.innerHTML = `<p class="tl-empty">passes 無し — scanner の PASS_DAG が空。</p>`;
-        return;
-    }
-
-    const stageW = TL_PAD_X * 2 + model.levelCount * TL_LEVEL_W;
-    const lanesH = model.laneCount * (TL_BAR_H + TL_LANE_GAP) + TL_LANE_GAP;
-
-    const stage = document.createElement("div");
-    stage.className = "tl-stage";
-    stage.style.width = stageW + "px";
-
-    // ── axis: one tick per execution level ──
-    const axis = document.createElement("div");
-    axis.className = "tl-axis";
-    for (let lv = 0; lv < model.levelCount; lv++) {
-        const tick = document.createElement("div");
-        tick.className = "tl-tick";
-        tick.style.left = (TL_PAD_X + lv * TL_LEVEL_W) + "px";
-        tick.innerHTML = `<span>lv ${lv}</span>`;
-        axis.appendChild(tick);
-        const grid = document.createElement("div");
-        grid.className = "tl-gridline";
-        grid.style.left = (TL_PAD_X + lv * TL_LEVEL_W) + "px";
-        grid.style.height = lanesH + "px";
-        stage.appendChild(grid);
-    }
-    stage.appendChild(axis);
-
-    // ── lane band: pass bars ──
-    const lanes = document.createElement("div");
-    lanes.className = "tl-lanes";
-    lanes.style.height = lanesH + "px";
-
-    model.passes.forEach((item) => {
-        const bar = document.createElement("div");
-        bar.className = "tl-bar" + (item.pass.kind === "graphics_chain" ? " chain" : "");
-        bar.dataset.passId = item.pass.id;
-        bar.style.left   = item.x + "px";
-        bar.style.width  = item.w + "px";
-        bar.style.top    = (TL_LANE_GAP + item.lane * (TL_BAR_H + TL_LANE_GAP)) + "px";
-        bar.style.height = TL_BAR_H + "px";
-
-        const drawCount = (item.pass.draws || []).length;
-        bar.innerHTML =
-            `<div class="tl-bar-label">${escapeHtml(item.pass.label)}</div>
-             <div class="tl-bar-sub">${item.pass.kind} · ${drawCount} draw${drawCount === 1 ? "" : "s"}</div>`;
-
-        // graphics_chain → nested sub-pass mini bars
-        if (item.subs.length) {
-            const subRow = document.createElement("div");
-            subRow.className = "tl-subrow";
-            item.subs.forEach((s) => {
-                const sb = document.createElement("div");
-                sb.className = "tl-sub";
-                sb.textContent = s.label.replace(/_pipeline$/, "");
-                sb.title = s.label;
-                subRow.appendChild(sb);
-            });
-            bar.appendChild(subRow);
-        }
-
-        // Phase 2: measured GPU time overlay, if injected.
-        applyTimingToBar(bar, item.pass.id);
-
-        bar.addEventListener("click", () => selectTimelinePass(item.pass.id));
-        if (TL_SELECTED === item.pass.id) bar.classList.add("selected");
-        lanes.appendChild(bar);
+    $("pass-delete").addEventListener("click", () => {
+        if (!confirm(`pass "${pass.pass_name}" を削除しますか?`)) return;
+        const idx = state.profile.render_passes.indexOf(pass);
+        if (idx >= 0) state.profile.render_passes.splice(idx, 1);
+        state.selectedPass = null;
+        setDirty(); renderAll();
     });
-    stage.appendChild(lanes);
-
-    // ── attachment lifetime band ──
-    if (tlLifetimesCb.checked && model.attachments.length) {
-        const att = document.createElement("div");
-        att.className = "tl-att-section";
-        const head = document.createElement("div");
-        head.className = "tl-att-head";
-        head.textContent = "attachment ライフタイム (produce → 最後の consume)";
-        att.appendChild(head);
-        model.attachments.forEach((a) => {
-            const row = document.createElement("div");
-            row.className = "tl-att-row";
-            const bar = document.createElement("div");
-            bar.className = "tl-att-bar";
-            const x = TL_PAD_X + a.fromLevel * TL_LEVEL_W;
-            // span at least one level wide so a produce==consume bar is visible
-            const span = Math.max(1, a.toLevel - a.fromLevel);
-            bar.style.left  = x + "px";
-            bar.style.width = (span * TL_LEVEL_W - 16) + "px";
-            bar.title = `${a.id}: lv ${a.fromLevel} → ${a.toLevel}`;
-            bar.innerHTML = `<span>${escapeHtml(a.id)}</span>`;
-            row.appendChild(bar);
-            att.appendChild(row);
-        });
-        stage.appendChild(att);
-    }
-
-    tlEl.appendChild(stage);
-
-    const lifetimeNote = tlLifetimesCb.checked
-        ? ` · ${model.attachments.length} attachment lifetimes`
-        : "";
-    tlMeta.textContent =
-        `${model.passes.length} passes · ${model.levelCount} levels · ` +
-        `${model.laneCount} lanes${lifetimeNote}` +
-        (tlWeightCb.checked ? " · draws 重み付け" : "");
-
-    if (TL_SELECTED) {
-        const sel = model.passes.find((p) => p.pass.id === TL_SELECTED);
-        if (sel) showTimelineDetail(sel.pass);
-    }
 }
 
-function selectTimelinePass(passId) {
-    TL_SELECTED = passId;
-    tlEl.querySelectorAll(".tl-bar").forEach((b) =>
-        b.classList.toggle("selected", b.dataset.passId === passId));
-    const p = (SNAPSHOT.passes || []).find((x) => x.id === passId);
-    if (p) showTimelineDetail(p);
-}
+// --------------------------------------------------------------------------
+// Timing overlay
+// --------------------------------------------------------------------------
 
-function showTimelineDetail(p) {
-    if (!p) return;
-    tlDetailTitle.textContent = `Pass — ${p.label}`;
-    const fmt = (arr) => (arr && arr.length)
-        ? arr.map((a) => `<code>${escapeHtml(a)}</code>`).join(", ")
-        : "<em>(none)</em>";
-    const us = TL_TIMING[p.id];
-    const timingRow = us != null
-        ? `<tr><th>GPU 実測</th><td>${(us / 1000).toFixed(3)} ms <span class="small">(${us} µs)</span></td></tr>`
-        : `<tr><th>GPU 実測</th><td><em>未計測 (Phase 2)</em></td></tr>`;
-    tlDetailBody.innerHTML =
-        `<table>
-           <tr><th>id</th>          <td>${escapeHtml(p.id)}</td></tr>
-           <tr><th>kind</th>        <td>${escapeHtml(p.kind)}</td></tr>
-           <tr><th>consumes</th>    <td>${fmt(p.consumes)}</td></tr>
-           <tr><th>produces</th>    <td>${fmt(p.produces)}</td></tr>
-           <tr><th>draws</th>       <td>${fmt(p.draws)}</td></tr>
-           ${timingRow}
-           <tr><th>description</th> <td>${escapeHtml(p.description || "")}</td></tr>
-         </table>`;
-}
+$("timing-overlay-toggle").addEventListener("change", (e) => {
+    state.timingEnabled = e.target.checked;
+    buildGraph();
+});
 
-// ── Phase 2: measured GPU timestamp injection ───────────────────────────
-//
-// `injectTiming` / `applyTimingMessage` are the seam for runtime GPU
-// timestamps. Nothing calls them yet (the chart is static), but the WS
-// `onUpgrade` handler in index.ts already reserves `{op:"timing"}`; wiring
-// it is just: connectWs() → on message → applyTimingMessage(msg).
-function applyTimingToBar(bar, passId) {
-    bar.querySelectorAll(".tl-timing, .tl-timing-tag").forEach((n) => n.remove());
-    const us = TL_TIMING[passId];
-    if (us == null) return;
-    // Width of the measured bar = fraction of the slowest measured pass.
-    const maxUs = Math.max(1, ...Object.values(TL_TIMING));
-    const overlay = document.createElement("div");
-    overlay.className = "tl-timing";
-    overlay.style.width = Math.max(4, (us / maxUs) * 100) + "%";
-    overlay.title = `${(us / 1000).toFixed(3)} ms measured`;
-    bar.appendChild(overlay);
-    const tag = document.createElement("div");
-    tag.className = "tl-timing-tag";
-    tag.textContent = `${(us / 1000).toFixed(2)} ms`;
-    bar.appendChild(tag);
-}
-
-// Inject a single measured timing and repaint that bar (if drawn).
-function injectTiming(passId, micros) {
-    TL_TIMING[passId] = micros;
-    const bar = tlEl.querySelector(`.tl-bar[data-pass-id="${CSS.escape(passId)}"]`);
-    if (bar) applyTimingToBar(bar, passId);
-    if (TL_SELECTED === passId) {
-        const p = (SNAPSHOT?.passes || []).find((x) => x.id === passId);
-        if (p) showTimelineDetail(p);
-    }
-}
-
-// Accept the reserved WS payload {op:"timing", frame, passes:[{id,us}]}
-// (or the single-pass {op:"timing", pass, us} shape). Static-safe: a no-op
-// when the timeline has never been drawn.
-function applyTimingMessage(msg) {
-    if (!msg || msg.op !== "timing") return;
-    let touched = false;
+function applyTiming(msg) {
+    if (msg.frame != null) state.timingFrame = msg.frame;
     if (Array.isArray(msg.passes)) {
-        msg.passes.forEach((e) => {
-            if (e && e.id != null && Number.isFinite(e.us)) {
-                injectTiming(e.id, e.us); touched = true;
-            }
-        });
-    } else if (msg.pass != null && Number.isFinite(msg.us)) {
-        injectTiming(msg.pass, msg.us); touched = true;
-    }
-    if (!touched) return;
-    if (msg.frame != null) TL_TIMING_FRAME = msg.frame;
-    tlTimingState.textContent = `timing: 実測${msg.frame != null ? ` (frame ${msg.frame})` : ""}`;
-    tlTimingState.classList.add("live");
-    if (btnModeTimeline.classList.contains("active")) updateStatusTimeline();
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  MODE B — Profile editor (read/write, disk-persisted)
-// ════════════════════════════════════════════════════════════════════
-//
-// Schema mirror of Pictor's PipelineProfileDef. Canonical source:
-//   Pictor/spec/pipeline-profile-config.md  (schema v1)
-// Server-side authority is src/plugins/render_pipeline/profile_schema.ts;
-// this block must stay in sync with it.
-
-const ENUMS = {
-    rendering_path: ["FORWARD", "FORWARD_PLUS", "DEFERRED", "HYBRID"],
-    pass_type:      ["DEPTH_ONLY", "OPAQUE", "TRANSPARENT", "SHADOW", "POST_PROCESS", "COMPUTE", "CUSTOM"],
-    sort_mode:      ["FRONT_TO_BACK", "BACK_TO_FRONT", "NONE"],
-    filter_mode:    ["NONE", "PCF", "PCSS"],
-    overlay_mode:   ["OFF", "MINIMAL", "STANDARD", "DETAILED", "TIMELINE"],
-    msaa_samples:   [0, 2, 4, 8],
-    pp_kind:        ["Unknown", "Bloom", "ToneMapping", "Vignette", "ColorGrading", "DepthOfField"],
-    tone_map_op:    ["ACES_FILMIC", "REINHARD", "REINHARD_EXT", "UNCHARTED2", "LINEAR_CLAMP"],
-};
-
-// post-process per-effect parameter defaults — mirror profile_schema.ts
-// (DEFAULT_BLOOM …) and Pictor's postprocess_effect.h.
-const PP_DEFAULTS = {
-    bloom: { threshold: 1.0, soft_threshold: 0.5, intensity: 0.8, radius: 5.0,
-             mip_levels: 5, scatter: 0.7 },
-    tone_mapping: { op: "ACES_FILMIC", exposure: 1.0, gamma: 2.2,
-                    white_point: 4.0, saturation: 1.0 },
-    vignette: { intensity: 0.35, radius: 0.75, softness: 0.45, color: [0, 0, 0] },
-    color_grading: { lut_path: "", lut_intensity: 1.0, lut_size: 16 },
-    depth_of_field: { focus_distance: 10.0, focus_range: 5.0, bokeh_radius: 4.0,
-                      near_start: 0.0, near_end: 3.0, far_start: 15.0,
-                      far_end: 50.0, sample_count: 16 },
-};
-
-// Map an effect name to a PostProcessKind — mirror profile_schema.ts
-// postProcessKindFromName() / Pictor post_process_kind_from_name().
-function ppKindFromName(name) {
-    const n = String(name || "").trim().toLowerCase();
-    if (n === "bloom") return "Bloom";
-    if (n === "tonemapping" || n === "tonemap" || n === "tone_mapping") return "ToneMapping";
-    if (n === "vignette") return "Vignette";
-    if (n === "colorgrading" || n === "color_grading" || n === "lut" || n === "grade") {
-        return "ColorGrading";
-    }
-    if (n === "dof" || n === "depthoffield" || n === "depth_of_field") return "DepthOfField";
-    return "Unknown";
-}
-
-// Blank PostProcessDef for "+ effect 追加" — mirror DEFAULT_POST_PROCESS.
-function blankPostProcess() {
-    return {
-        name: "", enabled: true, kind: "Unknown",
-        bloom:          { ...PP_DEFAULTS.bloom },
-        tone_mapping:   { ...PP_DEFAULTS.tone_mapping },
-        vignette:       { ...PP_DEFAULTS.vignette, color: [...PP_DEFAULTS.vignette.color] },
-        color_grading:  { ...PP_DEFAULTS.color_grading },
-        depth_of_field: { ...PP_DEFAULTS.depth_of_field },
-    };
-}
-
-// Ensure a PostProcessDef has every typed slot (defensive against profiles
-// authored before the typed schema). The server normalizes on load, so this
-// is mostly a belt-and-braces fill for in-memory edits.
-function ensurePpSlots(pp) {
-    if (typeof pp.kind !== "string") pp.kind = ppKindFromName(pp.name);
-    if (!pp.bloom)          pp.bloom = { ...PP_DEFAULTS.bloom };
-    if (!pp.tone_mapping)   pp.tone_mapping = { ...PP_DEFAULTS.tone_mapping };
-    if (!pp.vignette)       pp.vignette = { ...PP_DEFAULTS.vignette, color: [...PP_DEFAULTS.vignette.color] };
-    if (!pp.color_grading)  pp.color_grading = { ...PP_DEFAULTS.color_grading };
-    if (!pp.depth_of_field) pp.depth_of_field = { ...PP_DEFAULTS.depth_of_field };
-    if (!Array.isArray(pp.vignette.color)) pp.vignette.color = [...PP_DEFAULTS.vignette.color];
-    return pp;
-}
-
-// A blank profile used by "+ new". Mirrors profile_schema.ts DEFAULT_PROFILE.
-function blankProfile() {
-    return {
-        version: 1,
-        profile_name: "",
-        rendering_path: "FORWARD_PLUS",
-        max_lights: 256,
-        msaa_samples: 0,
-        gpu_driven_enabled: true,
-        compute_update_enabled: true,
-        render_passes: [],
-        post_process: [],
-        shadow: { cascade_count: 3, resolution: 2048, filter_mode: "PCF" },
-        gi: {
-            shadow_enabled: true, ssao_enabled: true, gi_probes_enabled: false,
-            shadow: {
-                cascade_count: 3, resolution: 2048, depth_bias: 0, normal_bias: 0,
-                slope_scale_bias: 0, cascade_lambda: 0.5, max_shadow_dist: 150,
-                cascade_blend_width: 0, filter_mode: "PCF", shadow_strength: 1,
-                pcss_light_size: 0.05, pcss_min_penumbra: 1, pcss_max_penumbra: 16,
-                pcss_blocker_search_radius: 8,
-            },
-            ssao: {
-                sample_count: 32, radius: 0.5, bias: 0.025, intensity: 1,
-                falloff_start: 0, falloff_end: 1, blur_enabled: true,
-            },
-            probes: {
-                grid_origin: [0, 0, 0], grid_spacing: [1, 1, 1],
-                grid_x: 8, grid_y: 8, grid_z: 8, gi_intensity: 1, max_probe_distance: 10,
-            },
-        },
-        memory: {
-            frame_allocator_size: 16777216, flight_count: 3, pool_chunk_size: 65536,
-            use_large_pages: false,
-            gpu: {
-                mesh_pool_size: 268435456, ssbo_pool_size: 134217728,
-                instance_buffer_size: 67108864, indirect_buffer_size: 16777216,
-                staging_buffer_size: 67108864,
-            },
-        },
-        gpu_driven: {
-            max_triangle_count: 50000, min_instance_count: 32, workgroup_size: 256,
-            two_phase_culling: true, compute_update: true,
-        },
-        update: { chunk_size: 16384, worker_threads: 0, nt_store_enabled: true, nt_store_threshold: 10000 },
-        profiler: { enabled: true, overlay_mode: "STANDARD", max_queries: 64 },
-    };
-}
-
-const RENDER_PASS_DEFAULT = {
-    pass_name: "", pass_type: "OPAQUE", shader_override: "none",
-    render_targets: [], input_textures: [], sort_mode: "FRONT_TO_BACK",
-    filter_mask: 65535, gpu_driven_pass: false, required_streams: [],
-};
-
-// ── editor state ──────────────────────────────────────────────────────
-let PROFILE_LIST = [];      // [{file, profile_name, size, mtime}, ...]
-let CURRENT = null;         // working PipelineProfileDef (edited copy)
-let CURRENT_FILE = null;    // file name on disk, or null for an unsaved new one
-let DIRTY = false;
-
-const profileListEl   = $("profile_list");
-const profileListNote = $("profile_list_note");
-const profileForm     = $("profile_form");
-const profileEditTitle= $("profile_edit_title");
-const profileEditNote = $("profile_edit_note");
-const dirtyFlag       = $("dirty_flag");
-const btnSave         = $("btn_save_profile");
-
-function markDirty() {
-    DIRTY = true;
-    dirtyFlag.style.display = "";
-    btnSave.disabled = false;
-    refreshJsonPreview();
-    updateStatusEditor();
-}
-function clearDirty() {
-    DIRTY = false;
-    dirtyFlag.style.display = "none";
-    btnSave.disabled = CURRENT == null;
-}
-
-function updateStatusEditor() {
-    if (!CURRENT) { statusEl.textContent = `editor · ${PROFILE_LIST.length} profiles`; return; }
-    statusEl.textContent =
-        `editor · ${CURRENT_FILE ?? "(unsaved)"} · ${CURRENT.render_passes.length} passes` +
-        (DIRTY ? " · 未保存" : "");
-}
-
-// ── profile list ──────────────────────────────────────────────────────
-async function loadProfileList(selectFile) {
-    statusEl.textContent = "loading profiles…";
-    try {
-        const r = await fetch("./api/profiles", { cache: "no-cache" });
-        const data = await r.json();
-        if (!data.ok) throw new Error(data.err || "list failed");
-        PROFILE_LIST = data.profiles || [];
-        $("profile_dir").textContent = data.dir || "(unknown)";
-        profileListNote.textContent = `${PROFILE_LIST.length} files · schema v${data.version}`;
-    } catch (e) {
-        profileListNote.textContent = "load 失敗: " + e.message;
-        statusEl.textContent = "profiles load 失敗";
-        return;
-    }
-    renderProfileList();
-    updateStatusEditor();
-    if (selectFile) {
-        const hit = PROFILE_LIST.find((p) => p.file === selectFile);
-        if (hit) openProfile(hit.file);
-    }
-}
-
-function renderProfileList() {
-    profileListEl.innerHTML = "";
-    for (const p of PROFILE_LIST) {
-        const li = document.createElement("li");
-        li.innerHTML = `<div class="pl-name">${escapeHtml(p.profile_name)}</div>
-                        <div class="pl-file">${escapeHtml(p.file)}</div>`;
-        if (CURRENT_FILE === p.file) li.classList.add("active");
-        li.addEventListener("click", () => {
-            if (DIRTY && !confirm("未保存の変更があります。破棄して切り替えますか?")) return;
-            openProfile(p.file);
-        });
-        profileListEl.appendChild(li);
-    }
-}
-
-$("btn_reload_profiles").addEventListener("click", () => {
-    if (DIRTY && !confirm("未保存の変更があります。一覧を再読込しますか?")) return;
-    loadProfileList(CURRENT_FILE);
-});
-
-$("btn_new_profile").addEventListener("click", () => {
-    if (DIRTY && !confirm("未保存の変更があります。破棄して新規作成しますか?")) return;
-    CURRENT = blankProfile();
-    CURRENT.profile_name = "NewProfile";
-    CURRENT_FILE = null;     // unsaved — server derives the file name on first save
-    renderProfileList();
-    renderForm();
-    profileEditTitle.textContent = "新規プロファイル (未保存)";
-    profileEditNote.textContent = "profile_name を設定して保存すると <name>.profile.json が作られる。";
-    markDirty();
-});
-
-async function openProfile(file) {
-    statusEl.textContent = `loading ${file}…`;
-    try {
-        const r = await fetch(`./api/profile/${encodeURIComponent(file)}`, { cache: "no-cache" });
-        const data = await r.json();
-        if (!data.ok) throw new Error(data.err || "load failed");
-        CURRENT = data.profile;
-        CURRENT_FILE = data.file;
-    } catch (e) {
-        statusEl.textContent = `load 失敗: ${e.message}`;
-        return;
-    }
-    clearDirty();
-    renderProfileList();
-    renderForm();
-    profileEditTitle.textContent = CURRENT.profile_name || CURRENT_FILE;
-    profileEditNote.textContent = `${CURRENT_FILE} を編集中。保存でディスクへ書き込み。`;
-    updateStatusEditor();
-}
-
-btnSave.addEventListener("click", async () => {
-    if (!CURRENT) return;
-    statusEl.textContent = "saving…";
-    try {
-        const body = { profile: CURRENT };
-        if (CURRENT_FILE) body.file = CURRENT_FILE;   // else server derives it
-        const r = await fetch("./api/profile", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        const data = await r.json();
-        if (!data.ok) throw new Error(data.err || "save failed");
-        CURRENT = data.profile;
-        CURRENT_FILE = data.file;
-        clearDirty();
-        profileEditTitle.textContent = CURRENT.profile_name || CURRENT_FILE;
-        profileEditNote.textContent = `保存しました → ${CURRENT_FILE}`;
-        await loadProfileList(CURRENT_FILE);
-    } catch (e) {
-        statusEl.textContent = `save 失敗: ${e.message}`;
-    }
-});
-
-// ── form rendering ────────────────────────────────────────────────────
-function renderForm() {
-    profileForm.style.display = "";
-    renderScalarFields();
-    renderPasses();
-    renderPostProcess();
-    renderObjectFields("shadow_fields", CURRENT.shadow, [
-        { key: "cascade_count", type: "int" },
-        { key: "resolution",    type: "int" },
-        { key: "filter_mode",   type: "enum", enum: "filter_mode" },
-    ]);
-    renderGiFields();
-    renderObjectFields("memory_fields", CURRENT.memory, [
-        { key: "frame_allocator_size", type: "int", hint: "bytes" },
-        { key: "flight_count",         type: "int" },
-        { key: "pool_chunk_size",      type: "int", hint: "bytes" },
-        { key: "use_large_pages",      type: "bool" },
-    ]);
-    renderObjectFields("memory_gpu_fields", CURRENT.memory.gpu, [
-        { key: "mesh_pool_size",       type: "int", hint: "bytes" },
-        { key: "ssbo_pool_size",       type: "int", hint: "bytes" },
-        { key: "instance_buffer_size", type: "int", hint: "bytes" },
-        { key: "indirect_buffer_size", type: "int", hint: "bytes" },
-        { key: "staging_buffer_size",  type: "int", hint: "bytes" },
-    ]);
-    renderObjectFields("gpu_driven_fields", CURRENT.gpu_driven, [
-        { key: "max_triangle_count", type: "int" },
-        { key: "min_instance_count", type: "int" },
-        { key: "workgroup_size",     type: "int" },
-        { key: "two_phase_culling",  type: "bool" },
-        { key: "compute_update",     type: "bool" },
-    ]);
-    renderObjectFields("update_fields", CURRENT.update, [
-        { key: "chunk_size",         type: "int" },
-        { key: "worker_threads",     type: "int", hint: "0 = auto" },
-        { key: "nt_store_enabled",   type: "bool" },
-        { key: "nt_store_threshold", type: "int" },
-    ]);
-    renderObjectFields("profiler_fields", CURRENT.profiler, [
-        { key: "enabled",      type: "bool" },
-        { key: "overlay_mode", type: "enum", enum: "overlay_mode" },
-        { key: "max_queries",  type: "int" },
-    ]);
-    refreshJsonPreview();
-}
-
-function renderScalarFields() {
-    const host = $("scalar_fields");
-    host.innerHTML = "";
-    host.appendChild(fieldText("profile_name", CURRENT.profile_name, (v) => {
-        CURRENT.profile_name = v; markDirty();
-    }, "マネージャのキー。実用上必須"));
-    host.appendChild(fieldEnum("rendering_path", ENUMS.rendering_path, CURRENT.rendering_path, (v) => {
-        CURRENT.rendering_path = v; markDirty();
-    }));
-    host.appendChild(fieldInt("max_lights", CURRENT.max_lights, (v) => {
-        CURRENT.max_lights = v; markDirty();
-    }));
-    host.appendChild(fieldEnumNum("msaa_samples", ENUMS.msaa_samples, CURRENT.msaa_samples, (v) => {
-        CURRENT.msaa_samples = v; markDirty();
-    }, "0 / 2 / 4 / 8"));
-    host.appendChild(fieldBool("gpu_driven_enabled", CURRENT.gpu_driven_enabled, (v) => {
-        CURRENT.gpu_driven_enabled = v; markDirty();
-    }));
-    host.appendChild(fieldBool("compute_update_enabled", CURRENT.compute_update_enabled, (v) => {
-        CURRENT.compute_update_enabled = v; markDirty();
-    }));
-}
-
-// generic: render a fixed list of typed fields for an object
-function renderObjectFields(hostId, obj, fields) {
-    const host = $(hostId);
-    host.innerHTML = "";
-    for (const f of fields) {
-        if (f.type === "int" || f.type === "float") {
-            host.appendChild(fieldNum(f.key, obj[f.key], (v) => { obj[f.key] = v; markDirty(); },
-                f.type === "float", f.hint));
-        } else if (f.type === "bool") {
-            host.appendChild(fieldBool(f.key, obj[f.key], (v) => { obj[f.key] = v; markDirty(); }));
-        } else if (f.type === "enum") {
-            host.appendChild(fieldEnum(f.key, ENUMS[f.enum], obj[f.key], (v) => { obj[f.key] = v; markDirty(); }));
-        } else if (f.type === "vec3") {
-            host.appendChild(fieldVec3(f.key, obj[f.key], (v) => { obj[f.key] = v; markDirty(); }));
+        for (const p of msg.passes) {
+            if (p && p.id != null && p.us != null) state.timing[p.id] = p.us;
         }
+    } else if (msg.pass && msg.us != null) {
+        state.timing[msg.pass] = msg.us;
     }
+    buildGraph();
 }
 
-function renderGiFields() {
-    renderObjectFields("gi_fields", CURRENT.gi, [
-        { key: "shadow_enabled",    type: "bool" },
-        { key: "ssao_enabled",      type: "bool" },
-        { key: "gi_probes_enabled", type: "bool" },
-    ]);
-    renderObjectFields("gi_shadow_fields", CURRENT.gi.shadow, [
-        { key: "cascade_count",              type: "int" },
-        { key: "resolution",                 type: "int" },
-        { key: "depth_bias",                 type: "float" },
-        { key: "normal_bias",                type: "float" },
-        { key: "slope_scale_bias",           type: "float" },
-        { key: "cascade_lambda",             type: "float" },
-        { key: "max_shadow_dist",            type: "float" },
-        { key: "cascade_blend_width",        type: "float" },
-        { key: "filter_mode",                type: "enum", enum: "filter_mode" },
-        { key: "shadow_strength",            type: "float" },
-        { key: "pcss_light_size",            type: "float" },
-        { key: "pcss_min_penumbra",          type: "float" },
-        { key: "pcss_max_penumbra",          type: "float" },
-        { key: "pcss_blocker_search_radius", type: "float" },
-    ]);
-    renderObjectFields("gi_ssao_fields", CURRENT.gi.ssao, [
-        { key: "sample_count",  type: "int" },
-        { key: "radius",        type: "float" },
-        { key: "bias",          type: "float" },
-        { key: "intensity",     type: "float" },
-        { key: "falloff_start", type: "float" },
-        { key: "falloff_end",   type: "float" },
-        { key: "blur_enabled",  type: "bool" },
-    ]);
-    renderObjectFields("gi_probes_fields", CURRENT.gi.probes, [
-        { key: "grid_origin",        type: "vec3" },
-        { key: "grid_spacing",       type: "vec3" },
-        { key: "grid_x",             type: "int" },
-        { key: "grid_y",             type: "int" },
-        { key: "grid_z",             type: "int" },
-        { key: "gi_intensity",       type: "float" },
-        { key: "max_probe_distance", type: "float" },
-    ]);
-}
+// --------------------------------------------------------------------------
+// WebSocket
+// --------------------------------------------------------------------------
 
-// ── render_passes editor ──────────────────────────────────────────────
-$("btn_add_pass").addEventListener("click", () => {
-    if (!CURRENT) return;
-    CURRENT.render_passes.push(JSON.parse(JSON.stringify(RENDER_PASS_DEFAULT)));
-    renderPasses();
-    markDirty();
-});
-
-function renderPasses() {
-    const host = $("passes_list");
-    host.innerHTML = "";
-    const passes = CURRENT.render_passes;
-    if (!passes.length) {
-        host.innerHTML = `<p class="pep-note">pass 無し — preset の pass 列がそのまま使われる (空配列でも置換扱い)。</p>`;
-    }
-    passes.forEach((pass, i) => {
-        const card = document.createElement("div");
-        card.className = "pass-card";
-
-        const head = document.createElement("div");
-        head.className = "pc-head";
-        head.innerHTML = `<span class="pc-idx">#${i}</span>
-                          <strong>${escapeHtml(pass.pass_name || "(unnamed)")}</strong>
-                          <span class="spacer"></span>`;
-        head.appendChild(makeBtn("▲", "pc-btn", i === 0, () => movePass(i, -1)));
-        head.appendChild(makeBtn("▼", "pc-btn", i === passes.length - 1, () => movePass(i, 1)));
-        head.appendChild(makeBtn("✕", "pc-btn del", false, () => {
-            passes.splice(i, 1); renderPasses(); markDirty();
-        }));
-        card.appendChild(head);
-
-        const grid = document.createElement("div");
-        grid.className = "field-grid";
-        grid.appendChild(fieldText("pass_name", pass.pass_name, (v) => {
-            pass.pass_name = v; head.querySelector("strong").textContent = v || "(unnamed)"; markDirty();
-        }, "ICustomRenderPass::name() と一致で custom dispatch"));
-        grid.appendChild(fieldEnum("pass_type", ENUMS.pass_type, pass.pass_type, (v) => {
-            pass.pass_type = v; markDirty();
-        }));
-        grid.appendChild(fieldEnum("sort_mode", ENUMS.sort_mode, pass.sort_mode, (v) => {
-            pass.sort_mode = v; markDirty();
-        }));
-        grid.appendChild(fieldText("shader_override", pass.shader_override, (v) => {
-            pass.shader_override = v; markDirty();
-        }, '"none" / "handle:<u32>" — scheduler 未消費'));
-        grid.appendChild(fieldInt("filter_mask", pass.filter_mask, (v) => {
-            pass.filter_mask = v; markDirty();
-        }));
-        grid.appendChild(fieldBool("gpu_driven_pass", pass.gpu_driven_pass, (v) => {
-            pass.gpu_driven_pass = v; markDirty();
-        }));
-        grid.appendChild(fieldStrList("render_targets", pass.render_targets, () => markDirty(),
-            "framebuffer 未配線 (系統B)"));
-        grid.appendChild(fieldStrList("input_textures", pass.input_textures, () => markDirty(),
-            "未配線 (系統B)"));
-        grid.appendChild(fieldStrList("required_streams", pass.required_streams, () => markDirty(),
-            "SoA prefetch ヒント"));
-        card.appendChild(grid);
-        host.appendChild(card);
-    });
-}
-
-function movePass(i, dir) {
-    const passes = CURRENT.render_passes;
-    const j = i + dir;
-    if (j < 0 || j >= passes.length) return;
-    [passes[i], passes[j]] = [passes[j], passes[i]];
-    renderPasses();
-    markDirty();
-}
-
-// ── post_process editor ───────────────────────────────────────────────
-$("btn_add_pp").addEventListener("click", () => {
-    if (!CURRENT) return;
-    CURRENT.post_process.push(blankPostProcess());
-    renderPostProcess();
-    markDirty();
-});
-
-// Build the typed parameter editor for the effect matching `pp.kind`.
-// Effects with no host-driven implementation (kind=Unknown — SSAO / TAA /
-// FXAA …) get a note instead: their params live nowhere the engine reads.
-function ppParamGrid(pp) {
-    const grid = document.createElement("div");
-    grid.className = "field-grid";
-    const fnum  = (obj, key, hint) => grid.appendChild(
-        fieldNum(key, obj[key], (v) => { obj[key] = v; markDirty(); }, true, hint));
-    const fint  = (obj, key, hint) => grid.appendChild(
-        fieldInt(key, obj[key], (v) => { obj[key] = v; markDirty(); }, hint));
-
-    switch (pp.kind) {
-        case "Bloom": {
-            const b = pp.bloom;
-            fnum(b, "threshold", "bloom 抽出輝度しきい値");
-            fnum(b, "soft_threshold", "ソフトニー幅");
-            fnum(b, "intensity");
-            fnum(b, "radius", "ブラー半径 (px @half-res)");
-            fint(b, "mip_levels", "ダウンサンプル段数");
-            fnum(b, "scatter", "mip 散乱重み");
-            break;
-        }
-        case "ToneMapping": {
-            const t = pp.tone_mapping;
-            grid.appendChild(fieldEnum("op", ENUMS.tone_map_op, t.op,
-                (v) => { t.op = v; markDirty(); }, "トーンマップ演算子"));
-            fnum(t, "exposure");
-            fnum(t, "gamma");
-            fnum(t, "white_point", "REINHARD_EXT で使用");
-            fnum(t, "saturation", "1.0 = 変化なし");
-            break;
-        }
-        case "Vignette": {
-            const v = pp.vignette;
-            fnum(v, "intensity", "0 = なし, 1 = 強い縁暗化");
-            fnum(v, "radius", "減衰が始まる正規化距離");
-            fnum(v, "softness", "減衰幅");
-            grid.appendChild(fieldVec3("color", v.color, (arr) => {
-                v.color = arr; markDirty();
-            }));
-            break;
-        }
-        case "ColorGrading": {
-            const c = pp.color_grading;
-            grid.appendChild(fieldText("lut_path", c.lut_path,
-                (v) => { c.lut_path = v; markDirty(); }, "PNG LUT strip; 空で LUT 無効"));
-            fnum(c, "lut_intensity", "0..1 ブレンド");
-            fint(c, "lut_size", "LUT cube 辺長");
-            break;
-        }
-        case "DepthOfField": {
-            const d = pp.depth_of_field;
-            fnum(d, "focus_distance");
-            fnum(d, "focus_range");
-            fnum(d, "bokeh_radius");
-            fnum(d, "near_start");
-            fnum(d, "near_end");
-            fnum(d, "far_start");
-            fnum(d, "far_end");
-            fint(d, "sample_count");
-            break;
-        }
-        default: {
-            const note = document.createElement("p");
-            note.className = "pep-note";
-            note.textContent =
-                "host-driven な PostProcessPipeline に実装の無いエフェクト "
-                + "(SSAO / TAA / FXAA / VolumetricFog 等)。 name / enabled / kind は "
-                + "round-trip するが、 C++ ブリッジは無視する (系統B phase 2)。";
-            grid.appendChild(note);
-        }
-    }
-    return grid;
-}
-
-function renderPostProcess() {
-    const host = $("pp_list");
-    host.innerHTML = "";
-    const stack = CURRENT.post_process;
-    if (!stack.length) {
-        host.innerHTML = `<p class="pep-note">effect 無し — preset の post-process スタックがそのまま使われる。</p>`;
-    }
-    stack.forEach((pp, i) => {
-        ensurePpSlots(pp);
-        const card = document.createElement("div");
-        card.className = "pp-card";
-
-        const head = document.createElement("div");
-        head.className = "pc-head";
-        head.innerHTML = `<span class="pc-idx">#${i}</span>`;
-        const nameInput = document.createElement("input");
-        nameInput.type = "text";
-        nameInput.value = pp.name;
-        nameInput.placeholder = "Bloom / SSAO / Tonemapping / TAA / FXAA …";
-        nameInput.style.flex = "1";
-        head.appendChild(nameInput);
-        head.appendChild(fieldBoolInline("enabled", pp.enabled, (v) => { pp.enabled = v; markDirty(); }));
-        head.appendChild(makeBtn("▲", "pc-btn", i === 0, () => movePp(i, -1)));
-        head.appendChild(makeBtn("▼", "pc-btn", i === stack.length - 1, () => movePp(i, 1)));
-        head.appendChild(makeBtn("✕", "pc-btn del", false, () => {
-            stack.splice(i, 1); renderPostProcess(); markDirty();
-        }));
-        card.appendChild(head);
-
-        // kind selector — drives which typed parameter editor is shown.
-        const kindRow = document.createElement("div");
-        kindRow.className = "field-grid";
-        const kindField = fieldEnum("kind", ENUMS.pp_kind, pp.kind, (v) => {
-            pp.kind = v;
-            renderPostProcess();   // re-render to swap the parameter editor
-            markDirty();
-        }, "エフェクト種別 — 対応パラメータのみ C++ に届く");
-        kindRow.appendChild(kindField);
-        card.appendChild(kindRow);
-
-        // Editing the name re-infers kind unless the user pinned it.
-        nameInput.addEventListener("input", () => {
-            pp.name = nameInput.value;
-            const inferred = ppKindFromName(pp.name);
-            if (inferred !== "Unknown") {
-                pp.kind = inferred;
-                renderPostProcess();
-            }
-            markDirty();
-        });
-
-        card.appendChild(ppParamGrid(pp));
-        host.appendChild(card);
-    });
-}
-
-function movePp(i, dir) {
-    const stack = CURRENT.post_process;
-    const j = i + dir;
-    if (j < 0 || j >= stack.length) return;
-    [stack[i], stack[j]] = [stack[j], stack[i]];
-    renderPostProcess();
-    markDirty();
-}
-
-// ── JSON preview ──────────────────────────────────────────────────────
-function refreshJsonPreview() {
-    const el = $("json_preview");
-    if (!el) return;
-    if (!CURRENT) { el.textContent = ""; return; }
-    el.textContent = JSON.stringify(serializeForPreview(CURRENT), null, 2);
-    el.className = "language-json";
-    if (window.hljs) hljs.highlightElement(el);
-}
-
-// Mirror profile_schema.ts serializePostProcess(): name/enabled/kind +
-// only the parameter block matching `kind`.
-function serializePpForPreview(pp) {
-    const out = { name: pp.name, enabled: pp.enabled, kind: pp.kind };
-    switch (pp.kind) {
-        case "Bloom":        out.bloom = { ...pp.bloom }; break;
-        case "ToneMapping":  out.tone_mapping = { ...pp.tone_mapping }; break;
-        case "Vignette":     out.vignette = { ...pp.vignette, color: [...pp.vignette.color] }; break;
-        case "ColorGrading": out.color_grading = { ...pp.color_grading }; break;
-        case "DepthOfField": out.depth_of_field = { ...pp.depth_of_field }; break;
-        default: break;
-    }
-    return out;
-}
-
-// Mirror profile_schema.ts serializeProfile(): version first, each
-// post_process entry carrying its typed kind + matching effect block.
-function serializeForPreview(p) {
-    return {
-        version: 1,
-        profile_name: p.profile_name,
-        rendering_path: p.rendering_path,
-        max_lights: p.max_lights,
-        msaa_samples: p.msaa_samples,
-        gpu_driven_enabled: p.gpu_driven_enabled,
-        compute_update_enabled: p.compute_update_enabled,
-        render_passes: p.render_passes.map((rp) => ({ ...rp })),
-        post_process: p.post_process.map(serializePpForPreview),
-        shadow: { ...p.shadow },
-        gi: {
-            shadow_enabled: p.gi.shadow_enabled,
-            ssao_enabled: p.gi.ssao_enabled,
-            gi_probes_enabled: p.gi.gi_probes_enabled,
-            shadow: { ...p.gi.shadow },
-            ssao: { ...p.gi.ssao },
-            probes: { ...p.gi.probes },
-        },
-        memory: { ...p.memory, gpu: { ...p.memory.gpu } },
-        gpu_driven: { ...p.gpu_driven },
-        update: { ...p.update },
-        profiler: { ...p.profiler },
-    };
-}
-
-// ── field widget factories ────────────────────────────────────────────
-function escapeHtml(s) {
-    return String(s ?? "").replace(/[&<>"]/g, (c) =>
-        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-function fieldWrap(key, hint) {
-    const f = document.createElement("div");
-    f.className = "field";
-    const label = document.createElement("label");
-    label.textContent = key;
-    f.appendChild(label);
-    if (hint) {
-        const h = document.createElement("span");
-        h.className = "field-hint";
-        h.textContent = hint;
-        f._hint = h;
-    }
-    return f;
-}
-
-function fieldText(key, value, onChange, hint) {
-    const f = fieldWrap(key, hint);
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = value ?? "";
-    input.addEventListener("input", () => onChange(input.value));
-    f.appendChild(input);
-    if (f._hint) f.appendChild(f._hint);
-    return f;
-}
-
-function fieldNum(key, value, onChange, isFloat, hint) {
-    const f = fieldWrap(key, hint);
-    const input = document.createElement("input");
-    input.type = "number";
-    if (!isFloat) input.step = "1";
-    input.value = value ?? 0;
-    input.addEventListener("input", () => {
-        const n = isFloat ? parseFloat(input.value) : parseInt(input.value, 10);
-        if (Number.isFinite(n)) onChange(n);
-    });
-    f.appendChild(input);
-    if (f._hint) f.appendChild(f._hint);
-    return f;
-}
-const fieldInt = (k, v, cb, hint) => fieldNum(k, v, cb, false, hint);
-
-function fieldEnum(key, options, value, onChange, hint) {
-    const f = fieldWrap(key, hint);
-    const sel = document.createElement("select");
-    for (const opt of options) {
-        const o = document.createElement("option");
-        o.value = opt; o.textContent = opt;
-        if (opt === value) o.selected = true;
-        sel.appendChild(o);
-    }
-    sel.addEventListener("change", () => onChange(sel.value));
-    f.appendChild(sel);
-    if (f._hint) f.appendChild(f._hint);
-    return f;
-}
-
-function fieldEnumNum(key, options, value, onChange, hint) {
-    const f = fieldWrap(key, hint);
-    const sel = document.createElement("select");
-    for (const opt of options) {
-        const o = document.createElement("option");
-        o.value = String(opt); o.textContent = String(opt);
-        if (opt === value) o.selected = true;
-        sel.appendChild(o);
-    }
-    sel.addEventListener("change", () => onChange(parseInt(sel.value, 10)));
-    f.appendChild(sel);
-    if (f._hint) f.appendChild(f._hint);
-    return f;
-}
-
-function fieldBool(key, value, onChange) {
-    const f = document.createElement("div");
-    f.className = "field bool";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = !!value;
-    cb.addEventListener("change", () => onChange(cb.checked));
-    const label = document.createElement("label");
-    label.textContent = key;
-    f.appendChild(cb);
-    f.appendChild(label);
-    return f;
-}
-
-function fieldBoolInline(key, value, onChange) {
-    const wrap = document.createElement("label");
-    wrap.style.cssText = "font-size:.74rem;color:var(--text-2);display:flex;gap:4px;align-items:center;";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = !!value;
-    cb.addEventListener("change", () => onChange(cb.checked));
-    wrap.appendChild(cb);
-    wrap.appendChild(document.createTextNode(key));
-    return wrap;
-}
-
-function fieldVec3(key, value, onChange) {
-    const f = document.createElement("div");
-    f.className = "field vec3";
-    const label = document.createElement("label");
-    label.textContent = `${key} [x,y,z]`;
-    f.appendChild(label);
-    const box = document.createElement("div");
-    box.className = "vec3-inputs";
-    const arr = Array.isArray(value) ? value.slice(0, 3) : [0, 0, 0];
-    [0, 1, 2].forEach((idx) => {
-        const input = document.createElement("input");
-        input.type = "number";
-        input.value = arr[idx] ?? 0;
-        input.addEventListener("input", () => {
-            const n = parseFloat(input.value);
-            if (Number.isFinite(n)) { arr[idx] = n; onChange(arr); }
-        });
-        box.appendChild(input);
-    });
-    f.appendChild(box);
-    return f;
-}
-
-// string-list editor: chips + an inline "add" input
-function fieldStrList(key, arr, onChange, hint) {
-    const f = fieldWrap(key, hint);
-    const box = document.createElement("div");
-    box.className = "strlist";
-
-    function repaint() {
-        box.innerHTML = "";
-        arr.forEach((s, i) => {
-            const chip = document.createElement("span");
-            chip.className = "chip";
-            chip.appendChild(document.createTextNode(s));
-            const x = document.createElement("button");
-            x.type = "button"; x.textContent = "✕";
-            x.addEventListener("click", () => { arr.splice(i, 1); repaint(); onChange(); });
-            chip.appendChild(x);
-            box.appendChild(chip);
-        });
-        const adder = document.createElement("input");
-        adder.type = "text";
-        adder.placeholder = "+ add";
-        adder.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && adder.value.trim()) {
-                arr.push(adder.value.trim());
-                repaint();
-                onChange();
-                const next = box.querySelector("input");
-                if (next) next.focus();
-            }
-        });
-        box.appendChild(adder);
-    }
-    repaint();
-    f.appendChild(box);
-    if (f._hint) f.appendChild(f._hint);
-    return f;
-}
-
-function makeBtn(label, cls, disabled, onClick) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = cls;
-    b.textContent = label;
-    b.disabled = !!disabled;
-    b.addEventListener("click", onClick);
-    return b;
-}
-
-// ── WS: react to profile changes from other clients ───────────────────
 function connectWs() {
-    let url;
-    try {
-        const base = new URL("./ws", location.href);
-        base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
-        url = base.toString();
-    } catch { return; }
-    let ws;
-    try { ws = new WebSocket(url); } catch { return; }
-    ws.addEventListener("message", (ev) => {
-        let msg;
-        try { msg = JSON.parse(ev.data); } catch { return; }
-        if (msg && msg.op === "profiles-changed") {
-            // Refresh the list silently; never clobber unsaved edits.
-            if (editorLoaded && !DIRTY) loadProfileList(CURRENT_FILE);
-        } else if (msg && msg.op === "timing") {
-            // Phase 2 seam: runtime GPU timestamps overlaid on the timeline.
-            applyTimingMessage(msg);
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const url = `${proto}://${location.host}/render_pipeline/ws`;
+    setWs("…");
+    state.ws = new WebSocket(url);
+    state.ws.addEventListener("open",  () => setWs("connected", "ok"));
+    state.ws.addEventListener("close", () => { setWs("disconnected", "err"); setTimeout(connectWs, 3000); });
+    state.ws.addEventListener("error", () => setWs("error", "err"));
+    state.ws.addEventListener("message", (ev) => {
+        let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+        if (msg.op === "timing") {
+            applyTiming(msg);
+        } else if (msg.op === "profiles-changed") {
+            if (msg.file && msg.file === state.file && !state.dirty) {
+                // Re-pull silently.
+                loadProfile(state.file).catch((e) => setStatus(e.message, "err"));
+            } else {
+                reloadProfileList().catch(() => {});
+            }
         }
     });
-    ws.addEventListener("close", () => setTimeout(connectWs, 3000));
-    ws.addEventListener("error", () => {});
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  Boot — scanner is the default mode.
-// ════════════════════════════════════════════════════════════════════
-connectWs();
-setMode("scanner");
+// --------------------------------------------------------------------------
+// Utilities
+// --------------------------------------------------------------------------
+
+function escapeText(s) {
+    return String(s).replace(/[&<>]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+}
+function escapeAttr(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+// --------------------------------------------------------------------------
+// Render all
+// --------------------------------------------------------------------------
+
+function renderAll() {
+    renderAttachmentPanel();
+    buildGraph();
+    renderInspector();
+    renderProfileSelect();
+}
+
+// --------------------------------------------------------------------------
+// Boot
+// --------------------------------------------------------------------------
+
+(async function boot() {
+    try {
+        await reloadProfileList();
+        if (state.profiles.length) {
+            await loadProfile(state.profiles[0].file);
+        } else {
+            setStatus("profile directory is empty", "warn");
+        }
+        connectWs();
+    } catch (e) {
+        setStatus(`boot failed: ${e.message}`, "err");
+        connectWs();
+    }
+})();
+
+})();
