@@ -269,6 +269,79 @@ function computeMaxTiming() {
     return max;
 }
 
+/// post_process[] の各 effect に対応する synthetic node id を返す。
+/// 衝突回避のため `__pp/` プレフィックス付き (pass_name は ASCII slash を含まない前提)。
+function postProcessSubNodeId_(index, effectName) {
+    return `__pp/${index}:${effectName || "effect"}`;
+}
+
+/// post_process[] の sub-node を nodes 配列に追加する。
+/// アンカーは render_passes[] 中の最初の POST_PROCESS pass。 アンカーが
+/// 無い場合は何もしない。 effect の `enabled` が false なら dim 表示。
+function appendPostProcessSubNodes_(nodes) {
+    const pp = state.profile.post_process || [];
+    if (!pp.length) return;
+    const anchor = state.profile.render_passes.find((p) => p.pass_type === "POST_PROCESS");
+    if (!anchor) return;
+
+    // kind ごとに色味を変える (vis-network)。 dim 色は enabled=false 用。
+    const kindColor = {
+        Bloom:        { bg: "#3c2a4a", bd: "#bb9af7" },
+        ToneMapping:  { bg: "#2a3c4a", bd: "#7aa2f7" },
+        Vignette:     { bg: "#2a4a3c", bd: "#9ece6a" },
+        ColorGrading: { bg: "#4a3c2a", bd: "#e0af68" },
+        DepthOfField: { bg: "#4a2a3c", bd: "#f7768e" },
+        Unknown:      { bg: "#2a2a2a", bd: "#565f89" },
+    };
+
+    pp.forEach((effect, i) => {
+        const id      = postProcessSubNodeId_(i, effect.name);
+        const enabled = effect.enabled !== false;
+        const col     = kindColor[effect.kind] || kindColor.Unknown;
+        nodes.push({
+            id,
+            label: `${effect.name || "(unnamed)"}\n[${effect.kind || "Unknown"}]${enabled ? "" : " · off"}`,
+            shape: "ellipse",
+            color: {
+                background: enabled ? col.bg : "#1f1f1f",
+                border:     enabled ? col.bd : "#3a3a3a",
+                highlight:  { background: col.bg, border: "#7aa2f7" },
+            },
+            font: {
+                color: enabled ? "#e6edf3" : "#7c7466",
+                size:  11, face: "monospace",
+            },
+            margin: 6,
+            // Drag 位置の永続化対象から外すための marker (dragEnd で見る)。
+            _pp_sub: true,
+        });
+    });
+}
+
+/// post_process[] の sub-node を chain で結ぶ edges を追加する。
+///   POST_PROCESS pass → pp[0] → pp[1] → ... → pp[N-1]
+function appendPostProcessSubEdges_(edges) {
+    const pp = state.profile.post_process || [];
+    if (!pp.length) return;
+    const anchor = state.profile.render_passes.find((p) => p.pass_type === "POST_PROCESS");
+    if (!anchor) return;
+
+    let prevId = anchor.pass_name;
+    for (let i = 0; i < pp.length; ++i) {
+        const id = postProcessSubNodeId_(i, pp[i].name);
+        edges.push({
+            id:     `e_pp_chain_${i}`,
+            from:   prevId,
+            to:     id,
+            dashes: true,
+            color:  { color: "#bb9af7", highlight: "#e0af68" },
+            arrows: "to",
+            smooth: false,
+        });
+        prevId = id;
+    }
+}
+
 function buildGraph() {
     if (!state.profile) {
         if (network) { network.destroy(); network = null; }
@@ -289,6 +362,11 @@ function buildGraph() {
             shapeProperties: { borderRadius: 4 },
         };
     });
+
+    // post_process[] の各エフェクトを sub-node として PostProcess pass に
+    // ぶら下げる (Phase 4 editor improvement)。 sub-node は visualization のみで
+    // render_passes[] には書き戻さない (Pictor 側は post_process[] を独自に消費)。
+    appendPostProcessSubNodes_(nodes);
 
     // Edges: producer -> consumer per shared attachment name.
     const edges = [];
@@ -314,6 +392,7 @@ function buildGraph() {
             });
         }
     }
+    appendPostProcessSubEdges_(edges);
 
     // Phase 4 editor: profile._editor.nodePositions から位置を復元。
     //   1 つでも node に保存位置があれば hierarchical を切り、 全 node を free
@@ -364,6 +443,12 @@ function buildGraph() {
         });
         network.on("selectNode", (params) => {
             const id = params.nodes[0];
+            // post_process sub-node は inspector 対象外 (visualization-only)。
+            if (id && id.startsWith("__pp/")) {
+                state.selectedPass = null;
+                renderInspector();
+                return;
+            }
             if (id) showInspector(id);
         });
         network.on("deselectNode", () => {
@@ -371,16 +456,21 @@ function buildGraph() {
             renderInspector();
         });
         network.on("doubleClick", (params) => {
-            if (params.nodes.length) network.editEdgeMode();
+            if (params.nodes.length && !params.nodes[0].startsWith("__pp/")) {
+                network.editEdgeMode();
+            }
         });
         // Drag 完了で位置を profile._editor.nodePositions に保存。 setDirty
         // して通常の保存フロー (Ctrl+S / 保存ボタン) で disk へ。
+        // post_process sub-node の位置は保存しない (chain 配置で十分)。
         network.on("dragEnd", (params) => {
             if (!params.nodes || !params.nodes.length) return;
-            const pos = network.getPositions(params.nodes);
+            const realNodes = params.nodes.filter((id) => !id.startsWith("__pp/"));
+            if (!realNodes.length) return;
+            const pos = network.getPositions(realNodes);
             if (!state.profile._editor) state.profile._editor = {};
             if (!state.profile._editor.nodePositions) state.profile._editor.nodePositions = {};
-            for (const id of params.nodes) {
+            for (const id of realNodes) {
                 const p = pos[id];
                 if (p) state.profile._editor.nodePositions[id] = { x: p.x, y: p.y };
             }
