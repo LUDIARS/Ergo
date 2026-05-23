@@ -227,6 +227,17 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_render
+    summary: Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)
+    category: システム
+    header_dir: include/ergo/render/
+    source_dir: src/render/
+    test_dir:   tests/render/
+    spec:       spec/module/render.md
+    cmake_option: ERGO_BUILD_RENDER   # Vulkan 実描画経路は pictor + Vulkan SDK 検出時のみ
+    tool_plugin: null
+    status: preview   # Vulkan 非依存部分のみテスト済。 KS/AC への載せ替えは P2
+
 shared_libs:
   - name: ergo_common
     summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
