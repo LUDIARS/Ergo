@@ -501,6 +501,8 @@ function renderInspector() {
       <div id="inputs-list"></div>
       <button id="inputs-add" type="button">+ input</button>
 
+      <div id="usage-warnings"></div>
+
       <h4>attachment_ops</h4>
       <table class="ops-grid"><tbody id="ops-body"></tbody></table>
       <div class="panel-hint" style="margin:0;">
@@ -635,6 +637,59 @@ function renderInspector() {
         state.selectedPass = null;
         setDirty(); renderAll();
     });
+
+    // attachment usage validation (Phase 4 editor improvement) — pass の
+    // render_targets / input_textures が参照する attachment の usage bit が
+    // 用法と整合するかチェックして warning を出す。 実行時 validation layer
+    // を待たずに編集時に気付ける。
+    const warnings = validateAttachmentUsage_(pass, state.profile);
+    const warnBox = $("usage-warnings");
+    if (warnings.length) {
+        warnBox.innerHTML = `<h4>⚠ usage 整合性</h4>` + warnings.map((w) =>
+            `<div class="panel-hint warn">• ${escapeText(w)}</div>`).join("");
+    } else {
+        warnBox.innerHTML = "";
+    }
+}
+
+/// pass の attachment 参照と AttachmentDef.usage が整合するか検査する。
+/// 戻り値は human-readable な警告メッセージ配列 (空 = 問題なし)。
+///
+///   - render_targets[i]: 参照先の usage に COLOR_ATTACHMENT (DEPTH の場合は
+///     DEPTH_STENCIL_ATTACHMENT) が無ければ warning。 SWAPCHAIN_COLOR は
+///     COLOR_ATTACHMENT で OK。
+///   - input_textures[i]: 参照先の usage に SAMPLED が無ければ warning。
+///   - 該当 attachment 名が attachments[] に無い → warning (未登録)
+function validateAttachmentUsage_(pass, profile) {
+    const out = [];
+    const attsByName = new Map(profile.attachments.map((a) => [a.name, a]));
+
+    for (const tgt of pass.render_targets) {
+        const att = attsByName.get(tgt);
+        if (!att) { out.push(`render_targets[${tgt}] が attachments[] に未登録`); continue; }
+        const usage = att.usage || [];
+        if (att.kind === "DEPTH") {
+            if (!usage.includes("DEPTH_STENCIL_ATTACHMENT")) {
+                out.push(`render_targets[${tgt}] は DEPTH attachment だが usage に DEPTH_STENCIL_ATTACHMENT が無い`);
+            }
+        } else {
+            // COLOR / SWAPCHAIN_COLOR とも COLOR_ATTACHMENT が必要
+            if (!usage.includes("COLOR_ATTACHMENT")) {
+                out.push(`render_targets[${tgt}] は ${att.kind} attachment だが usage に COLOR_ATTACHMENT が無い`);
+            }
+        }
+    }
+
+    for (const inp of pass.input_textures) {
+        const att = attsByName.get(inp);
+        if (!att) { out.push(`input_textures[${inp}] が attachments[] に未登録`); continue; }
+        const usage = att.usage || [];
+        if (!usage.includes("SAMPLED")) {
+            out.push(`input_textures[${inp}] は usage に SAMPLED が無い (descriptor binding 不可)`);
+        }
+    }
+
+    return out;
 }
 
 // --------------------------------------------------------------------------
