@@ -80,5 +80,5 @@ tools/ergo/src/plugins/render_pipeline/
 - multiple subpass (1 VkRenderPass 内の複数 subpass) は schema v2 で未対応 (Phase 4)
 - subpass dependency の明示は UI で編集できず、 Pictor 側が `attachment_ops` の `final_layout` ↔ 次 pass の `initial_layout` から自動生成する
 - ~~attachment usage ビットの組み合わせ検証なし~~ → **解消** (Phase 4): Inspector に usage 整合警告を表示 (`render_targets` が COLOR/DEPTH 用 usage を持つか、 `input_textures` が SAMPLED を持つか、 未登録参照のチェック)
-- ノードの自動レイアウトは hierarchical (LR) のみ。 ドラッグで動かした位置は永続化しない (Phase 4)
+- ~~ノード位置のドラッグ永続化なし~~ → **解消** (Phase 4): drag end で `profile._editor.nodePositions` に保存、 次回ロードで復元 (Pictor は unknown key を skip するので影響なし)
 - 並行編集の競合解決は last-write-wins。 別クライアントの保存通知で未保存差分なし時は静かに再読込
