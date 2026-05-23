@@ -30,6 +30,7 @@ const state = {
     timingEnabled: true,
     selectedPass: null,       // pass_name
     selectedAttachment: null, // name
+    selectedPostProcess: -1,  // index into profile.post_process[], or -1
     ws:          null,
 };
 
@@ -443,16 +444,20 @@ function buildGraph() {
         });
         network.on("selectNode", (params) => {
             const id = params.nodes[0];
-            // post_process sub-node は inspector 対象外 (visualization-only)。
             if (id && id.startsWith("__pp/")) {
+                // post_process sub-node — index を取り出して PP inspector を出す。
+                const m = id.match(/^__pp\/(\d+):/);
                 state.selectedPass = null;
+                state.selectedPostProcess = m ? parseInt(m[1], 10) : -1;
                 renderInspector();
                 return;
             }
+            state.selectedPostProcess = -1;
             if (id) showInspector(id);
         });
         network.on("deselectNode", () => {
             state.selectedPass = null;
+            state.selectedPostProcess = -1;
             renderInspector();
         });
         network.on("doubleClick", (params) => {
@@ -532,6 +537,35 @@ $("pass-add-btn").addEventListener("click", () => {
     renderAll();
 });
 
+$("pp-add-btn").addEventListener("click", () => {
+    if (!state.profile) return;
+    // 既存 PostProcess pass が無ければ警告 (sub-node は anchor 必須)。
+    if (!state.profile.render_passes.some((p) => p.pass_type === "POST_PROCESS")) {
+        setStatus("POST_PROCESS の pass が無いと post-process は連結できません (pass を 1 つ追加してから)", "warn");
+        return;
+    }
+    // 名前重複回避。
+    let name = "NewEffect";
+    let n = 1;
+    while ((state.profile.post_process || []).some((pp) => pp.name === name)) {
+        n++; name = `NewEffect_${n}`;
+    }
+    state.profile.post_process.push({
+        name,
+        enabled: true,
+        kind:    "Bloom",
+        bloom:          { threshold: 1.0, soft_threshold: 0.5, intensity: 0.8, radius: 5.0, mip_levels: 5, scatter: 0.7 },
+        tone_mapping:   { op: "ACES_FILMIC", exposure: 1.0, gamma: 2.2, white_point: 4.0, saturation: 1.0 },
+        vignette:       { intensity: 0.35, radius: 0.75, softness: 0.45, color: [0, 0, 0] },
+        color_grading:  { lut_path: "", lut_intensity: 1.0, lut_size: 16 },
+        depth_of_field: { focus_distance: 10, focus_range: 5, bokeh_radius: 4, near_start: 0, near_end: 3, far_start: 15, far_end: 50, sample_count: 16 },
+    });
+    setDirty();
+    renderAll();
+    state.selectedPostProcess = state.profile.post_process.length - 1;
+    renderInspector();
+});
+
 $("auto-layout-btn").addEventListener("click", () => {
     if (network) {
         network.setOptions({ layout: { hierarchical: { enabled: false } } });
@@ -569,10 +603,20 @@ function showInspector(passName) {
 function renderInspector() {
     const title = $("inspector-title");
     const body  = $("inspector-body");
-    if (!state.profile || !state.selectedPass) {
+    if (!state.profile) {
         title.textContent = "Inspector";
         body.className = "panel-hint";
-        body.innerHTML = "ノードをクリックすると pass プロパティをここで編集できます。";
+        body.innerHTML = "プロファイルをロードするとここに表示されます。";
+        return;
+    }
+    if (state.selectedPostProcess >= 0) {
+        renderPostProcessInspector_(state.selectedPostProcess, title, body);
+        return;
+    }
+    if (!state.selectedPass) {
+        title.textContent = "Inspector";
+        body.className = "panel-hint";
+        body.innerHTML = "ノードをクリックすると pass / post-process プロパティをここで編集できます。";
         return;
     }
     const pass = state.profile.render_passes.find((p) => p.pass_name === state.selectedPass);
@@ -769,6 +813,200 @@ function renderInspector() {
     } else {
         warnBox.innerHTML = "";
     }
+}
+
+// --------------------------------------------------------------------------
+// PostProcessInspector — sub-node クリックで開く kind 別パラメータエディタ
+// --------------------------------------------------------------------------
+
+const TONE_MAP_OPS = [
+    "ACES_FILMIC", "REINHARD", "REINHARD_EXT", "UNCHARTED2", "LINEAR_CLAMP",
+];
+const PP_KINDS = [
+    "Unknown", "Bloom", "ToneMapping", "Vignette", "ColorGrading", "DepthOfField",
+];
+
+/// kind ごとのパラメータ定義 (UI 自動生成用)。
+///   ranges は number input の min/max/step ヒント (validation はしない、
+///   ユーザが手で外れた値を入れることも許す)。
+const PP_PARAM_SPECS = {
+    Bloom: {
+        block: "bloom",
+        fields: [
+            { key: "threshold",      label: "Threshold",       type: "number", step: 0.01, min: 0,  max: 5 },
+            { key: "soft_threshold", label: "Soft Threshold",  type: "number", step: 0.01, min: 0,  max: 1 },
+            { key: "intensity",      label: "Intensity",       type: "number", step: 0.01, min: 0,  max: 3 },
+            { key: "radius",         label: "Radius",          type: "number", step: 0.1,  min: 0,  max: 20 },
+            { key: "mip_levels",     label: "Mip Levels",      type: "int",    step: 1,    min: 1,  max: 8 },
+            { key: "scatter",        label: "Scatter",         type: "number", step: 0.01, min: 0,  max: 1 },
+        ],
+    },
+    ToneMapping: {
+        block: "tone_mapping",
+        fields: [
+            { key: "op",          label: "Operator",   type: "enum",   options: TONE_MAP_OPS },
+            { key: "exposure",    label: "Exposure",   type: "number", step: 0.01, min: 0,  max: 10 },
+            { key: "gamma",       label: "Gamma",      type: "number", step: 0.01, min: 1,  max: 3 },
+            { key: "white_point", label: "White Point",type: "number", step: 0.1,  min: 1,  max: 20 },
+            { key: "saturation",  label: "Saturation", type: "number", step: 0.01, min: 0,  max: 3 },
+        ],
+    },
+    Vignette: {
+        block: "vignette",
+        fields: [
+            { key: "intensity", label: "Intensity", type: "number", step: 0.01, min: 0, max: 1 },
+            { key: "radius",    label: "Radius",    type: "number", step: 0.01, min: 0, max: 2 },
+            { key: "softness",  label: "Softness",  type: "number", step: 0.01, min: 0, max: 1 },
+            { key: "color",     label: "Color",     type: "vec3",   step: 0.01, min: 0, max: 1 },
+        ],
+    },
+    ColorGrading: {
+        block: "color_grading",
+        fields: [
+            { key: "lut_path",      label: "LUT Path",      type: "text" },
+            { key: "lut_intensity", label: "LUT Intensity", type: "number", step: 0.01, min: 0, max: 1 },
+            { key: "lut_size",      label: "LUT Size",      type: "int",    step: 1,    min: 4, max: 64 },
+        ],
+    },
+    DepthOfField: {
+        block: "depth_of_field",
+        fields: [
+            { key: "focus_distance", label: "Focus Distance", type: "number", step: 0.1,  min: 0,    max: 1000 },
+            { key: "focus_range",    label: "Focus Range",    type: "number", step: 0.1,  min: 0,    max: 1000 },
+            { key: "bokeh_radius",   label: "Bokeh Radius",   type: "number", step: 0.1,  min: 0,    max: 50 },
+            { key: "near_start",     label: "Near Start",     type: "number", step: 0.1,  min: 0,    max: 1000 },
+            { key: "near_end",       label: "Near End",       type: "number", step: 0.1,  min: 0,    max: 1000 },
+            { key: "far_start",      label: "Far Start",      type: "number", step: 0.1,  min: 0,    max: 1000 },
+            { key: "far_end",        label: "Far End",        type: "number", step: 0.1,  min: 0,    max: 1000 },
+            { key: "sample_count",   label: "Sample Count",   type: "int",    step: 1,    min: 1,    max: 128 },
+        ],
+    },
+    Unknown: {
+        block: null,
+        fields: [],
+    },
+};
+
+function renderPostProcessInspector_(index, title, body) {
+    const pp = (state.profile.post_process || [])[index];
+    if (!pp) {
+        // インデックス更新 (削除等) で stale: クリアして normal inspector へ。
+        state.selectedPostProcess = -1;
+        renderInspector();
+        return;
+    }
+    title.textContent = `Post-Process [${index}]: ${pp.name || "(unnamed)"}`;
+    body.className = "";
+
+    const spec = PP_PARAM_SPECS[pp.kind] || PP_PARAM_SPECS.Unknown;
+    const block = spec.block;
+
+    // ── ヘッダ部 (name / kind / enabled) ────────────────────────────────
+    const header = `
+      <div class="field">
+        <label>name</label>
+        <input type="text" id="pp-name" value="${escapeAttr(pp.name)}">
+      </div>
+      <div class="field">
+        <label>kind</label>
+        <select id="pp-kind">${PP_KINDS.map((k) =>
+          `<option value="${k}" ${k === pp.kind ? "selected" : ""}>${k}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="pp-enabled" ${pp.enabled ? "checked" : ""}> enabled</label>
+      </div>
+    `;
+
+    // ── パラメータブロック (kind 別) ─────────────────────────────────────
+    let paramsHtml = "";
+    if (block) {
+        paramsHtml += `<h4>${pp.kind} parameters</h4>`;
+        for (const f of spec.fields) {
+            const v = (pp[block] || {})[f.key];
+            if (f.type === "enum") {
+                paramsHtml += `<div class="field">
+                    <label>${escapeText(f.label)}</label>
+                    <select data-k="${escapeAttr(f.key)}">${f.options.map((o) =>
+                      `<option value="${o}" ${o === v ? "selected" : ""}>${o}</option>`).join("")}
+                    </select></div>`;
+            } else if (f.type === "text") {
+                paramsHtml += `<div class="field">
+                    <label>${escapeText(f.label)}</label>
+                    <input type="text" data-k="${escapeAttr(f.key)}" value="${escapeAttr(v ?? "")}"></div>`;
+            } else if (f.type === "vec3") {
+                const a = Array.isArray(v) ? v : [0, 0, 0];
+                paramsHtml += `<div class="field">
+                    <label>${escapeText(f.label)} (RGB)</label>
+                    <div class="vec3-row">
+                      <input type="number" data-k="${escapeAttr(f.key)}" data-i="0"
+                             step="${f.step}" min="${f.min}" max="${f.max}" value="${a[0]}">
+                      <input type="number" data-k="${escapeAttr(f.key)}" data-i="1"
+                             step="${f.step}" min="${f.min}" max="${f.max}" value="${a[1]}">
+                      <input type="number" data-k="${escapeAttr(f.key)}" data-i="2"
+                             step="${f.step}" min="${f.min}" max="${f.max}" value="${a[2]}">
+                    </div></div>`;
+            } else {
+                // number / int 共通
+                paramsHtml += `<div class="field">
+                    <label>${escapeText(f.label)}</label>
+                    <input type="number" data-k="${escapeAttr(f.key)}"
+                           step="${f.step}" min="${f.min}" max="${f.max}" value="${v ?? 0}"></div>`;
+            }
+        }
+    } else {
+        paramsHtml = `<div class="panel-hint">kind=Unknown のためパラメータは編集不可。 kind を切り替えると該当パラメータ編集が出ます。</div>`;
+    }
+
+    body.innerHTML = header + paramsHtml + `
+      <div class="danger-zone">
+        <button id="pp-delete" type="button">この post-process を削除</button>
+      </div>
+    `;
+
+    // ── 値の wiring (input → state) ─────────────────────────────────────
+    $("pp-name").addEventListener("change", (e) => {
+        pp.name = e.target.value.trim();
+        setDirty(); buildGraph(); renderInspector();
+    });
+    $("pp-kind").addEventListener("change", (e) => {
+        pp.kind = e.target.value;
+        setDirty(); buildGraph(); renderInspector();
+    });
+    $("pp-enabled").addEventListener("change", (e) => {
+        pp.enabled = e.target.checked;
+        setDirty(); buildGraph();
+    });
+
+    if (block) {
+        body.querySelectorAll(`[data-k]`).forEach((el) => {
+            const key = el.dataset.k;
+            const f = spec.fields.find((x) => x.key === key);
+            if (!f) return;
+            el.addEventListener("change", () => {
+                if (!pp[block]) pp[block] = {};
+                if (f.type === "vec3") {
+                    const arr = Array.isArray(pp[block][key]) ? pp[block][key].slice() : [0, 0, 0];
+                    arr[parseInt(el.dataset.i, 10)] = parseFloat(el.value) || 0;
+                    pp[block][key] = arr;
+                } else if (f.type === "int") {
+                    pp[block][key] = parseInt(el.value, 10) || 0;
+                } else if (f.type === "number") {
+                    pp[block][key] = parseFloat(el.value) || 0;
+                } else {
+                    pp[block][key] = el.value;
+                }
+                setDirty();
+            });
+        });
+    }
+
+    $("pp-delete").addEventListener("click", () => {
+        if (!confirm(`post-process [${index}] "${pp.name}" を削除しますか?`)) return;
+        state.profile.post_process.splice(index, 1);
+        state.selectedPostProcess = -1;
+        setDirty(); renderAll();
+    });
 }
 
 /// pass の attachment 参照と AttachmentDef.usage が整合するか検査する。
