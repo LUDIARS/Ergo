@@ -11,7 +11,8 @@
 //   overlay= Phase 2 §6.1 GPU timing を node 着色 + ラベル
 //
 // vis-network は physics:false / smooth:false でアニメ無効。 hierarchical
-// レイアウト (LR) を既定とし、 ノードはドラッグで再配置可能 (永続化なし)。
+// レイアウト (LR) を既定とし、 ノードはドラッグで再配置可能 (位置は
+// `profile._editor.nodePositions` に永続化、 PR #38)。
 
 (() => {
 "use strict";
@@ -313,8 +314,6 @@ function appendPostProcessSubNodes_(nodes) {
                 size:  11, face: "monospace",
             },
             margin: 6,
-            // Drag 位置の永続化対象から外すための marker (dragEnd で見る)。
-            _pp_sub: true,
         });
     });
 }
@@ -444,11 +443,12 @@ function buildGraph() {
         });
         network.on("selectNode", (params) => {
             const id = params.nodes[0];
-            if (id && id.startsWith("__pp/")) {
+            if (id && String(id).startsWith("__pp/")) {
                 // post_process sub-node — index を取り出して PP inspector を出す。
                 const m = id.match(/^__pp\/(\d+):/);
                 state.selectedPass = null;
                 state.selectedPostProcess = m ? parseInt(m[1], 10) : -1;
+                state.selectedAttachment = null; // 左 panel の attachment ハイライト解除
                 renderInspector();
                 return;
             }
@@ -461,7 +461,7 @@ function buildGraph() {
             renderInspector();
         });
         network.on("doubleClick", (params) => {
-            if (params.nodes.length && !params.nodes[0].startsWith("__pp/")) {
+            if (params.nodes.length && !String(params.nodes[0]).startsWith("__pp/")) {
                 network.editEdgeMode();
             }
         });
@@ -470,7 +470,7 @@ function buildGraph() {
         // post_process sub-node の位置は保存しない (chain 配置で十分)。
         network.on("dragEnd", (params) => {
             if (!params.nodes || !params.nodes.length) return;
-            const realNodes = params.nodes.filter((id) => !id.startsWith("__pp/"));
+            const realNodes = params.nodes.filter((id) => !String(id).startsWith("__pp/"));
             if (!realNodes.length) return;
             const pos = network.getPositions(realNodes);
             if (!state.profile._editor) state.profile._editor = {};

@@ -11,11 +11,11 @@
 /// struct it mirrors is `pictor::PipelineProfileDef`
 /// (`include/pictor/pipeline/pipeline_profile.h`).
 ///
-/// Distinct from the *scanner* snapshot (`render_pipeline.json`): the
-/// scanner describes how Pictor's hard-coded Vulkan code (系統B) actually
-/// renders today; this schema describes the declarative profile data
-/// (系統A) — i.e. how you *want* it to render. The two are deliberately
-/// kept separate in both API and UI.
+/// Profile-only design (Phase 3, PR #34): the legacy *scanner* snapshot
+/// (`render_pipeline.json`) and its Timeline/Scanner UI modes have been
+/// removed. `*.profile.json` is now the single source of truth — this
+/// schema describes the declarative profile data (系統A) that the single
+/// NodeGraph editor reads and writes.
 
 export const PROFILE_SCHEMA_VERSION = 2;
 
