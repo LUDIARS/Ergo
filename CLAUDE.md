@@ -107,3 +107,25 @@ npm run dev           # watch, default port 5170
   そのまま残る)
 - README.md に最新のモジュール一覧と運用方針を反映する
 - 横断変更 (モジュール側 + ツール側) は 1 PR (理想は 1 コミット) で行うのが原則
+
+## コード規約 (Ergo 固有)
+
+共通: `coding-conventions` skill (= `AIFormat/RULE_CODE.md`) を参照。 以下は Ergo 固有の上書き / 追加。
+
+### モジュール構造
+- **モジュールベース**: 機能は独立モジュール (`ergo_<domain>/`) に自己完結。 副作用は最小、 上層 (= consumer / tools) を import しない。
+- **プラグイン拡張思考**: 機能追加は既存モジュール改修ではなく **新規モジュール / plugin** として外側に出す。 既存 plugin host (= `tools/ergo`) に新規実装を inject する形が default。 既存 file を触らず増やせる経路を最初に検討する。
+
+### SOLID 全 5
+- **S (Single Responsibility)**: 共通通り (1 モジュール / 1 ファイル / 1 責務)。
+- **O (Open/Closed)**: 機能追加は extension point に plugin を足す形。 既存モジュール内に `if/else` で分岐を増やすのではなく、 新規 plugin で対応する。
+- **L (Liskov Substitution)**: 子クラス / 派生 trait は親 interface の契約 (引数 / 戻り値 / 副作用 / 例外) を完全に守る。 子で例外を増やす / 戻り値型を狭めるのは LSP 違反。
+- **I (Interface Segregation)**: client が必要な部分だけ薄く切る。 「大きい IRenderer 1 個」 ではなく `ICulling` / `IShader` / `IPass` 等に分離。
+- **D (Dependency Inversion)**: 上層は **interface に依存**、 具象は DI / factory 経由。 module 内部の具象型を `tools/` から直接 import しない。
+
+### レイヤ依存
+- `ergo_<domain>/` 同士は cross-import 禁止 (= 共有ロジックは `ergo_core` / `ergo_shared` 等の下層に集約)。
+- consumer (`tools/ergo` / 外部ゲーム) は plugin host 経由のみ。
+
+### 参照
+- `coding-conventions` skill / [[project_ergo_redesign]] / [[project_ergo_tools]] / [[feedback_ergo_editor_plugin_pack]]
