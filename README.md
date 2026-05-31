@@ -3,6 +3,13 @@
 LUDIARS / AdventureCube などのアプリで共通利用する C++17 モジュール群と、
 それらに付随する開発ツール群を集約するリポジトリ。
 
+## セットアップ
+
+設定・ビルド手順は用途別に [`spec/setup/`](spec/setup/) にまとめてある:
+
+- [C++ モジュールをビルド](spec/setup/build-cpp.md) / [tools/ergo を起動](spec/setup/run-tools-ergo.md) / [外部プラグイン (ERGO_PLUGIN_DIR)](spec/setup/external-plugins.md) / [プラグインのデータルート](spec/setup/plugin-data-roots.md) / [ブランチ+PR 運用](spec/setup/branch-and-pr.md)
+- 全設定キー: [spec/setup/config-reference.md](spec/setup/config-reference.md)
+
 ## 運用方針
 
 **main ブランチに全モジュールを集約する。** 旧運用 (モジュールごとに `module/<名>`
