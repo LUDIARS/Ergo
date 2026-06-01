@@ -1,0 +1,71 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UI Layout Editor</title>
+  <style>
+    body{margin:0;font-family:Segoe UI,system-ui,sans-serif;background:#0f172a;color:#e2e8f0}
+    .wrap{display:grid;grid-template-columns:1fr 380px;height:100vh}
+    textarea{width:100%;height:100%;background:#111827;color:#e5e7eb;border:0;padding:12px;box-sizing:border-box;font-family:Consolas,monospace}
+    .side{display:flex;flex-direction:column;border-left:1px solid #334155}
+    .row{display:flex;gap:8px;padding:8px;border-bottom:1px solid #334155}
+    input,button{padding:8px;background:#1e293b;color:#e2e8f0;border:1px solid #475569}
+    button{cursor:pointer}
+    #status{padding:8px;font-size:12px;color:#94a3b8}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <textarea id="editor" spellcheck="false"></textarea>
+  <div class="side">
+    <div class="row"><input id="patchUrl" placeholder="patch url" style="flex:1"/><button id="saveCfg">Bridge</button></div>
+    <div class="row"><button id="open">Open</button><button id="save">Save</button><button id="sendPatch">Send Patch</button></div>
+    <div class="row"><input id="nodeId" placeholder="node id"/><button id="pick">Patch Rect x+10</button></div>
+    <div id="status">ready</div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const status=(t)=>$('status').textContent=t;
+let currentPath='';
+let ws;
+async function init(){
+  const cfg=await fetch('/ui_layout/api/bridge/config').then(r=>r.json());
+  $('patchUrl').value=cfg.patchUrl||'';
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ui_layout/ws`);
+  ws.onmessage=(ev)=>status('live:'+ev.data.slice(0,120));
+}
+$('saveCfg').onclick=async()=>{
+  const patchUrl=$('patchUrl').value;
+  await fetch('/ui_layout/api/bridge/config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({patchUrl})});
+  status('bridge updated');
+};
+$('open').onclick=()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,.uilayout.json';
+  inp.onchange=()=>{const f=inp.files[0]; if(!f) return; currentPath=f.name; f.text().then(t=>{$('editor').value=t; status('loaded '+f.name);});}; inp.click();
+};
+$('save').onclick=()=>{
+  const blob=new Blob([$('editor').value],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=currentPath||'layout.uilayout.json'; a.click();
+  status('saved');
+};
+$('pick').onclick=()=>{
+  try{
+    const doc=JSON.parse($('editor').value); const id=$('nodeId').value.trim(); if(!id) return;
+    const q=[doc.root]; while(q.length){const n=q.shift(); if(n.id===id){n.rect=n.rect||{}; n.rect.x=(n.rect.x||0)+10; break;} (n.children||[]).forEach(c=>q.push(c));}
+    $('editor').value=JSON.stringify(doc,null,2); status('edited '+id);
+  }catch{status('invalid json');}
+};
+$('sendPatch').onclick=async()=>{
+  const id=$('nodeId').value.trim(); if(!id){status('node id required');return;}
+  const patch=JSON.stringify({id,rect:{x:10}});
+  const r=await fetch('/ui_layout/api/bridge/patch',{method:'POST',headers:{'content-type':'application/json'},body:patch}).then(x=>x.json());
+  if(ws&&ws.readyState===1) ws.send(JSON.stringify({op:'patch',payload:patch}));
+  status('patch sent '+JSON.stringify(r));
+};
+init();
+</script>
+</body>
+</html>

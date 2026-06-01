@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+﻿cmake_minimum_required(VERSION 3.16)
 project(Ergo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -780,7 +780,12 @@ endif()
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_UI_LAYOUT)
     add_library(ergo_ui_layout STATIC
-        src/ui_layout/ui_layout.cpp
+        src/ui_layout/document.cpp
+        src/ui_layout/json_codec.cpp
+        src/ui_layout/layout_solver.cpp
+        src/ui_layout/binding.cpp
+        src/ui_layout/render_emitter.cpp
+        src/ui_layout/hittest.cpp
     )
     target_include_directories(ergo_ui_layout PUBLIC include)
     target_link_libraries(ergo_ui_layout PUBLIC ergo_common ergo_io)
@@ -847,3 +852,4 @@ if(ERGO_BUILD_BENCHMARKS)
         target_link_libraries(bench_curve PRIVATE ergo_gpu_particle)
     endif()
 endif()
+
