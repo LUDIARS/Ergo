@@ -1,4 +1,4 @@
-# Ergo モジュール一覧 (機械処理用)
+﻿# Ergo モジュール一覧 (機械処理用)
 #
 # 人間向けの一覧は module_list.md を参照。新規モジュール追加時は両方に
 # エントリを足すこと。
@@ -238,9 +238,33 @@ modules:
     tool_plugin: null
     status: preview   # Vulkan 非依存部分のみテスト済。 KS/AC への載せ替えは P2
 
+  - name: ergo_vector
+    summary: SVG path polygon tessellation + extrude 3D mesh + vertex animation scene
+    category: UI
+    header_dir: include/ergo/vector/
+    source_dir: src/vector/
+    test_dir:   tests/vector/
+    spec:       spec/module/vector.md
+    cmake_option: ERGO_BUILD_VECTOR
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_ui_layout
+    summary: Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit.
+    category: UI
+    header_dir: include/ergo/ui_layout/
+    source_dir: src/ui_layout/
+    test_dir:   tests/ui_layout/
+    spec:       spec/module/ui_layout.md
+    cmake_option: ERGO_BUILD_UI_LAYOUT
+    tool_plugin: ui_layout
+    status: preview
+
 shared_libs:
   - name: ergo_common
     summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
     header_dir: include/ergo/common/
     source_dir: src/common/
     spec: null
+
+

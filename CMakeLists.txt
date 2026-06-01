@@ -32,8 +32,10 @@ option(ERGO_BUILD_SCORE        "Build ergo_score"         ON)
 option(ERGO_BUILD_COMBO_COUNTER "Build ergo_combo_counter" ON)
 option(ERGO_BUILD_TIMING_JUDGE "Build ergo_timing_judge"  ON)
 option(ERGO_BUILD_UI_KIT       "Build ergo_ui_kit (retained-mode UI framework)" ON)
+option(ERGO_BUILD_UI_LAYOUT    "Build ergo_ui_layout (data-driven UI layout runtime)" ON)
 option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shuriken → ergo_particle migrator + CLI)" ON)
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
+option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -767,6 +769,60 @@ if(ERGO_BUILD_RENDER)
             if(MSVC)
                 target_compile_options(${NAME} PRIVATE /utf-8)
             endif()
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_ui_layout — data-driven UI layout runtime with bind/update/emit APIs.
+# Pictor-agnostic at module layer via RenderAdapter abstraction.
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_UI_LAYOUT)
+    add_library(ergo_ui_layout STATIC
+        src/ui_layout/ui_layout.cpp
+    )
+    target_include_directories(ergo_ui_layout PUBLIC include)
+    target_link_libraries(ergo_ui_layout PUBLIC ergo_common ergo_io)
+    if(MSVC)
+        target_compile_options(ergo_ui_layout PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_ui_layout tests/ui_layout/test_ui_layout.cpp)
+        target_link_libraries(test_ui_layout PRIVATE ergo_ui_layout ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_ui_layout PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_ui_layout COMMAND test_ui_layout)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_vector - SVG path parser + tessellation + extruded mesh + scene animation
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_VECTOR)
+    add_library(ergo_vector STATIC
+        src/vector/path.cpp
+        src/vector/svg_parser.cpp
+        src/vector/flatten.cpp
+        src/vector/tessellator.cpp
+        src/vector/extruder.cpp
+        src/vector/vector_mesh.cpp
+        src/vector/vector_scene.cpp
+        src/vector/morph.cpp
+        src/vector/bind.cpp
+    )
+    target_include_directories(ergo_vector PUBLIC include)
+    target_include_directories(ergo_vector PRIVATE third_party)
+    if(MSVC)
+        target_compile_options(ergo_vector PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME test_svg_parser test_mesh_build test_extrude test_morph test_scene_collect)
+            add_executable(${NAME} tests/vector/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_vector ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
