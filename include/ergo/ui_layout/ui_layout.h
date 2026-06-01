@@ -91,7 +91,8 @@ public:
     void emit(RenderAdapter& adapter);
 
     Node* find(std::string_view id);
-    void apply_patch(std::string_view json_merge_patch);
+  // Current patch contract is id-based partial patch (not full RFC 7396 merge patch).
+  void apply_patch(std::string_view json_merge_patch);
     std::string to_json() const;
     Node* hit_test(float x, float y);
 

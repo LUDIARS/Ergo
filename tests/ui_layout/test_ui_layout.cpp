@@ -113,3 +113,41 @@ TEST(UiLayout, HitTestFindsFrontNode) {
     EXPECT_EQ(node->id, "timer");
 }
 
+TEST(UiLayout, FlexRowColumnLayoutResolvesPositions) {
+    const char* json = R"JSON({
+  "schema_version": 1,
+  "name": "flex_case",
+  "design_size": { "w": 200, "h": 120 },
+  "root": {
+    "id": "root", "type": "container", "layout": "row",
+    "rect": { "x": 0, "y": 0, "w": 200, "h": 120 },
+    "children": [
+      { "id": "a", "type": "rect", "rect": { "x": 0, "y": 0, "w": 40, "h": 20 } },
+      { "id": "b", "type": "container", "layout": "column", "rect": { "x": 0, "y": 0, "w": 60, "h": 40 },
+        "children": [
+          { "id": "b1", "type": "rect", "rect": { "x": 0, "y": 0, "w": 10, "h": 10 } },
+          { "id": "b2", "type": "rect", "rect": { "x": 0, "y": 0, "w": 10, "h": 10 } }
+        ]
+      }
+    ]
+  }
+})JSON";
+    auto doc = Document::load_json(json);
+    ASSERT_NE(doc, nullptr);
+    doc->update({}, 0.0f);
+
+    auto* a = doc->find("a");
+    auto* b = doc->find("b");
+    auto* b1 = doc->find("b1");
+    auto* b2 = doc->find("b2");
+    ASSERT_NE(a, nullptr);
+    ASSERT_NE(b, nullptr);
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(b2, nullptr);
+
+    EXPECT_FLOAT_EQ(a->resolved_rect.x, 0.0f);
+    EXPECT_FLOAT_EQ(b->resolved_rect.x, 40.0f);
+    EXPECT_FLOAT_EQ(b1->resolved_rect.y, 0.0f);
+    EXPECT_FLOAT_EQ(b2->resolved_rect.y, 10.0f);
+}
+

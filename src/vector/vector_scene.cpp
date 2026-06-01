@@ -1,6 +1,7 @@
 #include "ergo/vector/vector.h"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iterator>
 
@@ -8,6 +9,26 @@ namespace ergo::vector {
 namespace {
 float clamp01(float v) { return std::max(0.0f, std::min(1.0f, v)); }
 Mat4 mat_identity() { Mat4 m{}; m.m[0]=m.m[5]=m.m[10]=m.m[15]=1.0f; return m; }
+Mat4 mat_mul(const Mat4& a, const Mat4& b) {
+  Mat4 o{};
+  for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) {
+    o.m[r*4+c] = 0.0f;
+    for (int k = 0; k < 4; ++k) o.m[r*4+c] += a.m[r*4+k] * b.m[k*4+c];
+  }
+  return o;
+}
+Mat4 mat_translate(const Vec3& t) { Mat4 m = mat_identity(); m.m[3]=t.x; m.m[7]=t.y; m.m[11]=t.z; return m; }
+Mat4 mat_scale(const Vec3& s) { Mat4 m = mat_identity(); m.m[0]=s.x; m.m[5]=s.y; m.m[10]=s.z; return m; }
+Mat4 mat_rot_x(float a){ Mat4 m=mat_identity(); float c=std::cos(a), s=std::sin(a); m.m[5]=c; m.m[6]=-s; m.m[9]=s; m.m[10]=c; return m; }
+Mat4 mat_rot_y(float a){ Mat4 m=mat_identity(); float c=std::cos(a), s=std::sin(a); m.m[0]=c; m.m[2]=s; m.m[8]=-s; m.m[10]=c; return m; }
+Mat4 mat_rot_z(float a){ Mat4 m=mat_identity(); float c=std::cos(a), s=std::sin(a); m.m[0]=c; m.m[1]=-s; m.m[4]=s; m.m[5]=c; return m; }
+Mat4 mat_trs(const Transform& t, float sx) {
+  Transform tt = t;
+  tt.scale.x *= sx;
+  return mat_mul(mat_translate(tt.translate),
+         mat_mul(mat_mul(mat_rot_z(tt.rotate.z), mat_mul(mat_rot_y(tt.rotate.y), mat_rot_x(tt.rotate.x))),
+                 mat_scale(tt.scale)));
+}
 }
 
 std::vector<VectorPath> morph_blend(const std::vector<VectorPath>& a, const std::vector<VectorPath>& b, float w);
@@ -52,9 +73,14 @@ void VectorScene::update(float /*dt*/) {
 }
 
 void VectorScene::collect(std::vector<DrawItem>& out) const {
-  for (const auto& kv : nodes_) { DrawItem d{}; d.mesh = &kv.second.mesh; d.model = mat_identity(); d.model.m[0] = kv.second.scale_x; d.mat = kv.second.mat; out.push_back(d); }
+  for (const auto& kv : nodes_) {
+    DrawItem d{};
+    d.mesh = &kv.second.mesh;
+    d.model = mat_trs(kv.second.tf, kv.second.scale_x);
+    d.mat = kv.second.mat;
+    out.push_back(d);
+  }
 }
 bool VectorScene::dirty() const { return dirty_; }
 
 } // namespace ergo::vector
-
