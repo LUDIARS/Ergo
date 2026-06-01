@@ -22,8 +22,8 @@
                                 │  ・レイアウト解決 (anchor/constraint/flex)
                                 │  ・data-binding (bind式 → ランタイム値)
                                 ├─ プリミティブノード → Pictor UIRenderer (rect/9slice/image/text/clip)
-                                ├─ text ノード        → Pictor TextSvgRenderer/TextImageRenderer (ベクター文字)
-                                └─ vector ノード       → ergo_vector (SVG/Lottie → texture) → UIRenderer Image
+                                ├─ text ノード        → Pictor TextSvgRenderer/TextImageRenderer (ベクター文字。3D 押し出しは ergo_vector 経由も可)
+                                └─ vector ノード       → ergo_vector (SVG → ポリゴン化 → extrude 体積 3D メッシュ) → Pictor 3D 描画
         ▲                                   │
         │ read/write JSON                   │ live patch (JSON-merge)
    tools/ergo UI エディタ ◀── ergo_custos bridge (HTTP/WS) ──▶ 実行中ゲーム
@@ -68,12 +68,12 @@
         "id": "hp_bar_frame",
         "type": "vector",
         "rect": { "x": 24, "y": 56, "w": 320, "h": 28 },
-        "vector": { "src": "data/hud/hp_bar.svg", "fit": "stretch" },
+        "vector": { "src": "data/hud/hp_bar.svg", "fit": "stretch", "extrude": 6.0 },
         "binds": [
           { "target": "node:hp_fill", "op": "scale_x", "expr": "hp_ratio" },
-          { "target": "node:hp_fill", "op": "fill_color", "expr": "hp_low ? '#c0392b' : '#2ecc71'" }
+          { "target": "node:hp_fill", "op": "color", "expr": "hp_low ? '#c0392b' : '#2ecc71'" }
         ],
-        "anim": { "on": "hp_low", "play": "pulse" }   // vector(Lottie/SMIL) のトリガ
+        "anim": { "on": "hp_low", "morph": "pulse", "extrude_pulse": 2.0 }  // vector(頂点モーフ/extrude深度) のトリガ
       },
       {
         "id": "timer",
@@ -127,7 +127,7 @@ struct RenderAdapter {
   virtual void draw_nine_slice(...) = 0;
   virtual void draw_image(TextureRef, ...) = 0;
   virtual void draw_text(std::string_view, const TextStyle&, ...) = 0;   // Pictor ベクターテキストに委譲
-  virtual TextureRef vector_texture(VectorNodeState&) = 0;               // ergo_vector ラスタ→texture
+  virtual void draw_vector_mesh(const VectorDrawItem&) = 0;              // ergo_vector の 3D メッシュを Pictor 3D 描画へ
   virtual void push_clip(...) = 0; virtual void pop_clip() = 0;
 };
 
