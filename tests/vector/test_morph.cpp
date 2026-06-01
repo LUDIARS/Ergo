@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "ergo/vector/vector.h"
+#include <cmath>
 
 using namespace ergo::vector;
 
@@ -22,10 +23,13 @@ TEST(VectorMorph, WeightUpdatesGeometry) {
       {PathCmd::Close, {}, {}, {}}
   };
   s->add_morph_target("a", target);
-  s->set_morph_weight("a", 1.0f);
+  s->set_morph_weight("a", 0.5f);
   s->update(0.016f);
   std::vector<VectorScene::DrawItem> out;
   s->collect(out);
   ASSERT_EQ(out.size(), 1u);
   EXPECT_GT(out[0].mesh->vertices.size(), 0u);
+  float max_x = -999.0f;
+  for (const auto& v : out[0].mesh->vertices) if (v.pos.x > max_x) max_x = v.pos.x;
+  EXPECT_TRUE(std::abs(max_x - 1.5f) < 0.001f);
 }
