@@ -107,7 +107,7 @@ private:
     std::string source_json_;
 
     void solve_layout_();
-    void solve_node_(Node& node, const Rect& parent);
+    void solve_node_(Node& node, const Rect& parent, bool preserve_position = false);
     void apply_binds_(Node& node, const BindContext& ctx);
     void emit_node_(Node& node, RenderAdapter& adapter);
     Node* find_node_(Node& node, std::string_view id);
