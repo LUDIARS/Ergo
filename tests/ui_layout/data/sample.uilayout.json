@@ -1,0 +1,31 @@
+﻿{
+  "schema_version": 1,
+  "name": "sample_hud",
+  "design_size": { "w": 1280, "h": 720 },
+  "root": {
+    "id": "root",
+    "type": "container",
+    "layout": "absolute",
+    "rect": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+    "children": [
+      {
+        "id": "hp_bar",
+        "type": "vector",
+        "rect": { "x": 24, "y": 56, "w": 320, "h": 28 },
+        "vector": { "src": "data/hud/hp_bar.svg", "fit": "stretch", "extrude": 6.0 },
+        "binds": [
+          { "target": "self", "op": "opacity", "expr": "hp_ratio" }
+        ]
+      },
+      {
+        "id": "timer",
+        "type": "text",
+        "rect": { "x": 540, "y": 16, "w": 200, "h": 32 },
+        "text": { "font": "data/fonts/main.ttf", "size": 28, "align": "center", "color": "#ffffff", "value": "00:00" },
+        "binds": [
+          { "target": "self", "op": "text", "expr": "fmt_mmss(time_left)" }
+        ]
+      }
+    ]
+  }
+}
