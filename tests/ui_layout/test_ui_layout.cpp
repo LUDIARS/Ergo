@@ -103,6 +103,34 @@ TEST(UiLayout, UpdateBindEmitMock) {
     EXPECT_EQ(mock.clip_pop, 1);
 }
 
+TEST(UiLayout, ScaleXIsIdempotentAcrossFrames) {
+    // scale_x must derive width from the authored base rect, not compound per frame.
+    const char* json = R"JSON({
+  "schema_version": 1, "name": "bar", "design_size": { "w": 1280, "h": 720 },
+  "root": { "id": "root", "type": "container", "rect": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+    "children": [
+      { "id": "hp_fill", "type": "rect", "rect": { "x": 24, "y": 56, "w": 320, "h": 28 },
+        "binds": [ { "target": "self", "op": "scale_x", "expr": "hp_ratio" } ] }
+    ] } })JSON";
+    auto doc = Document::load_json(json);
+    ASSERT_NE(doc, nullptr);
+
+    BindContext ctx;
+    ctx.emplace("hp_ratio", BindValue::from_number(0.5));
+
+    doc->update(ctx, 0.016f);
+    EXPECT_FLOAT_EQ(doc->find("hp_fill")->rect.w, 160.0f);  // 320 * 0.5
+    // Repeated updates must NOT compound (was a bug: 320*0.5*0.5...).
+    doc->update(ctx, 0.016f);
+    doc->update(ctx, 0.016f);
+    EXPECT_FLOAT_EQ(doc->find("hp_fill")->rect.w, 160.0f);
+
+    // Changing the ratio recomputes from base, not from the shrunk value.
+    ctx["hp_ratio"] = BindValue::from_number(1.0);
+    doc->update(ctx, 0.016f);
+    EXPECT_FLOAT_EQ(doc->find("hp_fill")->rect.w, 320.0f);
+}
+
 TEST(UiLayout, HitTestFindsFrontNode) {
     auto doc = Document::load_json(sample_json());
     ASSERT_NE(doc, nullptr);
