@@ -23,11 +23,11 @@ const factory: PluginFactory = () => {
         for (const ws of clients) if (ws.readyState === WS.OPEN) ws.send(raw);
     }
 
-    function normalizeUserPath(inputPath: string): string {
+    function normalizeUserPath(inputPath: string, ext = ".uilayout.json"): string {
         if (!inputPath.trim()) throw new Error("path is empty");
         const absPath = path.isAbsolute(inputPath) ? inputPath : path.join(rootDir, inputPath);
         const out = path.normalize(absPath);
-        if (!out.endsWith(".uilayout.json")) throw new Error("file extension must be .uilayout.json");
+        if (!out.endsWith(ext)) throw new Error(`file extension must be ${ext}`);
         // Containment guard: never read/write outside rootDir (path-traversal protection).
         const rel = path.relative(rootDir, out);
         if (rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("path must stay within the tool root");
@@ -74,6 +74,18 @@ const factory: PluginFactory = () => {
                 }
             });
 
+            // vector ノードのサムネ用に参照 SVG を配信する。canvas が <img> で
+            // 読み込んで実サムネを描く。拡張子 .svg + containment guard で保護。
+            app.get("/api/file/svg", async (c) => {
+                try {
+                    const filePath = normalizeUserPath(c.req.query("path") ?? "", ".svg");
+                    const svg = await fs.readFile(filePath, "utf8");
+                    return c.body(svg, 200, { "content-type": "image/svg+xml; charset=utf-8" });
+                } catch (e) {
+                    return c.json({ ok: false, error: (e as Error).message }, 400);
+                }
+            });
+
             app.post("/api/bridge/patch", async (c) => {
                 const patch = await c.req.text();
                 const res = await fetch(cfg.patchUrl, {
@@ -98,6 +110,8 @@ const factory: PluginFactory = () => {
         onUpgrade(_req, ws) {
             clients.add(ws);
             ws.on("close", () => clients.delete(ws));
+            // 未処理 error イベントで Node プロセスが落ちるのを防ぐ (particle と同作法)。
+            ws.on("error", () => clients.delete(ws));
             ws.on("message", (raw) => {
                 try {
                     const m = JSON.parse(raw.toString()) as { op?: string };
