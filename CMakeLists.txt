@@ -799,6 +799,12 @@ if(ERGO_BUILD_UI_LAYOUT)
         if(MSVC)
             target_compile_options(test_ui_layout PRIVATE /utf-8)
         endif()
+        # Registered like every other module test. NOTE: with a multi-config
+        # generator (VS) the test is config-scoped, so it is only discoverable
+        # via `ctest -C <Release|Debug|...>`. A bare `ctest -R ui_layout`
+        # reports "Not Run"/"No tests found" for the empty config — that is the
+        # documented invocation (README: `ctest --test-dir build -C Release`),
+        # not a registration bug.
         add_test(NAME test_ui_layout COMMAND test_ui_layout)
     endif()
 endif()

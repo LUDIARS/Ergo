@@ -37,6 +37,42 @@ std::string trim(std::string s) {
     return s.substr(b, e - b + 1);
 }
 
+// Apply a transform mini-spec to node.rect. The rect is fully recomputed from
+// node.base_rect every call, so the result is idempotent across frames and
+// independent of any previous spec (channels not mentioned this frame fall back
+// to the authored base). Tokens are whitespace-separated; each writes distinct
+// rect fields, so their order is irrelevant:
+//   translate(dx,dy) -> rect.x = base.x + dx; rect.y = base.y + dy
+//   translate(dx)    -> dy defaults to 0
+//   scale(sx,sy)     -> rect.w = base.w * sx; rect.h = base.h * sy
+//   scale(s)         -> uniform (sx = sy = s)
+// Malformed / unknown tokens (e.g. rotate(...)) are ignored; the rect then
+// stays at the base. Do not combine `transform` with `scale_x` on one node.
+void apply_transform(Node& node, const std::string& spec) {
+    node.rect = node.base_rect;
+    size_t pos = 0;
+    while (pos < spec.size()) {
+        const auto open = spec.find('(', pos);
+        if (open == std::string::npos) break;
+        const auto close = spec.find(')', open);
+        if (close == std::string::npos) break;
+        const std::string name = trim(spec.substr(pos, open - pos));
+        const std::string args = spec.substr(open + 1, close - open - 1);
+        double a = 0.0, b = 0.0;
+        const int n = std::sscanf(args.c_str(), " %lf , %lf", &a, &b);
+        if (name == "translate" && n >= 1) {
+            node.rect.x = node.base_rect.x + static_cast<float>(a);
+            node.rect.y = node.base_rect.y + (n >= 2 ? static_cast<float>(b) : 0.0f);
+        } else if (name == "scale" && n >= 1) {
+            const float sx = static_cast<float>(a);
+            const float sy = (n >= 2) ? static_cast<float>(b) : sx;
+            node.rect.w = node.base_rect.w * sx;
+            node.rect.h = node.base_rect.h * sy;
+        }
+        pos = close + 1;
+    }
+}
+
 BindValue eval_expr(const std::string& expr, const BindContext& ctx) {
     const std::string e = trim(expr);
     const auto q = e.find('?');
@@ -105,7 +141,10 @@ void Document::apply_binds_(Node& node, const BindContext& ctx) {
         else if (b.op == "visible") node.visible = as_bool(v);
         else if ((b.op == "color" || b.op == "fill_color") && v.kind == BindValue::Kind::String) node.color = v.string;
         else if (b.op == "transform") {
-            // transform op is reserved for future matrix/translation support.
+            // expr resolves to a transform mini-spec string (e.g. a BindContext
+            // variable holding "translate(0,-8) scale(1.1)"); numeric/bool
+            // results stringify to something apply_transform safely ignores.
+            apply_transform(node, as_str(v));
         }
     }
     for (auto& c : node.children) apply_binds_(c, ctx);
