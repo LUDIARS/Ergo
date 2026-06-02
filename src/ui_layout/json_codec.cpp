@@ -29,6 +29,7 @@ void parse_node(const jm::JsonValue& j, Node& out) {
     out.type = jstr(&j, "type", "container");
     out.layout = jstr(&j, "layout", "absolute");
     if (const auto* r = j.find("rect")) out.rect = {jnum(r, "x", 0), jnum(r, "y", 0), jnum(r, "w", 0), jnum(r, "h", 0)};
+    out.base_rect = out.rect;  // snapshot authored rect so per-frame scale_x stays idempotent
     if (const auto* a = j.find("anchor")) { out.anchor.h = jstr(a, "h", "left"); out.anchor.v = jstr(a, "v", "top"); }
     if (const auto* s = j.find("stretch")) {
         if (const auto* v = s->find("left")) { out.stretch.has_left = !v->is_null(); out.stretch.left = static_cast<float>(v->as_number(0)); }
@@ -152,6 +153,7 @@ void Document::apply_patch(std::string_view patch_text) {
         n->rect.y = jnum(r, "y", n->rect.y);
         n->rect.w = jnum(r, "w", n->rect.w);
         n->rect.h = jnum(r, "h", n->rect.h);
+        n->base_rect = n->rect;  // editor/live patch redefines the authored base for scale_x
     }
     if (const auto* t = p.find("text")) n->text_value = jstr(t, "value", n->text_value);
     if (const auto* v = p.find("visible")) n->visible = v->as_bool(n->visible);

@@ -54,6 +54,7 @@ struct Node {
     std::string type = "container";
     std::string layout = "absolute";
     Rect rect;
+    Rect base_rect;      // authored rect snapshot; scale_x derives from this to stay idempotent per-frame
     Rect resolved_rect;
     Anchor anchor;
     Stretch stretch;

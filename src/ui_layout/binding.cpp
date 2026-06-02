@@ -100,7 +100,7 @@ void Document::apply_binds_(Node& node, const BindContext& ctx) {
     for (const auto& b : node.binds) {
         const BindValue v = eval_expr(b.expr, ctx);
         if (b.op == "text" && b.target == "self") node.text_value = as_str(v);
-        else if (b.op == "scale_x") node.rect.w = node.rect.w * static_cast<float>(as_num(v));
+        else if (b.op == "scale_x") node.rect.w = node.base_rect.w * static_cast<float>(as_num(v));
         else if (b.op == "opacity") node.opacity = static_cast<float>(as_num(v));
         else if (b.op == "visible") node.visible = as_bool(v);
         else if ((b.op == "color" || b.op == "fill_color") && v.kind == BindValue::Kind::String) node.color = v.string;
