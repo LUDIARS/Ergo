@@ -91,6 +91,11 @@
 
 ### data-binding
 - `binds[]`: `target` (self / node:<svg内id> / 属性), `op` (text / scale_x / fill_color / opacity / visible / transform), `expr` (バインド式)。
+  - **`scale_x` / `transform` は authored base rect 基準で適用** (毎フレーム base から再計算するので冪等。直前フレームの結果に乗算しない)。
+  - **`transform`**: `expr` が transform ミニ構文の文字列に解決される (例: `BindContext` 変数に `"translate(0,-8) scale(1.1)"` を入れる)。トークンは空白区切りで、各々が別フィールドを書くため順序非依存:
+    - `translate(dx,dy)` → `rect.x = base.x + dx; rect.y = base.y + dy` (dy 省略時 0)
+    - `scale(sx,sy)` → `rect.w = base.w * sx; rect.h = base.h * sy` (引数 1 個なら uniform)
+    - 不正・未知トークン (例 `rotate(...)`) は無視し base rect を保つ。
 - **バインド式**は最小の安全な評価器: 変数参照 + 三項 + 比較 + 少数の関数 (`fmt_mmss`, `clamp` 等)。チューリング完全にしない。変数は consumer がフレーム毎に供給する `BindContext` (`map<string, Value>`: number/bool/string)。
 - KS HUD のバインド変数例: `hp_ratio, xp_ratio, gauge_ratio, time_left, kill_count, level, hp_low, slot_a_label, ...`。
 

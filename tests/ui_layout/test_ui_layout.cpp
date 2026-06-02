@@ -131,6 +131,50 @@ TEST(UiLayout, ScaleXIsIdempotentAcrossFrames) {
     EXPECT_FLOAT_EQ(doc->find("hp_fill")->rect.w, 320.0f);
 }
 
+TEST(UiLayout, TransformBindTranslateAndScaleAreIdempotent) {
+    // transform op consumes a mini-spec string and applies it relative to the
+    // authored base rect, so it must not compound across frames.
+    const char* json = R"JSON({
+  "schema_version": 1, "name": "xform", "design_size": { "w": 1280, "h": 720 },
+  "root": { "id": "root", "type": "container", "rect": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+    "children": [
+      { "id": "card", "type": "rect", "rect": { "x": 100, "y": 200, "w": 80, "h": 40 },
+        "binds": [ { "target": "self", "op": "transform", "expr": "card_xform" } ] }
+    ] } })JSON";
+    auto doc = Document::load_json(json);
+    ASSERT_NE(doc, nullptr);
+
+    BindContext ctx;
+    ctx.emplace("card_xform", BindValue::from_string("translate(10,-8) scale(1.5,2.0)"));
+
+    doc->update(ctx, 0.016f);
+    auto* card = doc->find("card");
+    ASSERT_NE(card, nullptr);
+    EXPECT_FLOAT_EQ(card->rect.x, 110.0f);   // 100 + 10
+    EXPECT_FLOAT_EQ(card->rect.y, 192.0f);   // 200 - 8
+    EXPECT_FLOAT_EQ(card->rect.w, 120.0f);   // 80 * 1.5
+    EXPECT_FLOAT_EQ(card->rect.h, 80.0f);    // 40 * 2.0
+
+    // Re-applying the same spec must not drift.
+    doc->update(ctx, 0.016f);
+    doc->update(ctx, 0.016f);
+    EXPECT_FLOAT_EQ(card->rect.x, 110.0f);
+    EXPECT_FLOAT_EQ(card->rect.w, 120.0f);
+
+    // A new spec recomputes from base, not from the already-transformed rect.
+    ctx["card_xform"] = BindValue::from_string("scale(0.5)");
+    doc->update(ctx, 0.016f);
+    EXPECT_FLOAT_EQ(card->rect.x, 100.0f);   // translate dropped -> back to base x
+    EXPECT_FLOAT_EQ(card->rect.w, 40.0f);    // 80 * 0.5 (uniform)
+    EXPECT_FLOAT_EQ(card->rect.h, 20.0f);    // 40 * 0.5
+
+    // Malformed spec leaves the base rect untouched.
+    ctx["card_xform"] = BindValue::from_string("rotate(45)");
+    doc->update(ctx, 0.016f);
+    EXPECT_FLOAT_EQ(card->rect.x, 100.0f);
+    EXPECT_FLOAT_EQ(card->rect.w, 80.0f);
+}
+
 TEST(UiLayout, HitTestFindsFrontNode) {
     auto doc = Document::load_json(sample_json());
     ASSERT_NE(doc, nullptr);
