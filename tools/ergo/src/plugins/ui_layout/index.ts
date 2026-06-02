@@ -28,6 +28,9 @@ const factory: PluginFactory = () => {
         const absPath = path.isAbsolute(inputPath) ? inputPath : path.join(rootDir, inputPath);
         const out = path.normalize(absPath);
         if (!out.endsWith(".uilayout.json")) throw new Error("file extension must be .uilayout.json");
+        // Containment guard: never read/write outside rootDir (path-traversal protection).
+        const rel = path.relative(rootDir, out);
+        if (rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("path must stay within the tool root");
         return out;
     }
 
