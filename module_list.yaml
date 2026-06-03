@@ -1,4 +1,4 @@
-﻿# Ergo モジュール一覧 (機械処理用)
+# Ergo モジュール一覧 (機械処理用)
 #
 # 人間向けの一覧は module_list.md を参照。新規モジュール追加時は両方に
 # エントリを足すこと。
@@ -71,6 +71,17 @@ modules:
     spec:       spec/module/actor.md
     cmake_option: ERGO_BUILD_ACTOR   # ERGO_BUILD_BIND も ON が必須
     tool_plugin: variable
+    status: preview
+
+  - name: ergo_cast
+    summary: Actor を名前付き Scene に束ねる軽量グルーピング層 (一括/個別 activate + snapshot)。非所有・描画非依存。ergo_scene (look-dev ドキュメント) とは別物
+    category: システム
+    header_dir: include/ergo/cast/
+    source_dir: src/cast/
+    test_dir:   tests/cast/
+    spec:       spec/module/cast.md
+    cmake_option: ERGO_BUILD_CAST   # ERGO_BUILD_ACTOR / ERGO_BUILD_BIND も ON が必須
+    tool_plugin: null
     status: preview
 
   - name: ergo_sound
