@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.16)
 project(Ergo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -36,6 +36,7 @@ option(ERGO_BUILD_UI_LAYOUT    "Build ergo_ui_layout (data-driven UI layout runt
 option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shuriken → ergo_particle migrator + CLI)" ON)
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
+option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -224,6 +225,26 @@ if(ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND)
         add_executable(test_actor tests/actor/test_actor.cpp)
         target_link_libraries(test_actor PRIVATE ergo_actor ergo_gtest_main)
         add_test(NAME test_actor COMMAND test_actor)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_cast - bundles Actors into a named Scene for batch lifecycle mgmt.
+#   Non-owning (holds raw Actor*, never deletes) and render-independent
+#   (includes neither Pictor nor ergo_render). Provides bulk + per-actor
+#   activate/deactivate and snapshot/restore only. Sits on top of ergo_actor
+#   (Actor is a foundational base type, so this is not a layering violation;
+#   ergo_scene likewise builds on Actor).
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_CAST AND ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND)
+    add_library(ergo_cast src/cast/scene.cpp)
+    target_include_directories(ergo_cast PUBLIC include)
+    target_link_libraries(ergo_cast PUBLIC ergo_actor)
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_scene_cast tests/cast/test_scene.cpp)
+        target_link_libraries(test_scene_cast PRIVATE ergo_cast ergo_gtest_main)
+        add_test(NAME test_scene_cast COMMAND test_scene_cast)
     endif()
 endif()
 
