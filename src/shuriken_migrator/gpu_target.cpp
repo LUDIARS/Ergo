@@ -9,6 +9,7 @@
 #include "ergo/shuriken_migrator/migrator.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -44,6 +45,11 @@ ergo::gpu_particle::Curve linear_curve(float v0, float v1) {
     return ergo::gpu_particle::Curve::linear(v0, v1);
 }
 
+uint32_t curve_count_to_u32(float v) {
+    if (v <= 0.0f) return 0u;
+    return static_cast<uint32_t>(std::lround(v));
+}
+
 } // namespace
 
 ergo::gpu_particle::EmitterDescriptor
@@ -69,6 +75,19 @@ ConvertToGpuEmitter(const ShurikenSource& src, MigrationReport& report) {
     }
 
     d.rate_over_time = to_gpu_curve(src.emission.rateOverTime);
+    for (const auto& sb : src.emission.bursts) {
+        float lo = 0.0f, hi = 0.0f;
+        sb.count.Range(lo, hi);
+        if (hi < lo) std::swap(lo, hi);
+        ergo::gpu_particle::Burst b;
+        b.time        = std::max(0.0f, sb.time);
+        b.count_min   = curve_count_to_u32(lo);
+        b.count_max   = curve_count_to_u32(hi);
+        b.cycles      = sb.cycles == 0 ? 1u : sb.cycles;
+        b.interval    = sb.interval <= 0.0f ? 0.01f : sb.interval;
+        b.probability = std::clamp(sb.probability, 0.0f, 1.0f);
+        if (b.count_max > 0) d.bursts.push_back(b);
+    }
 
     d.shape          = to_gpu_shape(src.shape.shapeType);
     d.sphere_radius  = src.shape.radius;
@@ -241,6 +260,22 @@ std::string EmitterDescriptorToJson(const ergo::gpu_particle::EmitterDescriptor&
     append_kv(os, "gravity_modifier", d.gravity_modifier, f);
 
     append_minmax(os, "rate_over_time", d.rate_over_time, f);
+    if (!d.bursts.empty()) {
+        if (!f) os << ","; f = false;
+        os << "\"bursts\":[";
+        for (size_t i = 0; i < d.bursts.size(); ++i) {
+            if (i) os << ",";
+            const auto& b = d.bursts[i];
+            os << "{\"time\":" << b.time
+               << ",\"count_min\":" << b.count_min
+               << ",\"count_max\":" << b.count_max
+               << ",\"cycles\":" << b.cycles
+               << ",\"interval\":" << b.interval
+               << ",\"probability\":" << b.probability
+               << "}";
+        }
+        os << "]";
+    }
     append_kv(os, "shape", static_cast<int>(d.shape), f);
     append_kv(os, "sphere_radius", d.sphere_radius, f);
     append_kv(os, "cone_radius", d.cone_radius, f);

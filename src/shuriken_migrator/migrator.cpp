@@ -168,7 +168,8 @@ std::unordered_map<std::string, std::string> FlattenBlock(const std::string& bod
         std::string content = Trim(std::string_view(raw).substr(ind));
         if (content.empty()) continue;
         if (content.front() == '-' && content.size() > 1 && content[1] == ' ') {
-            // list item — v1 ではサポート外 (bursts など). スキップ。
+            // Generic list items are skipped here; m_Bursts is parsed from the
+            // source body by ReadEmissionBursts because it needs item scope.
             continue;
         }
 
@@ -237,6 +238,110 @@ void ReadColor4(const std::unordered_map<std::string, std::string>& m,
     TryFloat(m, prefix + ".a", dst[3]);
 }
 
+bool ReadInlineFloat(const std::string& content, const char* key, float& dst) {
+    const std::string prefix = std::string(key) + ":";
+    if (content.rfind(prefix, 0) != 0) return false;
+    return ParseFloat(Trim(content.substr(prefix.size())), dst);
+}
+
+bool ReadInlineInt(const std::string& content, const char* key, int& dst) {
+    const std::string prefix = std::string(key) + ":";
+    if (content.rfind(prefix, 0) != 0) return false;
+    return ParseInt(Trim(content.substr(prefix.size())), dst);
+}
+
+void ReadEmissionBursts(const std::string& body, std::vector<ShurikenBurst>& out) {
+    std::istringstream is(body);
+    std::string raw;
+    bool in_bursts = false;
+    bool have_burst = false;
+    int bursts_indent = -1;
+    int item_indent = -1;
+    int count_curve_indent = -1;
+    ShurikenBurst current;
+
+    auto finish_burst = [&]() {
+        if (!have_burst) return;
+        if (current.cycles == 0) current.cycles = 1;
+        if (current.interval <= 0.0f) current.interval = 0.01f;
+        current.probability = std::clamp(current.probability, 0.0f, 1.0f);
+        out.push_back(current);
+        current = ShurikenBurst{};
+        have_burst = false;
+        item_indent = -1;
+        count_curve_indent = -1;
+    };
+
+    while (std::getline(is, raw)) {
+        if (raw.empty()) continue;
+        const int ind = Indent(raw);
+        const std::string content = Trim(std::string_view(raw).substr(ind));
+        if (content.empty()) continue;
+
+        if (!in_bursts) {
+            if (content == "m_Bursts:") {
+                in_bursts = true;
+                bursts_indent = ind;
+            }
+            continue;
+        }
+
+        if (ind <= bursts_indent && content.front() != '-') {
+            finish_burst();
+            break;
+        }
+
+        if (content.front() == '-') {
+            finish_burst();
+            current = ShurikenBurst{};
+            current.count.scalarMultiplier = 1.0f;
+            have_burst = true;
+            item_indent = ind;
+            count_curve_indent = -1;
+            continue;
+        }
+
+        if (!have_burst) continue;
+        const int item_field_indent = item_indent + 2;
+
+        if (ind == item_field_indent) {
+            float fv = 0.0f;
+            int iv = 0;
+            if (ReadInlineFloat(content, "time", fv)) {
+                current.time = fv;
+            } else if (content == "countCurve:") {
+                count_curve_indent = ind;
+                current.count.scalarMultiplier = 1.0f;
+            } else if (ReadInlineInt(content, "cycleCount", iv)) {
+                current.cycles = static_cast<uint32_t>(std::max(0, iv));
+            } else if (ReadInlineFloat(content, "repeatInterval", fv)) {
+                current.interval = fv;
+            } else if (ReadInlineFloat(content, "probability", fv)) {
+                current.probability = fv;
+            }
+            continue;
+        }
+
+        if (count_curve_indent >= 0 && ind == count_curve_indent + 2) {
+            float fv = 0.0f;
+            int iv = 0;
+            if (ReadInlineInt(content, "minMaxState", iv)) {
+                current.count.state = static_cast<MinMaxState>(iv);
+            } else if (ReadInlineFloat(content, "scalar", fv)) {
+                current.count.scalar = fv;
+            } else if (ReadInlineFloat(content, "minScalar", fv)) {
+                current.count.minScalar = fv;
+            } else if (ReadInlineFloat(content, "maxScalar", fv)) {
+                current.count.maxScalar = fv;
+            } else if (ReadInlineFloat(content, "scalarMultiplier", fv)) {
+                current.count.scalarMultiplier = fv;
+            }
+        }
+    }
+
+    finish_burst();
+}
+
 }  // namespace
 
 // -------- public ----------
@@ -284,9 +389,7 @@ ShurikenSource ParseShurikenFromBody(const std::string& body, MigrationReport& r
         // Emission
         TryBool(map, "ParticleSystem.EmissionModule.enabled", src.emission.enabled);
         ReadMinMaxCurve(map, "ParticleSystem.EmissionModule.rateOverTime", src.emission.rateOverTime);
-        if (Get(map, "ParticleSystem.EmissionModule.m_Bursts")) {
-            report.Warn(src.name + ": Emission bursts は v1 で未対応");
-        }
+        ReadEmissionBursts(body, src.emission.bursts);
 
         // Shape
         TryBool(map,  "ParticleSystem.ShapeModule.enabled",   src.shape.enabled);
@@ -387,11 +490,6 @@ ShurikenSource ParseShurikenFromBody(const std::string& body, MigrationReport& r
             TryFloat(map, "ParticleSystem.UVModule.fps",           src.textureSheet.fps);
             TryInt(map,   "ParticleSystem.UVModule.cycles",        src.textureSheet.cycles);
             TryBool(map,  "ParticleSystem.UVModule.useRandomRow",  src.textureSheet.random_row);
-        }
-
-        // Bursts (Emission.m_Bursts) — array で表現される。 簡易対応として「最低 1 burst」のみ拾う
-        if (Get(map, "ParticleSystem.EmissionModule.m_Bursts")) {
-            report.Warn(src.name + ": Emission bursts はパース簡易対応 (詳細は ConvertToGpu で扱う)");
         }
 
         // ForceModule / RotationModule は EmitterDescriptor の対応フィールド無し
