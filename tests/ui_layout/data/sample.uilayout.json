@@ -12,9 +12,11 @@
         "id": "hp_bar",
         "type": "vector",
         "rect": { "x": 24, "y": 56, "w": 320, "h": 28 },
+        "color": "#2ecc71",
         "vector": { "src": "data/hud/hp_bar.svg", "fit": "stretch", "extrude": 6.0 },
         "binds": [
-          { "target": "self", "op": "opacity", "expr": "hp_ratio" }
+          { "target": "self", "op": "opacity", "expr": "hp_ratio" },
+          { "target": "self", "op": "color", "expr": "hp_low ? '#c0392b' : '#2ecc71'" }
         ]
       },
       {
