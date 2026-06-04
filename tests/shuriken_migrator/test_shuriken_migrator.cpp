@@ -60,6 +60,59 @@ ParticleSystem:
     angle: 25
 )";
 
+const char* kBurstPrefab = R"(%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &200000
+GameObject:
+  m_Name: BurstOnly
+  m_Component:
+  - component: {fileID: 200001}
+--- !u!198 &200001
+ParticleSystem:
+  m_GameObject: {fileID: 200000}
+  lengthInSec: 1
+  looping: 0
+  maxNumParticles: 100
+  InitialModule:
+    startLifetime:
+      minMaxState: 0
+      scalar: 1
+      scalarMultiplier: 1
+    startSpeed:
+      minMaxState: 0
+      scalar: 1
+      scalarMultiplier: 1
+    startSize:
+      minMaxState: 0
+      scalar: 1
+      scalarMultiplier: 1
+  EmissionModule:
+    enabled: 1
+    rateOverTime:
+      minMaxState: 0
+      scalar: 0
+      scalarMultiplier: 1
+    m_BurstCount: 1
+    m_Bursts:
+    - serializedVersion: 2
+      time: 0.25
+      countCurve:
+        serializedVersion: 2
+        minMaxState: 2
+        scalar: 0
+        minScalar: 3
+        maxScalar: 7
+        scalarMultiplier: 1
+      cycleCount: 2
+      repeatInterval: 0.5
+      probability: 0.75
+  ShapeModule:
+    enabled: 1
+    type: 5
+    radius: 1
+    angle: 25
+)";
+
 }  // namespace
 
 TEST(ShurikenMigrator, ParseMinimalPrefab) {
@@ -103,6 +156,29 @@ TEST(ShurikenMigrator, MinMaxStateTwoConstants) {
     c.Range(mn, mx);
     EXPECT_FLOAT_EQ(mn, 20.0f);
     EXPECT_FLOAT_EQ(mx, 100.0f);
+}
+
+TEST(ShurikenMigrator, ConvertsEmissionBurstsToGpuDescriptor) {
+    std::vector<ShurikenSource> systems;
+    MigrationReport report;
+    ASSERT_TRUE(ParsePrefabYaml(kBurstPrefab, systems, report));
+    ASSERT_EQ(systems.size(), 1u);
+    ASSERT_EQ(systems[0].emission.bursts.size(), 1u);
+
+    auto desc = ConvertToGpuEmitter(systems[0], report);
+    ASSERT_EQ(desc.bursts.size(), 1u);
+    EXPECT_FLOAT_EQ(desc.rate_over_time.constant_min, 0.0f);
+    EXPECT_FLOAT_EQ(desc.bursts[0].time, 0.25f);
+    EXPECT_EQ(desc.bursts[0].count_min, 3u);
+    EXPECT_EQ(desc.bursts[0].count_max, 7u);
+    EXPECT_EQ(desc.bursts[0].cycles, 2u);
+    EXPECT_FLOAT_EQ(desc.bursts[0].interval, 0.5f);
+    EXPECT_FLOAT_EQ(desc.bursts[0].probability, 0.75f);
+
+    const std::string json = EmitterDescriptorToJson(desc);
+    EXPECT_NE(json.find("\"bursts\""), std::string::npos);
+    EXPECT_NE(json.find("\"count_min\":3"), std::string::npos);
+    EXPECT_NE(json.find("\"count_max\":7"), std::string::npos);
 }
 
 TEST(ShurikenMigrator, NoSystemsWhenNoBlock) {
