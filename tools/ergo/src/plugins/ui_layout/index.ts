@@ -16,7 +16,7 @@ const factory: PluginFactory = () => {
         pullUrl: "http://127.0.0.1:8080/ui_layout/state",
     };
     const clients = new Set<WS>();
-    const rootDir = process.cwd();
+    const rootDir = path.resolve(process.env.ERGO_WORKSPACE_DIR || process.cwd());
 
     function broadcast(msg: unknown) {
         const raw = JSON.stringify(msg);
@@ -43,7 +43,7 @@ const factory: PluginFactory = () => {
         routes() {
             const app = new Hono();
 
-            app.get("/api/health", (c) => c.json({ ok: true, clients: clients.size, patchUrl: cfg.patchUrl, pullUrl: cfg.pullUrl }));
+            app.get("/api/health", (c) => c.json({ ok: true, clients: clients.size, rootDir, patchUrl: cfg.patchUrl, pullUrl: cfg.pullUrl }));
             app.get("/api/bridge/config", (c) => c.json(cfg));
 
             app.post("/api/bridge/config", async (c) => {

@@ -39,6 +39,7 @@ void parse_node(const jm::JsonValue& j, Node& out) {
     }
     out.visible = jbool(&j, "visible", true);
     out.opacity = jnum(&j, "opacity", 1.0f);
+    out.color = jstr(&j, "color");
     if (const auto* t = j.find("text")) {
         out.text_style.font = jstr(t, "font"); out.text_style.size = jnum(t, "size", 16);
         out.text_style.align = jstr(t, "align", "left"); out.text_style.color = jstr(t, "color", "#ffffff");
@@ -47,6 +48,7 @@ void parse_node(const jm::JsonValue& j, Node& out) {
     if (const auto* i = j.find("image")) out.image.path = jstr(i, "src");
     if (const auto* n = j.find("nine_slice")) out.nine_slice.path = jstr(n, "src");
     if (const auto* v = j.find("vector")) { out.vector.source = jstr(v, "src"); out.vector.fit = jstr(v, "fit", "stretch"); out.vector.extrude = jnum(v, "extrude", 0); }
+    out.vector.color = out.color.empty() ? "#ffffff" : out.color;
     if (const auto* b = j.find("binds"); b && b->is_array() && b->a) {
         for (const auto& it : *b->a) out.binds.push_back({jstr(&it, "target"), jstr(&it, "op"), jstr(&it, "expr")});
     }
@@ -71,6 +73,9 @@ jm::JsonValue node_json(const Node& n) {
     s.set("top", n.stretch.has_top ? jm::JsonValue::make_number(n.stretch.top) : jm::JsonValue::make_null());
     s.set("bottom", n.stretch.has_bottom ? jm::JsonValue::make_number(n.stretch.bottom) : jm::JsonValue::make_null());
     o.set("stretch", std::move(s));
+    if (!n.color.empty()) o.set("color", jm::JsonValue::make_string(n.color));
+    if (n.opacity != 1.0f) o.set("opacity", jm::JsonValue::make_number(n.opacity));
+    if (!n.visible) o.set("visible", jm::JsonValue::make_bool(n.visible));
     if (n.type == "text") {
         jm::JsonValue t = jm::JsonValue::make_object();
         t.set("font", jm::JsonValue::make_string(n.text_style.font));

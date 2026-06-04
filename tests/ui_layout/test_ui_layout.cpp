@@ -16,12 +16,13 @@ struct MockAdapter final : RenderAdapter {
     int vector = 0;
     int clip_push = 0;
     int clip_pop = 0;
+    std::string last_vector_color;
 
     void draw_rect(const Rect&, std::string_view, float) override { ++rect; }
     void draw_nine_slice(const Rect&, const TextureRef&, float) override { ++nine; }
     void draw_image(const TextureRef&, const Rect&, float) override { ++image; }
     void draw_text(std::string_view, const TextStyle&, const Rect&, float) override { ++text; }
-    void draw_vector_mesh(const VectorDrawItem&, float) override { ++vector; }
+    void draw_vector_mesh(const VectorDrawItem& item, float) override { ++vector; last_vector_color = item.color; }
     void push_clip(const Rect&) override { ++clip_push; }
     void pop_clip() override { ++clip_pop; }
 };
@@ -44,8 +45,12 @@ std::string sample_json() {
         "id": "hp_bar",
         "type": "vector",
         "rect": { "x": 24, "y": 56, "w": 320, "h": 28 },
+        "color": "#2ecc71",
         "vector": { "src": "data/hud/hp_bar.svg", "fit": "stretch", "extrude": 6.0 },
-        "binds": [ { "target": "self", "op": "opacity", "expr": "hp_ratio" } ]
+        "binds": [
+          { "target": "self", "op": "opacity", "expr": "hp_ratio" },
+          { "target": "self", "op": "color", "expr": "hp_low ? '#c0392b' : '#2ecc71'" }
+        ]
       },
       {
         "id": "timer",
@@ -87,6 +92,7 @@ TEST(UiLayout, UpdateBindEmitMock) {
     BindContext ctx;
     ctx.emplace("time_left", BindValue::from_number(125.0));
     ctx.emplace("hp_ratio", BindValue::from_number(0.75));
+    ctx.emplace("hp_low", BindValue::from_bool(true));
 
     doc->set_viewport(1920, 1080);
     doc->update(ctx, 0.016f);
@@ -98,6 +104,7 @@ TEST(UiLayout, UpdateBindEmitMock) {
     MockAdapter mock;
     doc->emit(mock);
     EXPECT_EQ(mock.vector, 1);
+    EXPECT_EQ(mock.last_vector_color, "#c0392b");
     EXPECT_EQ(mock.text, 1);
     EXPECT_EQ(mock.clip_push, 1);
     EXPECT_EQ(mock.clip_pop, 1);

@@ -38,6 +38,36 @@ function svgImage(src) {
 }
 
 function setStatus(text, cls) { statusEl.textContent = text; statusEl.className = cls || ""; }
+
+function colorOf(value, fallback) {
+  return (typeof value === "string" && value.trim()) ? value.trim() : fallback;
+}
+
+function alphaOf(node) {
+  const opacity = Number(node.opacity ?? 1);
+  return Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 1;
+}
+
+function withAlpha(color, alpha) {
+  if (alpha >= 0.999) return color;
+  const m3 = /^#([0-9a-f]{3})$/i.exec(color);
+  const m6 = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!m3 && !m6) return color;
+  const hex = m6 ? m6[1] : m3[1].split("").map(ch => ch + ch).join("");
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function drawBackgroundGrid(w, h) {
+  ctx.fillStyle = "#0f151c";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(255,255,255,0.055)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= w; x += 40) { ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); ctx.stroke(); }
+  for (let y = 0; y <= h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); ctx.stroke(); }
+}
 function connectWs() {
   ws = new WebSocket(`ws://${location.host}/ui_layout/ws`);
   ws.onopen = () => setStatus("ws connected", "ok");
@@ -93,13 +123,27 @@ function renderTree() {
 }
 
 function drawNode(n, parentAbs) {
+  if (n.visible === false) return;
   const r = n.rect || { x:0,y:0,w:0,h:0 };
   const abs = { x: parentAbs.x + r.x, y: parentAbs.y + r.y, w: r.w, h: r.h };
+  const alpha = alphaOf(n);
+  const fill = withAlpha(colorOf(n.color, "#2664a3"), alpha);
   if (n.type === "container") { ctx.strokeStyle = "#2f4b66"; ctx.strokeRect(abs.x, abs.y, abs.w, abs.h); }
-  if (n.type === "rect") { ctx.fillStyle = "#2664a3"; ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
-  if (n.type === "text") { ctx.fillStyle = "#111"; ctx.fillRect(abs.x, abs.y, abs.w, abs.h); ctx.fillStyle = "#fff"; ctx.font = `${(n.text?.size||16)}px sans-serif`; ctx.fillText(n.text?.value||n.id, abs.x+6, abs.y+22); }
-  if (n.type === "image") { ctx.fillStyle = "#3f515f"; ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
-  if (n.type === "nine_slice") { ctx.fillStyle = "#485f3f"; ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
+  if (n.type === "rect") { ctx.fillStyle = fill; ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
+  if (n.type === "text") {
+    ctx.fillStyle = withAlpha(colorOf(n.color, "#111820"), Math.min(alpha, 0.28));
+    ctx.fillRect(abs.x, abs.y, abs.w, abs.h);
+    ctx.fillStyle = withAlpha(colorOf(n.text?.color, "#ffffff"), alpha);
+    ctx.font = `${(n.text?.size||16)}px sans-serif`;
+    ctx.textBaseline = "top";
+    const align = n.text?.align || "left";
+    ctx.textAlign = align === "center" ? "center" : align === "right" ? "right" : "left";
+    const tx = align === "center" ? abs.x + abs.w * 0.5 : align === "right" ? abs.x + abs.w - 6 : abs.x + 6;
+    ctx.fillText(n.text?.value||n.id, tx, abs.y + 4);
+    ctx.textAlign = "left";
+  }
+  if (n.type === "image") { ctx.fillStyle = withAlpha("#3f515f", alpha); ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
+  if (n.type === "nine_slice") { ctx.fillStyle = withAlpha(colorOf(n.color, "#485f3f"), alpha); ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
   if (n.type === "vector") {
     // 参照 SVG のサムネを描く。未ロード/失敗時は従来の単色プレースホルダ。
     const img = svgImage(n.vector?.src);
@@ -107,7 +151,7 @@ function drawNode(n, parentAbs) {
     if (img && img.complete && !img.dataset.failed && img.naturalWidth > 0) {
       try { ctx.drawImage(img, abs.x, abs.y, abs.w, abs.h); drawn = true; } catch { drawn = false; }
     }
-    if (!drawn) { ctx.fillStyle = "#5a405d"; ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
+    if (!drawn) { ctx.fillStyle = withAlpha(colorOf(n.color, "#5a405d"), alpha); ctx.fillRect(abs.x, abs.y, abs.w, abs.h); }
   }
   ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.strokeRect(abs.x, abs.y, abs.w, abs.h);
   ctx.fillStyle = "#bcd7f0"; ctx.font = "11px monospace"; ctx.fillText(n.id, abs.x + 3, abs.y + 12);
@@ -122,7 +166,7 @@ function renderCanvas() {
   const w = Number(doc.design_size?.w || 1280), h = Number(doc.design_size?.h || 720);
   canvas.width = w; canvas.height = h;
   ctx.clearRect(0,0,w,h);
-  ctx.fillStyle = "#0f151c"; ctx.fillRect(0,0,w,h);
+  drawBackgroundGrid(w, h);
   drawNode(doc.root, { x:0,y:0,w,h });
 }
 
@@ -178,6 +222,22 @@ function renderProps() {
     const i = row.querySelector("input"); i.onchange = () => { node.rect[k] = Number(i.value); changed(false); };
   })));
   propBody.appendChild(rect);
+
+  const style = document.createElement("div"); style.className = "block"; style.innerHTML = `<h4>style</h4>`;
+  style.appendChild(propRow("color", `<div class="colorField"><input type="color" value="${colorOf(node.color, "#2664a3")}" /><input value="${colorOf(node.color, "")}" placeholder="#rrggbb" /></div>`, row => {
+    const swatch = row.querySelector('input[type="color"]');
+    const text = row.querySelector('input:not([type="color"])');
+    const apply = (v) => { node.color = v.trim(); swatch.value = colorOf(node.color, "#2664a3"); text.value = node.color; changed(false); };
+    swatch.oninput = () => apply(swatch.value);
+    text.onchange = () => apply(text.value);
+  }));
+  style.appendChild(propRow("opacity", `<input type="range" min="0" max="1" step="0.05" value="${alphaOf(node)}" />`, row => {
+    const i = row.querySelector("input"); i.oninput = () => { node.opacity = Number(i.value); changed(false); };
+  }));
+  style.appendChild(propRow("visible", `<input type="checkbox" ${node.visible === false ? "" : "checked"} />`, row => {
+    const i = row.querySelector("input"); i.onchange = () => { node.visible = i.checked; changed(); };
+  }));
+  propBody.appendChild(style);
 
   const layout = document.createElement("div"); layout.className = "block"; layout.innerHTML = `<h4>anchor/stretch/layout</h4>`;
   layout.appendChild(propRow("layout", `<select><option>absolute</option><option>row</option><option>column</option></select>`, row => {
@@ -362,6 +422,10 @@ $("openBtn").onclick = async () => {
   if (!j.ok) { setStatus(`open failed: ${j.error}`, "bad"); return; }
   filePathEl.value = j.path;
   loadDocString(j.json, false);
+};
+$("openKsHudBtn").onclick = async () => {
+  filePathEl.value = "data/hud/kuzu_hud.uilayout.json";
+  $("openBtn").click();
 };
 $("saveBtn").onclick = async () => {
   const path = filePathEl.value.trim();
