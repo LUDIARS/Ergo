@@ -14,6 +14,7 @@
 #include "ergo/particle/effect_config.h"
 #include "ergo/gpu_particle/emitter_descriptor.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -56,10 +57,18 @@ struct ShurikenMain {
     int maxNumParticles = 1000;
 };
 
+struct ShurikenBurst {
+    float       time = 0.0f;
+    MinMaxCurve count;
+    uint32_t    cycles = 1;
+    float       interval = 0.01f;
+    float       probability = 1.0f;
+};
+
 struct ShurikenEmission {
     bool enabled = true;
     MinMaxCurve rateOverTime;
-    // bursts は v1 で未対応 (warnings に記録)
+    std::vector<ShurikenBurst> bursts;
 };
 
 struct ShurikenShape {
