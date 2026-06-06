@@ -11,6 +11,7 @@ void Document::emit_node_(Node& node, RenderAdapter& adapter) {
     else if (node.type == "text") adapter.draw_text(node.text_value, node.text_style, node.resolved_rect, node.opacity);
     else if (node.type == "vector") {
         node.vector.rect = node.resolved_rect;
+        node.vector.color = node.color.empty() ? "#ffffff" : node.color;
         adapter.draw_vector_mesh(node.vector, node.opacity);
     }
 

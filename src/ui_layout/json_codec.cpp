@@ -39,6 +39,7 @@ void parse_node(const jm::JsonValue& j, Node& out) {
     }
     out.visible = jbool(&j, "visible", true);
     out.opacity = jnum(&j, "opacity", 1.0f);
+    out.color = jstr(&j, "color", out.color);
     if (const auto* t = j.find("text")) {
         out.text_style.font = jstr(t, "font"); out.text_style.size = jnum(t, "size", 16);
         out.text_style.align = jstr(t, "align", "left"); out.text_style.color = jstr(t, "color", "#ffffff");
@@ -65,6 +66,7 @@ jm::JsonValue node_json(const Node& n) {
     r.set("w", jm::JsonValue::make_number(n.rect.w)); r.set("h", jm::JsonValue::make_number(n.rect.h));
     o.set("rect", std::move(r));
     jm::JsonValue a = jm::JsonValue::make_object(); a.set("h", jm::JsonValue::make_string(n.anchor.h)); a.set("v", jm::JsonValue::make_string(n.anchor.v)); o.set("anchor", std::move(a));
+    if (!n.color.empty()) o.set("color", jm::JsonValue::make_string(n.color));
     jm::JsonValue s = jm::JsonValue::make_object();
     s.set("left", n.stretch.has_left ? jm::JsonValue::make_number(n.stretch.left) : jm::JsonValue::make_null());
     s.set("right", n.stretch.has_right ? jm::JsonValue::make_number(n.stretch.right) : jm::JsonValue::make_null());
