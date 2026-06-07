@@ -28,6 +28,7 @@ struct VectorDrawItem {
     Rect rect;
     float extrude = 0.0f;
     std::string fit = "stretch";
+    std::string color = "#ffffff";
 };
 
 struct BindValue {
