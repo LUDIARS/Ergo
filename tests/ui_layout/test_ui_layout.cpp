@@ -14,6 +14,7 @@ struct MockAdapter final : RenderAdapter {
     int nine = 0;
     int text = 0;
     int vector = 0;
+    std::string last_vector_color;
     int clip_push = 0;
     int clip_pop = 0;
 
@@ -21,7 +22,7 @@ struct MockAdapter final : RenderAdapter {
     void draw_nine_slice(const Rect&, const TextureRef&, float) override { ++nine; }
     void draw_image(const TextureRef&, const Rect&, float) override { ++image; }
     void draw_text(std::string_view, const TextStyle&, const Rect&, float) override { ++text; }
-    void draw_vector_mesh(const VectorDrawItem&, float) override { ++vector; }
+    void draw_vector_mesh(const VectorDrawItem& item, float) override { ++vector; last_vector_color = item.color; }
     void push_clip(const Rect&) override { ++clip_push; }
     void pop_clip() override { ++clip_pop; }
 };
@@ -101,6 +102,32 @@ TEST(UiLayout, UpdateBindEmitMock) {
     EXPECT_EQ(mock.text, 1);
     EXPECT_EQ(mock.clip_push, 1);
     EXPECT_EQ(mock.clip_pop, 1);
+}
+
+TEST(UiLayout, VectorColorRoundTripsAndEmits) {
+    const char* json = R"JSON({
+  "schema_version": 1, "name": "vector_color", "design_size": { "w": 1280, "h": 720 },
+  "root": { "id": "root", "type": "container", "rect": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+    "children": [
+      { "id": "badge", "type": "vector", "rect": { "x": 24, "y": 56, "w": 320, "h": 28 },
+        "color": "#ff3355",
+        "vector": { "src": "data/hud/badge.svg", "fit": "stretch", "extrude": 6.0 } }
+    ] } })JSON";
+    auto doc = Document::load_json(json);
+    ASSERT_NE(doc, nullptr);
+    ASSERT_NE(doc->find("badge"), nullptr);
+    EXPECT_EQ(doc->find("badge")->color, "#ff3355");
+
+    auto doc2 = Document::load_json(doc->to_json());
+    ASSERT_NE(doc2, nullptr);
+    ASSERT_NE(doc2->find("badge"), nullptr);
+    EXPECT_EQ(doc2->find("badge")->color, "#ff3355");
+
+    doc2->update({}, 0.0f);
+    MockAdapter mock;
+    doc2->emit(mock);
+    EXPECT_EQ(mock.vector, 1);
+    EXPECT_EQ(mock.last_vector_color, "#ff3355");
 }
 
 TEST(UiLayout, ScaleXIsIdempotentAcrossFrames) {
