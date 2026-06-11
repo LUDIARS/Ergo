@@ -10,3 +10,6 @@ tools/ergo/ergo-err.txt
 
 # Cygwin/MSYS bash crash dumps
 bash.exe.stackdump
+
+# session logs (lictor 等のローカルセッションログ)
+logs/
