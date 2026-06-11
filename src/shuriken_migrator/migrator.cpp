@@ -52,10 +52,12 @@ int Indent(std::string_view line) {
 }
 
 bool ParseFloat(const std::string& s, float& out) {
+    // 非数値は変換失敗として false (呼び出し側がフィールドを skip する)
     try { out = std::stof(s); return true; } catch (...) { return false; }
 }
 
 bool ParseInt(const std::string& s, int& out) {
+    // 非数値は変換失敗として false (呼び出し側がフィールドを skip する)
     try { out = std::stoi(s); return true; } catch (...) { return false; }
 }
 
@@ -99,6 +101,7 @@ std::vector<YamlBlock> SplitBlocks(const std::string& yaml) {
                 size_t s = amp + 1;
                 size_t e = s;
                 while (e < line.size() && std::isdigit(static_cast<unsigned char>(line[e]))) ++e;
+                // anchor が数値でない行は anchor=0 のまま継続 (該当ブロックは参照解決されないだけ)
                 try { cur.anchor = std::stoll(line.substr(s, e - s)); } catch (...) {}
             }
             cur.stripped = line.find("stripped") != std::string::npos;
@@ -137,6 +140,7 @@ bool InlineRaw(const std::string& braced, const char* key, std::string& out) {
 bool InlineNumber(const std::string& braced, const char* key, double& out) {
     std::string raw;
     if (!InlineRaw(braced, key, raw)) return false;
+    // 非数値は変換失敗として false (呼び出し側がフィールドを skip する)
     try { out = std::stod(raw); return true; } catch (...) { return false; }
 }
 
@@ -145,6 +149,7 @@ bool InlineNumber(const std::string& braced, const char* key, double& out) {
 bool InlineInt64(const std::string& braced, const char* key, long long& out) {
     std::string raw;
     if (!InlineRaw(braced, key, raw)) return false;
+    // 非数値は変換失敗として false (呼び出し側がフィールドを skip する)
     try { out = std::stoll(raw); return true; } catch (...) { return false; }
 }
 
