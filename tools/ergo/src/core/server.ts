@@ -14,8 +14,10 @@ import { WebSocketServer } from "ws";
 import type { Plugin, PluginContext, PluginFactory } from "./plugin.js";
 
 export interface BootOptions {
-    port:     number;
+    port:      number;
     factories: PluginFactory[];
+    /** Bind address. Defaults to "127.0.0.1" to avoid LAN exposure. */
+    hostname?: string;
 }
 
 export function boot(opts: BootOptions): void {
@@ -93,7 +95,7 @@ export function boot(opts: BootOptions): void {
     // ---- HTTP + WS server (shared port) ----
     // Let @hono/node-server create + listen the HTTP server; we attach
     // the WebSocket upgrade routing to the returned instance.
-    const httpServer = serve({ fetch: app.fetch, port: opts.port }, () => {
+    const httpServer = serve({ fetch: app.fetch, port: opts.port, hostname: opts.hostname ?? "127.0.0.1" }, () => {
         console.log(`[ergo] http://localhost:${opts.port}/`);
         for (const p of plugins) {
             console.log(`[ergo]   -> ${p.title}:  http://localhost:${opts.port}/${p.id}/  (ws: /${p.id}/ws)`);
