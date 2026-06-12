@@ -37,6 +37,7 @@ option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shurike
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
+option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -656,6 +657,39 @@ if(ERGO_BUILD_TIMING_JUDGE)
         add_executable(test_timing_judge tests/timing_judge/test_timing_judge.cpp)
         target_link_libraries(test_timing_judge PRIVATE ergo_timing_judge ergo_gtest_main)
         add_test(NAME test_timing_judge COMMAND test_timing_judge)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_character — TCC-style character controller (Brain/Check/Control/Effect)
+# 思想の出典: unity3d-jp/Project_TCC。エンジン非依存 (最下層、依存なし)。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_CHARACTER)
+    add_library(ergo_character STATIC
+        src/character/brain.cpp
+        src/character/transform_brain.cpp
+        src/character/move_manager.cpp
+        src/character/turn_manager.cpp
+        src/character/effect_manager.cpp
+        src/character/update_component_manager.cpp
+        src/character/move_control.cpp
+        src/character/gravity.cpp
+        src/character/extra_force.cpp
+    )
+    target_include_directories(ergo_character PUBLIC include)
+    if(MSVC)
+        target_compile_options(ergo_character PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME test_character_brain test_character_components)
+            add_executable(${NAME} tests/character/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_character ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(${NAME} PRIVATE /utf-8)
+            endif()
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
     endif()
 endif()
 
