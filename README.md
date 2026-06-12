@@ -65,6 +65,7 @@ ergo/
 | `ergo_score`         | スコアカウンタ + コンボ倍率 + ハイスコア通知 (game-lexicon: `score-system`)    | `include/ergo/score/`        | — |
 | `ergo_combo_counter` | 連続成功カウンタ + フルコンボ通知 (game-lexicon: `combo-counter`)              | `include/ergo/combo_counter/`| — |
 | `ergo_timing_judge`  | 音ゲー用 ms タイミング判定 PERFECT/GREAT/GOOD/MISS (game-lexicon: `timing-judge`) | `include/ergo/timing_judge/` | — |
+| `ergo_character`     | TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替)。エンジン非依存 | `include/ergo/character/`    | — |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。
