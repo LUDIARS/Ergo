@@ -238,6 +238,17 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_character
+    summary: TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替、エンジン非依存)
+    category: ゲームオブジェクト
+    header_dir: include/ergo/character/
+    source_dir: src/character/
+    test_dir:   tests/character/
+    spec:       spec/module/character.md
+    cmake_option: ERGO_BUILD_CHARACTER
+    tool_plugin: null
+    status: preview
+
   - name: ergo_render
     summary: Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)
     category: システム
