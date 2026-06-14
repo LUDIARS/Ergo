@@ -25,4 +25,15 @@ bind::Handle Actor::bind_accessor(const std::string&, bind::VarKind,
     return bind::INVALID_HANDLE;
 }
 
+template<class T>
+bind::Handle Actor::bind_var(const std::string&, T*, bind::VarMeta) {
+    return bind::INVALID_HANDLE;
+}
+template bind::Handle Actor::bind_var<bool>       (const std::string&, bool*,        bind::VarMeta);
+template bind::Handle Actor::bind_var<int32_t>    (const std::string&, int32_t*,     bind::VarMeta);
+template bind::Handle Actor::bind_var<int64_t>    (const std::string&, int64_t*,     bind::VarMeta);
+template bind::Handle Actor::bind_var<float>      (const std::string&, float*,       bind::VarMeta);
+template bind::Handle Actor::bind_var<double>     (const std::string&, double*,      bind::VarMeta);
+template bind::Handle Actor::bind_var<std::string>(const std::string&, std::string*, bind::VarMeta);
+
 } // namespace ergo::actor

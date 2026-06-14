@@ -193,6 +193,16 @@ if(ERGO_BUILD_BIND)
     if(WIN32)
         target_link_libraries(ergo_bind PUBLIC ws2_32)
     endif()
+    # VarKind is a closed wire-protocol enum (no runtime converter registry by
+    # design). Guard against it drifting: any switch over an enum that omits a
+    # case with no default label is a hard error, so adding a new VarKind fails
+    # to compile until every codec switch (value_to_json / json_to_value /
+    # Value::equals / to_string) handles it.
+    if(MSVC)
+        target_compile_options(ergo_bind PRIVATE /we4062)
+    else()
+        target_compile_options(ergo_bind PRIVATE -Werror=switch)
+    endif()
 
     if(ERGO_BUILD_DUMMY)
         add_library(ergo_bind_dummy src/bind/bind_dummy.cpp)

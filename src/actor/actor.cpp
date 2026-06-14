@@ -1,5 +1,9 @@
 #include "ergo/actor/actor.h"
 
+// actor.h no longer pulls in the bind Engine; the binding calls below are the
+// only place that needs it, so include it directly here.
+#include "ergo/bind/bind.h"
+
 #include <algorithm>
 #include <atomic>
 #include <mutex>
@@ -104,5 +108,24 @@ bind::Handle Actor::bind_accessor(const std::string& var_name,
     if (h != bind::INVALID_HANDLE) owned_.push_back(h);
     return h;
 }
+
+template<class T>
+bind::Handle Actor::bind_var(const std::string& var_name, T* ptr,
+                             bind::VarMeta meta)
+{
+    meta.actor_handle = handle_;
+    const std::string qn = qualified(var_name);
+    const bind::Handle h = bind::Engine::instance().bind<T>(qn, ptr, std::move(meta));
+    if (h != bind::INVALID_HANDLE) owned_.push_back(h);
+    return h;
+}
+
+// Explicit instantiations — same supported set as ergo::bind::Engine::bind<T>.
+template bind::Handle Actor::bind_var<bool>       (const std::string&, bool*,        bind::VarMeta);
+template bind::Handle Actor::bind_var<int32_t>    (const std::string&, int32_t*,     bind::VarMeta);
+template bind::Handle Actor::bind_var<int64_t>    (const std::string&, int64_t*,     bind::VarMeta);
+template bind::Handle Actor::bind_var<float>      (const std::string&, float*,       bind::VarMeta);
+template bind::Handle Actor::bind_var<double>     (const std::string&, double*,      bind::VarMeta);
+template bind::Handle Actor::bind_var<std::string>(const std::string&, std::string*, bind::VarMeta);
 
 } // namespace ergo::actor
