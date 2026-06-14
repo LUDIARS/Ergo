@@ -8,6 +8,12 @@
 
 namespace ergo::bind {
 
+/// Opaque handle for a registered variable. Lives here (not in bind.h) so
+/// that callers needing only the bind value types — e.g. `ergo::actor` — can
+/// depend on this lightweight header without pulling in the WS Engine.
+using Handle = uint32_t;
+constexpr Handle INVALID_HANDLE = 0;
+
 enum class VarKind : uint8_t {
     Bool   = 0,
     Int32  = 1,

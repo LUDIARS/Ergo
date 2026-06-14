@@ -18,7 +18,9 @@
 #include <string>
 #include <vector>
 
-#include "ergo/bind/bind.h"
+// Depend only on the lightweight bind value types (Handle / VarKind / VarMeta
+// / Value), NOT on ergo/bind/bind.h. The actual Engine call lives out-of-line
+// in actor.cpp so this public header stays decoupled from the WS Engine.
 #include "ergo/bind/types.h"
 
 namespace ergo::actor {
@@ -50,16 +52,11 @@ public:
 protected:
     /// Bind a typed lvalue under this actor. Supported T: bool, int32_t,
     /// int64_t, float, double, std::string (matches ergo::bind::Engine::bind<T>).
+    /// Defined out-of-line in actor.cpp with explicit instantiations for the
+    /// supported types, so this header need not include the bind Engine.
     template<class T>
     bind::Handle bind_var(const std::string& var_name, T* ptr,
-                          bind::VarMeta meta = {})
-    {
-        meta.actor_handle = handle_;
-        const std::string qn = qualified(var_name);
-        const bind::Handle h = bind::Engine::instance().bind<T>(qn, ptr, std::move(meta));
-        if (h != bind::INVALID_HANDLE) owned_.push_back(h);
-        return h;
-    }
+                          bind::VarMeta meta = {});
 
     /// Bind a custom getter / setter pair under this actor.
     bind::Handle bind_accessor(const std::string& var_name,

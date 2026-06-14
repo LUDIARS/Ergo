@@ -2,12 +2,14 @@
 #include "ergo/bind/json_min.h"
 #include "ws_client.h"
 
-#include <algorithm>
+#include "actor_topology.h"
+#include "pending_write_queue.h"
+#include "variable_registry.h"
+
 #include <atomic>
 #include <cstdint>
-#include <cstdio>
-#include <mutex>
-#include <unordered_map>
+#include <functional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -101,44 +103,22 @@ jsonm::JsonValue meta_to_json(const VarMeta& m) {
 } // namespace
 
 // ===========================================================================
-// Engine::Impl
+// Engine::Impl — owns the WS transport and the message protocol. Variable,
+// pending-write, and actor-topology state are delegated to dedicated single-
+// responsibility helpers (see *_registry.h / *_queue.h / *_topology.h).
 // ===========================================================================
 struct Engine::Impl {
-    struct Entry {
-        Handle                              handle = INVALID_HANDLE;
-        std::string                         name;
-        VarKind                             kind = VarKind::Bool;
-        VarMeta                             meta;
-        std::function<Value()>              getter;
-        std::function<void(const Value&)>   setter;
-        Value                               last_seen;
-        bool                                published = false;
-    };
+    using Entry      = detail::VariableRegistry::Entry;
+    using ActorEntry = detail::ActorTopology::ActorEntry;
 
-    struct PendingWrite {
-        Handle handle = INVALID_HANDLE;
-        Value  value;
-    };
+    std::string                 app_name = "anonymous";
 
-    std::string                              app_name = "anonymous";
+    detail::VariableRegistry    vars;
+    detail::PendingWriteQueue   pending;
+    detail::ActorTopology       topo;
 
-    mutable std::mutex                       mtx;
-    std::unordered_map<Handle, Entry>        by_handle;
-    std::unordered_map<std::string, Handle>  by_name;
-    Handle                                   next_handle = 1;
-
-    struct ActorEntry {
-        uint64_t    handle = 0;
-        uint64_t    parent = 0;
-        std::string name;
-    };
-    std::unordered_map<uint64_t, ActorEntry> actors;
-
-    std::mutex                               wq_mtx;
-    std::vector<PendingWrite>                wq;
-
-    ws::Client                               client;
-    std::atomic<bool>                        connected{false};
+    ws::Client                  client;
+    std::atomic<bool>           connected{false};
 
     void send_hello() {
         using namespace jsonm;
@@ -208,48 +188,25 @@ struct Engine::Impl {
         const JsonValue* jv = req.find("value");
         if (!jv) return;
 
+        Handle  h;
         VarKind kind;
-        Handle h;
-        {
-            std::lock_guard<std::mutex> lk(mtx);
-            auto it = by_name.find(name);
-            if (it == by_name.end()) return;
-            h = it->second;
-            auto eit = by_handle.find(h);
-            if (eit == by_handle.end()) return;
-            if (eit->second.meta.read_only) return;
-            kind = eit->second.kind;
-        }
+        if (!vars.resolve_writable(name, h, kind)) return;
 
         Value v;
         if (!json_to_value(*jv, kind, v)) return;
 
-        std::lock_guard<std::mutex> lk(wq_mtx);
-        wq.push_back({h, std::move(v)});
+        pending.push(h, std::move(v));
     }
 
     void on_open() {
         send_hello();
-        // Replay actor topology first — the server should know every
-        // actor before bind messages start flowing so it can attach
-        // variables to the right tree node.
-        std::vector<ActorEntry> actor_snapshot;
-        std::vector<Entry>      entries;
-        {
-            std::lock_guard<std::mutex> lk(mtx);
-            actor_snapshot.reserve(actors.size());
-            for (auto& [h, a] : actors) actor_snapshot.push_back(a);
-            entries.reserve(by_handle.size());
-            for (auto& [h, e] : by_handle) entries.push_back(e);
-        }
-        for (auto& a : actor_snapshot) send_actor_register(a);
-        for (auto& e : entries) send_bind(e);
-        // Mark all entries as "published" to prime change detection.
-        std::lock_guard<std::mutex> lk(mtx);
-        for (auto& [h, e] : by_handle) {
-            if (e.getter) e.last_seen = e.getter();
-            e.published = true;
-        }
+        // Replay actor topology first — the server should know every actor
+        // before bind messages start flowing so it can attach variables to
+        // the right tree node.
+        for (auto& a : topo.snapshot()) send_actor_register(a);
+        for (auto& e : vars.snapshot()) send_bind(e);
+        // Prime change detection so the next apply pass does not re-emit.
+        vars.prime_all_published();
         connected.store(true, std::memory_order_release);
     }
 };
@@ -300,37 +257,15 @@ Handle Engine::bind_accessor(std::string                       name,
                              VarMeta                           meta) {
     if (name.empty() || !getter) return INVALID_HANDLE;
 
-    Impl::Entry e{};
-    {
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        auto it = impl_->by_name.find(name);
-        if (it != impl_->by_name.end()) {
-            std::fprintf(stderr,
-                "[ergo::bind] WARN: re-binding existing variable \"%s\" — old handle dropped\n",
-                name.c_str());
-            impl_->by_handle.erase(it->second);
-            impl_->by_name.erase(it);
-        }
-        e.handle  = impl_->next_handle++;
-        if (impl_->next_handle == INVALID_HANDLE) impl_->next_handle = 1;
-        e.name    = name;
-        e.kind    = kind;
-        e.meta    = std::move(meta);
-        e.getter  = std::move(getter);
-        e.setter  = std::move(setter);
-        if (e.getter) e.last_seen = e.getter();
-        e.published = false;
-        impl_->by_name[name] = e.handle;
-        impl_->by_handle.emplace(e.handle, e);
-    }
+    Impl::Entry stored{};
+    const Handle h = impl_->vars.insert(std::move(name), kind, std::move(getter),
+                                        std::move(setter), std::move(meta), stored);
     // Send bind immediately if connected; otherwise on_open will resend.
     if (impl_->client.is_connected()) {
-        impl_->send_bind(e);
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        auto it = impl_->by_handle.find(e.handle);
-        if (it != impl_->by_handle.end()) it->second.published = true;
+        impl_->send_bind(stored);
+        impl_->vars.mark_published(h);
     }
-    return e.handle;
+    return h;
 }
 
 template<class T> Handle Engine::bind(std::string name, T* ptr, VarMeta meta) {
@@ -375,16 +310,8 @@ template Handle Engine::bind<std::string>(std::string, std::string*, VarMeta);
 void Engine::unbind(Handle h) {
     if (h == INVALID_HANDLE) return;
     std::string name;
-    bool was_published = false;
-    {
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        auto it = impl_->by_handle.find(h);
-        if (it == impl_->by_handle.end()) return;
-        name = it->second.name;
-        was_published = it->second.published;
-        impl_->by_name.erase(it->second.name);
-        impl_->by_handle.erase(it);
-    }
+    bool        was_published = false;
+    if (!impl_->vars.erase(h, name, was_published)) return;
     if (was_published && impl_->client.is_connected()) {
         impl_->send_unbind(name);
     }
@@ -394,73 +321,37 @@ void Engine::actor_register(uint64_t handle, uint64_t parent,
                             const std::string& name)
 {
     if (handle == 0) return;
-    Impl::ActorEntry a;
-    a.handle = handle;
-    a.parent = parent;
-    a.name   = name;
-    {
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        impl_->actors[handle] = a;
-    }
+    const Impl::ActorEntry a = impl_->topo.upsert(handle, parent, name);
     if (impl_->client.is_connected()) impl_->send_actor_register(a);
 }
 
 void Engine::actor_unregister(uint64_t handle) {
     if (handle == 0) return;
-    bool was_known = false;
-    {
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        was_known = impl_->actors.erase(handle) > 0;
-    }
-    if (was_known && impl_->client.is_connected()) {
+    if (impl_->topo.erase(handle) && impl_->client.is_connected()) {
         impl_->send_actor_unregister(handle);
     }
 }
 
 void Engine::apply_pending_writes() {
-    // Drain incoming sets first
-    std::vector<Impl::PendingWrite> local;
-    { std::lock_guard<std::mutex> lk(impl_->wq_mtx); local.swap(impl_->wq); }
-    for (auto& w : local) {
+    // Drain incoming sets and apply them.
+    for (auto& w : impl_->pending.drain()) {
         std::function<void(const Value&)> setter;
         VarMeta meta;
         VarKind kind = VarKind::Bool;
-        {
-            std::lock_guard<std::mutex> lk(impl_->mtx);
-            auto it = impl_->by_handle.find(w.handle);
-            if (it == impl_->by_handle.end()) continue;
-            if (it->second.meta.read_only) continue;
-            setter = it->second.setter;
-            meta   = it->second.meta;
-            kind   = it->second.kind;
-        }
+        if (!impl_->vars.fetch_for_apply(w.handle, setter, meta, kind)) continue;
         if (!setter) continue;
         if (w.value.kind != kind) continue;
         const Value clamped = clamp_to_meta(w.value, meta);
         setter(clamped);
-        // Update last_seen so the change-detection loop below doesn't re-emit.
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        auto it = impl_->by_handle.find(w.handle);
-        if (it != impl_->by_handle.end() && it->second.getter) {
-            it->second.last_seen = it->second.getter();
-        }
+        // Update last_seen so change detection below doesn't re-emit.
+        impl_->vars.refresh_last_seen(w.handle);
     }
 
     // Detect external changes and push them to the server.
     if (!impl_->client.is_connected()) return;
-    std::vector<std::pair<std::string, Value>> outs;
-    {
-        std::lock_guard<std::mutex> lk(impl_->mtx);
-        for (auto& [h, e] : impl_->by_handle) {
-            if (!e.getter || !e.published) continue;
-            Value cur = e.getter();
-            if (!cur.equals(e.last_seen)) {
-                e.last_seen = cur;
-                outs.emplace_back(e.name, cur);
-            }
-        }
+    for (auto& [n, v] : impl_->vars.collect_changes()) {
+        impl_->send_value(n, v);
     }
-    for (auto& [n, v] : outs) impl_->send_value(n, v);
 }
 
 } // namespace ergo::bind

@@ -23,8 +23,8 @@
 
 namespace ergo::bind {
 
-using Handle = uint32_t;
-constexpr Handle INVALID_HANDLE = 0;
+// Handle / INVALID_HANDLE now live in types.h (included above) so that
+// lightweight consumers can use them without the Engine declaration.
 
 #ifdef ERGO_BIND_ENABLED
 
