@@ -38,6 +38,7 @@ option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケスト�
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
+option(ERGO_BUILD_MATH         "Build ergo_math (C++20 generic math: vec/mat/batch/pool)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -598,6 +599,30 @@ if(ERGO_BUILD_CUSTOS)
             endif()
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_math — C++20 generic math (vec / mat / batch / pool)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_MATH)
+    add_library(ergo_math STATIC src/math/math.cpp)
+    target_include_directories(ergo_math PUBLIC include)
+    # ergo_math は C++20 concepts を使う。ターゲットだけ標準を上書きする。
+    set_target_properties(ergo_math PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+    # MSVC は BOM なし UTF-8 を CodePage 932 として読むので /utf-8 を渡す。
+    if(MSVC)
+        target_compile_options(ergo_math PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_math tests/math/test_math.cpp)
+        target_link_libraries(test_math PRIVATE ergo_math ergo_gtest_main)
+        set_target_properties(test_math PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
+        if(MSVC)
+            target_compile_options(test_math PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_math COMMAND test_math)
     endif()
 endif()
 

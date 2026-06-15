@@ -249,6 +249,17 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_math
+    summary: C++20 concepts ベースの汎用数学ライブラリ (Vec/Mat/SoA batch/Arena/ObjectPool)。ergo_physics2d 等の下層
+    category: システム
+    header_dir: include/ergo/math/
+    source_dir: src/math/
+    test_dir:   tests/math/
+    spec:       spec/module/math.md
+    cmake_option: ERGO_BUILD_MATH
+    tool_plugin: null
+    status: preview
+
   - name: ergo_render
     summary: Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)
     category: システム
