@@ -27,6 +27,12 @@ struct BodyDef {
     float restitution                     = 0.3f;
     float friction                        = 0.5f;
     float density                         = 1.0f;
+    /// Box2D-like per-body linear damping coefficient (>= 0).
+    /// Applied as: v *= 1 / (1 + dt * linear_damping)
+    float linear_damping                  = 0.0f;
+    /// Box2D-like per-body angular damping coefficient (>= 0).
+    /// Applied as: omega *= 1 / (1 + dt * angular_damping)
+    float angular_damping                 = 0.0f;
     uint64_t user_data                    = 0;
 };
 
@@ -40,6 +46,8 @@ struct Body {
     float inertia, inv_inertia;
     float restitution;
     float friction;
+    float linear_damping;   ///< v *= 1/(1+dt*linear_damping) per step
+    float angular_damping;  ///< omega *= 1/(1+dt*angular_damping) per step
     uint64_t user_data;
     BodyType type;
     Shape shape;

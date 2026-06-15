@@ -80,7 +80,9 @@ TEST(Physics2D, Restitution) {
     EXPECT_GT(b->linear_velocity.data[1], 0.0f);
 }
 
-// Test 5: Friction decelerates sliding body
+// Test 5: Friction + linear damping decelerates sliding body.
+// linear_damping=1.5 is an explicit per-body setting that models surface drag
+// (e.g. grass, sticky floor) — this replaces the old global hardcode hack.
 TEST(Physics2D, Friction) {
     World world(ergo::math::Vec<2,float>{{0.0f, -10.0f}});
     BodyDef floor_def;
@@ -91,6 +93,7 @@ TEST(Physics2D, Friction) {
     ball.position = {{0.0f, 1.0f}};
     ball.restitution = 0.0f;
     ball.friction = 0.8f;
+    ball.linear_damping = 1.5f;  // explicit per-body drag (replaces global hardcode)
     ball.linear_velocity = {{5.0f, 0.0f}};
     auto bh = world.create_body(ball, make_circle_shape(0.5f));
     float dt = 1.0f / 60.0f;

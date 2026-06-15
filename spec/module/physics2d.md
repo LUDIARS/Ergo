@@ -57,6 +57,8 @@ enum class BodyType { Static, Dynamic, Kinematic };
 struct BodyDef {
     BodyType type = Dynamic; Vec<2,float> position, linear_velocity;
     float angle=0, angular_velocity=0, restitution=0.3, friction=0.5, density=1;
+    float linear_damping=0;   // per-body linear drag coefficient (>= 0)
+    float angular_damping=0;  // per-body angular drag coefficient (>= 0)
     uint64_t user_data = 0;
 };
 
@@ -65,6 +67,8 @@ struct Body {
     float angle, angular_velocity;
     float mass, inv_mass, inertia, inv_inertia;
     float restitution, friction;
+    float linear_damping;   // copied from BodyDef
+    float angular_damping;  // copied from BodyDef
     uint64_t user_data;
     BodyType type;
     Shape shape;
@@ -117,10 +121,17 @@ private:
 ### Semi-implicit Euler 積分
 
 ```
-velocity += gravity * dt      (Dynamic のみ)
+velocity += gravity * dt                        (Dynamic のみ)
+velocity *= 1 / (1 + dt * linear_damping)      (per-body、フレームレート非依存)
+angular_velocity *= 1 / (1 + dt * angular_damping)
 position += velocity * dt
 angle    += angular_velocity * dt
 ```
+
+`linear_damping` / `angular_damping` は Box2D 準拠の per-body 係数 (デフォルト 0.0)。
+damping = 0 のとき式は乗数 1.0 となりノーオペレーション。
+旧来の接触ベース hardcode damping (`ang_damp=0.85`, `lin_damp=0.995`) は廃止。
+減衰が必要なシナリオでは BodyDef にフィールドを明示設定すること。
 
 ### N² AABB ブロードフェーズ
 

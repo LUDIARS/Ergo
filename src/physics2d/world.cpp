@@ -80,6 +80,8 @@ BodyHandle World::create_body(const BodyDef& def, const Shape& shape) {
     body.angular_velocity = def.angular_velocity;
     body.restitution      = def.restitution;
     body.friction         = def.friction;
+    body.linear_damping   = def.linear_damping;
+    body.angular_damping  = def.angular_damping;
     body.user_data        = def.user_data;
     body.type             = def.type;
     body.shape            = shape;
@@ -125,6 +127,12 @@ void World::integrate(float dt) {
 
         // Semi-implicit Euler: integrate velocity first, then position.
         body.linear_velocity  += gravity_ * dt;
+
+        // Per-body damping (frame-rate independent, Box2D formula).
+        // Applied after gravity but before position integration, matching Box2D.
+        body.linear_velocity  *= 1.0f / (1.0f + dt * body.linear_damping);
+        body.angular_velocity *= 1.0f / (1.0f + dt * body.angular_damping);
+
         body.position         += body.linear_velocity * dt;
         body.angle            += body.angular_velocity * dt;
     }
@@ -223,22 +231,6 @@ void World::broadphase_and_solve(float dt, int vel_iter, int pos_iter) {
         }
     }
 
-    // Rolling resistance: angular damping applied to bodies that have active contacts.
-    // This models the energy loss from surface deformation / imperfect elasticity.
-    // It does NOT affect free-falling bodies (no contacts → no damping).
-    if (!manifolds.empty()) {
-        const float ang_damp = 0.85f;   // per-step angular velocity decay for contacting bodies
-        const float lin_damp = 0.995f;  // very slight linear decay to handle residual rolling
-        for (auto& mf : manifolds) {
-            for (BodyHandle h : { mf.body_a, mf.body_b }) {
-                Body& body = pool_.get(static_cast<std::size_t>(h));
-                if (body.type == BodyType::Dynamic) {
-                    body.angular_velocity *= ang_damp;
-                    body.linear_velocity  *= lin_damp;
-                }
-            }
-        }
-    }
 }
 
 void World::step(float dt, int velocity_iterations, int position_iterations) {
