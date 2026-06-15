@@ -39,6 +39,7 @@ option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + ani
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
 option(ERGO_BUILD_MATH         "Build ergo_math (C++20 generic math: vec/mat/batch/pool)" ON)
+option(ERGO_BUILD_PHYSICS2D    "Build ergo_physics2d (2D rigid body, Box2D-like)" ON)
 
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
@@ -623,6 +624,39 @@ if(ERGO_BUILD_MATH)
             target_compile_options(test_math PRIVATE /utf-8)
         endif()
         add_test(NAME test_math COMMAND test_math)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_physics2d — 2D rigid body physics engine (Box2D-like)
+#   Shape(Circle/Polygon), Body, World, ContactEvent
+#   Sequential impulse solver + SAT narrowphase + N² AABB broadphase
+#   Uses ergo_math ObjectPool/Vec2 for DoD body storage
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_PHYSICS2D)
+    file(GLOB PHYSICS2D_SRC src/physics2d/*.cpp)
+    add_library(ergo_physics2d STATIC ${PHYSICS2D_SRC})
+    target_include_directories(ergo_physics2d PUBLIC include)
+    target_link_libraries(ergo_physics2d PUBLIC ergo_math)
+    set_target_properties(ergo_physics2d PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+    )
+    if(MSVC)
+        target_compile_options(ergo_physics2d PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_physics2d tests/physics2d/test_physics2d.cpp)
+        target_link_libraries(test_physics2d PRIVATE ergo_physics2d ergo_gtest_main)
+        set_target_properties(test_physics2d PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+        )
+        if(MSVC)
+            target_compile_options(test_physics2d PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_physics2d COMMAND test_physics2d)
     endif()
 endif()
 

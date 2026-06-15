@@ -260,6 +260,18 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_physics2d
+    summary: 2D 剛体物理エンジン (Box2D ライク)。Shape(Circle/Polygon)/Body/World/ContactEvent。sequential impulse + SAT narrowphase + N² broadphase
+    category: システム
+    header_dir: include/ergo/physics2d/
+    source_dir: src/physics2d/
+    test_dir:   tests/physics2d/
+    spec:       spec/module/physics2d.md
+    cmake_option: ERGO_BUILD_PHYSICS2D
+    tool_plugin: null
+    depends:    [ergo_math]
+    status: preview
+
   - name: ergo_render
     summary: Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)
     category: システム
