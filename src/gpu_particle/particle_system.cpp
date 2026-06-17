@@ -453,7 +453,10 @@ uint32_t ParticleSystem::Impl::compute_spawn_count(EmitterRuntime& rt, float dt)
         const uint32_t cycles = b.cycles == 0 ? 1u : b.cycles;
         for (uint32_t c = 0; c < cycles; ++c) {
             const float fire_time = b.time + static_cast<float>(c) * b.interval;
-            if (fire_time <= prev || fire_time > rt.time_since_play) continue;
+            const bool crossed =
+                (fire_time > prev && fire_time <= rt.time_since_play) ||
+                (prev <= 0.0f && fire_time <= 0.0f && rt.time_since_play > 0.0f);
+            if (!crossed) continue;
 
             // Stochastic gate.
             if (b.probability < 1.0f && random01(rt.random_state) > b.probability) {
