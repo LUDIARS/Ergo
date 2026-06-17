@@ -61,6 +61,7 @@ ConvertToGpuEmitter(const ShurikenSource& src, MigrationReport& report) {
     d.start_lifetime = to_gpu_curve(src.main.startLifetime);
     d.start_speed    = to_gpu_curve(src.main.startSpeed);
     d.start_size     = to_gpu_curve(src.main.startSize);
+    d.size_over_lifetime = GpuMinMax::constant(1.0f);
     d.start_color    = ergo::gpu_particle::Vec4f{
         src.main.startColor[0], src.main.startColor[1],
         src.main.startColor[2], src.main.startColor[3]};
@@ -108,6 +109,11 @@ ConvertToGpuEmitter(const ShurikenSource& src, MigrationReport& report) {
 
     if (src.sizeOverLifetime.enabled) {
         d.size_over_lifetime = to_gpu_curve(src.sizeOverLifetime.size);
+        if (d.size_over_lifetime.constant_min <= 0.0f &&
+            d.size_over_lifetime.constant_max <= 0.0f) {
+            d.size_over_lifetime = GpuMinMax::constant(1.0f);
+            report.Warn(src.name + ": SizeOverLifetime curve fallback -> constant 1");
+        }
     }
 
     if (src.colorOverLifetime.enabled) {
