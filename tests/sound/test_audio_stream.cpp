@@ -4,10 +4,16 @@
 #include "ergo/sound/audio_stream.h"
 #include <fstream>
 #include <cmath>
+#include <filesystem>
 
 using namespace ergo::sound;
 
 namespace {
+
+std::string tmpPath(const char* filename) {
+    return (std::filesystem::temp_directory_path() / filename).string();
+}
+
 
 std::string createTestWav(const std::string& path, uint32_t numFrames = 4410) {
     std::ofstream file(path, std::ios::binary);
@@ -49,7 +55,7 @@ std::string createTestWav(const std::string& path, uint32_t numFrames = 4410) {
 class AudioStreamTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        wavPath_ = "/tmp/ergo_stream_test.wav";
+        wavPath_ = tmpPath("ergo_stream_test.wav");
         createTestWav(wavPath_, 10000);
     }
 
@@ -142,7 +148,7 @@ TEST_F(AudioStreamTest, Seek) {
 // 存在しないファイル
 TEST_F(AudioStreamTest, NonexistentFile) {
     AudioStream stream;
-    EXPECT_FALSE(stream.open("/tmp/nonexistent.wav"));
+    EXPECT_FALSE(stream.open(tmpPath("ergo_nonexistent_stream.wav")));
     EXPECT_FALSE(stream.isOpen());
 }
 
