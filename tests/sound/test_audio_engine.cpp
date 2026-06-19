@@ -6,10 +6,16 @@
 #include <cmath>
 #include <thread>
 #include <chrono>
+#include <filesystem>
 
 using namespace ergo::sound;
 
 namespace {
+
+std::string tmpPath(const char* filename) {
+    return (std::filesystem::temp_directory_path() / filename).string();
+}
+
 
 std::string createTestWav(const std::string& path, uint32_t numFrames = 4410) {
     std::ofstream file(path, std::ios::binary);
@@ -52,7 +58,7 @@ std::string createTestWav(const std::string& path, uint32_t numFrames = 4410) {
 class AudioEngineTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        wavPath_ = "/tmp/ergo_engine_test.wav";
+        wavPath_ = tmpPath("ergo_engine_test.wav");
         createTestWav(wavPath_, 44100);  // 1秒分
     }
 
