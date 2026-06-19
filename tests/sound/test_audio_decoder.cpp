@@ -5,10 +5,16 @@
 #include <fstream>
 #include <cstring>
 #include <cmath>
+#include <filesystem>
 
 using namespace ergo::sound;
 
 namespace {
+
+std::string tmpPath(const char* filename) {
+    return (std::filesystem::temp_directory_path() / filename).string();
+}
+
 
 // テスト用WAVファイルを生成するヘルパー
 // 440Hz正弦波、16bit、モノラル、44100Hz、指定フレーム数
@@ -78,7 +84,7 @@ std::string createInvalidFile(const std::string& path) {
 class WavDecoderTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        wavPath_ = "/tmp/ergo_test_440hz.wav";
+        wavPath_ = tmpPath("ergo_test_440hz.wav");
         createTestWavFile(wavPath_);
     }
 
@@ -131,7 +137,7 @@ TEST_F(WavDecoderTest, DecodePcm) {
 
 // 不正なファイルに対してエラーが返されること
 TEST_F(WavDecoderTest, InvalidFile) {
-    std::string invalidPath = "/tmp/ergo_test_invalid.wav";
+    std::string invalidPath = tmpPath("ergo_test_invalid.wav");
     createInvalidFile(invalidPath);
 
     WavDecoder decoder;
@@ -144,7 +150,7 @@ TEST_F(WavDecoderTest, InvalidFile) {
 // 存在しないファイルに対してエラーが返されること
 TEST_F(WavDecoderTest, NonexistentFile) {
     WavDecoder decoder;
-    EXPECT_FALSE(decoder.open("/tmp/nonexistent_file.wav"));
+    EXPECT_FALSE(decoder.open(tmpPath("ergo_nonexistent_file.wav")));
 }
 
 // シークが正しく動作すること
@@ -166,7 +172,7 @@ TEST_F(WavDecoderTest, Seek) {
 
 // 24bit WAVが正しくデコードされること
 TEST(WavDecoder24BitTest, Decode24Bit) {
-    std::string path = "/tmp/ergo_test_24bit.wav";
+    std::string path = tmpPath("ergo_test_24bit.wav");
     createTestWavFile(path, 44100, 1, 24, 1000);
 
     WavDecoder decoder;
@@ -185,7 +191,7 @@ TEST(WavDecoder24BitTest, Decode24Bit) {
 
 // ステレオWAVが正しくデコードされること
 TEST(WavDecoderStereoTest, DecodeStereo) {
-    std::string path = "/tmp/ergo_test_stereo.wav";
+    std::string path = tmpPath("ergo_test_stereo.wav");
     createTestWavFile(path, 44100, 2, 16, 1000);
 
     WavDecoder decoder;
