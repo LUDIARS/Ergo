@@ -13,3 +13,6 @@ bash.exe.stackdump
 
 # session logs (lictor 等のローカルセッションログ)
 logs/
+
+# デバッグ用メッシュエクスポート
+*.obj
