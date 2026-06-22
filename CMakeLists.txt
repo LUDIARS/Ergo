@@ -37,6 +37,7 @@ option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shurike
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
+option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
 option(ERGO_BUILD_MATH         "Build ergo_math (C++20 generic math: vec/mat/batch/pool)" ON)
 option(ERGO_BUILD_PHYSICS2D    "Build ergo_physics2d (2D rigid body, Box2D-like)" ON)
@@ -264,6 +265,19 @@ endif()
 # ---------------------------------------------------------------------------
 # ergo_sound — WAV/OGG decode, streaming, mixing engine, waveform, quantizer
 # ---------------------------------------------------------------------------
+# ergo_scene - serializable look-dev scene document.
+if(ERGO_BUILD_SCENE)
+    add_library(ergo_scene src/scene/scene.cpp)
+    target_include_directories(ergo_scene PUBLIC include)
+    target_link_libraries(ergo_scene PUBLIC ergo_common)
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_scene tests/scene/test_scene.cpp)
+        target_link_libraries(test_scene PRIVATE ergo_scene ergo_gtest_main)
+        add_test(NAME test_scene COMMAND test_scene)
+    endif()
+endif()
+
 if(ERGO_BUILD_SOUND)
     add_library(ergo_sound
         src/sound/audio_decoder.cpp

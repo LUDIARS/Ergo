@@ -14,7 +14,7 @@
 /// consumer may serialize it however it likes.
 ///
 /// Relationship to `ergo_scene`: distinct modules. `ergo_scene` is a heavier
-/// GUI-editable look-dev *document* (camera + GameObjects + post-process,
+/// GUI-editable look-dev *document* (camera + actor specs + post-process,
 /// serialized to `*.scene.json`, depends on `ergo_render`). `ergo_cast` is a
 /// thin runtime cast list with zero rendering coupling.
 
