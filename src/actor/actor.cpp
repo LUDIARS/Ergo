@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <mutex>
 #include <unordered_map>
 
@@ -75,6 +76,7 @@ Actor::Actor(std::string name, Actor* parent)
     detail::add(this);
     bind::Engine::instance().actor_register(
         handle_, parent_ ? parent_->handle() : INVALID_HANDLE, name_);
+    bind_var<float>("time_scale", &time_scale_);
 }
 
 Actor::~Actor() {
@@ -89,6 +91,10 @@ Actor::~Actor() {
     owned_.clear();
     bind::Engine::instance().actor_unregister(handle_);
     detail::remove(this);
+}
+
+void Actor::set_time_scale(float s) {
+    time_scale_ = s < 0.0f ? 0.0f : s;
 }
 
 std::string Actor::qualified(const std::string& var_name) const {
