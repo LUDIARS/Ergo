@@ -176,12 +176,98 @@ export const CATALOG: VfxPreset[] = [
         forces: { gravity: [0, -22] },
         render:  { blend: "additive", shape: "circle" },
     }),
+
+    // ── KS 固有 ─────────────────────────────────────────────────────────────
+
+    p("Effect/ReflectLaserBeam", "レーザーが反射する瞬間の閃光散乱。高速スパーク+残光。KS ReflectLaserBeam キー向き。", {
+        name: "Effect/ReflectLaserBeam",
+        emission:  { rate: 180, maxAlive: 100 },
+        initial: {
+            positionShape: "disc", svgSource: "", svgScale: 1,
+            positionRadius: 2,
+            velocityAngleDeg: 270, velocityAngleSpreadDeg: 140,
+            speedMin: 120, speedMax: 300,
+            lifetimeMin: 0.1, lifetimeMax: 0.35,
+            size: 5, color: [0.7, 0.95, 1, 1],
+        },
+        overLife: {
+            sizeStart: 1.2, sizeEnd: 0.0,
+            colorStart: [0.8, 1, 1, 1],
+            colorEnd:   [0.3, 0.6, 1, 0],
+            velocityDamping: 0.45,
+        },
+        forces: { gravity: [0, 0] },
+        render:  { blend: "additive", shape: "square" },
+    }),
+
+    p("Effect/Clone", "半透明の残像分身。幽霊的な薄い輝き粒子が短命で散る。KS Clone キー向き。", {
+        name: "Effect/Clone",
+        emission:  { rate: 55, maxAlive: 120 },
+        initial: {
+            positionShape: "disc", svgSource: "", svgScale: 1,
+            positionRadius: 10,
+            velocityAngleDeg: 270, velocityAngleSpreadDeg: 360,
+            speedMin: 15,  speedMax: 55,
+            lifetimeMin: 0.5, lifetimeMax: 1.5,
+            size: 7, color: [0.55, 0.8, 1, 0.55],
+        },
+        overLife: {
+            sizeStart: 0.8, sizeEnd: 0.3,
+            colorStart: [0.65, 0.85, 1, 0.5],
+            colorEnd:   [0.35, 0.55, 1, 0],
+            velocityDamping: 0.85,
+        },
+        forces: { gravity: [0, -15] },
+        render:  { blend: "additive", shape: "circle" },
+    }),
+
+    // ── AC 固有 ─────────────────────────────────────────────────────────────
+
+    p("斬撃フラッシュ", "auto_melee_forward の瞬間フラッシュ。前方への鋭い白フラッシュ+残光。", {
+        emission:  { rate: 200, maxAlive: 60 },
+        initial: {
+            positionShape: "disc", svgSource: "", svgScale: 1,
+            positionRadius: 1,
+            velocityAngleDeg: 0, velocityAngleSpreadDeg: 40,
+            speedMin: 80,  speedMax: 200,
+            lifetimeMin: 0.05, lifetimeMax: 0.18,
+            size: 8, color: [1, 0.95, 0.8, 1],
+        },
+        overLife: {
+            sizeStart: 1.5, sizeEnd: 0.0,
+            colorStart: [1, 1, 0.9, 1],
+            colorEnd:   [1, 0.65, 0.3, 0],
+            velocityDamping: 0.3,
+        },
+        forces: { gravity: [0, 0] },
+        render:  { blend: "additive", shape: "square" },
+    }),
+
+    p("追尾弾軌跡", "auto_timed_projectile の弾軌跡。小さな輝粒子が後方に流れる。", {
+        emission:  { rate: 60, maxAlive: 80 },
+        initial: {
+            positionShape: "disc", svgSource: "", svgScale: 1,
+            positionRadius: 1,
+            velocityAngleDeg: 270, velocityAngleSpreadDeg: 30,
+            speedMin: 10,  speedMax: 40,
+            lifetimeMin: 0.15, lifetimeMax: 0.4,
+            size: 4, color: [0.9, 0.7, 1, 1],
+        },
+        overLife: {
+            sizeStart: 1.0, sizeEnd: 0.0,
+            colorStart: [0.95, 0.75, 1, 1],
+            colorEnd:   [0.5, 0.2, 0.8, 0],
+            velocityDamping: 0.9,
+        },
+        forces: { gravity: [0, 20] },
+        render:  { blend: "additive", shape: "circle" },
+    }),
 ];
 
 /// Game-specific tags map event keywords → catalog preset names for few-shot.
 export const GAME_HINTS: Record<GameId, string[]> = {
-    ks: ["雷撃", "爆発", "衝撃波", "炎", "氷結"],
-    ac: ["炎", "衝撃波", "魔法陣", "回復", "砂煙"],
+    ks: ["雷撃", "爆発", "衝撃波", "Effect/ReflectLaserBeam", "Effect/Clone", "炎"],
+    ac: ["斬撃フラッシュ", "追尾弾軌跡", "炎", "衝撃波", "魔法陣", "回復"],
     ul: ["回復", "魔法陣", "砂煙", "炎", "氷結"],
     generic: ["炎", "爆発", "回復", "衝撃波", "魔法陣"],
 };

@@ -61,6 +61,7 @@
   .btn-preview { color:var(--ok);   border-color:var(--ok); }
   .btn-copy    { color:var(--accent); }
   .btn-dl      { color:var(--muted); }
+  .btn-ks      { color:var(--warn);  border-color:var(--warn); }
 
   /* catalog */
   details { margin-top:1.5rem; border:1px solid var(--line); border-radius:5px; }
@@ -235,10 +236,12 @@ function renderCards(presets, container, compact) {
         <button class="btn-preview" title="particle プラグインに送りプレビュー">▷ preview</button>
         <button class="btn-copy"    title="JSON をコピー">📋 copy</button>
         <button class="btn-dl"      title="JSON をダウンロード">↓ DL</button>
+        <button class="btn-ks"      title="KS GPU EmitterDescriptor JSON をダウンロード (VfxCatalog::register_from_json 用)">↗ KS</button>
       </div>`;
     div.querySelector(".btn-preview").onclick = () => sendToParticle(cfg);
     div.querySelector(".btn-copy").onclick    = () => copyConfig(cfg, p.name);
     div.querySelector(".btn-dl").onclick      = () => downloadConfig(cfg, p.name);
+    div.querySelector(".btn-ks").onclick      = () => exportKsEmitter(cfg, p.name);
     container.appendChild(div);
   }
 }
@@ -266,6 +269,57 @@ function downloadConfig(config, name) {
   });
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ── KS GPU EmitterDescriptor エクスポート (クライアント側変換) ────────────────
+// ergo::shuriken_migrator::EmitterDescriptorToJson と同形式の JSON を出力する。
+// 制約: color-over-lifetime は未シリアライズ (start_color のみ)、
+//       size_over_lifetime は two_constants 近似。
+function toKsEmitter(cfg, key) {
+  const ini = cfg.initial ?? {};
+  const ol  = cfg.overLife ?? {};
+  const em  = cfg.emission ?? {};
+  const re  = cfg.render   ?? {};
+  const g   = cfg.forces?.gravity ?? [0, 120];
+  const c   = ini.color ?? [1, 0.75, 0.25, 1];
+  const sStart = typeof ol.sizeStart === "number" ? ol.sizeStart : 1;
+  const sEnd   = typeof ol.sizeEnd   === "number" ? ol.sizeEnd   : 0;
+  const minmax0 = v => ({ mode: 0, min: +v, max: +v });
+  const minmax2 = (lo, hi) => Math.abs(hi - lo) < 1e-6
+    ? minmax0(lo) : { mode: 2, min: +lo, max: +hi };
+  return {
+    name:             key ?? cfg.name ?? "untitled",
+    duration:         0,
+    loop:             true,
+    start_lifetime:   minmax2(ini.lifetimeMin ?? 0.7, ini.lifetimeMax ?? 1.4),
+    start_speed:      minmax2(ini.speedMin    ?? 80,  ini.speedMax    ?? 180),
+    start_size:       minmax0(ini.size        ?? 8),
+    start_color:      [+c[0], +c[1], +c[2], +c[3]],
+    max_particles:    em.maxAlive ?? 400,
+    simulation_space: 0,
+    gravity_modifier: +(+g[1] / 9.81).toFixed(4),
+    rate_over_time:   minmax0(em.rate ?? 60),
+    shape:            1,
+    sphere_radius:    ini.positionRadius ?? 4,
+    cone_radius:      ini.positionRadius ?? 4,
+    cone_angle_deg:   (ini.velocityAngleSpreadDeg ?? 60) / 2,
+    shape_scale:      [1, 1, 1],
+    size_over_lifetime: minmax2(sEnd, sStart),
+    blend_mode:       re.blend === "alpha" ? 0 : 2,
+  };
+}
+function exportKsEmitter(config, name) {
+  const key = (name ?? "").startsWith("Effect/") ? name : undefined;
+  const emitter = toKsEmitter(config, key);
+  const json  = JSON.stringify(emitter, null, 2);
+  const fname = (emitter.name).replace(/\//g, "_").replace(/\s+/g, "_") + ".emitter.json";
+  const blob  = new Blob([json], { type: "application/json" });
+  const a     = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(blob), download: fname,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus(`"${emitter.name}" を KS GPU Emitter JSON としてダウンロードしました (color-over-lifetime は start_color のみ)`);
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
