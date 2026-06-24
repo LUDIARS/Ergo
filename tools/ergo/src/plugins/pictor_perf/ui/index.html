@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ergo — Pictor Perf Monitor</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header>
+  <h1>📊 Pictor Perf Monitor</h1>
+  <span class="status" id="status">未接続</span>
+</header>
+
+<main>
+  <div class="toolbar">
+    <span class="hint">
+      host が <code>PerfQueryAPI::export_json()</code> を
+      <code>/pictor_perf/api/publish</code> に POST するとライブ更新。
+    </span>
+    <button id="file_btn" type="button">JSON を開く</button>
+    <input type="file" id="file_input" accept=".json,application/json" hidden>
+    <span class="summary" id="summary"></span>
+  </div>
+
+  <!-- DoD 不変条件 -->
+  <section class="card">
+    <h2>DoD 不変条件 <small>(コンパイル時の事実)</small></h2>
+    <div class="chips" id="invariants"></div>
+  </section>
+
+  <!-- メモリレイアウト / キャッシュ効率 (A) -->
+  <section class="card">
+    <h2>メモリレイアウト / キャッシュ効率 <small>(A 構造的)</small></h2>
+    <div class="mem-summary" id="mem_summary"></div>
+    <div id="pools"></div>
+  </section>
+
+  <!-- キャッシュトラフィック (B) -->
+  <section class="card">
+    <h2>パス毎キャッシュトラフィック <small>(B モデル推定 — 実効帯域)</small></h2>
+    <div id="traffic"></div>
+  </section>
+
+  <!-- バッチ適格性 -->
+  <section class="card">
+    <h2>GPU バッチ適格性 <small>(per-object → per-batch)</small></h2>
+    <div class="mem-summary" id="batch_summary"></div>
+    <div id="batches"></div>
+  </section>
+
+  <!-- per-batch GPU 時間 -->
+  <section class="card">
+    <h2>per-batch GPU 時間</h2>
+    <div id="batch_timings"></div>
+  </section>
+
+  <!-- HW カウンタ (C) -->
+  <section class="card">
+    <h2>ハードウェアカウンタ <small>(C — Intel PCM)</small></h2>
+    <div id="hw"></div>
+  </section>
+</main>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
