@@ -7,6 +7,8 @@ import { Hono } from "hono";
 import type { Plugin, PluginContext, PluginFactory } from "../../core/plugin.js";
 import { CATALOG } from "./catalog.js";
 import { makeGenerator } from "./generator.js";
+import { toKsEmitterJson } from "./ks_export.js";
+import { mergeConfig, DEFAULT_EFFECT } from "../particle/schema.js";
 import { GAME_LABELS, isGameId } from "./schema.js";
 
 const factory: PluginFactory = () => {
@@ -64,6 +66,22 @@ const factory: PluginFactory = () => {
                     ctx.log("error", `vfx-suggest generate failed: ${String(e)}`);
                     return c.json({ ok: false, err: String(e) }, 502);
                 }
+            });
+
+            /// POST /api/ks-emitter
+            /// Body: ParticleEffectConfig (partial OK — merged with DEFAULT_EFFECT)
+            /// Query: ?key=Effect%2FLightning (optional VfxCatalog key override)
+            /// Returns: EmitterDescriptor JSON compatible with VfxCatalog::register_from_json
+            app.post("/api/ks-emitter", async (c) => {
+                const body = await c.req.json().catch(() => null);
+                if (!body || typeof body !== "object") {
+                    return c.json({ ok: false, err: "request body must be ParticleEffectConfig JSON" }, 400);
+                }
+                const key = c.req.query("key") ?? undefined;
+                const cfg = mergeConfig(DEFAULT_EFFECT, body);
+                const emitter = toKsEmitterJson(cfg, key);
+                ctx.log("info", `vfx-suggest: ks-emitter export "${emitter.name}"`);
+                return c.json({ ok: true, emitter });
             });
 
             app.get("/api/health", (c) => c.json(gen.health()));
