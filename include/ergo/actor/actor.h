@@ -12,6 +12,22 @@
 /// visibility, or any other game-engine concepts — those are a host
 /// concern. What Actor gives you is stable identity (a handle) and a
 /// consistent place to hang live-tuned variables.
+///
+/// ## Per-actor time scale
+///
+/// Each actor carries a `time_scale` multiplier (default 1.0).  Call
+/// `scaled_dt(dt)` in your tick to get the actor-local delta time:
+///
+///     void MyActor::tick(float world_dt) {
+///         const float dt = scaled_dt(world_dt);   // 0 if actor is paused
+///         anim_.update(dt);
+///         effect_.update(dt);
+///     }
+///
+/// The base dt passed in can be either the world dt (from
+/// `ergo::world_time::Engine::update`) so that global hit-stop still
+/// applies, or real dt if the actor should be immune to world effects.
+/// The variable editor exposes `{actor_name}.time_scale` for live tuning.
 
 #include <cstdint>
 #include <functional>
@@ -44,6 +60,23 @@ public:
     Actor*                     parent()   const { return parent_; }
     const std::vector<Actor*>& children() const { return children_; }
 
+    // ---- Per-actor time scale --------------------------------------------
+
+    /// Local time-scale multiplier. Default 1.0. Clamped to [0, ∞).
+    /// Setting to 0 pauses this actor's animations and effects without
+    /// affecting any other actor or the global world time.
+    float time_scale() const { return time_scale_; }
+
+    /// Set the local time-scale. Values < 0 are clamped to 0.
+    void set_time_scale(float s);
+
+    /// Multiply `dt` by this actor's time_scale and return the result.
+    /// Pass the world dt (from WorldTime) or real dt depending on
+    /// whether the actor should honour global time effects.
+    float scaled_dt(float dt) const { return dt * time_scale_; }
+
+    // -----------------------------------------------------------------------
+
     /// Compose the wire name for a variable bound under this actor.
     /// Default: `"{actor_name}.{var_name}"` — subclasses may override
     /// (e.g. to use slashes for a deeper hierarchy).
@@ -67,10 +100,11 @@ protected:
 
 private:
     std::string                name_;
-    Handle                     handle_ = INVALID_HANDLE;
-    Actor*                     parent_ = nullptr;
+    Handle                     handle_     = INVALID_HANDLE;
+    Actor*                     parent_     = nullptr;
     std::vector<Actor*>        children_;
     std::vector<bind::Handle>  owned_;
+    float                      time_scale_ = 1.0f;
 };
 
 // -------------------------------------------------------------------------
