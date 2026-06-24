@@ -17,6 +17,7 @@ import makeProfilePlugin        from "../plugins/profile/index.js";
 import makeRenderPipelinePlugin from "../plugins/render_pipeline/index.js";
 import makeVisusPlugin          from "../plugins/visus/index.js";
 import makeUiLayoutPlugin       from "../plugins/ui_layout/index.js";
+import makeVfxSuggestPlugin     from "../plugins/vfx-suggest/index.js";
 
 export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeParticlePlugin,
@@ -26,4 +27,5 @@ export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeRenderPipelinePlugin,
     makeVisusPlugin,
     makeUiLayoutPlugin,
+    makeVfxSuggestPlugin,
 ];
