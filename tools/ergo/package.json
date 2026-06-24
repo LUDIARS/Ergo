@@ -16,9 +16,10 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.7",
-    "hono":              "^4.6.10",
-    "ws":                "^8.18.0"
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@hono/node-server":  "^1.13.7",
+    "hono":               "^4.6.10",
+    "ws":                 "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
