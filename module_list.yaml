@@ -317,16 +317,6 @@ modules:
     tool_plugin: ui_layout
     status: preview
 
-  - name: ergo_stickfig
-    summary: 棒人間 (頭=球 / 四肢=カプセル) のプロシージャル幾何生成。CPU メッシュのみ (Vulkan 非依存)
-    category: ゲームオブジェクト
-    header_dir: include/ergo/stickfig/
-    source_dir: src/stickfig/
-    test_dir:   tests/stickfig/
-    spec:       spec/module/stickfig.md
-    cmake_option: ERGO_BUILD_STICKFIG
-    tool_plugin: stickfig
-    status: preview
 
 shared_libs:
   - name: ergo_common
