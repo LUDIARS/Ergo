@@ -47,8 +47,6 @@ option(ERGO_BUILD_HTTP         "Build ergo_http (libcurl-backed HTTP client; for
 if(ERGO_BUILD_HTTP)
     set(ERGO_WITH_CURL ON)  # ergo_http consumes CURL::libcurl (see third_party/dependencies.cmake)
 endif()
-option(ERGO_BUILD_STICKFIG     "Build ergo_stickfig (stick figure procedural geometry)" ON)
-
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
 option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute shaders to SPIR-V via glslc" ON)
@@ -953,28 +951,6 @@ if(ERGO_BUILD_RENDER)
     endif()
 endif()
 
-# ---------------------------------------------------------------------------
-# ergo_stickfig — stick figure (head=sphere / limbs=capsule) procedural geometry.
-#   Pure CPU mesh generation (no Vulkan, no cross-module import). Output Vertex
-#   is layout-compatible with ergo::render::StageVertex so a render layer can
-#   upload the meshes directly.
-# ---------------------------------------------------------------------------
-if(ERGO_BUILD_STICKFIG)
-    add_library(ergo_stickfig STATIC src/stickfig/stick_figure.cpp)
-    target_include_directories(ergo_stickfig PUBLIC include)
-    if(MSVC)
-        target_compile_options(ergo_stickfig PRIVATE /utf-8)
-    endif()
-
-    if(ERGO_BUILD_TESTS)
-        add_executable(test_stick_figure tests/stickfig/test_stick_figure.cpp)
-        target_link_libraries(test_stick_figure PRIVATE ergo_stickfig ergo_gtest_main)
-        if(MSVC)
-            target_compile_options(test_stick_figure PRIVATE /utf-8)
-        endif()
-        add_test(NAME test_stick_figure COMMAND test_stick_figure)
-    endif()
-endif()
 
 # ---------------------------------------------------------------------------
 # ergo_ui_layout — data-driven UI layout runtime with bind/update/emit APIs.
