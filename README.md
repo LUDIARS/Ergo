@@ -67,6 +67,7 @@ ergo/
 | `ergo_combo_counter` | 連続成功カウンタ + フルコンボ通知 (game-lexicon: `combo-counter`)              | `include/ergo/combo_counter/`| — |
 | `ergo_timing_judge`  | 音ゲー用 ms タイミング判定 PERFECT/GREAT/GOOD/MISS (game-lexicon: `timing-judge`) | `include/ergo/timing_judge/` | — |
 | `ergo_character`     | TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替)。エンジン非依存 | `include/ergo/character/`    | — |
+| `ergo_http`          | libcurl バックエンドの同期 HTTP クライアント (`IHttpClient`/`get`/`post`)。公開 API は curl を隠蔽。既定 OFF (opt-in、`ERGO_WITH_CURL` を強制) | `include/ergo/http/`         | — |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。
