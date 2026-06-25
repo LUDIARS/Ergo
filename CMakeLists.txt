@@ -73,6 +73,16 @@ if(ERGO_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
+# Managed third-party libraries (fetched + compiled from pinned upstreams:
+# kazmath / curl / ...). The registry declares every managed dependency and
+# opt-in builds the ones whose ERGO_WITH_<NAME> switch is ON. Engine lives in
+# cmake/ErgoDependencies.cmake; per-lib wiring in cmake/deps/<name>.cmake.
+# Header-only vendored libs (earcut/nanosvg/gtest) stay under third_party/ and
+# are not managed here. See spec/setup/third-party-deps.md.
+# ---------------------------------------------------------------------------
+include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
+
+# ---------------------------------------------------------------------------
 # ergo_input — unified input (mouse/keyboard/gamepad/USB HID)
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_INPUT)
@@ -995,5 +1005,17 @@ if(ERGO_BUILD_BENCHMARKS)
         target_include_directories(bench_curve PRIVATE benchmarks)
         target_link_libraries(bench_curve PRIVATE ergo_gpu_particle)
     endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# tests/thirdparty/ — smoke test for the managed dependency manager. Proves the
+# fetched libraries (kazmath + curl) link and run. Opt-in via
+# -DERGO_BUILD_THIRDPARTY_SMOKE=ON (which forces ERGO_WITH_KAZMATH/CURL on; see
+# third_party/dependencies.cmake).
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)
+    add_executable(test_thirdparty_deps tests/thirdparty/deps_smoke.cpp)
+    target_link_libraries(test_thirdparty_deps PRIVATE ergo_thirdparty ergo_gtest_main)
+    add_test(NAME test_thirdparty_deps COMMAND test_thirdparty_deps)
 endif()
 
