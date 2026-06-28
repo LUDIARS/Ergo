@@ -7,6 +7,7 @@
 /// build on this stable document layer later.
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -40,6 +41,28 @@ struct ResourceRef {
     std::string material;
 };
 
+/// Component attached to an actor (Renderable / Collider / Behavior / ...).
+/// Extra properties beyond "type" are stored as (key, JSON-text) pairs so that
+/// arbitrary component schemas round-trip without schema knowledge in ergo_scene.
+struct ComponentSpec {
+    std::string type;
+    std::vector<std::pair<std::string, std::string>> props;
+};
+
+/// Typed public variable on an actor instance (writable via ergo_bind / editors).
+/// value is JSON-encoded text so any JSON primitive or array/object is preserved.
+struct VarSpec {
+    std::string name;
+    std::string type;   // "bool" | "int" | "float" | "string" | "vec3" | "color" | ...
+    std::string value;  // JSON-encoded (e.g. "100", "3.14", "\"hello\"", "true")
+};
+
+/// Single prefab override: target property path → JSON-encoded replacement value.
+struct OverrideEntry {
+    std::string path;   // slash-separated field path, e.g. "vars/health"
+    std::string value;  // JSON-encoded replacement value
+};
+
 struct ActorSpec {
     std::string id;
     std::string name;
@@ -47,6 +70,10 @@ struct ActorSpec {
     std::string parent;
     Transform transform{};
     ResourceRef visual{};
+    std::vector<ComponentSpec> components;  // composition list (#240)
+    std::vector<VarSpec> vars;              // public typed variables (#241)
+    std::string instance_of;               // prefab reference (#242)
+    std::vector<OverrideEntry> overrides;  // prefab property overrides (#242)
 };
 
 enum class CameraMode {
@@ -135,6 +162,34 @@ private:
 
 const char* to_string(CameraMode mode);
 CameraMode camera_mode_from_string(const std::string& value);
+
+/// Runtime multi-scene compositor: mount / unmount Scene documents and present
+/// a unified actor graph. Scenes are keyed by their id (from Scene::id()).
+/// Actors across all mounted scenes are visited in mount order.
+class SceneGraph {
+public:
+    SceneGraph() = default;
+
+    /// Mount a scene. Returns false if a scene with the same id is already mounted.
+    bool mount(std::unique_ptr<Scene> scene);
+
+    /// Unmount (and destroy) the scene with the given id. Returns false if not found.
+    bool unmount(const std::string& scene_id);
+
+    /// True if a scene with this id is currently mounted.
+    bool is_mounted(const std::string& scene_id) const;
+
+    std::size_t scene_count() const { return scenes_.size(); }
+
+    /// Find an actor by id across all mounted scenes (first match wins).
+    const ActorSpec* find_actor(const std::string& actor_id) const;
+
+    /// Call visitor(scene, actor) for every actor in every mounted scene.
+    void for_each_actor(const std::function<void(const Scene&, const ActorSpec&)>& visitor) const;
+
+private:
+    std::vector<std::unique_ptr<Scene>> scenes_;
+};
 
 void mat4_identity(float out[16]);
 
