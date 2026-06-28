@@ -240,7 +240,7 @@ std::unique_ptr<Scene> Scene::load_json(std::string_view json) {
     }
 
     const JsonValue* actors = root.find("actors");
-    if (!actors) actors = root.find("objects");
+    if (!actors) actors = root.find("objects");  // "objects" key deprecated since v2; use "actors"
     if (actors && actors->is_array() && actors->a) {
         for (const JsonValue& item : *actors->a) {
             if (!item.is_object()) continue;
@@ -254,6 +254,47 @@ std::unique_ptr<Scene> Scene::load_json(std::string_view json) {
             }
             actor.transform = read_transform(item.find("transform"));
             actor.visual = read_visual(item.find("visual"));
+
+            if (const JsonValue* comps = item.find("components"); comps && comps->is_array() && comps->a) {
+                for (const JsonValue& c : *comps->a) {
+                    if (!c.is_object() || !c.o) continue;
+                    ComponentSpec cs;
+                    cs.type = string_or(c.find("type"));
+                    if (cs.type.empty()) continue;
+                    for (const auto& [k, v] : *c.o) {
+                        if (k != "type") cs.props.push_back({k, ergo::common::jsonm::serialize(v)});
+                    }
+                    actor.components.push_back(std::move(cs));
+                }
+            }
+
+            if (const JsonValue* vars = item.find("vars"); vars && vars->is_array() && vars->a) {
+                for (const JsonValue& v : *vars->a) {
+                    if (!v.is_object()) continue;
+                    VarSpec vs;
+                    vs.name  = string_or(v.find("name"));
+                    vs.type  = string_or(v.find("type"));
+                    if (const JsonValue* val = v.find("value"); val) {
+                        vs.value = ergo::common::jsonm::serialize(*val);
+                    }
+                    if (!vs.name.empty()) actor.vars.push_back(std::move(vs));
+                }
+            }
+
+            actor.instance_of = string_or(item.find("instanceOf"));
+
+            if (const JsonValue* ovs = item.find("overrides"); ovs && ovs->is_array() && ovs->a) {
+                for (const JsonValue& ov : *ovs->a) {
+                    if (!ov.is_object()) continue;
+                    OverrideEntry oe;
+                    oe.path = string_or(ov.find("path"));
+                    if (const JsonValue* val = ov.find("value"); val) {
+                        oe.value = ergo::common::jsonm::serialize(*val);
+                    }
+                    if (!oe.path.empty()) actor.overrides.push_back(std::move(oe));
+                }
+            }
+
             scene->add_actor(std::move(actor));
         }
     }
@@ -328,6 +369,54 @@ std::string Scene::to_json() const {
         }
         obj.set("transform", transform_json(actor.transform));
         obj.set("visual", visual_json(actor.visual));
+
+        if (!actor.components.empty()) {
+            auto comps = JsonValue::make_array();
+            for (const auto& cs : actor.components) {
+                auto c = JsonValue::make_object();
+                c.set("type", JsonValue::make_string(cs.type));
+                for (const auto& [k, raw] : cs.props) {
+                    JsonValue val;
+                    if (ergo::common::jsonm::parse(raw, val)) c.set(k, std::move(val));
+                }
+                comps.push(std::move(c));
+            }
+            obj.set("components", std::move(comps));
+        }
+
+        if (!actor.vars.empty()) {
+            auto vars = JsonValue::make_array();
+            for (const auto& vs : actor.vars) {
+                auto v = JsonValue::make_object();
+                v.set("name", JsonValue::make_string(vs.name));
+                v.set("type", JsonValue::make_string(vs.type));
+                JsonValue val;
+                if (!vs.value.empty() && ergo::common::jsonm::parse(vs.value, val)) {
+                    v.set("value", std::move(val));
+                }
+                vars.push(std::move(v));
+            }
+            obj.set("vars", std::move(vars));
+        }
+
+        if (!actor.instance_of.empty()) {
+            obj.set("instanceOf", JsonValue::make_string(actor.instance_of));
+        }
+
+        if (!actor.overrides.empty()) {
+            auto ovs = JsonValue::make_array();
+            for (const auto& oe : actor.overrides) {
+                auto o = JsonValue::make_object();
+                o.set("path", JsonValue::make_string(oe.path));
+                JsonValue val;
+                if (!oe.value.empty() && ergo::common::jsonm::parse(oe.value, val)) {
+                    o.set("value", std::move(val));
+                }
+                ovs.push(std::move(o));
+            }
+            obj.set("overrides", std::move(ovs));
+        }
+
         actors.push(std::move(obj));
     }
     root.set("actors", std::move(actors));
@@ -377,6 +466,46 @@ bool Scene::remove_actor(const std::string& id) {
 
 void Scene::clear_actors() {
     actors_.clear();
+}
+
+// ─── SceneGraph ─────────────────────────────────────────────────────────────
+
+bool SceneGraph::mount(std::unique_ptr<Scene> scene) {
+    if (!scene || scene->id().empty()) return false;
+    if (is_mounted(scene->id())) return false;
+    scenes_.push_back(std::move(scene));
+    return true;
+}
+
+bool SceneGraph::unmount(const std::string& scene_id) {
+    for (auto it = scenes_.begin(); it != scenes_.end(); ++it) {
+        if ((*it)->id() != scene_id) continue;
+        scenes_.erase(it);
+        return true;
+    }
+    return false;
+}
+
+bool SceneGraph::is_mounted(const std::string& scene_id) const {
+    for (const auto& s : scenes_) {
+        if (s->id() == scene_id) return true;
+    }
+    return false;
+}
+
+const ActorSpec* SceneGraph::find_actor(const std::string& actor_id) const {
+    for (const auto& s : scenes_) {
+        if (const ActorSpec* a = s->find_actor(actor_id)) return a;
+    }
+    return nullptr;
+}
+
+void SceneGraph::for_each_actor(const std::function<void(const Scene&, const ActorSpec&)>& visitor) const {
+    for (const auto& s : scenes_) {
+        for (const ActorSpec& actor : s->actors()) {
+            visitor(*s, actor);
+        }
+    }
 }
 
 } // namespace ergo::scene
