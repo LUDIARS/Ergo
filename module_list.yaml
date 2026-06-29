@@ -272,6 +272,18 @@ modules:
     depends:    [ergo_math]
     status: preview
 
+  - name: ergo_http
+    summary: libcurl バックエンドの同期 HTTP クライアント (IHttpClient/get/post)。公開 API は std:: のみで curl を隠蔽。既定 OFF (ERGO_WITH_CURL を強制)
+    category: システム
+    header_dir: include/ergo/http/
+    source_dir: src/http/
+    test_dir:   tests/http/
+    spec:       spec/module/http.md
+    cmake_option: ERGO_BUILD_HTTP
+    tool_plugin: null
+    depends:    [curl]
+    status: preview
+
   - name: ergo_render
     summary: Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)
     category: システム
@@ -304,6 +316,7 @@ modules:
     cmake_option: ERGO_BUILD_UI_LAYOUT
     tool_plugin: ui_layout
     status: preview
+
 
 shared_libs:
   - name: ergo_common

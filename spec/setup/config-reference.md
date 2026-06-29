@@ -31,7 +31,13 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 `INPUT` / `PARTICLE` / `GPU_PARTICLE` / `BIND` / `ACTOR` / `SOUND` / `FRAME` /
 `PROFILE` / `LOG` / `IO` / `AUDIO` / `WORLD_TIME` / `BLACKBOARD` / `UI` /
 `CUSTOS` / `HEALTH` / `SCORE` / `COMBO_COUNTER` / `TIMING_JUDGE` / `UI_KIT` /
-`SHURIKEN_MIGRATOR` / `RENDER`
+`SHURIKEN_MIGRATOR` / `RENDER` / `MATH` / `PHYSICS2D`
+
+例外的に既定 **OFF** のモジュール:
+
+| キー | 既定 | 役割 |
+|---|---|---|
+| `ERGO_BUILD_HTTP` | OFF | `ergo_http` (libcurl 同期 HTTP クライアント) をビルド。ON にすると `ERGO_WITH_CURL` を強制する (取得対象の libcurl を伴うため既定 OFF) |
 
 ### モジュール固有ノブ
 
@@ -40,6 +46,21 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | `ERGO_AUDIO_BACKEND`                | `auto` | `ergo_audio` バックエンド: `auto` / `fmod` / `dummy` |
 | `ERGO_PARTICLE_HAS_RENDERER`        | OFF    | `ergo_particle` の Vulkan ビルボード描画 (pictor + Vulkan 必須) |
 | `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON     | compute シェーダを `glslc` で SPIR-V に bake |
+
+### サードパーティ・ライブラリ管理 (kazmath / curl)
+
+取得 (fetch) してビルドする外部ライブラリのスイッチ。詳細は
+[third-party-deps.md](third-party-deps.md)。
+
+| キー | 既定 | 役割 |
+|---|---|---|
+| `ERGO_FETCH_DEPENDENCIES`     | ON     | 依存を upstream から取得してよいかのマスタースイッチ。OFF + override 無しで要求されると FATAL_ERROR |
+| `ERGO_WITH_KAZMATH`           | OFF    | kazmath を取得してビルド (target `kazmath`) |
+| `ERGO_WITH_CURL`              | OFF    | libcurl を取得してビルド (target `CURL::libcurl`) |
+| `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF    | スモークテストをビルド (kazmath + curl を強制 ON) |
+| `ERGO_CURL_USE_SSL`           | ON     | curl の TLS backend を有効化 (Windows は Schannel) |
+| `ERGO_DEPENDENCY_CACHE_DIR`   | (空)   | 取得ソースの共有キャッシュ dir (空 = `<build>/_deps`) |
+| `ERGO_SOURCE_DIR_<UPPER>`     | (空)   | その依存を fetch せずローカルソースで差し替える (オフライン用) |
 
 ### ビルド時に定義されるマクロ (フラグではなく自動分岐)
 

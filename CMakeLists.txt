@@ -37,10 +37,16 @@ option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shurike
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
+option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
 option(ERGO_BUILD_MATH         "Build ergo_math (C++20 generic math: vec/mat/batch/pool)" ON)
 option(ERGO_BUILD_PHYSICS2D    "Build ergo_physics2d (2D rigid body, Box2D-like)" ON)
-
+# ergo_http needs the managed libcurl, which is a fetched/opt-in dependency, so
+# this module is OFF by default (keeps the plain build offline + light).
+option(ERGO_BUILD_HTTP         "Build ergo_http (libcurl-backed HTTP client; forces ERGO_WITH_CURL)" OFF)
+if(ERGO_BUILD_HTTP)
+    set(ERGO_WITH_CURL ON)  # ergo_http consumes CURL::libcurl (see third_party/dependencies.cmake)
+endif()
 # Per-module knobs (passed through to module sections below)
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
 option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute shaders to SPIR-V via glslc" ON)
@@ -69,6 +75,40 @@ if(ERGO_BUILD_TESTS)
     enable_testing()
     add_library(ergo_gtest_main STATIC tests/gtest_main.cpp)
     target_include_directories(ergo_gtest_main PUBLIC third_party)
+endif()
+
+# ---------------------------------------------------------------------------
+# Managed third-party libraries (fetched + compiled from pinned upstreams:
+# kazmath / curl / ...). The registry declares every managed dependency and
+# opt-in builds the ones whose ERGO_WITH_<NAME> switch is ON. Engine lives in
+# cmake/ErgoDependencies.cmake; per-lib wiring in cmake/deps/<name>.cmake.
+# Header-only vendored libs (earcut/nanosvg/gtest) stay under third_party/ and
+# are not managed here. See spec/setup/third-party-deps.md.
+# ---------------------------------------------------------------------------
+include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
+
+# ---------------------------------------------------------------------------
+# ergo_http — libcurl-backed synchronous HTTP client. The public header hides
+# curl entirely (consumers link ergo_http, never <curl/curl.h>); curl is a
+# PRIVATE link. Opt-in via -DERGO_BUILD_HTTP=ON (forces ERGO_WITH_CURL above).
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_HTTP)
+    if(NOT TARGET CURL::libcurl)
+        message(FATAL_ERROR
+            "ERGO_BUILD_HTTP=ON but CURL::libcurl is unavailable. Ensure ERGO_WITH_CURL=ON "
+            "and ERGO_FETCH_DEPENDENCIES=ON (or provide ERGO_SOURCE_DIR_CURL). No silent fallback.")
+    endif()
+    add_library(ergo_http
+        src/http/curl_client.cpp
+        src/http/curl_global.cpp)
+    target_include_directories(ergo_http PUBLIC include)
+    target_link_libraries(ergo_http PRIVATE CURL::libcurl)
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_http_client tests/http/test_http_client.cpp)
+        target_link_libraries(test_http_client PRIVATE ergo_http ergo_gtest_main)
+        add_test(NAME test_http_client COMMAND test_http_client)
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -264,6 +304,19 @@ endif()
 # ---------------------------------------------------------------------------
 # ergo_sound — WAV/OGG decode, streaming, mixing engine, waveform, quantizer
 # ---------------------------------------------------------------------------
+# ergo_scene - serializable look-dev scene document.
+if(ERGO_BUILD_SCENE)
+    add_library(ergo_scene src/scene/scene.cpp)
+    target_include_directories(ergo_scene PUBLIC include)
+    target_link_libraries(ergo_scene PUBLIC ergo_common)
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_scene tests/scene/test_scene.cpp)
+        target_link_libraries(test_scene PRIVATE ergo_scene ergo_gtest_main)
+        add_test(NAME test_scene COMMAND test_scene)
+    endif()
+endif()
+
 if(ERGO_BUILD_SOUND)
     add_library(ergo_sound
         src/sound/audio_decoder.cpp
@@ -898,6 +951,7 @@ if(ERGO_BUILD_RENDER)
     endif()
 endif()
 
+
 # ---------------------------------------------------------------------------
 # ergo_ui_layout — data-driven UI layout runtime with bind/update/emit APIs.
 # Pictor-agnostic at module layer via RenderAdapter abstraction.
@@ -981,5 +1035,17 @@ if(ERGO_BUILD_BENCHMARKS)
         target_include_directories(bench_curve PRIVATE benchmarks)
         target_link_libraries(bench_curve PRIVATE ergo_gpu_particle)
     endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# tests/thirdparty/ — smoke test for the managed dependency manager. Proves the
+# fetched libraries (kazmath + curl) link and run. Opt-in via
+# -DERGO_BUILD_THIRDPARTY_SMOKE=ON (which forces ERGO_WITH_KAZMATH/CURL on; see
+# third_party/dependencies.cmake).
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)
+    add_executable(test_thirdparty_deps tests/thirdparty/deps_smoke.cpp)
+    target_link_libraries(test_thirdparty_deps PRIVATE ergo_thirdparty ergo_gtest_main)
+    add_test(NAME test_thirdparty_deps COMMAND test_thirdparty_deps)
 endif()
 

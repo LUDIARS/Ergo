@@ -116,3 +116,52 @@ TEST(Actor, BindVarReturnsNonZeroHandle) {
     // Actor dtor drops the handles — no leak even without connection.
     EXPECT_TRUE(true);
 }
+
+// -------------------------------------------------------------------------
+// Per-actor time scale.
+// -------------------------------------------------------------------------
+
+TEST(Actor, TimeScaleDefaultsToOne) {
+    World w("ts_world");
+    EXPECT_FLOAT_EQ(w.time_scale(), 1.0f);
+}
+
+TEST(Actor, ScaledDtPassThroughAtDefaultScale) {
+    World w("ts_pass");
+    EXPECT_FLOAT_EQ(w.scaled_dt(0.016f), 0.016f);
+}
+
+TEST(Actor, SetTimeScaleHalf) {
+    World w("ts_half");
+    w.set_time_scale(0.5f);
+    EXPECT_FLOAT_EQ(w.time_scale(), 0.5f);
+    EXPECT_FLOAT_EQ(w.scaled_dt(0.1f), 0.05f);
+}
+
+TEST(Actor, SetTimeScaleZeroPausesActor) {
+    World w("ts_pause");
+    w.set_time_scale(0.0f);
+    EXPECT_FLOAT_EQ(w.scaled_dt(0.1f), 0.0f);
+}
+
+TEST(Actor, SetTimeScaleNegativeClampsToZero) {
+    World w("ts_neg");
+    w.set_time_scale(-2.0f);
+    EXPECT_FLOAT_EQ(w.time_scale(), 0.0f);
+    EXPECT_FLOAT_EQ(w.scaled_dt(0.1f), 0.0f);
+}
+
+TEST(Actor, SetTimeScaleAboveOneSpeedsUp) {
+    World w("ts_fast");
+    w.set_time_scale(2.0f);
+    EXPECT_FLOAT_EQ(w.scaled_dt(0.016f), 0.032f);
+}
+
+TEST(Actor, TimeScaleIsPerInstance) {
+    World a("ts_a");
+    World b("ts_b");
+    a.set_time_scale(0.0f);
+    b.set_time_scale(1.0f);
+    EXPECT_FLOAT_EQ(a.scaled_dt(0.1f), 0.0f);
+    EXPECT_FLOAT_EQ(b.scaled_dt(0.1f), 0.1f);
+}
