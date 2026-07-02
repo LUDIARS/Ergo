@@ -181,6 +181,69 @@ TEST(ShurikenMigrator, ConvertsEmissionBurstsToGpuDescriptor) {
     EXPECT_NE(json.find("\"count_max\":7"), std::string::npos);
 }
 
+TEST(ShurikenMigrator, SerializesOverLifeCurvesToJson) {
+    ergo::gpu_particle::EmitterDescriptor d{};
+    d.name = "overlife";
+    d.color_r_over_lifetime = ergo::gpu_particle::Curve::linear(1.0f, 0.5f);
+    d.color_g_over_lifetime = ergo::gpu_particle::Curve::linear(0.75f, 0.1f);
+    d.color_b_over_lifetime = ergo::gpu_particle::Curve::linear(0.25f, 0.0f);
+    d.color_a_over_lifetime = ergo::gpu_particle::Curve::linear(1.0f, 0.0f);
+    d.velocity_over_lifetime_y = ergo::gpu_particle::Curve::linear(2.0f, 0.0f);
+    d.rotation_over_lifetime   = ergo::gpu_particle::MinMaxCurve::constant(3.14f);
+
+    const std::string json = EmitterDescriptorToJson(d);
+    // RGBA がグループで出力され、キー列 [time,value] を含む
+    EXPECT_NE(json.find("\"color_over_lifetime\""), std::string::npos);
+    EXPECT_NE(json.find("\"r\":{\"keys\":[[0,1],[1,0.5]]}"), std::string::npos);
+    EXPECT_NE(json.find("\"a\":{\"keys\":[[0,1],[1,0]]}"), std::string::npos);
+    // velocity は軸ごとのカーブ (未設定軸は空 keys)
+    EXPECT_NE(json.find("\"velocity_over_lifetime\""), std::string::npos);
+    EXPECT_NE(json.find("\"y\":{\"keys\":[[0,2],[1,0]]}"), std::string::npos);
+    EXPECT_NE(json.find("\"rotation_over_lifetime\""), std::string::npos);
+    // レンダリング設定 (blend_mode 等) も出力される
+    EXPECT_NE(json.find("\"blend_mode\":0"), std::string::npos);
+    EXPECT_NE(json.find("\"atlas_cols\":1"), std::string::npos);
+}
+
+TEST(ShurikenMigrator, OmitsOverLifeCurvesWhenUnset) {
+    ergo::gpu_particle::EmitterDescriptor d{};
+    d.name = "plain";
+    const std::string json = EmitterDescriptorToJson(d);
+    EXPECT_EQ(json.find("\"color_over_lifetime\""), std::string::npos);
+    EXPECT_EQ(json.find("\"velocity_over_lifetime\""), std::string::npos);
+}
+
+TEST(ShurikenMigrator, SerializesCurveModeMinMaxWithKeys) {
+    ergo::gpu_particle::EmitterDescriptor d{};
+    d.name = "curvemode";
+    d.size_over_lifetime.mode         = ergo::gpu_particle::MinMaxCurve::Mode::Curve;
+    d.size_over_lifetime.constant_min = 0.0f;
+    d.size_over_lifetime.constant_max = 1.0f;
+    d.size_over_lifetime.curve_min    = ergo::gpu_particle::Curve::linear(1.0f, 0.0f);
+
+    const std::string json = EmitterDescriptorToJson(d);
+    EXPECT_NE(json.find("\"size_over_lifetime\":{\"mode\":2"), std::string::npos);
+    EXPECT_NE(json.find("\"curve_min\":{\"keys\":[[0,1],[1,0]]}"), std::string::npos);
+}
+
+TEST(ShurikenMigrator, ColorOverLifetimeSurvivesGpuJsonRoundTrip) {
+    std::vector<ShurikenSource> systems;
+    MigrationReport report;
+    ASSERT_TRUE(ParsePrefabYaml(kMinimalPrefab, systems, report));
+    ASSERT_EQ(systems.size(), 1u);
+    // ColorOverLifetime を有効化した状態を直接組み立てる (YAML パースの
+    // gradient 抽出精度はここでは対象外)
+    systems[0].colorOverLifetime.enabled = true;
+    systems[0].colorOverLifetime.gradient.startColor[0] = 1.0f;
+    systems[0].colorOverLifetime.gradient.endColor[0]   = 0.0f;
+
+    auto desc = ConvertToGpuEmitter(systems[0], report);
+    ASSERT_FALSE(desc.color_r_over_lifetime.empty());
+    const std::string json = EmitterDescriptorToJson(desc);
+    // ConvertToGpuEmitter が計算した color over-life が JSON へ出力されること
+    EXPECT_NE(json.find("\"color_over_lifetime\""), std::string::npos);
+}
+
 TEST(ShurikenMigrator, NoSystemsWhenNoBlock) {
     std::vector<ShurikenSource> systems;
     MigrationReport report;

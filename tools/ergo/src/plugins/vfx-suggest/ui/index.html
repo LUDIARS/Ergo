@@ -271,46 +271,28 @@ function downloadConfig(config, name) {
   URL.revokeObjectURL(a.href);
 }
 
-// ── KS GPU EmitterDescriptor エクスポート (クライアント側変換) ────────────────
-// ergo::shuriken_migrator::EmitterDescriptorToJson と同形式の JSON を出力する。
-// 制約: color-over-lifetime は未シリアライズ (start_color のみ)、
-//       size_over_lifetime は two_constants 近似。
-function toKsEmitter(cfg, key) {
-  const ini = cfg.initial ?? {};
-  const ol  = cfg.overLife ?? {};
-  const em  = cfg.emission ?? {};
-  const re  = cfg.render   ?? {};
-  const g   = cfg.forces?.gravity ?? [0, 120];
-  const c   = ini.color ?? [1, 0.75, 0.25, 1];
-  const sStart = typeof ol.sizeStart === "number" ? ol.sizeStart : 1;
-  const sEnd   = typeof ol.sizeEnd   === "number" ? ol.sizeEnd   : 0;
-  const minmax0 = v => ({ mode: 0, min: +v, max: +v });
-  const minmax2 = (lo, hi) => Math.abs(hi - lo) < 1e-6
-    ? minmax0(lo) : { mode: 2, min: +lo, max: +hi };
-  return {
-    name:             key ?? cfg.name ?? "untitled",
-    duration:         0,
-    loop:             true,
-    start_lifetime:   minmax2(ini.lifetimeMin ?? 0.7, ini.lifetimeMax ?? 1.4),
-    start_speed:      minmax2(ini.speedMin    ?? 80,  ini.speedMax    ?? 180),
-    start_size:       minmax0(ini.size        ?? 8),
-    start_color:      [+c[0], +c[1], +c[2], +c[3]],
-    max_particles:    em.maxAlive ?? 400,
-    simulation_space: 0,
-    gravity_modifier: +(+g[1] / 9.81).toFixed(4),
-    rate_over_time:   minmax0(em.rate ?? 60),
-    shape:            1,
-    sphere_radius:    ini.positionRadius ?? 4,
-    cone_radius:      ini.positionRadius ?? 4,
-    cone_angle_deg:   (ini.velocityAngleSpreadDeg ?? 60) / 2,
-    shape_scale:      [1, 1, 1],
-    size_over_lifetime: minmax2(sEnd, sStart),
-    blend_mode:       re.blend === "alpha" ? 0 : 2,
-  };
-}
-function exportKsEmitter(config, name) {
+// ── KS GPU EmitterDescriptor エクスポート ────────────────────────────────────
+// 変換の正本はサーバ側 ks_export.ts (POST /vfx-suggest/api/ks-emitter)。
+// クライアントには変換ロジックを持たない (二重実装の drift 防止)。
+async function exportKsEmitter(config, name) {
   const key = (name ?? "").startsWith("Effect/") ? name : undefined;
-  const emitter = toKsEmitter(config, key);
+  const url = "/vfx-suggest/api/ks-emitter" + (key ? `?key=${encodeURIComponent(key)}` : "");
+  let res;
+  try {
+    res = await fetch(url, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(config),
+    }).then(x => x.json());
+  } catch (e) {
+    setStatus(`KS エクスポートに失敗しました: ${e}`, true);
+    return;
+  }
+  if (!res?.ok || !res.emitter) {
+    setStatus(`KS エクスポートに失敗しました: ${res?.err ?? "unknown error"}`, true);
+    return;
+  }
+  const emitter = res.emitter;
   const json  = JSON.stringify(emitter, null, 2);
   const fname = (emitter.name).replace(/\//g, "_").replace(/\s+/g, "_") + ".emitter.json";
   const blob  = new Blob([json], { type: "application/json" });
@@ -319,7 +301,7 @@ function exportKsEmitter(config, name) {
   });
   a.click();
   URL.revokeObjectURL(a.href);
-  setStatus(`"${emitter.name}" を KS GPU Emitter JSON としてダウンロードしました (color-over-lifetime は start_color のみ)`);
+  setStatus(`"${emitter.name}" を KS GPU Emitter JSON としてダウンロードしました`);
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
