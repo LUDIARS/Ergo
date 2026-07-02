@@ -4,21 +4,45 @@
 /// (ergo::shuriken_migrator::EmitterDescriptorToJson 出力形式) を生成する。
 ///
 /// 制約:
-///  - color-over-lifetime カーブは EmitterDescriptorToJson が未シリアライズのため非対応。
-///    start_color のみ引き継ぐ (フェードは失われる)。
 ///  - gravity は KS が World Y 軸を重力方向として使うため gravity_modifier に変換。
 ///  - EmitterShape: Sphere(1) を使用 (2D エミッタの positionRadius をそのまま利用)。
 ///  - BlendMode: additive→2, alpha→0 (gpu_particle::BlendMode の enum 値)。
 
 import type { ParticleEffectConfig } from "../particle/schema.js";
 
-interface MinMaxCurveJson { mode: number; min: number; max: number; }
+/// gpu_particle::Curve のシリアライズ形式 (EmitterDescriptorToJson と同形)。
+/// keys は [time, value] の列 (time は 0..1 正規化)。
+interface CurveJson { keys: [number, number][]; }
+
+/// gpu_particle::MinMaxCurve::Mode と同値 (Constant=0 / TwoConstants=1 /
+/// Curve=2 / TwoCurves=3)。mode 2/3 では curve_min (+curve_max) が評価対象で、
+/// min/max はカーブ未対応の消費側向けフォールバック値。
+interface MinMaxCurveJson {
+    mode: number;
+    min: number;
+    max: number;
+    curve_min?: CurveJson;
+    curve_max?: CurveJson;
+}
 
 function constant(v: number): MinMaxCurveJson {
     return { mode: 0, min: v, max: v };
 }
 function twoConsts(lo: number, hi: number): MinMaxCurveJson {
-    return Math.abs(hi - lo) < 1e-6 ? constant(lo) : { mode: 2, min: lo, max: hi };
+    return Math.abs(hi - lo) < 1e-6 ? constant(lo) : { mode: 1, min: lo, max: hi };
+}
+function linearCurve(v0: number, v1: number): CurveJson {
+    return { keys: [[0, v0], [1, v1]] };
+}
+/// v0 (寿命開始) → v1 (寿命終了) の線形フェードを Curve モードで表す。
+function fadeMinMax(v0: number, v1: number): MinMaxCurveJson {
+    if (Math.abs(v0 - v1) < 1e-6) return constant(v0);
+    return {
+        mode: 2,
+        min: Math.min(v0, v1),
+        max: Math.max(v0, v1),
+        curve_min: linearCurve(v0, v1),
+    };
 }
 
 export interface KsEmitterJson {
@@ -39,6 +63,8 @@ export interface KsEmitterJson {
     cone_angle_deg:    number;
     shape_scale:       [number, number, number];
     size_over_lifetime: MinMaxCurveJson;
+    /// RGBA 各成分の over-life カーブ。overLife.colorStart→colorEnd の線形フェード。
+    color_over_lifetime: { r: CurveJson; g: CurveJson; b: CurveJson; a: CurveJson };
     blend_mode:        number;   // 0 = Alpha, 2 = Additive
 }
 
@@ -72,8 +98,14 @@ export function toKsEmitterJson(cfg: ParticleEffectConfig, key?: string): KsEmit
         cone_radius:      ini.positionRadius,
         cone_angle_deg:   ini.velocityAngleSpreadDeg / 2,
         shape_scale:      [1, 1, 1],
-        // size_over_lifetime: sizeStart=1.0 → sizeEnd=0.0 のフェードを two_constants で近似
-        size_over_lifetime: twoConsts(ol.sizeEnd, ol.sizeStart),
+        // size_over_lifetime: sizeStart → sizeEnd の線形フェード (Curve モード)
+        size_over_lifetime: fadeMinMax(ol.sizeStart, ol.sizeEnd),
+        color_over_lifetime: {
+            r: linearCurve(ol.colorStart[0], ol.colorEnd[0]),
+            g: linearCurve(ol.colorStart[1], ol.colorEnd[1]),
+            b: linearCurve(ol.colorStart[2], ol.colorEnd[2]),
+            a: linearCurve(ol.colorStart[3], ol.colorEnd[3]),
+        },
         blend_mode:       re.blend === "additive" ? 2 : 0,
     };
 }
