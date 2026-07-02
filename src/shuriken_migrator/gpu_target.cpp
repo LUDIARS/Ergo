@@ -231,12 +231,32 @@ void append_kv_str(std::ostringstream& os, const char* key, const std::string& v
     if (!first) os << ","; first = false;
     os << "\"" << key << "\":\"" << v << "\"";
 }
+void append_curve(std::ostringstream& os, const char* key,
+                  const ergo::gpu_particle::Curve& c, bool& first) {
+    if (!first) os << ","; first = false;
+    os << "\"" << key << "\":{\"keys\":[";
+    const auto& keys = c.keys();
+    for (size_t i = 0; i < keys.size(); ++i) {
+        if (i) os << ",";
+        os << "[" << keys[i].time << "," << keys[i].value << "]";
+    }
+    os << "]}";
+}
 void append_minmax(std::ostringstream& os, const char* key, const GpuMinMax& v, bool& first) {
     if (!first) os << ","; first = false;
     os << "\"" << key << "\":{";
     os << "\"mode\":" << static_cast<int>(v.mode)
        << ",\"min\":" << v.constant_min
-       << ",\"max\":" << v.constant_max << "}";
+       << ",\"max\":" << v.constant_max;
+    // Curve / TwoCurves モードはカーブ本体が評価対象 (evaluate 参照) なので
+    // キー列も出力する。 min/max はカーブ未対応の消費側向けのフォールバック値。
+    using Mode = GpuMinMax::Mode;
+    if (v.mode == Mode::Curve || v.mode == Mode::TwoCurves) {
+        bool cf = false;
+        append_curve(os, "curve_min", v.curve_min, cf);
+        if (v.mode == Mode::TwoCurves) append_curve(os, "curve_max", v.curve_max, cf);
+    }
+    os << "}";
 }
 void append_vec3(std::ostringstream& os, const char* key,
                  const ergo::gpu_particle::Vec3f& v, bool& first) {
@@ -288,6 +308,32 @@ std::string EmitterDescriptorToJson(const ergo::gpu_particle::EmitterDescriptor&
     append_kv(os, "cone_angle_deg", d.cone_angle_deg, f);
     append_vec3(os, "shape_scale", d.shape_scale, f);
     append_minmax(os, "size_over_lifetime", d.size_over_lifetime, f);
+    append_minmax(os, "rotation_over_lifetime", d.rotation_over_lifetime, f);
+
+    // Over-life curves: 空 (キー無し) は「モジュール無効」を意味するので出力を
+    // 省略する。 消費側 (KS VfxCatalog::register_from_json / ks_export.ts) は
+    // キー欠落 = 効果なしとして扱う契約。
+    if (!d.velocity_over_lifetime_x.empty() || !d.velocity_over_lifetime_y.empty() ||
+        !d.velocity_over_lifetime_z.empty()) {
+        if (!f) os << ","; f = false;
+        os << "\"velocity_over_lifetime\":{";
+        bool vf = true;
+        append_curve(os, "x", d.velocity_over_lifetime_x, vf);
+        append_curve(os, "y", d.velocity_over_lifetime_y, vf);
+        append_curve(os, "z", d.velocity_over_lifetime_z, vf);
+        os << "}";
+    }
+    if (!d.color_r_over_lifetime.empty() || !d.color_g_over_lifetime.empty() ||
+        !d.color_b_over_lifetime.empty() || !d.color_a_over_lifetime.empty()) {
+        if (!f) os << ","; f = false;
+        os << "\"color_over_lifetime\":{";
+        bool cf = true;
+        append_curve(os, "r", d.color_r_over_lifetime, cf);
+        append_curve(os, "g", d.color_g_over_lifetime, cf);
+        append_curve(os, "b", d.color_b_over_lifetime, cf);
+        append_curve(os, "a", d.color_a_over_lifetime, cf);
+        os << "}";
+    }
 
     if (d.limit_velocity.enabled) {
         if (!f) os << ","; f = false;
@@ -328,6 +374,10 @@ std::string EmitterDescriptorToJson(const ergo::gpu_particle::EmitterDescriptor&
            << ",\"row_random\":" << (d.texture_sheet.random_row ? "true" : "false")
            << ",\"time_mode\":" << static_cast<int>(d.texture_sheet.time_mode) << "}";
     }
+    append_kv(os, "render_style", static_cast<int>(d.render_style), f);
+    append_kv(os, "blend_mode", static_cast<int>(d.blend_mode), f);
+    append_kv(os, "atlas_cols", static_cast<int>(d.atlas_cols), f);
+    append_kv(os, "atlas_rows", static_cast<int>(d.atlas_rows), f);
     os << "}";
     return os.str();
 }
