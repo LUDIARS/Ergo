@@ -150,11 +150,40 @@ function hitTest(x, y) {
   return hit;
 }
 
-function propRow(label, inputHtml, onBind) {
-  const row = document.createElement("div"); row.className = "row";
-  row.innerHTML = `<label>${label}</label>${inputHtml}`;
-  onBind(row);
+function createBlock(title) {
+  const block = document.createElement("div");
+  block.className = "block";
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  block.appendChild(heading);
+  return block;
+}
+
+function propRow(label, control) {
+  const row = document.createElement("div");
+  row.className = "row";
+  const labelEl = document.createElement("label");
+  labelEl.textContent = label;
+  row.append(labelEl, control);
   return row;
+}
+
+function textInput(value, type = "text") {
+  const input = document.createElement("input");
+  input.type = type;
+  input.value = value;
+  return input;
+}
+
+function selectInput(options) {
+  const select = document.createElement("select");
+  options.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+  return select;
 }
 
 function renderProps() {
@@ -162,97 +191,129 @@ function renderProps() {
   const { node, parent } = findNode(selectedId);
   if (!node) return;
 
-  const info = document.createElement("div"); info.className = "block";
-  info.innerHTML = `<h4>${node.id}</h4>`;
-  info.appendChild(propRow("id", `<input value="${node.id}" />`, row => {
-    const i = row.querySelector("input"); i.onchange = () => { node.id = i.value.trim() || node.id; selectedId = node.id; changed(); };
-  }));
-  info.appendChild(propRow("type", `<select><option>container</option><option>rect</option><option>text</option><option>image</option><option>nine_slice</option><option>vector</option></select>`, row => {
-    const s = row.querySelector("select"); s.value = node.type;
-    s.onchange = () => { node.type = s.value; changed(); };
-  }));
+  const info = createBlock(node.id);
+  const idInput = textInput(node.id);
+  idInput.onchange = () => { node.id = idInput.value.trim() || node.id; selectedId = node.id; changed(); };
+  info.appendChild(propRow("id", idInput));
+  const typeInput = selectInput(["container", "rect", "text", "image", "nine_slice", "vector"]);
+  typeInput.value = node.type;
+  typeInput.onchange = () => { node.type = typeInput.value; changed(); };
+  info.appendChild(propRow("type", typeInput));
   propBody.appendChild(info);
 
-  const rect = document.createElement("div"); rect.className = "block"; rect.innerHTML = `<h4>rect</h4>`;
-  ["x","y","w","h"].forEach(k => rect.appendChild(propRow(k, `<input type="number" value="${node.rect?.[k] ?? 0}" />`, row => {
-    const i = row.querySelector("input"); i.onchange = () => { node.rect[k] = Number(i.value); changed(false); };
-  })));
+  const rect = createBlock("rect");
+  ["x","y","w","h"].forEach(k => {
+    const input = textInput(node.rect?.[k] ?? 0, "number");
+    input.onchange = () => { node.rect[k] = Number(input.value); changed(false); };
+    rect.appendChild(propRow(k, input));
+  });
   propBody.appendChild(rect);
 
-  const layout = document.createElement("div"); layout.className = "block"; layout.innerHTML = `<h4>anchor/stretch/layout</h4>`;
-  layout.appendChild(propRow("layout", `<select><option>absolute</option><option>row</option><option>column</option></select>`, row => {
-    const s = row.querySelector("select"); s.value = node.layout || "absolute"; s.onchange = () => { node.layout = s.value; changed(); };
-  }));
-  layout.appendChild(propRow("anchor.h", `<select><option>left</option><option>center</option><option>right</option></select>`, row => {
-    const s = row.querySelector("select"); s.value = node.anchor?.h || "left";
-    s.onchange = () => { node.anchor = node.anchor || {}; node.anchor.h = s.value; changed(); };
-  }));
-  layout.appendChild(propRow("anchor.v", `<select><option>top</option><option>middle</option><option>bottom</option></select>`, row => {
-    const s = row.querySelector("select"); s.value = node.anchor?.v || "top";
-    s.onchange = () => { node.anchor = node.anchor || {}; node.anchor.v = s.value; changed(); };
-  }));
-  ["left","right","top","bottom"].forEach(k => layout.appendChild(propRow(`stretch.${k}`, `<input value="${node.stretch?.[k] ?? ""}" />`, row => {
-    const i = row.querySelector("input"); i.onchange = () => { node.stretch = node.stretch || {}; node.stretch[k] = i.value === "" ? null : Number(i.value); changed(); };
-  })));
+  const layout = createBlock("anchor/stretch/layout");
+  const layoutInput = selectInput(["absolute", "row", "column"]);
+  layoutInput.value = node.layout || "absolute";
+  layoutInput.onchange = () => { node.layout = layoutInput.value; changed(); };
+  layout.appendChild(propRow("layout", layoutInput));
+  const anchorHInput = selectInput(["left", "center", "right"]);
+  anchorHInput.value = node.anchor?.h || "left";
+  anchorHInput.onchange = () => { node.anchor = node.anchor || {}; node.anchor.h = anchorHInput.value; changed(); };
+  layout.appendChild(propRow("anchor.h", anchorHInput));
+  const anchorVInput = selectInput(["top", "middle", "bottom"]);
+  anchorVInput.value = node.anchor?.v || "top";
+  anchorVInput.onchange = () => { node.anchor = node.anchor || {}; node.anchor.v = anchorVInput.value; changed(); };
+  layout.appendChild(propRow("anchor.v", anchorVInput));
+  ["left","right","top","bottom"].forEach(k => {
+    const input = textInput(node.stretch?.[k] ?? "");
+    input.onchange = () => { node.stretch = node.stretch || {}; node.stretch[k] = input.value === "" ? null : Number(input.value); changed(); };
+    layout.appendChild(propRow(`stretch.${k}`, input));
+  });
   propBody.appendChild(layout);
 
-  const typeBlock = document.createElement("div"); typeBlock.className = "block"; typeBlock.innerHTML = `<h4>type-specific</h4>`;
+  const typeBlock = createBlock("type-specific");
   if (node.type === "text") {
     node.text = node.text || { value:"", size:16, color:"#ffffff" };
-    typeBlock.appendChild(propRow("text.value", `<input value="${node.text.value || ""}" />`, row => row.querySelector("input").onchange = (e) => { node.text.value = e.target.value; changed(false); }));
-    typeBlock.appendChild(propRow("text.size", `<input type="number" value="${node.text.size || 16}" />`, row => row.querySelector("input").onchange = (e) => { node.text.size = Number(e.target.value); changed(false); }));
-    typeBlock.appendChild(propRow("text.color", `<input value="${node.text.color || "#ffffff"}" />`, row => row.querySelector("input").onchange = (e) => { node.text.color = e.target.value; changed(false); }));
+    const textValueInput = textInput(node.text.value || "");
+    textValueInput.onchange = () => { node.text.value = textValueInput.value; changed(false); };
+    typeBlock.appendChild(propRow("text.value", textValueInput));
+    const textSizeInput = textInput(node.text.size || 16, "number");
+    textSizeInput.onchange = () => { node.text.size = Number(textSizeInput.value); changed(false); };
+    typeBlock.appendChild(propRow("text.size", textSizeInput));
+    const textColorInput = textInput(node.text.color || "#ffffff");
+    textColorInput.onchange = () => { node.text.color = textColorInput.value; changed(false); };
+    typeBlock.appendChild(propRow("text.color", textColorInput));
   }
   if (node.type === "image") {
     node.image = node.image || { src:"", fit:"stretch" };
-    typeBlock.appendChild(propRow("image.src", `<input value="${node.image.src || ""}" />`, row => row.querySelector("input").onchange = (e) => { node.image.src = e.target.value; changed(); }));
-    typeBlock.appendChild(propRow("image.fit", `<select><option>stretch</option><option>contain</option><option>cover</option></select>`, row => {
-      const s = row.querySelector("select"); s.value = node.image.fit || "stretch"; s.onchange = () => { node.image.fit = s.value; changed(); };
-    }));
+    const imageSourceInput = textInput(node.image.src || "");
+    imageSourceInput.onchange = () => { node.image.src = imageSourceInput.value; changed(); };
+    typeBlock.appendChild(propRow("image.src", imageSourceInput));
+    const imageFitInput = selectInput(["stretch", "contain", "cover"]);
+    imageFitInput.value = node.image.fit || "stretch";
+    imageFitInput.onchange = () => { node.image.fit = imageFitInput.value; changed(); };
+    typeBlock.appendChild(propRow("image.fit", imageFitInput));
   }
   if (node.type === "vector") {
     node.vector = node.vector || { src:"", fit:"stretch", extrude:0 };
-    typeBlock.appendChild(propRow("vector.src", `<input value="${node.vector.src || ""}" />`, row => row.querySelector("input").onchange = (e) => { node.vector.src = e.target.value; changed(); }));
-    typeBlock.appendChild(propRow("vector.fit", `<select><option>stretch</option><option>contain</option><option>cover</option></select>`, row => {
-      const s = row.querySelector("select"); s.value = node.vector.fit || "stretch"; s.onchange = () => { node.vector.fit = s.value; changed(); };
-    }));
-    typeBlock.appendChild(propRow("vector.extrude", `<input type="number" value="${Number(node.vector.extrude||0)}" />`, row => row.querySelector("input").onchange = (e) => { node.vector.extrude = Number(e.target.value); changed(); }));
+    const vectorSourceInput = textInput(node.vector.src || "");
+    vectorSourceInput.onchange = () => { node.vector.src = vectorSourceInput.value; changed(); };
+    typeBlock.appendChild(propRow("vector.src", vectorSourceInput));
+    const vectorFitInput = selectInput(["stretch", "contain", "cover"]);
+    vectorFitInput.value = node.vector.fit || "stretch";
+    vectorFitInput.onchange = () => { node.vector.fit = vectorFitInput.value; changed(); };
+    typeBlock.appendChild(propRow("vector.fit", vectorFitInput));
+    const vectorExtrudeInput = textInput(Number(node.vector.extrude || 0), "number");
+    vectorExtrudeInput.onchange = () => { node.vector.extrude = Number(vectorExtrudeInput.value); changed(); };
+    typeBlock.appendChild(propRow("vector.extrude", vectorExtrudeInput));
   }
   if (node.type === "nine_slice") {
     node.nine_slice = node.nine_slice || { src:"", left:8,right:8,top:8,bottom:8 };
-    typeBlock.appendChild(propRow("9slice.src", `<input value="${node.nine_slice.src || ""}" />`, row => row.querySelector("input").onchange = (e) => { node.nine_slice.src = e.target.value; changed(); }));
-    ["left","right","top","bottom"].forEach(k => typeBlock.appendChild(propRow(`9slice.${k}`, `<input type="number" value="${Number(node.nine_slice[k]||0)}" />`, row => row.querySelector("input").onchange = (e) => { node.nine_slice[k] = Number(e.target.value); changed(false); })));
+    const nineSliceSourceInput = textInput(node.nine_slice.src || "");
+    nineSliceSourceInput.onchange = () => { node.nine_slice.src = nineSliceSourceInput.value; changed(); };
+    typeBlock.appendChild(propRow("9slice.src", nineSliceSourceInput));
+    ["left","right","top","bottom"].forEach(k => {
+      const input = textInput(Number(node.nine_slice[k] || 0), "number");
+      input.onchange = () => { node.nine_slice[k] = Number(input.value); changed(false); };
+      typeBlock.appendChild(propRow(`9slice.${k}`, input));
+    });
   }
   propBody.appendChild(typeBlock);
 
-  const binds = document.createElement("div"); binds.className = "block"; binds.innerHTML = `<h4>binds (JSON array)</h4>`;
-  binds.appendChild(propRow("binds", `<textarea>${JSON.stringify(node.binds || [], null, 2)}</textarea>`, row => {
-    const t = row.querySelector("textarea");
-    t.onchange = () => { try { node.binds = JSON.parse(t.value); changed(); } catch { setStatus("binds JSON parse error", "bad"); } };
-  }));
+  const binds = createBlock("binds (JSON array)");
+  const bindsInput = document.createElement("textarea");
+  bindsInput.value = JSON.stringify(node.binds || [], null, 2);
+  bindsInput.onchange = () => { try { node.binds = JSON.parse(bindsInput.value); changed(); } catch { setStatus("binds JSON parse error", "bad"); } };
+  binds.appendChild(propRow("binds", bindsInput));
   propBody.appendChild(binds);
 
-  const hierarchy = document.createElement("div"); hierarchy.className = "block"; hierarchy.innerHTML = `<h4>hierarchy</h4>`;
+  const hierarchy = createBlock("hierarchy");
   const allNodes = [];
   eachNode(doc.root, null, (n)=>allNodes.push(n));
-  hierarchy.appendChild(propRow("parent", `<select><option value="">(none)</option></select>`, row => {
-    const s = row.querySelector("select");
-    allNodes.forEach(n => { if (n.id !== node.id) { const o = document.createElement("option"); o.value = n.id; o.textContent = n.id; s.appendChild(o); } });
-    s.value = parent ? parent.id : "";
-    s.onchange = () => {
-      if (!parent) return;
-      const idx = parent.children.findIndex(ch => ch.id === node.id);
-      if (idx >= 0) parent.children.splice(idx, 1);
-      const p2 = s.value ? findNode(s.value).node : doc.root;
-      if (p2) { p2.children = p2.children || []; p2.children.push(node); }
-      changed();
-    };
-  }));
-  hierarchy.appendChild(propRow("order", `<div class="inlineBtns"><button id="upBtn">Up</button><button id="downBtn">Down</button></div>`, row => {
-    const up = row.querySelector("#upBtn"), down = row.querySelector("#downBtn");
-    up.onclick = () => { if (!parent) return; const i = parent.children.findIndex(ch => ch.id===node.id); if (i>0){ [parent.children[i-1], parent.children[i]]=[parent.children[i], parent.children[i-1]]; changed(); } };
-    down.onclick = () => { if (!parent) return; const i = parent.children.findIndex(ch => ch.id===node.id); if (i>=0 && i<parent.children.length-1){ [parent.children[i+1], parent.children[i]]=[parent.children[i], parent.children[i+1]]; changed(); } };
-  }));
+  const parentInput = document.createElement("select");
+  const rootOption = document.createElement("option");
+  rootOption.value = "";
+  rootOption.textContent = "(none)";
+  parentInput.appendChild(rootOption);
+  allNodes.forEach(n => { if (n.id !== node.id) { const o = document.createElement("option"); o.value = n.id; o.textContent = n.id; parentInput.appendChild(o); } });
+  parentInput.value = parent ? parent.id : "";
+  parentInput.onchange = () => {
+    if (!parent) return;
+    const idx = parent.children.findIndex(ch => ch.id === node.id);
+    if (idx >= 0) parent.children.splice(idx, 1);
+    const p2 = parentInput.value ? findNode(parentInput.value).node : doc.root;
+    if (p2) { p2.children = p2.children || []; p2.children.push(node); }
+    changed();
+  };
+  hierarchy.appendChild(propRow("parent", parentInput));
+  const orderButtons = document.createElement("div");
+  orderButtons.className = "inlineBtns";
+  const upButton = document.createElement("button");
+  upButton.textContent = "Up";
+  upButton.onclick = () => { if (!parent) return; const i = parent.children.findIndex(ch => ch.id===node.id); if (i>0){ [parent.children[i-1], parent.children[i]]=[parent.children[i], parent.children[i-1]]; changed(); } };
+  const downButton = document.createElement("button");
+  downButton.textContent = "Down";
+  downButton.onclick = () => { if (!parent) return; const i = parent.children.findIndex(ch => ch.id===node.id); if (i>=0 && i<parent.children.length-1){ [parent.children[i+1], parent.children[i]]=[parent.children[i], parent.children[i+1]]; changed(); } };
+  orderButtons.append(upButton, downButton);
+  hierarchy.appendChild(propRow("order", orderButtons));
   propBody.appendChild(hierarchy);
 }
 
