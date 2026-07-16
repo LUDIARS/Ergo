@@ -272,6 +272,18 @@ modules:
     depends:    [ergo_math]
     status: preview
 
+  - name: ergo_resource
+    summary: タグ駆動リソース自動選択 + 読み込み。JSON マニフェスト catalog + Clio 同重みスコアラ + バイト列 loader (MUSA Clio の C++ 移植)
+    category: システム
+    header_dir: include/ergo/resource/
+    source_dir: src/resource/
+    test_dir:   tests/resource/
+    spec:       spec/module/resource.md
+    cmake_option: ERGO_BUILD_RESOURCE
+    tool_plugin: null
+    depends:    [ergo_common, ergo_io]
+    status: preview
+
   - name: ergo_http
     summary: libcurl バックエンドの同期 HTTP クライアント (IHttpClient/get/post)。公開 API は std:: のみで curl を隠蔽。既定 OFF (ERGO_WITH_CURL を強制)
     category: システム
