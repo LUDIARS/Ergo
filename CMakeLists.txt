@@ -41,6 +41,7 @@ option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene do
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
 option(ERGO_BUILD_MATH         "Build ergo_math (C++20 generic math: vec/mat/batch/pool)" ON)
 option(ERGO_BUILD_PHYSICS2D    "Build ergo_physics2d (2D rigid body, Box2D-like)" ON)
+option(ERGO_BUILD_RESOURCE     "Build ergo_resource (tag-driven resource selection & loading)" ON)
 # ergo_http needs the managed libcurl, which is a fetched/opt-in dependency, so
 # this module is OFF by default (keeps the plain build offline + light).
 option(ERGO_BUILD_HTTP         "Build ergo_http (libcurl-backed HTTP client; forces ERGO_WITH_CURL)" OFF)
@@ -728,6 +729,30 @@ if(ERGO_BUILD_HEALTH)
         add_executable(test_health tests/health/test_health.cpp)
         target_link_libraries(test_health PRIVATE ergo_health ergo_gtest_main)
         add_test(NAME test_health COMMAND test_health)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_resource — tag-driven resource selection & loading (Clio の C++ 移植)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_RESOURCE)
+    add_library(ergo_resource STATIC
+        src/resource/catalog.cpp
+        src/resource/loader.cpp
+        src/resource/resolver.cpp
+        src/resource/tag_scorer.cpp)
+    target_include_directories(ergo_resource PUBLIC include)
+    target_link_libraries(ergo_resource PUBLIC ergo_common ergo_io)
+    if(MSVC)
+        target_compile_options(ergo_resource PUBLIC /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME tag_scorer catalog resolver)
+            add_executable(test_resource_${NAME} tests/resource/test_${NAME}.cpp)
+            target_link_libraries(test_resource_${NAME} PRIVATE ergo_resource ergo_gtest_main)
+            add_test(NAME test_resource_${NAME} COMMAND test_resource_${NAME})
+        endforeach()
     endif()
 endif()
 
