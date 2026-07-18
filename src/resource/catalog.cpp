@@ -51,6 +51,16 @@ bool Catalog::load_manifest(const std::string& manifest_path) {
 
     const fs::path manifest_dir = fs::path(manifest_path).parent_path();
     std::size_t skipped = 0;
+    std::size_t duplicate_ids = 0;
+
+    // Tracks every id already present (from this call and prior ones) so an
+    // omitted "id" that collides with an existing entry can be flagged.
+    // find_by_id() resolves duplicates to the most-recently-added entry (see
+    // below), so this is purely a diagnostic — it doesn't change what gets
+    // added — but a silent collision would otherwise make an earlier entry
+    // permanently unreachable by id with no indication why.
+    std::set<std::string> seen_ids;
+    for (const Entry& existing : entries_) seen_ids.insert(existing.id);
 
     for (const jsonm::JsonValue& item : *resources->a) {
         if (!item.is_object()) {
@@ -73,6 +83,8 @@ bool Catalog::load_manifest(const std::string& manifest_path) {
         entry.id = id_value != nullptr ? id_value->as_string() : "";
         if (entry.id.empty()) entry.id = raw_path;
 
+        if (!seen_ids.insert(entry.id).second) ++duplicate_ids;
+
         const jsonm::JsonValue* name_value = item.find("name");
         entry.name = name_value != nullptr ? name_value->as_string() : "";
         if (entry.name.empty()) entry.name = stem_of(raw_path);
@@ -88,9 +100,22 @@ bool Catalog::load_manifest(const std::string& manifest_path) {
         entries_.push_back(std::move(entry));
     }
 
+    std::vector<std::string> issues;
     if (skipped > 0) {
-        last_error_ = "skipped " + std::to_string(skipped) +
-                      " entr(ies) without \"path\": " + manifest_path;
+        issues.push_back("skipped " + std::to_string(skipped) +
+                         " entr(ies) without \"path\"");
+    }
+    if (duplicate_ids > 0) {
+        issues.push_back(std::to_string(duplicate_ids) +
+                         " duplicate resource id(s) (find_by_id resolves to "
+                         "the last one loaded)");
+    }
+    if (!issues.empty()) {
+        last_error_ = manifest_path + ": ";
+        for (std::size_t i = 0; i < issues.size(); ++i) {
+            if (i > 0) last_error_ += "; ";
+            last_error_ += issues[i];
+        }
     }
     return true;
 }
@@ -105,10 +130,14 @@ void Catalog::clear() {
 }
 
 const Entry* Catalog::find_by_id(const std::string& id) const {
+    // Search back-to-front: when a manifest (or repeated add()) produces a
+    // duplicate id, the most-recently-registered entry wins. That matches
+    // load_manifest()'s duplicate-id diagnostic above and gives a single,
+    // predictable rule instead of "whichever happened to load first".
     const auto it = std::find_if(
-        entries_.begin(), entries_.end(),
+        entries_.rbegin(), entries_.rend(),
         [&](const Entry& e) { return e.id == id; });
-    return it != entries_.end() ? &*it : nullptr;
+    return it != entries_.rend() ? &*it : nullptr;
 }
 
 std::vector<std::string> Catalog::vocabulary() const {

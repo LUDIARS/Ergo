@@ -32,7 +32,10 @@ class Catalog {
     /// are invalidated by load_manifest/add/clear.
     const std::vector<Entry>& entries() const { return entries_; }
 
-    /// nullptr when no entry has the id.
+    /// nullptr when no entry has the id. When more than one entry shares an
+    /// id (e.g. two manifest items whose "id" was both omitted and both
+    /// defaulted to the same path), the most recently added one wins — see
+    /// load_manifest()'s duplicate-id diagnostic in last_error().
     const Entry* find_by_id(const std::string& id) const;
 
     /// Sorted, de-duplicated union of all entry tags (tag-palette source).

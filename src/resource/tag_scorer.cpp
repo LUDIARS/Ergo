@@ -1,11 +1,35 @@
 #include "ergo/resource/tag_scorer.h"
 
 #include <algorithm>
-#include <cctype>
 #include <unordered_set>
 
 namespace ergo::resource {
 namespace {
+
+// Tags are UTF-8 and frequently non-ASCII (Japanese tag vocab shared with
+// Curare / MUSA Clio). std::tolower/std::isspace take an int and their
+// behavior for values outside 0-127 is locale-dependent even when the byte
+// is first cast to unsigned char: under a non-"C" global locale they can
+// remap individual bytes of a multibyte UTF-8 sequence, corrupting it and
+// producing wrong (or just non-deterministic) matches. Fold/trim ASCII only
+// and pass every byte >= 0x80 through unchanged instead.
+//
+// Known limitation: scripts that carry a non-ASCII case distinction (e.g.
+// full-width Latin, Cyrillic) are compared byte-for-byte rather than
+// case-folded, so "ＡＢＣ" vs "ａｂｃ" won't match. CJK tags (no case
+// concept) already compare correctly since there's nothing to fold. Full
+// Unicode case folding/normalization is out of scope for this module (see
+// spec/module/resource.md); this only guarantees non-ASCII bytes can never
+// crash or get mangled into a false match.
+bool is_ascii_space(unsigned char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' ||
+          c == '\f' || c == '\v';
+}
+
+char ascii_tolower(unsigned char c) {
+    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a')
+                                  : static_cast<char>(c);
+}
 
 std::string normalize(const std::string& value) {
     std::string out;
@@ -14,12 +38,11 @@ std::string normalize(const std::string& value) {
     // trim
     std::size_t begin = 0;
     std::size_t end   = value.size();
-    while (begin < end && std::isspace(static_cast<unsigned char>(value[begin]))) ++begin;
-    while (end > begin && std::isspace(static_cast<unsigned char>(value[end - 1]))) --end;
+    while (begin < end && is_ascii_space(static_cast<unsigned char>(value[begin]))) ++begin;
+    while (end > begin && is_ascii_space(static_cast<unsigned char>(value[end - 1]))) --end;
 
     for (std::size_t i = begin; i < end; ++i) {
-        out.push_back(static_cast<char>(
-            std::tolower(static_cast<unsigned char>(value[i]))));
+        out.push_back(ascii_tolower(static_cast<unsigned char>(value[i])));
     }
     return out;
 }
@@ -82,13 +105,14 @@ int score(const std::vector<std::string>& candidate_tags,
 std::string extract_name_hint(const std::string& object_name) {
     std::string trimmed = object_name;
 
-    // trim outer whitespace
+    // trim outer whitespace (ASCII-only trim — see comment above normalize()
+    // for why std::isspace isn't used directly on raw bytes here)
     while (!trimmed.empty() &&
-           std::isspace(static_cast<unsigned char>(trimmed.front()))) {
+           is_ascii_space(static_cast<unsigned char>(trimmed.front()))) {
         trimmed.erase(trimmed.begin());
     }
     while (!trimmed.empty() &&
-           std::isspace(static_cast<unsigned char>(trimmed.back()))) {
+           is_ascii_space(static_cast<unsigned char>(trimmed.back()))) {
         trimmed.pop_back();
     }
 
@@ -98,7 +122,8 @@ std::string extract_name_hint(const std::string& object_name) {
         if (open != std::string::npos && open + 1 < trimmed.size() - 1) {
             bool digits = true;
             for (std::size_t i = open + 1; i < trimmed.size() - 1; ++i) {
-                if (!std::isdigit(static_cast<unsigned char>(trimmed[i]))) {
+                const unsigned char ch = static_cast<unsigned char>(trimmed[i]);
+                if (ch < '0' || ch > '9') {
                     digits = false;
                     break;
                 }
@@ -106,7 +131,7 @@ std::string extract_name_hint(const std::string& object_name) {
             if (digits) {
                 trimmed.erase(open);
                 while (!trimmed.empty() &&
-                       std::isspace(static_cast<unsigned char>(trimmed.back()))) {
+                       is_ascii_space(static_cast<unsigned char>(trimmed.back()))) {
                     trimmed.pop_back();
                 }
             }

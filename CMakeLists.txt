@@ -736,6 +736,16 @@ endif()
 # ergo_resource — tag-driven resource selection & loading (Clio の C++ 移植)
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_RESOURCE)
+    # catalog.cpp / loader.cpp read manifests and resource bytes through
+    # ergo_io (see their #include "ergo/io/file.h"); there is no IO-less
+    # code path. Fail fast at configure time instead of a cryptic LNK1181
+    # from linking a target that ERGO_BUILD_IO=OFF never created.
+    if(NOT ERGO_BUILD_IO)
+        message(FATAL_ERROR
+            "ERGO_BUILD_RESOURCE=ON but ERGO_BUILD_IO=OFF. ergo_resource reads "
+            "manifests/resources via ergo_io and has no non-IO fallback. Set "
+            "ERGO_BUILD_IO=ON (or ERGO_BUILD_RESOURCE=OFF). No silent fallback.")
+    endif()
     add_library(ergo_resource STATIC
         src/resource/catalog.cpp
         src/resource/loader.cpp
@@ -748,7 +758,7 @@ if(ERGO_BUILD_RESOURCE)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME tag_scorer catalog resolver)
+        foreach(NAME tag_scorer catalog resolver loader)
             add_executable(test_resource_${NAME} tests/resource/test_${NAME}.cpp)
             target_link_libraries(test_resource_${NAME} PRIVATE ergo_resource ergo_gtest_main)
             add_test(NAME test_resource_${NAME} COMMAND test_resource_${NAME})
