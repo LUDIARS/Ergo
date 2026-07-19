@@ -237,7 +237,14 @@ bool parse(const std::string& src, JsonValue& out) {
     Cursor c{src};
     if (!parse_value(c, out, 0)) return false;
     c.skip_ws();
-    return !c.err;
+    if (c.err) return false;
+    // A shared cursor stops as soon as it has one well-formed value; without
+    // this check trailing garbage after that value (extra tokens, a second
+    // JSON document, stray bytes, ...) is silently ignored and callers like
+    // Catalog::load_manifest would treat a corrupt file as a clean parse.
+    // Require the cursor to have consumed the whole input (ignoring only
+    // trailing whitespace already skipped above).
+    return c.eof();
 }
 
 std::string serialize(const JsonValue& v) {

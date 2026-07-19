@@ -51,3 +51,31 @@ TEST(TagScorerHint, PlaceholderDefaultNameYieldsEmptyHint) {
     EXPECT_EQ(extract_name_hint("cube (3)"), "");
     EXPECT_EQ(extract_name_hint(""), "");
 }
+
+// normalize()/extract_name_hint() only case-fold ASCII (see the comment in
+// tag_scorer.cpp); these guard the actual safety requirement — non-ASCII
+// UTF-8 bytes must never crash or get corrupted into a false/garbled match,
+// even though there is no full Unicode case folding.
+TEST(TagScorer, NonAsciiTagsMatchByteForByte) {
+    // Identical multibyte (Japanese) tags match.
+    EXPECT_EQ(score({"\xe6\xa8\xb9"}, {"\xe6\xa8\xb9"}, "", ""),
+              kTagMatchScore);  // "樹" (tree)
+    // Different multibyte tags don't accidentally match.
+    EXPECT_EQ(score({"\xe6\xa8\xb9"}, {"\xe5\xb2\xa9"}, "", ""), 0);
+}
+
+TEST(TagScorer, MixedAsciiAndNonAsciiTagStillFoldsTheAsciiPart) {
+    // "Tree_\xe6\xa8\xb9" ("Tree_樹") vs "tree_\xe6\xa8\xb9" — ASCII half
+    // should still fold case-insensitively; the non-ASCII half compares
+    // unchanged (identical bytes here, so it still matches).
+    EXPECT_EQ(score({"Tree_\xe6\xa8\xb9"}, {"tree_\xe6\xa8\xb9"}, "", ""),
+              kTagMatchScore);
+}
+
+TEST(TagScorerHint, NonAsciiNameHintDoesNotCrashOrCorrupt) {
+    // Trim/strip logic must leave a pure-Japanese name intact (nothing to
+    // trim, no ASCII "(N)" suffix to strip) instead of misclassifying any
+    // of its UTF-8 continuation bytes as whitespace/digits.
+    EXPECT_EQ(extract_name_hint("\xe6\xa8\xb9\xe3\x81\xae\xe5\xad\x90"),
+              "\xe6\xa8\xb9\xe3\x81\xae\xe5\xad\x90");  // "樹の子"
+}

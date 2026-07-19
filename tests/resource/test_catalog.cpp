@@ -40,14 +40,35 @@ class TempDir {
     bool all_writes_ok_ = true;
 };
 
-constexpr const char* kManifest = R"({
+// NOTE: the "absolute path passes through untouched" case used to hardcode
+// a Windows drive path ("C:/abs/boulder.glb") as if it were a universally
+// absolute path. fs::path::is_absolute() only agrees with that on Windows;
+// on POSIX (Linux CI) "C:/abs/boulder.glb" has no leading '/' and is a
+// *relative* path, so resolve_entry_path() joined it under the manifest
+// dir instead of passing it through — failing the assertion below on any
+// non-Windows runner. abs_boulder_path() builds a real, platform-native
+// absolute path from std::filesystem's own temp directory instead, so the
+// test is meaningful (and passing) on every OS.
+std::string abs_boulder_path() {
+    // generic_string() keeps forward slashes on every platform, which is
+    // both a valid absolute path on POSIX/Windows and safe to splice into a
+    // JSON string literal without escaping backslashes.
+    return (fs::temp_directory_path() / "ergo_resource_abs_boulder.glb")
+        .generic_string();
+}
+
+std::string manifest_json(const std::string& boulder_path) {
+    return std::string(R"({
   "resources": [
     {"id": "tree01", "name": "tree01", "path": "models/tree01.glb",
      "tags": ["tree", "nature"]},
     {"path": "models/rock.glb", "tags": ["rock"]},
-    {"path": "C:/abs/boulder.glb"}
+    {"path": ")") + boulder_path + R"("}
   ]
 })";
+}
+
+const std::string kManifest = manifest_json(abs_boulder_path());
 
 } // namespace
 
@@ -73,10 +94,12 @@ TEST(Catalog, LoadsEntriesWithDefaults) {
     ASSERT_NE(rock, nullptr);
     EXPECT_EQ(rock->name, "rock");
 
-    // absolute paths pass through untouched
-    const auto* boulder = catalog.find_by_id("C:/abs/boulder.glb");
+    // absolute paths pass through untouched (real absolute path on this OS,
+    // see abs_boulder_path() above)
+    const std::string boulder_path = abs_boulder_path();
+    const auto* boulder = catalog.find_by_id(boulder_path);
     ASSERT_NE(boulder, nullptr);
-    EXPECT_EQ(boulder->path, "C:/abs/boulder.glb");
+    EXPECT_EQ(boulder->path, boulder_path);
 }
 
 TEST(Catalog, VocabularyIsSortedUnique) {
@@ -137,4 +160,56 @@ TEST(Catalog, LoadManifestAppendsAcrossCalls) {
 
     catalog.clear();
     EXPECT_TRUE(catalog.entries().empty());
+}
+
+TEST(Catalog, TrailingGarbageAfterJsonFailsWithReason) {
+    TempDir dir("trailing");
+    // Valid JSON followed by non-whitespace garbage. The shared jsonm parser
+    // used to stop as soon as it had one well-formed value and never checked
+    // it had reached EOF, so this manifest was silently accepted as clean.
+    const auto manifest = dir.file(
+        "resources.json",
+        R"({"resources": [{"path": "a.bin"}]}garbage)");
+    ASSERT_TRUE(dir.ok());
+
+    Catalog catalog;
+    EXPECT_FALSE(catalog.load_manifest(manifest));
+    EXPECT_FALSE(catalog.last_error().empty());
+    EXPECT_TRUE(catalog.entries().empty());
+}
+
+TEST(Catalog, TrailingWhitespaceOnlyAfterJsonStillSucceeds) {
+    TempDir dir("trailing-ws");
+    const auto manifest = dir.file(
+        "resources.json",
+        "{\"resources\": [{\"path\": \"a.bin\"}]}\n  \n");
+    ASSERT_TRUE(dir.ok());
+
+    Catalog catalog;
+    EXPECT_TRUE(catalog.load_manifest(manifest));
+    EXPECT_EQ(catalog.entries().size(), 1u);
+}
+
+TEST(Catalog, DuplicateDefaultIdsAreDiagnosedAndLastOneWins) {
+    TempDir dir("dup");
+    // Both entries omit "id", so both default to the same raw path — a
+    // collision find_by_id() used to resolve to the *first* match, making
+    // the second (real, later) entry permanently unreachable by id.
+    const auto manifest = dir.file(
+        "resources.json",
+        R"({"resources": [
+              {"path": "a.bin", "tags": ["first"]},
+              {"path": "a.bin", "tags": ["second"]}
+            ]})");
+    ASSERT_TRUE(dir.ok());
+
+    Catalog catalog;
+    ASSERT_TRUE(catalog.load_manifest(manifest));
+    ASSERT_EQ(catalog.entries().size(), 2u);
+    EXPECT_FALSE(catalog.last_error().empty());  // duplicate id is observable
+
+    const auto* found = catalog.find_by_id("a.bin");
+    ASSERT_NE(found, nullptr);
+    ASSERT_EQ(found->tags.size(), 1u);
+    EXPECT_EQ(found->tags[0], "second");  // most recently loaded wins
 }

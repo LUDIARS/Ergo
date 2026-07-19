@@ -27,6 +27,7 @@ private:
     std::thread thread_;
     std::atomic<bool> running_{false};
     std::atomic<uint64_t> intervalUs_{1000};
+    std::atomic<bool> intervalChanged_{false};
     std::mutex mutex_;
     std::condition_variable cv_;
 };
