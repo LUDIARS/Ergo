@@ -4,14 +4,16 @@
 ///
 /// Default backend: **FMOD Core** (auto-detected at CMake configure time
 /// via `FMOD_SDK_DIR`). When FMOD is unavailable the build falls back
-/// transparently to a **Dummy** backend that just logs what would have
-/// played — hosts don't need any #ifdefs.
+/// transparently to **miniaudio** (fetched from a pinned upstream), and
+/// finally to a **Dummy** backend that just logs what would have played
+/// — hosts don't need any #ifdefs.
 ///
 /// Only one-shot playback is exposed right now. Streams / 3D / DSP
 /// chains / FMOD Studio events are intentionally left for later
 /// iterations — this header stays small so we can commit the wiring
 /// without the rest of the game depending on an evolving API.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -23,8 +25,9 @@ constexpr SoundHandle INVALID_SOUND = 0;
 /// Which backend the linked library actually uses at runtime. Resolved
 /// at CMake configure time.
 enum class Backend : uint8_t {
-    Dummy = 0,   ///< No real playback, logs events. Always available.
-    FMOD  = 1,   ///< FMOD Core 2.x (requires FMOD_SDK_DIR on the build).
+    Dummy     = 0,   ///< No real playback, logs events. Always available.
+    FMOD      = 1,   ///< FMOD Core 2.x (requires FMOD_SDK_DIR on the build).
+    MiniAudio = 2,   ///< miniaudio (fetched single-header, no SDK needed).
 };
 
 class Engine {
@@ -51,6 +54,10 @@ public:
     /// returned handle is opaque and stable until `unload_sound` or
     /// `shutdown`. Returns 0 on failure.
     SoundHandle load_sound(const std::string& path);
+
+    /// メモリ上の float mono PCM からサウンドを作る (Figmentum 等の動的合成波形用)。
+    /// samples はコピーされ、呼び出し後に解放してよい。失敗/未初期化は 0。
+    SoundHandle load_sound_pcm(const float* samples, size_t sampleCount, int sampleRate);
 
     /// Release the underlying resource. Safe on INVALID_SOUND.
     void unload_sound(SoundHandle handle);
@@ -79,6 +86,9 @@ inline bool         initialize()                                        { return
 inline void         shutdown()                                          { Engine::instance().shutdown(); }
 inline void         update()                                            { Engine::instance().update(); }
 inline SoundHandle  load_sound(const std::string& path)                 { return Engine::instance().load_sound(path); }
+inline SoundHandle  load_sound_pcm(const float* samples, size_t sampleCount, int sampleRate) {
+    return Engine::instance().load_sound_pcm(samples, sampleCount, sampleRate);
+}
 inline void         unload_sound(SoundHandle h)                         { Engine::instance().unload_sound(h); }
 inline void         play(SoundHandle h, float vol = 1.0f, float pitch = 1.0f) {
     Engine::instance().play(h, vol, pitch);

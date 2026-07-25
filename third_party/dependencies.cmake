@@ -31,6 +31,16 @@ ergo_declare_dependency(
     HOMEPAGE   https://curl.se
     SUMMARY    "Client-side URL transfer library (HTTP/HTTPS/...)")
 
+# miniaudio has no ERGO_WITH_* switch: the ergo_audio backend selector owns it
+# and includes cmake/deps/miniaudio on demand (see CMakeLists.txt, ergo_audio).
+ergo_declare_dependency(
+    NAME       miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG    9634bedb5b5a2ca38c1ee7108a9358a4e233f14d   # tag 0.11.25
+    LICENSE    MIT-0
+    HOMEPAGE   https://miniaud.io
+    SUMMARY    "Single-header C audio playback/capture library")
+
 # --- Opt-in build switches -------------------------------------------------
 # Default OFF: these pull (and, for curl, compile) source from the network, so a
 # plain Ergo build stays light and offline-friendly. Turn on the ones a module
