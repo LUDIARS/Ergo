@@ -182,7 +182,12 @@ function refreshArtboardList() {
         const sm_count   = ab && ab.stateMachineNames ? ab.stateMachineNames().length : 0;
         const anim_count = ab && ab.animationNames    ? ab.animationNames().length    : 0;
         if (ab) try { ab.delete(); } catch {}
-        li.innerHTML = `<span>${n}</span><span class="sub">${w}×${h} · SM${sm_count} · anim${anim_count}</span>`;
+        const name = document.createElement("span");
+        name.textContent = n;
+        const details = document.createElement("span");
+        details.className = "sub";
+        details.textContent = `${w}×${h} · SM${sm_count} · anim${anim_count}`;
+        li.append(name, details);
         li.addEventListener("click", () => { artboardSel.value = n; selectArtboard(n); });
         artboardListEl.appendChild(li);
     });
@@ -231,7 +236,12 @@ async function selectArtboard(name) {
             const inst = artboard.animationByName(n);
             if (inst) { dur = inst.duration / inst.fps; inst.delete(); }
         } catch {}
-        li.innerHTML = `<span>${n}</span><span class="sub">${dur.toFixed(3)} s</span>`;
+        const name = document.createElement("span");
+        name.textContent = n;
+        const details = document.createElement("span");
+        details.className = "sub";
+        details.textContent = `${dur.toFixed(3)} s`;
+        li.append(name, details);
         const btn = document.createElement("button");
         btn.textContent = "▶";
         btn.addEventListener("click", () => { sceneSel.value = `anim:${n}`; selectScene(`anim:${n}`); });

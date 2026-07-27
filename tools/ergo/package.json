@@ -10,7 +10,8 @@
     "app":       "npm run build && electron .",
     "serve":     "tsx src/main.ts",
     "dev":       "tsx watch src/main.ts",
-    "build":     "tsc -p tsconfig.json"
+    "build":     "tsc -p tsconfig.json",
+    "test":      "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=20"
