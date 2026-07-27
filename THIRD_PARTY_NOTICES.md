@@ -48,3 +48,15 @@ built only when their `ERGO_WITH_<NAME>` switch is enabled.
 - Pin: tag `curl-8_19_0`
 - License: **curl** (MIT/X-derivative)
 - Used via: `ERGO_WITH_CURL=ON` → target `CURL::libcurl`
+
+### miniaudio
+
+- Source: https://github.com/mackron/miniaudio (https://miniaud.io)
+- Copyright (c) 2025 David Reid
+- Pin: commit `9634bedb5b5a2ca38c1ee7108a9358a4e233f14d` (tag `0.11.25`)
+- License: dual-licensed, take your pick — **MIT-0** (MIT No Attribution) or
+  **public domain** (Unlicense). Neither imposes an attribution requirement;
+  this entry is recorded for provenance and pin tracking.
+- Used via: `ERGO_AUDIO_BACKEND=auto|miniaudio` → target `miniaudio`
+  (INTERFACE; the single `MINIAUDIO_IMPLEMENTATION` translation unit is
+  `src/audio/audio_engine_miniaudio.cpp`)

@@ -140,13 +140,13 @@ modules:
     status: stable
 
   - name: ergo_audio
-    summary: ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。ergo_sound とは独立・横並び
+    summary: ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 → miniaudio → Dummy 自動フォールバック)。ファイル再生に加えメモリ上 float mono PCM 再生 (load_sound_pcm) 対応。ergo_sound とは独立・横並び
     category: システム
     header_dir: include/ergo/audio/
     source_dir: src/audio/
     test_dir:   tests/audio/
     spec:       spec/module/audio.md
-    cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/dummy)
+    cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/miniaudio/dummy)
     tool_plugin: null
     status: preview
 

@@ -15,6 +15,17 @@ struct Engine::Impl {
     std::unordered_map<SoundHandle, std::string> paths;
 };
 
+namespace {
+
+/// Dummy handles carry only a label; PCM sounds get a synthetic one so
+/// play() can report "what would have played" the same way as files.
+std::string pcm_label(size_t sampleCount, int sampleRate) {
+    return "<pcm " + std::to_string(sampleCount) + " samples @ " +
+           std::to_string(sampleRate) + "Hz>";
+}
+
+} // namespace
+
 Engine& Engine::instance() {
     static Engine e;
     return e;
@@ -44,6 +55,16 @@ SoundHandle Engine::load_sound(const std::string& path) {
     if (!impl_->initialized) return INVALID_SOUND;
     const SoundHandle h = impl_->next_handle++;
     impl_->paths[h] = path;
+    return h;
+}
+
+SoundHandle Engine::load_sound_pcm(const float* samples, size_t sampleCount, int sampleRate) {
+    if (!impl_->initialized) return INVALID_SOUND;
+    if (!samples || sampleCount == 0 || sampleRate <= 0) return INVALID_SOUND;
+    const SoundHandle h = impl_->next_handle++;
+    impl_->paths[h] = pcm_label(sampleCount, sampleRate);
+    std::fprintf(stderr, "[audio:dummy] load_sound_pcm samples=%zu rate=%d\n",
+                 sampleCount, sampleRate);
     return h;
 }
 

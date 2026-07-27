@@ -14,7 +14,7 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 | `ergo_actor`        | シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (`ergo_bind` に委譲) | システム | `include/ergo/actor/`        | `src/actor/`        | `spec/module/actor.md`        | `tools/ergo/` (`variable` plugin で表示) |
 | `ergo_cast`         | Actor を名前付き Scene に束ねる軽量グルーピング層 (一括/個別 activate + snapshot)。非所有・描画非依存。`ergo_scene` (look-dev ドキュメント) とは別物 | システム | `include/ergo/cast/`         | `src/cast/`         | `spec/module/cast.md`         | — |
 | `ergo_sound`        | WAV デコード + ストリーミング + ミキサ + 波形処理 + Quantizer (外部 lib 無し)          | システム | `include/ergo/sound/`        | `src/sound/`        | `spec/module/sound.md`        | — |
-| `ergo_audio`        | ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。`ergo_sound` とは独立・横並び | システム | `include/ergo/audio/`        | `src/audio/`        | `spec/module/audio.md`        | — |
+| `ergo_audio`        | ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 → miniaudio → Dummy 自動フォールバック)。ファイル再生に加えメモリ上 float mono PCM 再生 (`load_sound_pcm`) 対応。`ergo_sound` とは独立・横並び | システム | `include/ergo/audio/`        | `src/audio/`        | `spec/module/audio.md`        | — |
 | `ergo_frame`        | アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列                              | システム | `include/ergo/frame/`        | `src/frame/`        | `spec/module/frame.md`        | — |
 | `ergo_profile`      | パフォーマンス確認用タイムライン。 AOP 的マーカー注入で速度/メモリ/スレッドを計測し Chrome Trace 形式で出力 | システム | `include/ergo/profile/`      | `src/profile/`      | `spec/module/profile.md`      | `tools/ergo/` (`profile` plugin) |
 | `ergo_log`          | 4-level ロガー (Error/Warn/Info/Debug)。行頭にフレーム番号を埋め込む                   | システム | `include/ergo/log/`          | `src/log/`          | `spec/module/log.md`          | — |

@@ -52,11 +52,12 @@ endif()
 option(ERGO_PARTICLE_HAS_RENDERER        "ergo_particle: build Vulkan billboard renderer (requires pictor + Vulkan)" OFF)
 option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute shaders to SPIR-V via glslc" ON)
 
-# ergo_audio backend selector. "auto" probes for FMOD via the bundled
-# FindFMOD.cmake and falls back to dummy; "dummy" forces no-op; "fmod"
-# hard-requires the SDK and errors if not found.
-set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / dummy")
-set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy)
+# ergo_audio backend selector. "auto" probes FMOD (bundled FindFMOD.cmake)
+# first, then miniaudio (fetched from a pinned upstream), then falls back to
+# dummy; "dummy" forces no-op. "fmod" / "miniaudio" hard-require their
+# dependency and error out if it cannot be provided (no silent downgrade).
+set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / miniaudio / dummy")
+set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod miniaudio dummy)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
@@ -504,12 +505,19 @@ if(ERGO_BUILD_IO)
 endif()
 
 # ---------------------------------------------------------------------------
-# ergo_audio — game audio wrapper. FMOD Core by default (auto-detected);
-# dummy backend when the SDK is missing so hosts link unconditionally.
+# ergo_audio — game audio wrapper. Backend priority: FMOD Core (auto-detected
+# via FMOD_SDK_DIR) → miniaudio (fetched, no SDK needed, real sound on dev
+# machines/CI) → dummy, so hosts link unconditionally either way.
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_AUDIO)
+    if(NOT ERGO_AUDIO_BACKEND MATCHES "^(auto|fmod|miniaudio|dummy)$")
+        message(FATAL_ERROR
+            "ergo_audio: ERGO_AUDIO_BACKEND='${ERGO_AUDIO_BACKEND}' is not one of auto/fmod/miniaudio/dummy.")
+    endif()
+
+    # --- 1. FMOD (preferred when the SDK is present) ------------------------
     set(_ERGO_AUDIO_USE_FMOD OFF)
-    if(NOT ERGO_AUDIO_BACKEND STREQUAL "dummy")
+    if(ERGO_AUDIO_BACKEND STREQUAL "auto" OR ERGO_AUDIO_BACKEND STREQUAL "fmod")
         if(ERGO_AUDIO_BACKEND STREQUAL "fmod")
             find_package(FMOD REQUIRED)
         else()
@@ -517,21 +525,44 @@ if(ERGO_BUILD_AUDIO)
         endif()
         if(FMOD_FOUND)
             set(_ERGO_AUDIO_USE_FMOD ON)
+        elseif(ERGO_AUDIO_BACKEND STREQUAL "fmod")
+            message(FATAL_ERROR "ergo_audio: ERGO_AUDIO_BACKEND=fmod but FMOD SDK not found. Set FMOD_SDK_DIR.")
         endif()
     endif()
 
+    # --- 2. miniaudio (fetched; only when FMOD is out of the picture) -------
+    # An explicit ERGO_AUDIO_BACKEND=miniaudio makes the fetch mandatory: if it
+    # cannot be provided this errors out rather than silently degrading to
+    # dummy (RULE_CODE §7.1 — no silent fallback). In "auto" we only attempt
+    # the fetch when fetching is actually permitted, so an offline
+    # -DERGO_FETCH_DEPENDENCIES=OFF build still configures (as dummy).
+    set(_ERGO_AUDIO_USE_MINIAUDIO OFF)
+    if(NOT _ERGO_AUDIO_USE_FMOD AND
+       (ERGO_AUDIO_BACKEND STREQUAL "auto" OR ERGO_AUDIO_BACKEND STREQUAL "miniaudio"))
+        if(ERGO_AUDIO_BACKEND STREQUAL "miniaudio" OR ERGO_FETCH_DEPENDENCIES
+           OR ERGO_SOURCE_DIR_MINIAUDIO)
+            include(deps/miniaudio)   # FATAL_ERROR inside if the fetch fails
+            set(_ERGO_AUDIO_USE_MINIAUDIO ON)
+        endif()
+    endif()
+
+    # --- 3. Wire the selected backend ---------------------------------------
     if(_ERGO_AUDIO_USE_FMOD)
         add_library(ergo_audio src/audio/audio_engine_fmod.cpp)
         target_link_libraries(ergo_audio PUBLIC FMOD::FMOD Threads::Threads)
         target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_FMOD=1)
         message(STATUS "ergo_audio: backend = FMOD (${FMOD_LIBRARY})")
+    elseif(_ERGO_AUDIO_USE_MINIAUDIO)
+        add_library(ergo_audio src/audio/audio_engine_miniaudio.cpp)
+        target_link_libraries(ergo_audio PUBLIC Threads::Threads)
+        target_link_libraries(ergo_audio PRIVATE miniaudio)
+        target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_MINIAUDIO=1)
+        message(STATUS "ergo_audio: backend = miniaudio")
     else()
         add_library(ergo_audio src/audio/audio_engine_dummy.cpp)
         target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_DUMMY=1)
-        if(ERGO_AUDIO_BACKEND STREQUAL "fmod")
-            message(FATAL_ERROR "ergo_audio: ERGO_AUDIO_BACKEND=fmod but FMOD SDK not found. Set FMOD_SDK_DIR.")
-        endif()
-        message(STATUS "ergo_audio: backend = Dummy (set FMOD_SDK_DIR + reconfigure for FMOD)")
+        message(STATUS "ergo_audio: backend = Dummy (set FMOD_SDK_DIR, or enable "
+                       "ERGO_FETCH_DEPENDENCIES for miniaudio, + reconfigure)")
     endif()
     target_include_directories(ergo_audio PUBLIC include)
 

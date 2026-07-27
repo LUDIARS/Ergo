@@ -110,6 +110,35 @@ SoundHandle Engine::load_sound(const std::string& path) {
     return h;
 }
 
+SoundHandle Engine::load_sound_pcm(const float* samples, size_t sampleCount, int sampleRate) {
+    if (!impl_->initialized || !impl_->sys) return INVALID_SOUND;
+    if (!samples || sampleCount == 0 || sampleRate <= 0) return INVALID_SOUND;
+
+    // FMOD_OPENMEMORY copies the block into its own buffer, so the
+    // caller's `samples` may be freed as soon as createSound returns.
+    FMOD_CREATESOUNDEXINFO ex{};
+    ex.cbsize           = sizeof(FMOD_CREATESOUNDEXINFO);
+    ex.length           = static_cast<unsigned int>(sampleCount * sizeof(float));
+    ex.numchannels      = 1;
+    ex.defaultfrequency = sampleRate;
+    ex.format           = FMOD_SOUND_FORMAT_PCMFLOAT;
+
+    FMOD::Sound* snd = nullptr;
+    const FMOD_RESULT r =
+        impl_->sys->createSound(reinterpret_cast<const char*>(samples),
+                                FMOD_OPENMEMORY | FMOD_OPENRAW | FMOD_2D | FMOD_LOOP_OFF,
+                                &ex, &snd);
+    if (r != FMOD_OK || !snd) {
+        log_fmod_err("createSound(PCM)", r);
+        return INVALID_SOUND;
+    }
+
+    std::lock_guard<std::mutex> lk(impl_->mtx);
+    const SoundHandle h = impl_->next_handle++;
+    impl_->sounds[h] = snd;
+    return h;
+}
+
 void Engine::unload_sound(SoundHandle h) {
     if (h == INVALID_SOUND) return;
     FMOD::Sound* snd = nullptr;
