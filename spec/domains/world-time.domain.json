@@ -1,0 +1,14 @@
+{
+  "name": "world-time",
+  "description": "世界時間。 ゲーム内時間の進行と時刻に依存する挙動。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/world_time/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?world_time/(?:.*/)?[^/]+$"
+    }
+  ]
+}

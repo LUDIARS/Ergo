@@ -30,6 +30,9 @@ Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツ
   (詳細は `spec/tool/ergo.md`)。 ゲーム固有のエディタは Ergo に入れず、
   ホストリポの plugin pack + `ERGO_PLUGIN_DIR` でロードする
 - 仕様書は `spec/module/<名>.md`
+- ドメイン定義 (Anatomia) の正本は `spec/domains/<名>.domain.json`。
+  新しいトップレベルのソースディレクトリを足す PR では、 同じ PR で
+  membership を更新する (詳細は `spec/domains/README.md`)
 
 ### 旧運用 (履歴保全のみ・参照禁止)
 

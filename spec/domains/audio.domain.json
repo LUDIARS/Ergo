@@ -1,0 +1,20 @@
+{
+  "name": "audio",
+  "description": "音。 再生と音源の管理。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/audio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?audio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/sound/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?sound/(?:.*/)?[^/]+$"
+    }
+  ]
+}

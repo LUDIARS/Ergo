@@ -1,0 +1,38 @@
+{
+  "name": "foundation",
+  "description": "共通土台。 型・ユーティリティ・テンプレート・ビルド定義。 上位の意味づけは持たない。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/common/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?common/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)template/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)cmake/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)CMakeLists\\.txt$"
+    },
+    {
+      "pathPattern": "(^|/)tools/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)benchmarks/(?:.*/)?[^/]+$"
+    }
+  ]
+}

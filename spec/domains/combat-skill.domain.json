@@ -1,0 +1,32 @@
+{
+  "name": "combat-skill",
+  "description": "戦闘とスキル。 コンボ計数、 体力、 得点といった戦闘まわりの数値と進行。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/combo_counter/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?combo_counter/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/health/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?health/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/score/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?score/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/timing_judge/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?timing_judge/(?:.*/)?[^/]+$"
+    }
+  ]
+}

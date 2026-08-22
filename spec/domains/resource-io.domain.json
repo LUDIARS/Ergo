@@ -1,0 +1,26 @@
+{
+  "name": "resource-io",
+  "description": "資産と入出力。 リソースの選択と読み込み、 ファイル入出力、 HTTP。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/resource/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?resource/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/io/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?io/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/http/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?http/(?:.*/)?[^/]+$"
+    }
+  ]
+}

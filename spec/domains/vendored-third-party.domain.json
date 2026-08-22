@@ -1,0 +1,11 @@
+{
+  "name": "vendored-third-party",
+  "description": "ベンダリングした外部コード。 上流の実装をそのまま同梱し、 自前のロジックを足さない。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)third_party/(?:.*/)?[^/]+$"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "ui-layout",
+  "description": "UI とレイアウト。 画面要素の構成と配置、 ベクタ図形の描画。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/ui/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?ui/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/ui_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?ui_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/vector/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?vector/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/ui_kit/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?ui_kit/(?:.*/)?[^/]+$"
+    }
+  ]
+}

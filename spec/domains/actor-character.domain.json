@@ -1,0 +1,26 @@
+{
+  "name": "actor-character",
+  "description": "アクターとキャラクター。 実体の生成と状態、 役割の割り当て、 キャストの管理。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/actor/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?actor/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/character/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?character/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/cast/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?cast/(?:.*/)?[^/]+$"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "physics",
+  "description": "物理。 2D の衝突と運動。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/physics2d/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?physics2d/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/math/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?math/(?:.*/)?[^/]+$"
+    }
+  ]
+}

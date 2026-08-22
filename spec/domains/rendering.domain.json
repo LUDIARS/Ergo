@@ -1,0 +1,35 @@
+{
+  "name": "rendering",
+  "description": "描画。 レンダラ、 シェーダ資産、 パーティクル、 GPU 側の処理。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/render/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?render/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/particle/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?particle/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/gpu_particle/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?gpu_particle/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/shuriken_migrator/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?shuriken_migrator/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)shaders/(?:.*/)?[^/]+$"
+    }
+  ]
+}

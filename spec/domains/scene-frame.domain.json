@@ -1,0 +1,20 @@
+{
+  "name": "scene-frame",
+  "description": "シーンとフレーム進行。 シーン構成と 1 フレームの流れ。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/scene/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?scene/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/frame/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?frame/(?:.*/)?[^/]+$"
+    }
+  ]
+}

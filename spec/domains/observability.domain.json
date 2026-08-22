@@ -1,0 +1,32 @@
+{
+  "name": "observability",
+  "description": "観測。 ログ、 プロファイル、 診断出力、 ライブチューニングの窓口。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/log/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?log/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/profile/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?profile/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/custos/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?custos/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/bind/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?bind/(?:.*/)?[^/]+$"
+    }
+  ]
+}

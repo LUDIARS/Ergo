@@ -1,0 +1,14 @@
+{
+  "name": "ai-behavior",
+  "description": "AI の意思決定。 ブラックボード上の状態共有と行動選択。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/blackboard/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?blackboard/(?:.*/)?[^/]+$"
+    }
+  ]
+}

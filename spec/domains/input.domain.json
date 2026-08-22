@@ -1,0 +1,14 @@
+{
+  "name": "input",
+  "description": "入力。 デバイス入力の取得と正規化。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/input/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?input/(?:.*/)?[^/]+$"
+    }
+  ]
+}
