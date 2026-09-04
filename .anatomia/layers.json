@@ -1,0 +1,510 @@
+{
+  "$comment": "Anatomia のプログラムドメイン (二層判定) 用の層宣言。 glob は repo 相対のファイルパスへ完全一致で当たる (`*` = 1 階層、 `**` = 任意階層)。 Anatomia の module 単位はディレクトリなので、 モジュール 1 つにつき `<dir>/*` を 1 本だけ置き glob 同士を重ねない (ローダーが glob 文字列でソートしてから先勝ちで評価するため、 包括 glob を混ぜると個別宣言が効かなくなる)。 ゲームエンジンとしての層: 描画・UI・音は presentation、 キャラクタ/戦闘/判定などルールと状態は domain-logic、 資源読み込み・計測・ログ・言語バインド・HTTP/IO は infrastructure、 シーン組み立てとエディタ本体は application、 数学と共通型とベンチとテストは shared。 include/ と src/ は同じ役割なので同じ層へ置く (宣言と実装で層が変わるのはおかしい)。 third_party/ は外部から取り込んだコードなので infrastructure に寄せ、 自分たちの層の議論に混ぜない。 確認は `anatomia domains program --repo .` で unclassified 0 を保つこと。",
+  "layers": [
+    {
+      "glob": "benchmarks/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "include/ergo/actor/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/audio/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/bind/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/blackboard/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/cast/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/character/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/character/checks/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/character/controls/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/character/detail/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/character/effects/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/combo_counter/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/common/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "include/ergo/custos/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/frame/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/gpu_particle/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/health/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/http/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/input/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/io/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/log/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/math/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "include/ergo/particle/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/physics2d/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/profile/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/render/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/resource/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/scene/*",
+      "layer": "application"
+    },
+    {
+      "glob": "include/ergo/score/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/shuriken_migrator/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/sound/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/timing_judge/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "include/ergo/ui_kit/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/ui_layout/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/vector/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/world_time/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/actor/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/audio/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/bind/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/blackboard/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/cast/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/character/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/combo_counter/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/common/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "src/custos/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/frame/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/gpu_particle/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/health/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/http/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/input/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/io/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/log/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/math/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "src/particle/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/physics2d/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/profile/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/render/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/resource/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/scene/*",
+      "layer": "application"
+    },
+    {
+      "glob": "src/score/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/shuriken_migrator/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/sound/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/timing_judge/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "src/ui_kit/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/ui_layout/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/vector/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/world_time/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "tests/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/actor/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/audio/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/bind/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/blackboard/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/cast/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/character/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/combo_counter/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/custos/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/frame/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/gpu_particle/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/health/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/http/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/input/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/io/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/log/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/math/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/particle/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/physics2d/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/profile/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/render/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/resource/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/scene/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/score/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/shuriken_migrator/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/sound/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/thirdparty/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/timing_judge/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/ui_kit/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/ui_layout/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/ui/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/vector/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/world_time/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "third_party/earcut/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "third_party/gtest/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "third_party/nanosvg/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "tools/ergo/electron/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/public/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/core/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/particle/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/pictor_perf/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/pictor_perf/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/profile/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/profile/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/render_pipeline/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/render_pipeline/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/rive/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/rive/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/scene_editor/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/scene_editor/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/ui_layout/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/ui_layout/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/variable/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/vfx-suggest/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/visus/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/shuriken_migrator/*",
+      "layer": "application"
+    }
+  ],
+  "mergeCouplingThreshold": 1
+}
