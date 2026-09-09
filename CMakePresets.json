@@ -1,0 +1,69 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "ide-base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "ERGO_BUILD_TESTS": false,
+        "ERGO_BUILD_DUMMY": false,
+        "ERGO_BUILD_BENCHMARKS": false,
+        "ERGO_AUDIO_BACKEND": "dummy",
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo",
+        "CMAKE_POLICY_DEFAULT_CMP0091": "NEW"
+      }
+    },
+    {
+      "name": "vs2022",
+      "displayName": "Visual Studio 2022 (x64)",
+      "inherits": "ide-base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "/utf-8",
+        "CMAKE_CXX_FLAGS": "/utf-8"
+      }
+    },
+    {
+      "name": "vs2022-deps",
+      "displayName": "Visual Studio 2022 (x64, kazmath + libcurl)",
+      "inherits": "vs2022",
+      "cacheVariables": {
+        "ERGO_WITH_KAZMATH": true,
+        "ERGO_WITH_CURL": true,
+        "ERGO_BUILD_HTTP": true
+      }
+    },
+    {
+      "name": "xcode",
+      "displayName": "Xcode (macOS, host architecture)",
+      "inherits": "ide-base",
+      "generator": "Xcode",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+    },
+    {
+      "name": "xcode-deps",
+      "displayName": "Xcode (macOS, kazmath + libcurl/OpenSSL)",
+      "inherits": "xcode",
+      "cacheVariables": {
+        "ERGO_WITH_KAZMATH": true,
+        "ERGO_WITH_CURL": true,
+        "ERGO_BUILD_HTTP": true,
+        "CURL_USE_OPENSSL": true
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "vs2022-debug", "configurePreset": "vs2022", "configuration": "Debug" },
+    { "name": "vs2022-release", "configurePreset": "vs2022", "configuration": "Release" },
+    { "name": "vs2022-deps-debug", "configurePreset": "vs2022-deps", "configuration": "Debug" },
+    { "name": "vs2022-deps-release", "configurePreset": "vs2022-deps", "configuration": "Release" },
+    { "name": "xcode-debug", "configurePreset": "xcode", "configuration": "Debug" },
+    { "name": "xcode-release", "configurePreset": "xcode", "configuration": "Release" },
+    { "name": "xcode-deps-debug", "configurePreset": "xcode-deps", "configuration": "Debug" },
+    { "name": "xcode-deps-release", "configurePreset": "xcode-deps", "configuration": "Release" }
+  ]
+}

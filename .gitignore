@@ -1,5 +1,6 @@
 build/
 build_*/
+CMakeUserPresets.json
 
 # tools/ergo — per-developer local state
 tools/ergo/placer-data.json

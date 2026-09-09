@@ -16,7 +16,7 @@
 #   api/core/inc/fmod.hpp
 #   api/core/lib/x64/fmod_vc.lib
 #   api/core/lib/x64/fmod.dll
-# (linux / macos: api/core/lib/<arch>/libfmod.{so,dylib})
+# (Linux: api/core/lib/<arch>/libfmod.so; macOS: api/core/lib/libfmod.dylib)
 
 set(_FMOD_HINT_DIRS
     "${FMOD_SDK_DIR}"
@@ -26,14 +26,11 @@ set(_FMOD_HINT_DIRS
 )
 
 find_path(FMOD_INCLUDE_DIR
-    NAMES api/core/inc/fmod.hpp
+    NAMES fmod.hpp
     HINTS ${_FMOD_HINT_DIRS}
+    PATH_SUFFIXES api/core/inc
     NO_DEFAULT_PATH
 )
-
-if(FMOD_INCLUDE_DIR)
-    set(FMOD_INCLUDE_DIR "${FMOD_INCLUDE_DIR}/api/core/inc" CACHE PATH "FMOD headers" FORCE)
-endif()
 
 # Pick the arch-appropriate subfolder.
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -53,24 +50,29 @@ else()
     set(_FMOD_DLL_NAMES   libfmod.so libfmodL.so)
 endif()
 
-foreach(HINT ${_FMOD_HINT_DIRS})
-    if(IS_DIRECTORY "${HINT}/api/core/lib/${_FMOD_ARCH}")
-        find_library(FMOD_LIBRARY
-            NAMES ${_FMOD_LIB_NAMES}
-            PATHS "${HINT}/api/core/lib/${_FMOD_ARCH}"
-            NO_DEFAULT_PATH)
+set(_FMOD_LIB_SUFFIXES "api/core/lib/${_FMOD_ARCH}")
+if(APPLE)
+    # The macOS SDK ships its universal dylib directly in lib/, not lib/x64/.
+    list(PREPEND _FMOD_LIB_SUFFIXES api/core/lib)
+endif()
+find_library(FMOD_LIBRARY
+    NAMES ${_FMOD_LIB_NAMES}
+    HINTS ${_FMOD_HINT_DIRS}
+    PATH_SUFFIXES ${_FMOD_LIB_SUFFIXES}
+    NO_DEFAULT_PATH)
 
-        foreach(DLL ${_FMOD_DLL_NAMES})
-            if(EXISTS "${HINT}/api/core/lib/${_FMOD_ARCH}/${DLL}")
-                set(FMOD_RUNTIME "${HINT}/api/core/lib/${_FMOD_ARCH}/${DLL}")
-                break()
-            endif()
-        endforeach()
-    endif()
-    if(FMOD_LIBRARY)
-        break()
-    endif()
-endforeach()
+# Resolve the runtime beside the selected import library, including on a
+# repeated configure; do not accidentally stage a DLL from another SDK.
+unset(FMOD_RUNTIME)
+if(FMOD_LIBRARY)
+    get_filename_component(_FMOD_LIBRARY_DIR "${FMOD_LIBRARY}" DIRECTORY)
+    foreach(DLL ${_FMOD_DLL_NAMES})
+        if(EXISTS "${_FMOD_LIBRARY_DIR}/${DLL}")
+            set(FMOD_RUNTIME "${_FMOD_LIBRARY_DIR}/${DLL}")
+            break()
+        endif()
+    endforeach()
+endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(FMOD

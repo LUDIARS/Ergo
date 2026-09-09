@@ -13,6 +13,9 @@
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
 
+# Keep the base Ergo project C++-only; a C compiler is required only when this
+# optional dependency is requested.
+enable_language(C)
 ergo_populate_dependency(kazmath OUT_SOURCE_DIR _kazmath_src)
 
 # Core C sources (everything under kazmath/ except the optional GL/ helpers).
@@ -36,6 +39,10 @@ add_library(kazmath STATIC ${_kazmath_sources})
 # Source root is the include root so consumers resolve <kazmath/...>.
 target_include_directories(kazmath PUBLIC "${_kazmath_src}")
 set_target_properties(kazmath PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+if(UNIX AND NOT APPLE)
+    # Preserve the C math runtime dependency for final executable links.
+    target_link_libraries(kazmath PUBLIC m)
+endif()
 if(MSVC)
     # kazmath predates _CRT_SECURE_NO_WARNINGS hygiene; silence C runtime noise.
     target_compile_definitions(kazmath PRIVATE _CRT_SECURE_NO_WARNINGS)

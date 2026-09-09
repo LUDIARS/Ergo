@@ -63,6 +63,10 @@
 
 ## 手順
 
+Visual Studio の `.sln` / Xcode の `.xcodeproj` を生成する場合は
+[IDE プロジェクト生成](ide-projects.md) のプリセットを使う。
+kazmath / libcurl を含む構成と、ホストアプリへのリンク例もそちらに記載する。
+
 ```bash
 # 1. 構成 (例: テスト込み Release、audio は dummy 固定)
 cmake -S . -B build -DERGO_AUDIO_BACKEND=dummy
