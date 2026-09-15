@@ -8,7 +8,7 @@
 /// that has an `index.js` or `index.ts` is dynamic-imported and its
 /// default export is expected to be a `PluginFactory`. This lets a game
 /// repo keep its own editor plugins without forking the shared tool:
-///   PrivateGame -> tools/kzs-web/plugins/{spawn,skill}
+///   PrivateGame -> tools/game-web/plugins/{spawn,skill}
 ///   AdventureCube -> tools/ac-web/plugins/{placer,terrain,acstage}
 ///
 /// A broken pack entry is logged and skipped — it never aborts startup.

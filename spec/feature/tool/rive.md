@@ -6,7 +6,7 @@ Ergo 統合開発者ツール (`tools/ergo`) の組み込みプラグインの 1
 `.riv` ファイルをドラッグ&ドロップ (またはファイルダイアログ) で受け取り、
 browser canvas 上で再生 + 構造を可視化する。
 
-KS / AC など Pictor の Rive runtime を使うホストで「この .riv は何を含むか」
+PrivateGame / AC など Pictor の Rive runtime を使うホストで「この .riv は何を含むか」
 「どの state machine input がどう動くか」 を運用中にチェックできるのが狙い。
 
 ## 主機能
@@ -19,7 +19,7 @@ KS / AC など Pictor の Rive runtime を使うホストで「この .riv は�
   - state machine inputs (bool / number / trigger 全部 GUI 操作可)
   - 簡易 timeline (animation 再生時は duration 内のカーソル / SM は 10s wrap)
 - **WebSocket hub**: 1 クライアントが publish したメタ情報を他クライアントに
-  broadcast。 将来 KS 側 (Vulkan ベンチ) から接続して同一 riv の構造を
+  broadcast。 将来 PrivateGame 側 (Vulkan ベンチ) から接続して同一 riv の構造を
   共有する用途を想定
 
 ## 設置場所
@@ -88,7 +88,7 @@ KS / AC など Pictor の Rive runtime を使うホストで「この .riv は�
 ## テスト
 
 - `tools/ergo` を起動 (`npm run dev`) → `http://localhost:5170/rive/` で UI
-- KS の `data/rive/sample.riv` / `santa.riv` / `sample3.riv` を読ませて:
+- PrivateGame の `data/rive/sample.riv` / `santa.riv` / `sample3.riv` を読ませて:
   - 各 artboard の寸法・SM・anim 数が出ること
   - SM input 操作で再生が変化すること (bool/trigger)
   - speed スライダで再生速度が変わること

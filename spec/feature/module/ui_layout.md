@@ -8,7 +8,7 @@
 
 ゲーム UI (HUD / メニュー / レベルアップ等) を **コードに直書きせず、外部データ (JSON) として定義**し、**Figma 的なツールで配置・編集**でき、**ゲーム実行中にもライブ調整**できる汎用基盤を作る。配置データは外部に出し、ロード/書き戻しする。
 
-「Pictor/Ergo 上で」= 特定ゲーム非依存の **Ergo モジュール**として作り、全ゲームで再利用 (KS は最初の consumer)。
+「Pictor/Ergo 上で」= 特定ゲーム非依存の **Ergo モジュール**として作り、全ゲームで再利用 (PrivateGame は最初の consumer)。
 
 ### スコープ
 - **やる**: UI レイアウトの宣言的データモデル (JSON) + ランタイム (ロード/構築/レイアウト解決/描画委譲/データバインド/ヒットテスト) + tools/ergo の Figma 的 UI エディタプラグイン + ergo_custos 経由のライブ往復編集。
@@ -30,7 +30,7 @@
 ```
 
 - **描画は再実装しない**。プリミティブは ergo_ui_kit + Pictor UIRenderer、文字は Pictor のベクターテキスト経路、ベクターアセットは ergo_vector。ergo_ui_layout は「データ→これらへの描画コマンド生成 + レイアウト計算 + バインド」を担う中間層。
-- KS の現状 `hud_layer.cpp` は最終的に「uilayout を 1 枚ロードして描画する」薄い consumer に置き換わる (KS 側別 PR)。
+- PrivateGame の現状 `hud_layer.cpp` は最終的に「uilayout を 1 枚ロードして描画する」薄い consumer に置き換わる (PrivateGame 側別 PR)。
 
 ## 2. モジュール構成 (Ergo 規約準拠)
 
@@ -54,7 +54,7 @@
 ```jsonc
 {
   "schema_version": 1,
-  "name": "kuzu_hud",
+  "name": "game_hud",
   "design_size": { "w": 1280, "h": 720 },
   "root": {
     "id": "root",
@@ -97,7 +97,7 @@
     - `scale(sx,sy)` → `rect.w = base.w * sx; rect.h = base.h * sy` (引数 1 個なら uniform)
     - 不正・未知トークン (例 `rotate(...)`) は無視し base rect を保つ。
 - **バインド式**は最小の安全な評価器: 変数参照 + 三項 + 比較 + 少数の関数 (`fmt_mmss`, `clamp` 等)。チューリング完全にしない。変数は consumer がフレーム毎に供給する `BindContext` (`map<string, Value>`: number/bool/string)。
-- KS HUD のバインド変数例: `hp_ratio, xp_ratio, gauge_ratio, time_left, kill_count, level, hp_low, slot_a_label, ...`。
+- PrivateGame HUD のバインド変数例: `hp_ratio, xp_ratio, gauge_ratio, time_left, kill_count, level, hp_low, slot_a_label, ...`。
 
 ### レイアウト解決
 - `absolute` (rect 直接) + `anchor`/`stretch` (Figma constraint: 親リサイズ時の追従) + `row`/`column` flex (gap/justify/align) の最小セット。実画面解像度へは design_size 基準でスケール (letterbox or scale)。
@@ -139,24 +139,24 @@ struct RenderAdapter {
 } // namespace
 ```
 
-- consumer (KS) が Pictor 実装の `RenderAdapter` を提供 (UIRenderer + TextSvgRenderer + ergo_vector を束ねる)。ergo_ui_layout 本体は Pictor 非依存に保つ。
+- consumer (PrivateGame) が Pictor 実装の `RenderAdapter` を提供 (UIRenderer + TextSvgRenderer + ergo_vector を束ねる)。ergo_ui_layout 本体は Pictor 非依存に保つ。
 
 ## 5. UI エディタ (tools/ergo プラグイン `ui_layout`)
 
-- tools/ergo (Electron + プラグインホスト、既存) に **UI レイアウトエディタプラグイン**を追加。[[feedback_ergo_editor_plugin_pack]] の一般則どおり tools/ergo プラグインとして実装 (KS 専用 fork はしない)。
+- tools/ergo (Electron + プラグインホスト、既存) に **UI レイアウトエディタプラグイン**を追加。[[feedback_ergo_editor_plugin_pack]] の一般則どおり tools/ergo プラグインとして実装 (PrivateGame 専用 fork はしない)。
 - 機能 (Figma 的):
   - キャンバスに uilayout を描画 (Web 側は SVG/Canvas で同等プレビュー、真実はゲーム側描画)、ノード選択/移動/リサイズ/階層編集。
   - プロパティパネル: rect/anchor/stretch/flex、ノード型別プロパティ、binds 編集。
   - `*.uilayout.json` の open / save (外部データが正)。
   - vector ノードは参照 SVG/Lottie のサムネ表示。
-- **ライブ往復** (ergo_custos): エディタ ↔ 実行中ゲームを ergo_custos ブリッジ (HTTP/WS、KS に `ergo_custos_bridge.json` 既設) で接続。エディタでの変更を `apply_patch` で実機に即反映、ゲーム側の手動調整も pull、保存で JSON 書き戻し。variable プラグイン ([[project_variable_editor]] = ergo_bind) と同じライブチューニング思想。
+- **ライブ往復** (ergo_custos): エディタ ↔ 実行中ゲームを ergo_custos ブリッジ (HTTP/WS、PrivateGame に `ergo_custos_bridge.json` 既設) で接続。エディタでの変更を `apply_patch` で実機に即反映、ゲーム側の手動調整も pull、保存で JSON 書き戻し。variable プラグイン ([[project_variable_editor]] = ergo_bind) と同じライブチューニング思想。
 - ライブ調整の伝送単位は **JSON Merge Patch** (ノード単位の差分) を既定。
 
-## 6. KS HUD consumer (別 PR / KS 側)
-- `data/hud/kuzu_hud.uilayout.json` を作成 (spec/hud.md のレイアウトを移植: timer/kill/hp/xp/gauge/slot/toast)。
+## 6. PrivateGame HUD consumer (別 PR / PrivateGame 側)
+- `data/hud/game_hud.uilayout.json` を作成 (spec/hud.md のレイアウトを移植: timer/kill/hp/xp/gauge/slot/toast)。
 - `src/render/layers/hud_layer.cpp` を「Document をロードし、`hud.sync()` の値を BindContext に詰めて update→emit」する薄い consumer に置換。BitmapText 依存を除去。
 - vector ノード (hp_bar.svg 等) は ergo_vector、文字は Pictor ベクターテキスト。
-- これにより KS HUD は「データ編集 = エディタ / ライブ調整」で回る = goal2 の HUD 仕上げ項目を満たす。
+- これにより PrivateGame HUD は「データ編集 = エディタ / ライブ調整」で回る = goal2 の HUD 仕上げ項目を満たす。
 
 ## 7. テスト (tests/ui_layout/)
 - JSON ロード→ツリー構築→find(id)。
@@ -170,15 +170,15 @@ struct RenderAdapter {
 2. サンプル uilayout を load→update(bind)→emit(モック) が通る。
 3. tools/ergo に `ui_layout` プラグインが立ち上がり、JSON の open/save/ノード編集ができる。
 4. ergo_custos 経由のライブ patch 往復が動く (最小: 1 ノードの rect/色をエディタ→実機反映)。
-5. module_list 反映、spec 同期。KS HUD 置換は別 PR。
+5. module_list 反映、spec 同期。PrivateGame HUD 置換は別 PR。
 
 ## 9. 実装ステップ (prototyping-flow)
 1. データモデル + parser + レイアウト解決 (absolute+anchor) + RenderAdapter IF + モックテスト。← まず「粗く動く」
-2. プリミティブ (rect/nine_slice/image/text) を Pictor RenderAdapter で実描画 (KS 側最小consumer で1枚出す)。
+2. プリミティブ (rect/nine_slice/image/text) を Pictor RenderAdapter で実描画 (PrivateGame 側最小consumer で1枚出す)。
 3. vector ノード (ergo_vector 連携) + binds。
 4. tools/ergo `ui_layout` プラグイン (編集 + save)。
 5. ergo_custos ライブ往復。
-6. flex/応用レイアウト、KS HUD 全面移植 (別 PR)。
+6. flex/応用レイアウト、PrivateGame HUD 全面移植 (別 PR)。
 
 ## 委託メモ (Codex)
 - cwd = `E:/Document/Ars/ergo`。ブランチ `feat/ergo-ui-layout` 新規。Ergo は feat ブランチ + PR 必須 ([[feedback_ergo_branch_pr_required]])。

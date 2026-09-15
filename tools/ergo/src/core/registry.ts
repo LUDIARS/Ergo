@@ -5,7 +5,7 @@
 /// listed here. They live in the host repo and are loaded at runtime via
 /// `ERGO_PLUGIN_DIR` — see core/external.ts. This keeps the shared tool
 /// free of per-game features:
-///   PrivateGame -> tools/kzs-web/plugins/{spawn,skill}
+///   PrivateGame -> tools/game-web/plugins/{spawn,skill}
 ///   AdventureCube -> tools/ac-web/plugins/{placer,terrain,acstage}
 
 import type { PluginFactory } from "./plugin.js";

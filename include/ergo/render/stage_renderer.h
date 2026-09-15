@@ -6,7 +6,7 @@
 /// `IRenderLayer` を実装する形に整えたもの。 最小限の 1 パイプライン:
 /// per-frame Scene UBO (view/proj/lightDir) + per-object push constants
 /// (model + baseColor)。 「色付きキューブ群」を描くだけの軽量描画層で、
-/// AC / KS 共通の仮表示・フォールバック描画に使える。
+/// AC / PrivateGame 共通の仮表示・フォールバック描画に使える。
 ///
 /// IRenderLayer ライフサイクルへの対応:
 ///   set_render_pass() → 描画先 render pass を指定 (depth 付きパスなら深度有効)

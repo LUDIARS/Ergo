@@ -19,7 +19,7 @@
 ///   fc.shutdown();
 ///
 /// パス列の組み方で描画構成を表現する (設計意図):
-///   * KS の「postprocess 有効/無効 2 経路」 — 有効なら HDR scene パス +
+///   * PrivateGame の「postprocess 有効/無効 2 経路」 — 有効なら HDR scene パス +
 ///     post パス + HUD パスの 3 列、 無効なら swapchain default 1 列、 と
 ///     add_pass の呼び方を変えるだけで切り替わる。
 ///   * AC は最小構成 — default render pass 1 列に 1 レイヤーを載せるだけ。
@@ -92,7 +92,7 @@ public:
     /// 合成など) は IRenderLayer::record (= renderpass 内) には収まらないので、
     /// このパス間 hook で記録する。
     ///
-    /// KS の post-process 経路: 「HDR scene パス」と「HUD パス」の 2 パスを
+    /// PrivateGame の post-process 経路: 「HDR scene パス」と「HUD パス」の 2 パスを
     /// add_pass で登録し、 HUD パス (index 1) の pre-pass hook に
     /// 「投影デカール合成 + post-process チェーン」を積む。 hook は HUD パスの
     /// vkCmdBeginRenderPass より前、 scene パスの vkCmdEndRenderPass より後に

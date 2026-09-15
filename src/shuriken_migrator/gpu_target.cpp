@@ -311,7 +311,7 @@ std::string EmitterDescriptorToJson(const ergo::gpu_particle::EmitterDescriptor&
     append_minmax(os, "rotation_over_lifetime", d.rotation_over_lifetime, f);
 
     // Over-life curves: 空 (キー無し) は「モジュール無効」を意味するので出力を
-    // 省略する。 消費側 (KS VfxCatalog::register_from_json / ks_export.ts) は
+    // 省略する。 消費側 (PrivateGame VfxCatalog::register_from_json / ks_export.ts) は
     // キー欠落 = 効果なしとして扱う契約。
     if (!d.velocity_over_lifetime_x.empty() || !d.velocity_over_lifetime_y.empty() ||
         !d.velocity_over_lifetime_z.empty()) {

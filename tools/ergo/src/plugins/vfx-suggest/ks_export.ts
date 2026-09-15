@@ -1,10 +1,10 @@
 /// ParticleEffectConfig → PrivateGame GPU EmitterDescriptor JSON 変換。
 ///
-/// KS の VfxCatalog::register_from_json が読む EmitterDescriptor JSON
+/// PrivateGame の VfxCatalog::register_from_json が読む EmitterDescriptor JSON
 /// (ergo::shuriken_migrator::EmitterDescriptorToJson 出力形式) を生成する。
 ///
 /// 制約:
-///  - gravity は KS が World Y 軸を重力方向として使うため gravity_modifier に変換。
+///  - gravity は PrivateGame が World Y 軸を重力方向として使うため gravity_modifier に変換。
 ///  - EmitterShape: Sphere(1) を使用 (2D エミッタの positionRadius をそのまま利用)。
 ///  - BlendMode: additive→2, alpha→0 (gpu_particle::BlendMode の enum 値)。
 
@@ -68,7 +68,7 @@ export interface KsEmitterJson {
     blend_mode:        number;   // 0 = Alpha, 2 = Additive
 }
 
-/// 2D ParticleEffectConfig を KS GPU EmitterDescriptor JSON に変換する。
+/// 2D ParticleEffectConfig を PrivateGame GPU EmitterDescriptor JSON に変換する。
 /// `key` は VfxCatalog への登録キー (例 "Effect/Lightning")。
 /// 省略すると config.name をそのまま使う。
 export function toKsEmitterJson(cfg: ParticleEffectConfig, key?: string): KsEmitterJson {

@@ -26,7 +26,7 @@ inspector など) を **単一の Node サーバ + プラグインアーキテ�
   - **外部 (ゲーム固有)** — ホストリポ側に置き、`ERGO_PLUGIN_DIR` 環境変数で
     指定したディレクトリから起動時に動的ロードする (`src/core/external.ts`)。
     Ergo の core/shell を fork せずに各ゲームが自分のエディタを足せる
-    - PrivateGame → `tools/kzs-web/plugins/{spawn,skill}`
+    - PrivateGame → `tools/game-web/plugins/{spawn,skill}`
     - AdventureCube → `tools/ac-web/plugins/{placer,terrain,acstage}`
 - 新しいツールは **新規プラグインとして追加** (新規サーバは作らない)。
   汎用なら組み込み、特定ゲーム向けなら外部プラグインにする
@@ -153,7 +153,7 @@ export default (): Plugin => {
     宣言し、ホストの `editor.bat` が pack で `npm install` してから
     `ERGO_PLUGIN_DIR` を渡してツールを起動する
 - 既存の plugin pack:
-  - PrivateGame: `tools/kzs-web/plugins/{spawn,skill}`
+  - PrivateGame: `tools/game-web/plugins/{spawn,skill}`
   - AdventureCube: `tools/ac-web/plugins/{placer,terrain,acstage}`
 
 ## 現行プラグイン (組み込み・汎用)

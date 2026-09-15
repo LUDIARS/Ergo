@@ -236,7 +236,7 @@ function renderCards(presets, container, compact) {
         <button class="btn-preview" title="particle プラグインに送りプレビュー">▷ preview</button>
         <button class="btn-copy"    title="JSON をコピー">📋 copy</button>
         <button class="btn-dl"      title="JSON をダウンロード">↓ DL</button>
-        <button class="btn-ks"      title="KS GPU EmitterDescriptor JSON をダウンロード (VfxCatalog::register_from_json 用)">↗ KS</button>
+        <button class="btn-ks"      title="PrivateGame GPU EmitterDescriptor JSON をダウンロード (VfxCatalog::register_from_json 用)">↗ PrivateGame</button>
       </div>`;
     div.querySelector(".btn-preview").onclick = () => sendToParticle(cfg);
     div.querySelector(".btn-copy").onclick    = () => copyConfig(cfg, p.name);
@@ -271,7 +271,7 @@ function downloadConfig(config, name) {
   URL.revokeObjectURL(a.href);
 }
 
-// ── KS GPU EmitterDescriptor エクスポート ────────────────────────────────────
+// ── PrivateGame GPU EmitterDescriptor エクスポート ────────────────────────────────────
 // 変換の正本はサーバ側 ks_export.ts (POST /vfx-suggest/api/ks-emitter)。
 // クライアントには変換ロジックを持たない (二重実装の drift 防止)。
 async function exportKsEmitter(config, name) {
@@ -285,11 +285,11 @@ async function exportKsEmitter(config, name) {
       body:    JSON.stringify(config),
     }).then(x => x.json());
   } catch (e) {
-    setStatus(`KS エクスポートに失敗しました: ${e}`, true);
+    setStatus(`PrivateGame エクスポートに失敗しました: ${e}`, true);
     return;
   }
   if (!res?.ok || !res.emitter) {
-    setStatus(`KS エクスポートに失敗しました: ${res?.err ?? "unknown error"}`, true);
+    setStatus(`PrivateGame エクスポートに失敗しました: ${res?.err ?? "unknown error"}`, true);
     return;
   }
   const emitter = res.emitter;
@@ -301,7 +301,7 @@ async function exportKsEmitter(config, name) {
   });
   a.click();
   URL.revokeObjectURL(a.href);
-  setStatus(`"${emitter.name}" を KS GPU Emitter JSON としてダウンロードしました`);
+  setStatus(`"${emitter.name}" を PrivateGame GPU Emitter JSON としてダウンロードしました`);
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────

@@ -913,7 +913,7 @@ endif()
 #   * FrameComposer  — パス構成 + フレームループ (acquire→update→record→submit→present)
 #   * ScreenshotBridge — HTTP↔レンダースレッドのスクリーンショット同期
 #   * asset_paths    — シェーダ/アセットルートの上方探索ユーティリティ
-#   * StageRenderer  — 色キューブ描画の共通レイヤー (KS から移植)
+#   * StageRenderer  — 色キューブ描画の共通レイヤー (PrivateGame から移植)
 #
 # Vulkan 非依存部分 (カメラ math / asset path / ScreenshotBridge /
 # FrameComposer のパス列管理) は常にビルドする。 Vulkan 依存の実描画経路は

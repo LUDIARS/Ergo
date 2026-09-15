@@ -57,7 +57,7 @@ export const CATALOG: VfxPreset[] = [
         render:  { blend: "additive", shape: "square" },
     }),
 
-    p("雷撃", "瞬間的な高速白黄パーティクル。KS Effect/Lightning 向き。短命・鮮烈。", {
+    p("雷撃", "瞬間的な高速白黄パーティクル。PrivateGame Effect/Lightning 向き。短命・鮮烈。", {
         emission:  { rate: 250, maxAlive: 120 },
         initial: {
             positionShape: "disc", svgSource: "", svgScale: 1,
@@ -77,7 +77,7 @@ export const CATALOG: VfxPreset[] = [
         render:  { blend: "additive", shape: "square" },
     }),
 
-    p("爆発", "全方位バースト。KS Effect/Shockwave 向き。強烈な閃光から残煙へ。", {
+    p("爆発", "全方位バースト。PrivateGame Effect/Shockwave 向き。強烈な閃光から残煙へ。", {
         emission:  { rate: 350, maxAlive: 300 },
         initial: {
             positionShape: "disc", svgSource: "", svgScale: 1,
@@ -117,7 +117,7 @@ export const CATALOG: VfxPreset[] = [
         render:  { blend: "additive", shape: "circle" },
     }),
 
-    p("衝撃波", "放射状に広がる白い波紋。AC の被弾リアクション・KS リフレクトに。", {
+    p("衝撃波", "放射状に広がる白い波紋。AC の被弾リアクション・PrivateGame リフレクトに。", {
         emission:  { rate: 120, maxAlive: 100 },
         initial: {
             positionShape: "disc", svgSource: "", svgScale: 1,
@@ -177,9 +177,9 @@ export const CATALOG: VfxPreset[] = [
         render:  { blend: "additive", shape: "circle" },
     }),
 
-    // ── KS 固有 ─────────────────────────────────────────────────────────────
+    // ── PrivateGame 固有 ─────────────────────────────────────────────────────────────
 
-    p("Effect/ReflectLaserBeam", "レーザーが反射する瞬間の閃光散乱。高速スパーク+残光。KS ReflectLaserBeam キー向き。", {
+    p("Effect/ReflectLaserBeam", "レーザーが反射する瞬間の閃光散乱。高速スパーク+残光。PrivateGame ReflectLaserBeam キー向き。", {
         name: "Effect/ReflectLaserBeam",
         emission:  { rate: 180, maxAlive: 100 },
         initial: {
@@ -200,7 +200,7 @@ export const CATALOG: VfxPreset[] = [
         render:  { blend: "additive", shape: "square" },
     }),
 
-    p("Effect/Clone", "半透明の残像分身。幽霊的な薄い輝き粒子が短命で散る。KS Clone キー向き。", {
+    p("Effect/Clone", "半透明の残像分身。幽霊的な薄い輝き粒子が短命で散る。PrivateGame Clone キー向き。", {
         name: "Effect/Clone",
         emission:  { rate: 55, maxAlive: 120 },
         initial: {

@@ -57,7 +57,7 @@ tools/ergo (Hono :5170)
 
 ### 2.2 非ゴール
 
-- 外部 plugin pack (kzs-web / ac-web) の即時 IR 化 (移行ガイドのみ提供、 実移植は各リポ側)
+- 外部 plugin pack (game-web / ac-web) の即時 IR 化 (移行ガイドのみ提供、 実移植は各リポ側)
 - **Pictor リポへの新規モジュール追加 / 既存ファイル変更** (全 GUI 機能を Ergo 側に集約することで回避)
 - Pictor の既存描画系 (Vulkan / Visus / Material) の再設計
 - Web 標準準拠の HTML/CSS subset レンダラ実装 (= IR は HTML ではなく独自 schema)
@@ -1248,7 +1248,7 @@ client                              server
 
 ### Phase 4 — 外部 plugin pack 対応
 
-- kzs-web / ac-web に **migration guide** を提供 ([[feedback_ergo_editor_plugin_pack]])
+- game-web / ac-web に **migration guide** を提供 ([[feedback_ergo_editor_plugin_pack]])
 - Vanilla HTML plugin の fallback 互換 shim を残す (即時 IR 化を強制しない)
 - 各ホストリポ側で順次 IR 化
 
@@ -1315,11 +1315,11 @@ Plugin 別の追加 acceptance:
 
 成果物:
 - `tools/ergo/docs/migration-guide-plugin-pack.md` (新設)
-- kzs-web / ac-web リポに 1 plugin だけ IR 移植したサンプル PR
+- game-web / ac-web リポに 1 plugin だけ IR 移植したサンプル PR
 
 Acceptance:
 - [ ] migration guide が plugin pack 作者の手で読める粒度 (IR generator export 方法 + 旧 Vanilla → 新 IR の対応表)
-- [ ] kzs-web / ac-web の **1 plugin だけ** が IR 化されて Pictor 内で見える
+- [ ] game-web / ac-web の **1 plugin だけ** が IR 化されて Pictor 内で見える
 - [ ] 残りの Vanilla HTML plugin は fallback shim で起動可能 (壊さない)
 - [ ] ホストリポ側の追従 PR は各 game リポで個別に発行
 
@@ -1412,7 +1412,7 @@ GET /api/plugins
 
 #### 9.6.4 外部 plugin pack の fallback shim
 
-- 外部 plugin pack (kzs-web / ac-web 等) が IR generator を export しない場合:
+- 外部 plugin pack (game-web / ac-web 等) が IR generator を export しない場合:
   - 起動時に `irReady: false` でロード
   - shell は iframe で legacyUrl を埋め込み
   - ergo_ui_native では描画不可 (subscribe 時に `ack { ok: false, error: 'plugin not ir-ready' }`)
@@ -1463,7 +1463,7 @@ GET /api/plugins
 | 項目 | 影響 | 緩和策 |
 |------|------|--------|
 | 既存 5 plugin の UI | Phase 3 で 1 つずつ移植、 並存期間あり | フラグ `?ir=1` で切替、 旧 UI は最後の plugin が完了するまで保持 |
-| 外部 plugin pack (kzs-web / ac-web) 破壊 | Phase 4 で migration guide | Vanilla HTML fallback shim を残す |
+| 外部 plugin pack (game-web / ac-web) 破壊 | Phase 4 で migration guide | Vanilla HTML fallback shim を残す |
 | `ergo_ui_native` primitives 自作の工数 | Phase 1.4 で primitives 確立必須 | 最初は最小セット (panel/text/button/slider) のみ、 plugin 移植と同期して拡張 |
 | **Pictor リポと衝突するリスク** | **設計上ゼロ** | Pictor リポへの変更は新規モジュール / 既存ファイル含め一切なし。 ergo_ui_native は Pictor の既存描画 API のみを呼ぶ thin wrapper として動作 |
 | ergo_custos の WS 拡張 | C++ で RFC 6455 subset 実装 | 自前実装が現実的、 fallback で uWebSockets vendoring も検討 |

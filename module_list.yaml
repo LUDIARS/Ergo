@@ -305,7 +305,7 @@ modules:
     spec:       spec/module/render.md
     cmake_option: ERGO_BUILD_RENDER   # Vulkan 実描画経路は pictor + Vulkan SDK 検出時のみ
     tool_plugin: null
-    status: preview   # Vulkan 非依存部分のみテスト済。 KS/AC への載せ替えは P2
+    status: preview   # Vulkan 非依存部分のみテスト済。 PrivateGame/AC への載せ替えは P2
 
   - name: ergo_vector
     summary: SVG path polygon tessellation + extrude 3D mesh + vertex animation scene

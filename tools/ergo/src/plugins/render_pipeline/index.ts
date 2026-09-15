@@ -122,7 +122,7 @@ const factory: PluginFactory = () => {
             clients.add(ws);
             ws.on("message", (raw: any) => {
                 // Phase 2 GPU timestamp relay (`{op:"timing", frame, passes:[{id,us}]}`)。
-                // KS の TimingRelay WS クライアントが送ってくるのをそのまま全 UI へ
+                // PrivateGame の TimingRelay WS クライアントが送ってくるのをそのまま全 UI へ
                 // broadcast。 GraphView の timing オーバーレイがノード着色に使う。
                 let msg: any;
                 try { msg = JSON.parse(raw.toString()); } catch { return; }

@@ -115,7 +115,7 @@ public:
   void update(float dt /*, optional BindContext*/);
 
   // --- 出力: 3D メッシュ列 (Pictor 非依存) ---
-  // consumer (ui_layout / KS) が Pictor 3D パイプラインへ流す。
+  // consumer (ui_layout / PrivateGame) が Pictor 3D パイプラインへ流す。
   struct DrawItem { const VectorMesh* mesh; Mat4 model; MaterialParams mat; };
   void collect(std::vector<DrawItem>& out) const;
 
@@ -125,7 +125,7 @@ public:
 } // namespace
 ```
 
-- **Pictor 連携は consumer 側**。`ergo_vector` は `VectorMesh` + model 行列 + マテリアルまで。GPU 頂点バッファ化/描画は ui_layout の RenderAdapter か KS の 3D レイヤが行う (レイヤ単方向、ergo_vector は Pictor 非依存)。
+- **Pictor 連携は consumer 側**。`ergo_vector` は `VectorMesh` + model 行列 + マテリアルまで。GPU 頂点バッファ化/描画は ui_layout の RenderAdapter か PrivateGame の 3D レイヤが行う (レイヤ単方向、ergo_vector は Pictor 非依存)。
 - 再テッセレートは形状変化時のみ。affine/色/depth/morph-weight は頂点再生成不要 (model 行列・モーフ補間・uniform で済むものは GPU 側)。
 
 ## 6. 文字 (3D 押し出しテキスト)
@@ -145,7 +145,7 @@ public:
 2. サンプル SVG (バー枠 + アイコン) を体積メッシュ化し collect が DrawItem を返す。
 3. 頂点モーフ・extrude 深度アニメが update で反映 (dirty 管理含む)。
 4. Pictor TextSvgRenderer のパスを add_path_node して 3D 文字メッシュが出る。
-5. module_list 反映、spec 同期。Pictor 3D 描画統合・KS HUD は別 PR (consumer)。
+5. module_list 反映、spec 同期。Pictor 3D 描画統合・PrivateGame HUD は別 PR (consumer)。
 
 ## 9. 実装ステップ (prototyping-flow)
 1. svg_parser + path + flatten + tessellator(earcut) で「SVG → 2D 三角形メッシュ」→ テストで面積検証。← 粗く動かす (最初)
@@ -153,7 +153,7 @@ public:
 3. VectorScene (ノード/transform/collect) + affine アニメ。
 4. 頂点モーフ + extrude 深度アニメ + bind。
 5. Pictor TextSvgRenderer 連携 (3D 文字)。
-6. tests 整備、Release 受け入れ。Pictor 3D 描画統合は consumer(ui_layout/KS) 側 PR。
+6. tests 整備、Release 受け入れ。Pictor 3D 描画統合は consumer(ui_layout/PrivateGame) 側 PR。
 
 ## 委託メモ (Codex)
 - cwd = `E:/Document/Ars/ergo`。ブランチ `feat/ergo-vector` 新規。Ergo は **feat ブランチ + PR 必須・main 直 push 禁止** (CLAUDE.md)。

@@ -45,7 +45,7 @@ TEST(AssetPaths, EnvVarTakesPrecedenceForShaderDir) {
 
 TEST(AssetPaths, EnvVarTakesPrecedenceForAssetRoot) {
     set_env("ERGO_RENDER_ASSET_ROOT", "/explicit/asset/root");
-    const std::string r = resolve_asset_root("KzSUnity");
+    const std::string r = resolve_asset_root("GameUnity");
     unset_env("ERGO_RENDER_ASSET_ROOT");
     EXPECT_NE(r.find("asset"), std::string::npos);
 }
@@ -67,13 +67,13 @@ TEST(AssetPaths, FindsDirInStartDir) {
 TEST(AssetPaths, SearchesUpwards) {
     unset_env("ERGO_RENDER_ASSET_ROOT");
     fs::path root = make_temp_dir("upward");
-    fs::create_directories(root / "KzSUnity");
+    fs::create_directories(root / "GameUnity");
     fs::path deep = root / "a" / "b" / "c";
     fs::create_directories(deep);
 
-    // 深い起点からでも上方向に KzSUnity/ を見つける。
-    const std::string r = resolve_asset_root("KzSUnity", deep.string(), 5);
-    EXPECT_NE(r.find("KzSUnity"), std::string::npos);
+    // 深い起点からでも上方向に GameUnity/ を見つける。
+    const std::string r = resolve_asset_root("GameUnity", deep.string(), 5);
+    EXPECT_NE(r.find("GameUnity"), std::string::npos);
     EXPECT_TRUE(fs::is_directory(r));
 
     std::error_code ec;

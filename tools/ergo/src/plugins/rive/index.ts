@@ -4,7 +4,7 @@
 /// アーキ:
 ///   - サーバ側はほぼ何もしない (.riv はクライアント側 FileReader で読む)。
 ///   - WS 経由で「現在開いてる .riv のメタ情報」を他クライアントに broadcast
-///     できる軽い hub にしておく (将来 KS など engine 側と繋ぐ用途)。
+///     できる軽い hub にしておく (将来 PrivateGame など engine 側と繋ぐ用途)。
 ///   - UI 本体は `ui/index.html` (Rive WebGL via @rive-app/canvas-advanced)。
 
 import { Hono } from "hono";

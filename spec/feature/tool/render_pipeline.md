@@ -50,7 +50,7 @@ WS   /render_pipeline/ws                        → 双方向 (下記)
 
 WS 経路:
 - サーバ → 全 UI クライアント: `{op:"profiles-changed", file}` (別クライアントの保存通知)
-- クライアント (KS) → サーバ → 全 UI: `{op:"timing", frame, passes:[{id, us}]}` の relay (Phase 2 §6.1 GPU timestamp)
+- クライアント (PrivateGame) → サーバ → 全 UI: `{op:"timing", frame, passes:[{id, us}]}` の relay (Phase 2 §6.1 GPU timestamp)
 
 ## timing オーバーレイ
 

@@ -6,7 +6,7 @@
 placer / terrain / acstage) を、`tools/ergo` の core/shell を fork せずに
 読み込む。**一般則**: ゲーム Web エディタは `tools/ergo` を fork せず、
 ホストリポ側の **plugin pack** + `ERGO_PLUGIN_DIR` で拡張する
-(kzs-web は upstream を独自拡張する例外。詳細は
+(game-web は upstream を独自拡張する例外。詳細は
 [`../tool/ergo.md`](../tool/ergo.md) 「外部プラグイン」)。
 
 ## 設定キー
@@ -42,7 +42,7 @@ cd tools/ergo
 npm install
 
 # 例 (PowerShell): PrivateGame の plugin pack を読み込んで起動
-$env:ERGO_PLUGIN_DIR = "E:\Document\Ars\PrivateGame\tools\kzs-web\plugins"
+$env:ERGO_PLUGIN_DIR = "E:\Document\Ars\PrivateGame\tools\game-web\plugins"
 npm run dev
 
 # 複数 pack を渡す場合 (Windows は ; 区切り)
@@ -56,7 +56,7 @@ register するため、`.ts` のままの外部プラグインを読み込め�
 
 ## 既存の plugin pack (参照)
 
-- PrivateGame: `tools/kzs-web/plugins/{spawn,skill}`
+- PrivateGame: `tools/game-web/plugins/{spawn,skill}`
 - AdventureCube: `tools/ac-web/plugins/{placer,terrain,acstage}`
 
 (いずれも Ergo リポには存在せず、各ホストリポ側。`registry.ts` / `external.ts`

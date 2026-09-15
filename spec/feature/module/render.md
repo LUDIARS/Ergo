@@ -16,7 +16,7 @@ submit/present・screenshot・破棄順序 — を 1 箇所に溜め込んで Go
 組み立ては `ergo_render` に入れず **ゲーム側に残す**。
 
 依存の向きは **ergo_render → Pictor の一方向**。`ergo_render` はどのゲーム
-(KS / AC) にも依存しないフレームワークであり、 上位レイヤー (Ergo の他
+(PrivateGame / AC) にも依存しないフレームワークであり、 上位レイヤー (Ergo の他
 モジュール / ergo_custos / ホストアプリ) も demo に組み込まない。
 
 ## カテゴリ
@@ -76,7 +76,7 @@ public:
 
 **パス列の構成違いで描画構成を表現する** (設計意図):
 
-- KS の「postprocess 有効/無効 2 経路」 — 有効なら HDR scene パス + post パス
+- PrivateGame の「postprocess 有効/無効 2 経路」 — 有効なら HDR scene パス + post パス
   + HUD パスの 3 列、 無効なら swapchain default 1 列、 と add_pass の呼び方を
   変えるだけで切り替わる。
 - AC は最小構成 — default render pass 1 列に 1 レイヤーを載せるだけ。
@@ -93,7 +93,7 @@ hook を持つ:
 
 - `set_pre_pass_hook(pass_index, fn, user)` — パス `pass_index` を begin する
   直前、 render pass の外側で `fn(cmd, image_index, frame, user)` を呼ぶ。
-  KS の post-process 経路は「HDR scene パス」と「HUD パス」の 2 パスを登録し、
+  PrivateGame の post-process 経路は「HDR scene パス」と「HUD パス」の 2 パスを登録し、
   HUD パス (index 1) の pre-pass hook に「デカール合成 + post-process チェーン」
   を積む。
 - `set_post_present_hook(fn, user)` — present 完了直後に
@@ -129,7 +129,7 @@ PrivateGame の `src/render/stage_renderer.{h,cpp}` を移植し `IRenderLayer`
 を実装する形に整えたもの。 最小 1 パイプライン (per-frame Scene UBO +
 per-object push constants)、 既定 depth なし。 depth attachment を持つ
 render pass を `set_render_pass()` で渡すと深度テスト/書き込みが有効になる。
-「色付きキューブ群」を描くだけの軽量描画層で、 AC / KS 共通の仮表示・
+「色付きキューブ群」を描くだけの軽量描画層で、 AC / PrivateGame 共通の仮表示・
 フォールバック描画に使える。 drawable はゲーム側が `set_drawables()` で
 毎フレーム差し込む (actor → StageDrawable 変換はゲーム側の責務)。
 
@@ -158,8 +158,8 @@ render pass を `set_render_pass()` で渡すと深度テスト/書き込みが�
   二重 API を持つが、 ergo_render は当面 **`VulkanContext` (生 Vulkan)** を
   基盤とし、 `PictorRenderer` は任意パススルー。
 - 「実描画を Pictor データ層へ寄せる」のは今回スコープ外。
-- ゲーム側の元ファイル (KS の `stage_renderer.{h,cpp}` 等) は今回変更しない。
-  KS / AC への載せ替えは P2 で別途行う。
+- ゲーム側の元ファイル (PrivateGame の `stage_renderer.{h,cpp}` 等) は今回変更しない。
+  PrivateGame / AC への載せ替えは P2 で別途行う。
 
 ## 作業
 
@@ -195,4 +195,4 @@ render pass を `set_render_pass()` で渡すと深度テスト/書き込みが�
 
 Vulkan 実描画経路 (`run_frame` の acquire/record/submit/present、 StageRenderer
 の pipeline 構築) は VulkanContext 実体を要するためユニットテストの対象外。
-P2 で KS / AC へ載せ替えた際に実機で検証する。
+P2 で PrivateGame / AC へ載せ替えた際に実機で検証する。

@@ -39,7 +39,7 @@ std::string resolve_shader_dir(const std::string& dir_name   = "shaders",
 ///   2. `start_dir` から上方向へ `dir_name` を探索
 ///   3. フォールバック: `start_dir / dir_name`
 ///
-/// `dir_name` はゲームごとに異なる (例: KS は "KzSUnity")。 `start_dir` を
+/// `dir_name` はゲームごとに異なる (例: PrivateGame は "GameUnity")。 `start_dir` を
 /// 空にすると現在の作業ディレクトリを起点にする。
 std::string resolve_asset_root(const std::string& dir_name,
                                const std::string& start_dir  = "",
