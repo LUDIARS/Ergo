@@ -35,6 +35,10 @@ option(ERGO_BUILD_UI_KIT       "Build ergo_ui_kit (retained-mode UI framework)" 
 option(ERGO_BUILD_UI_LAYOUT    "Build ergo_ui_layout (data-driven UI layout runtime)" ON)
 option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shuriken → ergo_particle migrator + CLI)" ON)
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
+# 実描画経路 (Pictor + Vulkan) を確保できない構成を構成エラーにする。
+# Android / iOS は ErgoRenderBackend.cmake が常に必須扱いにするため、
+# このオプションはデスクトップ構成を厳格化するためのもの。
+option(ERGO_RENDER_REQUIRE_REAL "ergo_render: 実描画経路を確保できない構成を構成エラーにする" OFF)
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
@@ -914,11 +918,15 @@ endif()
 #   * ScreenshotBridge — HTTP↔レンダースレッドのスクリーンショット同期
 #   * asset_paths    — シェーダ/アセットルートの上方探索ユーティリティ
 #   * StageRenderer  — 色キューブ描画の共通レイヤー (PrivateGame から移植)
+#   * RenderBackend  — 実描画バックエンドのビルド時契約 (desktop/Android/iOS)
+#   * RenderRequirements — RenderContext が実描画の前提を満たすかの型付き検査
 #
 # Vulkan 非依存部分 (カメラ math / asset path / ScreenshotBridge /
 # FrameComposer のパス列管理) は常にビルドする。 Vulkan 依存の実描画経路は
-# `pictor` ターゲットが存在し Vulkan SDK が見つかったときだけ有効化する
-# (ergo_particle の renderer と同じパターン)。
+# `pictor` ターゲットが公開する runtime Vulkan contract (PICTOR_HAS_VULKAN) を
+# 正本に、 desktop / Android / iOS それぞれの出所で有効化する
+# (判定は cmake/ErgoRenderBackend.cmake)。 実描画を確保できない構成は
+# STATUS で黙って通さず、 警告または構成エラーにする。
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_RENDER)
     add_library(ergo_render STATIC
@@ -927,6 +935,8 @@ if(ERGO_BUILD_RENDER)
         src/render/screenshot_bridge.cpp
         src/render/asset_paths.cpp
         src/render/stage_renderer.cpp
+        src/render/render_backend.cpp
+        src/render/render_requirements.cpp
     )
     target_include_directories(ergo_render PUBLIC include)
     target_link_libraries(ergo_render PUBLIC Threads::Threads)
@@ -935,47 +945,48 @@ if(ERGO_BUILD_RENDER)
         target_compile_options(ergo_render PUBLIC /utf-8)
     endif()
 
-    # Pictor + Vulkan が揃っていれば実描画経路 (FrameComposer の run_frame、
-    # StageRenderer の pipeline 構築) を有効化する。 揃わない場合でも上記
-    # 5 ソースは Vulkan 非依存部分としてビルドできる (ヘッダの互換型で縮退)。
-    if(TARGET pictor)
-        find_package(Vulkan QUIET)
-        if(Vulkan_FOUND)
-            target_link_libraries(ergo_render PUBLIC pictor Vulkan::Vulkan)
-            target_compile_definitions(ergo_render PUBLIC ERGO_RENDER_HAS_VULKAN=1)
-            # StageRenderer 用 SPIR-V を bake (glslc がある環境のみ)。
-            if(Vulkan_GLSLC_EXECUTABLE)
-                set(_RENDER_SHADERS
-                    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/stage.vert
-                    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/stage.frag
-                )
-                set(_RENDER_SPIRV)
-                foreach(SHADER ${_RENDER_SHADERS})
-                    get_filename_component(N ${SHADER} NAME)
-                    set(OUT ${CMAKE_BINARY_DIR}/shaders/${N}.spv)
-                    add_custom_command(
-                        OUTPUT ${OUT}
-                        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
-                        COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${SHADER} -o ${OUT}
-                        DEPENDS ${SHADER}
-                        COMMENT "ergo_render: compiling ${N} -> SPIR-V")
-                    list(APPEND _RENDER_SPIRV ${OUT})
-                endforeach()
-                add_custom_target(ergo_render_shaders ALL DEPENDS ${_RENDER_SPIRV})
-                add_dependencies(ergo_render ergo_render_shaders)
-            endif()
-            message(STATUS "ergo_render: real render path enabled (Pictor + Vulkan)")
-        else()
-            message(STATUS "ergo_render: Vulkan not found — Vulkan-free build only")
+    # 実描画経路 (FrameComposer の run_frame、 StageRenderer の pipeline 構築)
+    # の可否は ErgoRenderBackend.cmake がプラットフォーム中立に判定する。
+    # デスクトップは Vulkan SDK、 Android は NDK 同梱 Vulkan、 iOS は MoltenVK
+    # で、 いずれも pictor が公開する PICTOR_HAS_VULKAN が正本。
+    # `Vulkan::Vulkan` の不在だけでモバイルの描画を無効化しない (KD-MOB-001)。
+    include(ErgoRenderBackend)
+    ergo_render_resolve_backend(ERGO_RENDER_BACKEND)
+    ergo_render_enforce_backend(ERGO_RENDER_BACKEND)
+
+    if(ERGO_RENDER_BACKEND_ENABLED)
+        target_link_libraries(ergo_render PUBLIC pictor ${ERGO_RENDER_BACKEND_LIBRARIES})
+        target_compile_definitions(ergo_render PUBLIC ${ERGO_RENDER_BACKEND_DEFINITIONS})
+        # StageRenderer 用 SPIR-V を bake (glslc がある環境のみ)。
+        # モバイルは bake 済み SPIR-V をホストのパッケージが配る前提なので、
+        # glslc 不在は実描画可否の判定に影響しない。
+        if(Vulkan_GLSLC_EXECUTABLE)
+            set(_RENDER_SHADERS
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/stage.vert
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/stage.frag
+            )
+            set(_RENDER_SPIRV)
+            foreach(SHADER ${_RENDER_SHADERS})
+                get_filename_component(N ${SHADER} NAME)
+                set(OUT ${CMAKE_BINARY_DIR}/shaders/${N}.spv)
+                add_custom_command(
+                    OUTPUT ${OUT}
+                    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/shaders
+                    COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${SHADER} -o ${OUT}
+                    DEPENDS ${SHADER}
+                    COMMENT "ergo_render: compiling ${N} -> SPIR-V")
+                list(APPEND _RENDER_SPIRV ${OUT})
+            endforeach()
+            add_custom_target(ergo_render_shaders ALL DEPENDS ${_RENDER_SPIRV})
+            add_dependencies(ergo_render ergo_render_shaders)
         endif()
-    else()
-        message(STATUS "ergo_render: pictor target absent — Vulkan-free build only")
     endif()
 
     if(ERGO_BUILD_TESTS)
         foreach(NAME
                 test_frame_context test_asset_paths
-                test_screenshot_bridge test_frame_composer)
+                test_screenshot_bridge test_frame_composer
+                test_render_backend)
             add_executable(${NAME} tests/render/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_render ergo_gtest_main)
             if(MSVC)

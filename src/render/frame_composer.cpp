@@ -1,6 +1,7 @@
 #include "ergo/render/frame_composer.h"
 
 #include "ergo/render/render_context.h"
+#include "ergo/render/render_requirements.h"
 
 #if defined(PICTOR_HAS_VULKAN) || defined(ERGO_RENDER_HAS_VULKAN)
 #include "pictor/surface/vulkan_context.h"
@@ -63,9 +64,18 @@ void FrameComposer::set_post_present_hook(
     post_present_hook_.user = user;
 }
 
-void FrameComposer::initialize(RenderContext& ctx) {
-    if (initialized_) return;
+RenderBackendError FrameComposer::initialize(RenderContext& ctx) {
+    // 2 回目以降は no-op。 ただし返すのは「初期化時の前提診断」であって
+    // run_frame が上書きした最新値ではないため、 initialize 時の結果を
+    // 別に保持して返す。
+    if (initialized_) return init_error_;
     ctx_ = &ctx;
+
+    // 実描画の前提診断。 失敗しても レイヤーの initialize は従来どおり
+    // 実行する (Vulkan 非依存の初期化を止めない) が、 「描けない」ことは
+    // 戻り値と last_error() で明示し、 成功へ縮退させない。
+    last_error_ = check_render_requirements(ctx);
+    init_error_ = last_error_;
 
     // 1. 全パス × 全レイヤーを登録順に initialize()。
     //    add_pass の呼び出し順 × パス内レイヤー順 = 初期化順。
@@ -85,11 +95,29 @@ void FrameComposer::initialize(RenderContext& ctx) {
     initialized_   = true;
     first_frame_   = true;
     shutdown_done_ = false;
+    return init_error_;
 }
 
 bool FrameComposer::run_frame(const FrameContext& frame) {
+    if (!initialized_ || !ctx_) {
+        last_error_ = RenderBackendError::FrameComposerNotInitialized;
+        return false;
+    }
+
 #if defined(PICTOR_HAS_VULKAN) || defined(ERGO_RENDER_HAS_VULKAN)
-    if (!initialized_ || !ctx_ || !ctx_->vk) return false;
+    // 以降で早期 return するときは last_error_ を必ず更新してから返す
+    // (前フレームの診断値を残して「今フレームも同じ理由」と誤読させない)。
+    // Android のバックグラウンド遷移などで initialize() 後にネイティブ
+    // ウィンドウが失われることがあるため、 フレームごとに前提を検査する。
+    // これを省くと、 初期化時に成功した compositor が無効な surface に対して
+    // acquire / submit / present を続けてしまう。
+    last_error_ = check_render_requirements(*ctx_);
+    if (last_error_ == RenderBackendError::SurfaceNotReady) {
+        // ネイティブウィンドウの喪失は一時的なライフサイクル
+        // 状態。ホストのフレームループは終了させず、復帰を待つ。
+        return true;
+    }
+    if (last_error_ != RenderBackendError::None) return false;
     pictor::VulkanContext* vk = ctx_->vk;
 
     // 1. swapchain image を取得する。 fence 待ち / リセットは VulkanContext が
@@ -119,10 +147,16 @@ bool FrameComposer::run_frame(const FrameContext& frame) {
 
     // 4. コマンドバッファ記録。 パスごとに begin → 各レイヤー record → end。
     VkCommandBuffer cmd = vk->command_buffers()[image_idx];
-    vkResetCommandBuffer(cmd, 0);
+    if (vkResetCommandBuffer(cmd, 0) != VK_SUCCESS) {
+        last_error_ = RenderBackendError::FrameSubmissionFailed;
+        return false;
+    }
     VkCommandBufferBeginInfo cbi{};
     cbi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    if (vkBeginCommandBuffer(cmd, &cbi) != VK_SUCCESS) return false;
+    if (vkBeginCommandBuffer(cmd, &cbi) != VK_SUCCESS) {
+        last_error_ = RenderBackendError::FrameSubmissionFailed;
+        return false;
+    }
 
     const VkExtent2D extent = vk->swapchain_extent();
 
@@ -165,7 +199,10 @@ bool FrameComposer::run_frame(const FrameContext& frame) {
         vkCmdEndRenderPass(cmd);
     }
 
-    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) return false;
+    if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
+        last_error_ = RenderBackendError::FrameSubmissionFailed;
+        return false;
+    }
 
     // 5. submit + present。 swapchain 取得待ちのセマフォを wait、 描画完了の
     //    セマフォを signal し、 in-flight fence を立てる (次フレームの
@@ -184,6 +221,7 @@ bool FrameComposer::run_frame(const FrameContext& frame) {
     si.pSignalSemaphores    = &sig_sem;
     if (vkQueueSubmit(vk->graphics_queue(), 1, &si, vk->in_flight_fence())
             != VK_SUCCESS) {
+        last_error_ = RenderBackendError::FrameSubmissionFailed;
         return false;
     }
 
@@ -198,9 +236,11 @@ bool FrameComposer::run_frame(const FrameContext& frame) {
     }
     return true;
 #else
-    // Vulkan SDK 無しビルド — フレームループは no-op。 ホストのループが
-    // 空回りしないよう false (継続不能) を返す。
+    // 実描画経路を含まないビルド — フレームループは no-op。 ホストのループが
+    // 空回りしないよう false (継続不能) を返し、 失敗理由も型付きで残す
+    // (Vulkan-free ビルドを「描けた」ことにしない)。
     (void)frame;
+    last_error_ = RenderBackendError::VulkanBackendUnavailable;
     return false;
 #endif
 }

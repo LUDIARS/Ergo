@@ -8,7 +8,13 @@
 /// `initialize()` に const でない参照で渡す。
 ///
 /// 所有関係: RenderContext はどのハンドルも **所有しない** (借用のみ)。
-/// VulkanContext / GlfwSurfaceProvider 等の生存期間はホストが管理する。
+/// VulkanContext / ISurfaceProvider 実装等の生存期間はホストが管理する。
+
+/// プラットフォーム中立: `surface` は Pictor の抽象 `ISurfaceProvider` を
+/// 借用する。 デスクトップの `GlfwSurfaceProvider`、 Android の
+/// `AndroidSurfaceProvider`、 iOS の `IOSSurfaceProvider` はいずれもこの
+/// インターフェースの実装なので、 ergo_render の公開ヘッダは具象型を
+/// 一切要求しない (KD-MOB-001)。
 ///
 /// 設計判断 (承認済み): Pictor は「生 Vulkan の VulkanContext」と「高レベルの
 /// PictorRenderer」の二重 API を持つが、 ergo_render は当面 VulkanContext を
@@ -19,7 +25,7 @@
 
 namespace pictor {
 class VulkanContext;
-class GlfwSurfaceProvider;
+class ISurfaceProvider;
 class PictorRenderer;
 class AnimationSystem;
 } // namespace pictor
@@ -32,9 +38,13 @@ struct RenderContext {
     /// ergo_render のフレームループの基盤。 必須 (非 null を想定)。
     pictor::VulkanContext* vk = nullptr;
 
-    /// ウィンドウ/サーフェス供給者。 イベントポーリングや should_close の
-    /// 問い合わせに使う。 デスクトップでは GlfwSurfaceProvider 実体。
-    pictor::GlfwSurfaceProvider* surface = nullptr;
+    /// ウィンドウ/サーフェス供給者 (プラットフォーム中立)。 ネイティブ
+    /// ハンドル / swapchain 設定の問い合わせ、 イベントポーリングや
+    /// should_close に使う。 実体はデスクトップなら `GlfwSurfaceProvider`、
+    /// Android なら `AndroidSurfaceProvider`、 iOS なら `IOSSurfaceProvider`
+    /// だが、 ergo_render はどれかを知らない。 実描画には非 null が必須で、
+    /// 不足は `check_render_requirements()` が型付き失敗として返す。
+    pictor::ISurfaceProvider* surface = nullptr;
 
     /// 高レベル Pictor レンダラ。 任意 — VulkanContext だけで描く
     /// レイヤーは使わない。 使うレイヤーだけが参照する。

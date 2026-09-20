@@ -28,6 +28,7 @@
 /// (= どの VkRenderPass にどのレイヤーを並べるか) はホストが決める。
 
 #include "ergo/render/frame_context.h"
+#include "ergo/render/render_backend.h"
 #include "ergo/render/render_layer.h"
 #include "ergo/render/vk_fwd.h"
 
@@ -117,8 +118,25 @@ public:
     /// 全パスの全レイヤーを登録順に初期化する。
     ///   1. 各レイヤー initialize()
     ///   2. 各レイヤーへ所属パスの render pass を set_render_pass() で通知
-    /// initialize 順は add_pass 登録順 × パス内レイヤー順。
-    void initialize(RenderContext& ctx);
+    /// initialize 順は add_pass 登録順 × パス内レイヤー順 (従来どおり)。
+    ///
+    /// 戻り値は実描画の前提診断 (`check_render_requirements()` と同じ判定)。
+    /// `RenderBackendError::None` 以外なら **このコンポーザは実際には
+    /// 描かない**。 レイヤーの initialize 自体は Vulkan 非依存の初期化を
+    /// 行えるよう従来どおり実行するが、 描けないことは戻り値と
+    /// `last_error()` で明示する — 呼び出し側はこれを握り潰して
+    /// 「描画できた」ことにしてはならない (KD-MOB-001)。
+    ///
+    /// 初期化済みの状態で再度呼んでも no-op で、 **初回 initialize 時の**
+    /// 診断結果をそのまま返す (その後の run_frame が観測した一時的な失敗は
+    /// 反映しない — そちらは `last_error()` を見ること)。
+    RenderBackendError initialize(RenderContext& ctx);
+
+    /// 直近の initialize() / run_frame() が記録した実描画の診断結果。
+    /// 直近の検査が成功していれば `RenderBackendError::None`。
+    /// run_frame() が Vulkan 呼び出しの失敗で継続不能を返した場合も、
+    /// 対応する型付き値がここに残る。
+    RenderBackendError last_error() const { return last_error_; }
 
     /// 1 フレームを回す。 内部シーケンス:
     ///   1. acquire_next_image()  — swapchain image を取得 (fence 待ちは内部)
@@ -127,7 +145,10 @@ public:
     ///   4. コマンドバッファ記録 — パスごとに begin/各レイヤー record/end
     ///   5. vkQueueSubmit + present
     /// 戻り値は継続可否 (false = フレームループを抜けるべき致命的失敗)。
-    /// swapchain out-of-date 等の回復可能な状況では true を返してスキップする。
+    /// swapchain out-of-date や `SurfaceNotReady` 等の回復可能な状況では
+    /// true を返してそのフレームをスキップする。
+    /// initialize() 前の呼び出しや、実行中に surface が失われた場合の理由は
+    /// `last_error()` で取得できる。
     bool run_frame(const FrameContext& frame);
 
     /// 全レイヤーを登録の **逆順** に shutdown() する。 二重呼び出しは no-op。
@@ -166,6 +187,10 @@ private:
     bool           first_frame_   = true;
     bool           shutdown_done_ = false;
     uint32_t       last_present_idx_ = UINT32_MAX;
+    RenderBackendError last_error_    = RenderBackendError::None;
+    /// initialize() 時点の前提診断。 run_frame() が last_error_ を毎フレーム
+    /// 上書きするため、 initialize() の再呼び出しが返す値はこちらで保持する。
+    RenderBackendError init_error_    = RenderBackendError::None;
     uint64_t       frame_count_      = 0;
 };
 

@@ -44,22 +44,53 @@
 | `ERGO_AUDIO_BACKEND`              | `auto` | `ergo_audio` のバックエンド。`auto` (FMOD 検出 → 無ければ dummy) / `fmod` (SDK 必須・無ければエラー) / `dummy` (no-op 強制) (`CMakeLists.txt:45`) |
 | `ERGO_PARTICLE_HAS_RENDERER`      | OFF    | `ergo_particle` の Vulkan ビルボード描画を有効化。`pictor` ターゲット + Vulkan SDK が必要 (`CMakeLists.txt:39`) |
 | `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON   | `ergo_gpu_particle` の GLSL compute を `glslc` で SPIR-V に bake する (`CMakeLists.txt:40`) |
+| `ERGO_RENDER_REQUIRE_REAL`        | OFF    | `ergo_render` の実描画経路を確保できないデスクトップ構成を構成エラーにする。Android / iOS は常に必須なのでこのノブに関係なくエラー |
 
 ## Pictor / Vulkan 連携 (描画系モジュール)
 
 `ergo_render` と `ergo_particle` の **実描画パス** は Pictor + Vulkan に依存する
 が、専用の有効化フラグは無く、**`pictor` CMake ターゲットが存在するか**で
-自動分岐する:
+自動分岐する。`pictor` ターゲットはホスト統合側 (例: AdventureCube /
+PrivateGame のスーパープロジェクト、モバイルホスト) が
+`add_subdirectory(Pictor ...)` 等で提供する。Ergo 単体ビルドでは通常
+Vulkan 非依存ビルドになる。正本は `CMakeLists.txt:118-160` (particle) /
+`CMakeLists.txt:695-758` (render)。
 
-- `pictor` ターゲットが無い → Vulkan 非依存部分のみビルド (カメラ math /
-  asset path / ScreenshotBridge 等。`ERGO_RENDER_HAS_VULKAN` 未定義の縮退型)
-- `pictor` ターゲットあり + `find_package(Vulkan)` 成功 → 実描画パスを有効化
-  (`ERGO_RENDER_HAS_VULKAN=1` を定義、`glslc` があれば SPIR-V を bake)
+### ergo_render のクロスプラットフォーム契約 (KD-MOB-001)
 
-`pictor` ターゲットはホスト統合側 (例: AdventureCube / PrivateGame の
-スーパープロジェクト) が `add_subdirectory(Pictor ...)` 等で提供する。Ergo 単体
-ビルドでは通常 Vulkan 非依存ビルドになる。正本は `CMakeLists.txt:118-160`
-(particle) / `CMakeLists.txt:695-758` (render)。
+判定の正本は **`pictor` ターゲットが公開する `PICTOR_HAS_VULKAN`** であり、
+デスクトップ専用の import ターゲット `Vulkan::Vulkan` の有無ではない。
+Android は NDK 同梱 `libvulkan.so`、iOS は MoltenVK を pictor 側がリンクする
+ため、モバイルでは `find_package(Vulkan)` が失敗する。ここを desktop 前提で
+判定するとモバイルが黙って Vulkan-free ビルドへ落ちる。判定は
+`cmake/ErgoRenderBackend.cmake` に集約した。
+
+| プラットフォーム | Vulkan の出所 | ergo_render のリンク | 付与される定義 |
+|---|---|---|---|
+| Desktop (SDK) | Vulkan SDK (`find_package(Vulkan)`) | `pictor` + `Vulkan::Vulkan` | `ERGO_RENDER_PLATFORM_DESKTOP=1` |
+| Desktop (host supplied) | pictor が供給する Vulkan | `pictor` のみ | `ERGO_RENDER_PLATFORM_DESKTOP=1` |
+| Android (`-DANDROID=ON` / NDK toolchain) | NDK 同梱 `libvulkan.so` | `pictor` のみ | `ERGO_RENDER_PLATFORM_ANDROID=1` |
+| iOS (`CMAKE_SYSTEM_NAME=iOS`) | MoltenVK | `pictor` のみ | `ERGO_RENDER_PLATFORM_IOS=1` |
+
+有効化時は共通で `ERGO_RENDER_HAS_VULKAN=1` と
+`ERGO_RENDER_VULKAN_SOURCE="<出所>"` が付く。実描画を確保できなかった場合:
+
+- **Android / iOS は常に構成エラー** (`FATAL_ERROR`)。モバイルに Vulkan-free の
+  正当な用途は無いため、黙って縮退させない。
+- **Desktop は既定で警告**のみ (Vulkan 非依存部分のユニットテスト構成を残す)。
+  `-DERGO_RENDER_REQUIRE_REAL=ON` で構成エラーへ格上げできる。
+- `glslc` の有無は SPIR-V bake の可否だけに影響し、実描画可否には影響しない
+  (モバイルは bake 済み SPIR-V をホストのパッケージが配る)。
+
+実行時にも同じ契約を型付きで問い合わせられる — `render_backend_contract()` /
+`check_render_requirements()` / `FrameComposer::initialize()` の戻り値
+(`RenderBackendError`)。詳細は
+[`../feature/module/render.md`](../feature/module/render.md) (F)〜(H)。
+
+`ergo_particle` は従来どおり `pictor` + `find_package(Vulkan)` で分岐する
+(desktop 前提のまま。モバイル対応は後続タスク)。正本は
+`CMakeLists.txt` の `ergo_particle` / `ergo_render` 各セクションと
+`cmake/ErgoRenderBackend.cmake`。
 
 ## 手順
 

@@ -37,11 +37,17 @@ submit/present・screenshot・破棄順序 — を 1 箇所に溜め込んで Go
 | メンバ | 型 | 必須 | 役割 |
 |---|---|---|---|
 | `vk`         | `pictor::VulkanContext*`      | 必須 | 生 Vulkan の基盤 |
-| `surface`    | `pictor::GlfwSurfaceProvider*`| 任意 | ウィンドウ/サーフェス |
+| `surface`    | `pictor::ISurfaceProvider*`   | 実描画では必須 | ウィンドウ/サーフェス供給者 (プラットフォーム中立) |
 | `renderer`   | `pictor::PictorRenderer*`     | 任意 | 高レベルレンダラ (パススルー) |
 | `anim`       | `pictor::AnimationSystem*`    | 任意 | skinning 行列ソース |
 | `shader_dir` | `std::string`                 | —    | 解決済シェーダディレクトリ |
 | `asset_root` | `std::string`                 | —    | 解決済アセットルート |
+
+`surface` は Pictor の抽象インターフェース `ISurfaceProvider` を借用する。
+実体はデスクトップが `GlfwSurfaceProvider`、 Android が
+`AndroidSurfaceProvider` (`ANativeWindow`)、 iOS が `IOSSurfaceProvider`
+(`CAMetalLayer`) だが、 **ergo_render の公開ヘッダは具象型を一切要求しない**
+(KD-MOB-001)。 デスクトップの GLFW 経路も同じインターフェース越しに使う。
 
 ### (B) IRenderLayer — サブレンダラ統一インターフェース
 
@@ -133,6 +139,85 @@ render pass を `set_render_pass()` で渡すと深度テスト/書き込みが�
 フォールバック描画に使える。 drawable はゲーム側が `set_drawables()` で
 毎フレーム差し込む (actor → StageDrawable 変換はゲーム側の責務)。
 
+### (F) RenderBackend — 実描画バックエンドのビルド時契約
+
+`render_backend.h` は「このビルドに実描画経路が入っているか」「どの
+プラットフォーム契約で組まれたか」を実行時に問い合わせる読み取り専用 API。
+
+```cpp
+enum class RenderPlatform      : uint8_t { Unknown, Desktop, Android, IOS };
+enum class RenderBackendError  : uint8_t {
+    None, VulkanBackendUnavailable, FrameComposerNotInitialized, VulkanContextMissing,
+    SurfaceProviderMissing, SurfaceNotReady, FrameSubmissionFailed };
+struct RenderBackendContract {
+    bool           real_render_enabled;
+    RenderPlatform platform;
+    const char*    vulkan_source;   // "Vulkan SDK" / "Android NDK" / "MoltenVK"
+};
+RenderBackendContract render_backend_contract();
+bool                  real_render_enabled();
+```
+
+実描画無効ビルドは `platform == Unknown` / `vulkan_source == "none"` を返し、
+**desktop を名乗らない**。 「Vulkan 非依存ビルドなのに Desktop 構成として
+成功している」状態を作らないための取り決め。
+
+### (G) RenderRequirements — RenderContext の型付き前提検査
+
+`render_requirements.h` は「いま渡された `RenderContext` で実際に描けるか」を
+判定し、 失敗を必ず `RenderBackendError` で返す。 判定順は
+バックエンド不在 → `vk` null → `surface` null → サーフェス未準備。
+
+```cpp
+RenderBackendError check_render_requirements(const RenderContext& ctx);
+bool               surface_has_native_window(const RenderContext& ctx);
+```
+
+`surface_has_native_window()` は `ISurfaceProvider::get_native_handle().type`
+を見るため、 GLFW / `ANativeWindow` / `CAMetalLayer` を区別せずに扱える。
+Android のバックグラウンド遷移 (`ANativeWindow` 破棄) は `SurfaceNotReady`
+として表れる。
+
+`FrameComposer::initialize()` はこの判定結果を戻り値として返し、
+`last_error()` に保持する。 初期化済みの状態で `initialize()` を再度呼んだ
+場合は no-op で、 **初回 initialize 時の**診断結果を返す (その後の
+`run_frame()` が観測した一時的な失敗は混ぜない — そちらは `last_error()`)。
+記録 / submit の Vulkan 呼び出しが失敗した場合は `FrameSubmissionFailed` を
+`last_error()` に残してから継続不能を返す (成功値のまま落とさない)。
+`run_frame()` はフレームごとに同じ前提を再検査し、
+Android のバックグラウンド遷移などで surface が失われた場合にも Vulkan 呼び出し
+の前にそのフレームをスキップし、ループは継続して surface の復帰を待つ。
+initialize 前に `run_frame()` を呼んだ場合は
+`FrameComposerNotInitialized` を返す。 レイヤーの initialize / shutdown の順序と
+所有関係は従来どおり (登録順に初期化、 逆順に破棄) で変更していない。
+実描画不可を「Vulkan-free の成功」へ縮退させないことだけが変更点。
+
+### (H) クロスプラットフォームビルド契約
+
+実描画可否の判定正本は **`pictor` ターゲットが公開する
+`PICTOR_HAS_VULKAN`** であり、 デスクトップ専用 import ターゲット
+`Vulkan::Vulkan` の有無ではない。 判定は
+`cmake/ErgoRenderBackend.cmake` の `ergo_render_resolve_backend()` に集約する。
+
+| プラットフォーム | Vulkan の出所 | ergo_render のリンク | 付与される定義 |
+|---|---|---|---|
+| Desktop (SDK) | Vulkan SDK (`find_package(Vulkan)`) | `pictor` + `Vulkan::Vulkan` | `ERGO_RENDER_PLATFORM_DESKTOP=1` |
+| Desktop (host supplied) | pictor が供給する Vulkan | `pictor` のみ | `ERGO_RENDER_PLATFORM_DESKTOP=1` |
+| Android | NDK 同梱 `libvulkan.so` (pictor がリンク) | `pictor` のみ | `ERGO_RENDER_PLATFORM_ANDROID=1` |
+| iOS | MoltenVK (ホスト xcodeproj / `Vulkan_LIBRARIES`) | `pictor` のみ | `ERGO_RENDER_PLATFORM_IOS=1` |
+
+有効化時は共通で `ERGO_RENDER_HAS_VULKAN=1` と
+`ERGO_RENDER_VULKAN_SOURCE="<出所>"` が付く。
+
+実描画を確保できなかった構成の扱い (`ergo_render_enforce_backend()`):
+
+- Android / iOS — **常に構成エラー** (`FATAL_ERROR`)。 モバイルには
+  Vulkan-free の正当な用途が無いため、 黙って縮退させない。
+- Desktop — 既定は `WARNING` (Vulkan 非依存部分のユニットテスト構成を
+  残すため)。 `-DERGO_RENDER_REQUIRE_REAL=ON` で構成エラーへ格上げできる。
+- `glslc` の有無は SPIR-V bake の可否だけに影響し、 実描画可否の判定材料に
+  しない (モバイルは bake 済み SPIR-V をホストのパッケージが配る)。
+
 ## 必要なデータ
 
 - Pictor の `VulkanContext` (instance/device/swapchain/同期オブジェクト)
@@ -145,11 +230,13 @@ render pass を `set_render_pass()` で渡すと深度テスト/書き込みが�
 - C++17 標準ライブラリ: `<filesystem>` / `<mutex>` / `<condition_variable>` /
   `<atomic>` / `<vector>` / `<deque>` / `<cmath>`
 - `Threads::Threads` (ScreenshotBridge の同期)
-- Pictor + Vulkan SDK — **任意**。 `pictor` ターゲットが存在し Vulkan が
-  見つかったときだけ実描画経路 (`FrameComposer::run_frame`、 StageRenderer の
-  pipeline 構築) が有効化される (`ERGO_RENDER_HAS_VULKAN`)。 揃わない環境でも
-  Vulkan 非依存部分 (カメラ math / asset path / ScreenshotBridge /
-  FrameComposer のパス列管理) はビルド・テストできる
+- Pictor + Vulkan — デスクトップでは **任意**。 `pictor` ターゲットが
+  `PICTOR_HAS_VULKAN` を公開していれば実描画経路
+  (`FrameComposer::run_frame`、 StageRenderer の pipeline 構築) が有効化される
+  (`ERGO_RENDER_HAS_VULKAN`)。 揃わないデスクトップ環境でも Vulkan 非依存部分
+  (カメラ math / asset path / ScreenshotBridge / FrameComposer のパス列管理)
+  はビルド・テストできる。 Android / iOS は実描画が必須で、 確保できない
+  構成は構成エラーになる (上記 (H))
 - テスト: mini-gtest (`ergo_gtest_main`)
 
 ## 設計判断
@@ -192,6 +279,12 @@ render pass を `set_render_pass()` で渡すと深度テスト/書き込みが�
   失敗通知での即時解除 / consume の one-shot 性
 - `test_frame_composer` — パス数追跡 / 初期化順 (登録順) / 破棄順 (逆順) /
   initialize・shutdown の冪等性 / VulkanContext 不在時の安全な縮退
+- `test_render_backend` — バックエンド契約とビルド構成の一致 /
+  プラットフォーム名・エラー名の安定性 / 空 `RenderContext` が決して
+  成功を返さないこと / `FrameComposer::initialize` と `run_frame` が
+  型付き失敗を返し `last_error()` に残すこと / initialize 前の `run_frame()` が
+  `FrameComposerNotInitialized` を返すこと / `initialize()` の再呼び出しが
+  初回の診断結果を返すこと
 
 Vulkan 実描画経路 (`run_frame` の acquire/record/submit/present、 StageRenderer
 の pipeline 構築) は VulkanContext 実体を要するためユニットテストの対象外。

@@ -1,0 +1,22 @@
+{
+  "name": "render-orchestration",
+  "role": "semantic",
+  "description": "ergo_render — Pictor の上・ゲームの下に入る横断描画オーケストレーション層。RenderContext (Pictor ハンドル束) / IRenderLayer / FrameComposer のパス列とフレームループ / ScreenshotBridge / asset path 解決 / StageRenderer、および実描画バックエンドのプラットフォーム契約 (desktop Vulkan SDK / Android NDK Vulkan / iOS MoltenVK) と型付き前提検査を含む。",
+  "membership": [
+    { "pathPattern": "(^|/)include/ergo/render/[^/]+\\.h$" },
+    { "pathPattern": "(^|/)src/render/[^/]+\\.cpp$" },
+    { "pathPattern": "(^|/)tests/render/[^/]+\\.cpp$" }
+  ],
+  "presetRules": [],
+  "templateRules": [],
+  "cardTemplate": "Summarise the \"render-orchestration\" domain: RenderContext のハンドル借用 → FrameComposer のパス列/フレームループ → 実描画バックエンド契約 (platform × Vulkan 出所) と型付き失敗。",
+  "source": "spec-draft",
+  "mechanics": [],
+  "specRefs": [
+    "spec/feature/module/render.md (A)-(H)",
+    "spec/setup/build-cpp.md Pictor / Vulkan 連携",
+    "spec/tasks/2026-08-21-kd-mob-001-platform-render-contract.md"
+  ],
+  "rationale": "描画オーケストレーションは include/ergo/render・src/render・tests/render で 1 つの入出力レッグを成す。membership はパース対象の C++ ソース/ヘッダのみを対象にする (cmake/spec はノードを持たないためパターンに含めない)。KD-MOB-001 でプラットフォーム契約が加わったため、Anatomia の target-domain ゲートが render 変更を 1 ドメインとして扱えるよう宣言する。",
+  "updatedAt": "2026-08-21T00:00:00.000Z"
+}

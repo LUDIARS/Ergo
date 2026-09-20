@@ -46,6 +46,7 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | `ERGO_AUDIO_BACKEND`                | `auto` | `ergo_audio` バックエンド: `auto` / `fmod` / `dummy` |
 | `ERGO_PARTICLE_HAS_RENDERER`        | OFF    | `ergo_particle` の Vulkan ビルボード描画 (pictor + Vulkan 必須) |
 | `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON     | compute シェーダを `glslc` で SPIR-V に bake |
+| `ERGO_RENDER_REQUIRE_REAL`          | OFF    | 実描画経路の無い desktop 構成を構成エラーにする (Android / iOS は常に必須) |
 
 ### サードパーティ・ライブラリ管理 (kazmath / curl)
 
@@ -66,7 +67,8 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 
 | マクロ | 条件 |
 |---|---|
-| `ERGO_RENDER_HAS_VULKAN=1` | `pictor` ターゲット存在 + `find_package(Vulkan)` 成功時に `ergo_render` へ定義 (`CMakeLists.txt:731`) |
+| `ERGO_RENDER_HAS_VULKAN=1` | `pictor` が `PICTOR_HAS_VULKAN` を公開し、`ErgoRenderBackend.cmake` が対象 platform の実描画経路を解決したとき |
+| `ERGO_RENDER_PLATFORM_DESKTOP=1` / `ANDROID=1` / `IOS=1` | `ErgoRenderBackend.cmake` が解決した platform に対応する 1 つを定義 |
 
 CMake 必須要件: バージョン `>= 3.16`、C++17、`Threads`
 (`CMakeLists.txt:1-6,50`)。
