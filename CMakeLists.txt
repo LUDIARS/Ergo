@@ -994,6 +994,20 @@ if(ERGO_BUILD_RENDER)
             endif()
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
+
+        # 出所名定義の作り方は実描画の有無に依存させずに検査する
+        # (実描画が無効な構成ではこの定義の経路がビルドされないため)。
+        add_executable(test_render_vulkan_source_define
+            tests/render/test_render_vulkan_source_define.cpp)
+        target_link_libraries(test_render_vulkan_source_define PRIVATE ergo_gtest_main)
+        ergo_render_vulkan_source_definition(_test_source_definition "Vulkan SDK")
+        target_compile_definitions(test_render_vulkan_source_define
+            PRIVATE "${_test_source_definition}")
+        if(MSVC)
+            target_compile_options(test_render_vulkan_source_define PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_render_vulkan_source_define
+            COMMAND test_render_vulkan_source_define)
     endif()
 endif()
 

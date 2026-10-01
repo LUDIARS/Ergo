@@ -73,7 +73,11 @@ Android は NDK 同梱 `libvulkan.so`、iOS は MoltenVK を pictor 側がリン
 | iOS (`CMAKE_SYSTEM_NAME=iOS`) | MoltenVK | `pictor` のみ | `ERGO_RENDER_PLATFORM_IOS=1` |
 
 有効化時は共通で `ERGO_RENDER_HAS_VULKAN=1` と
-`ERGO_RENDER_VULKAN_SOURCE="<出所>"` が付く。実描画を確保できなかった場合:
+`ERGO_RENDER_VULKAN_SOURCE="<出所>"` が付く。出所名は空白を含むため、定義は
+`ergo_render_vulkan_source_definition()` で作る。値のエスケープは CMake に任せ、
+CMake 文字列で `\"` を 1 段だけ書く (二重に書くと MSVC で C2017 / C2001 になる)。
+この関数の出力は `test_render_vulkan_source_define` が実描画の有無に関係なく検査する。
+実描画を確保できなかった場合:
 
 - **Android / iOS は常に構成エラー** (`FATAL_ERROR`)。モバイルに Vulkan-free の
   正当な用途は無いため、黙って縮退させない。

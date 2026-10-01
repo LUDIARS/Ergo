@@ -39,6 +39,17 @@ function(_ergo_render_pictor_has_vulkan out_var)
     endforeach()
 endfunction()
 
+# Vulkan の出所名を C++ の文字列リテラルとして渡す定義を作る。
+# 出所名は空白を含む ("Vulkan SDK" 等) ので値を `"` で囲む。 compile
+# definitions の値はネイティブのビルドツール向けに CMake 自身がエスケープ
+# するため、 ここで書く `\"` は 1 段だけにする。 `\\\"` と二重に書くと
+# MSVC で `\"Vulkan SDK\"` という壊れたトークン列になり、
+# render_backend.cpp が C2017 / C2001 で落ちる。
+# @implements spec/setup/build-cpp.md "ergo_render のクロスプラットフォーム契約"
+function(ergo_render_vulkan_source_definition out_var source)
+    set(${out_var} "ERGO_RENDER_VULKAN_SOURCE=\"${source}\"" PARENT_SCOPE)
+endfunction()
+
 function(ergo_render_resolve_backend prefix)
     set(_enabled     OFF)
     set(_platform    "unknown")
@@ -101,11 +112,8 @@ function(ergo_render_resolve_backend prefix)
 
     if(_enabled)
         list(APPEND _definitions ERGO_RENDER_HAS_VULKAN=1)
-        # 出所名は空白を含む ("Vulkan SDK" 等)。 定義値の内側の `"` を
-        # エスケープしないと、 コンパイラのコマンドラインでクォートが剥がれて
-        # マクロが裸のトークン列 (`Vulkan SDK`) に展開され、
-        # `return ERGO_RENDER_VULKAN_SOURCE;` が構文エラーになる。
-        list(APPEND _definitions "ERGO_RENDER_VULKAN_SOURCE=\\\"${_source}\\\"")
+        ergo_render_vulkan_source_definition(_source_definition "${_source}")
+        list(APPEND _definitions "${_source_definition}")
     endif()
 
     set(${prefix}_ENABLED     ${_enabled}     PARENT_SCOPE)
