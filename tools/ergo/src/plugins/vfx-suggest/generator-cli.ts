@@ -2,13 +2,14 @@
 /// Long prompts are written to stdin (feedback_claude_cli_long_prompt).
 /// Requires claude CLI on PATH; on Windows use git-bash (feedback_claude_cli_windows_bash).
 
-import { spawn } from "node:child_process";
+import { spawnOneShot as spawn, resolveModel } from "@ludiars/one-shot";
 import type { VfxGenerator, VfxGeneratorHealth } from "./generator.js";
 import type { GenRequest, VfxPreset } from "./schema.js";
 import { buildSystemPrompt, buildUserContent } from "./prompt.js";
 import { sanitizePresets, extractJson } from "./sanitize.js";
 
 export function makeCliGenerator(model: string): VfxGenerator {
+    model = resolveModel(model, "claude");
     const bin = process.env["CLAUDE_BIN"] ?? "claude";
 
     return {
@@ -26,7 +27,7 @@ export function makeCliGenerator(model: string): VfxGenerator {
                 const child = spawn(
                     bin,
                     ["-p", "--model", model, "--output-format", "json"],
-                    { stdio: ["pipe", "pipe", "pipe"] },
+                    { cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"] },
                 );
 
                 let out = "";

@@ -9,7 +9,8 @@ Ergo の共有プラグインホスト型 Web 開発者ツール (`tools/ergo`) 
 
 ## 前提
 
-- Node `>= 20` (`tools/ergo/package.json` の `engines.node`)
+- Node `>= 22.12.0` (`tools/ergo/package.json` の `engines.node`)
+- `git submodule update --init -- lib/lapilli` で共有 CLI 起動ライブラリを取得する。
 - 依存はバックエンドが `hono` + `@hono/node-server` + `ws`、起動形態に
   `electron` + `tsx` + `typescript` (`tools/ergo/package.json`)
 

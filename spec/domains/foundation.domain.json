@@ -3,6 +3,7 @@
   "description": "共通土台。 型・ユーティリティ・テンプレート・ビルド定義。 上位の意味づけは持たない。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": ["spec/feature/tool/shared-one-shot.md"],
   "membership": [
     {
       "pathPattern": "(^|/)src/common/(?:.*/)?[^/]+$"

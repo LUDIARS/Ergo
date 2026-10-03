@@ -22,7 +22,7 @@ export interface VfxGenerator {
 
 export function makeGenerator(): VfxGenerator {
     const backend = (process.env["ERGO_VFX_BACKEND"] ?? "cli").toLowerCase();
-    const model   =  process.env["ERGO_VFX_MODEL"]   ?? "claude-haiku-4-5";
+    const model   =  process.env["ERGO_VFX_MODEL"]   ?? (backend === "cli" ? "haiku" : "claude-haiku-4-5");
 
     if (backend === "cli") return makeCliGenerator(model);
     if (backend === "sdk") return makeSdkGenerator(model);
