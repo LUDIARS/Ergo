@@ -318,6 +318,28 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_tela_graph
+    summary: Ergo 可視化の共通出口。 配置済み関係図の値型 + Tela TELA_GRAPH 1 の検査・書き出し + tela::Graph 変換 (Tela があるとき)
+    category: システム
+    header_dir: include/ergo/tela_graph/
+    source_dir: src/tela_graph/
+    test_dir:   tests/tela_graph/
+    spec:       spec/module/tela_graph.md
+    cmake_option: ERGO_BUILD_TELA_GRAPH   # tela::Graph 変換は Tela::Graph ターゲット検出時のみ
+    tool_plugin: null
+    status: preview   # ファイルの Tela 受理はテスト済。 Tela 画面での見え方は未確認
+
+  - name: ergo_render_viz
+    summary: Pictor 描画パイプライン (パス / アタッチメント / ポストプロセス / CPU 段 / GPU 時間) を Tela の関係図にする可視化層 + CLI
+    category: システム
+    header_dir: include/ergo/render_viz/
+    source_dir: src/render_viz/
+    test_dir:   tests/render_viz/
+    spec:       spec/module/render_viz.md
+    cmake_option: ERGO_BUILD_RENDER_VIZ   # Pictor アダプタと CLI は pictor ターゲット検出時のみ
+    tool_plugin: null
+    status: preview
+
   - name: ergo_ui_layout
     summary: Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit.
     category: UI

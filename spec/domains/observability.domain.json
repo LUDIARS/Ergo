@@ -1,6 +1,6 @@
 {
   "name": "observability",
-  "description": "観測。 ログ、 プロファイル、 診断出力、 ライブチューニングの窓口。",
+  "description": "観測。 ログ、 プロファイル、 診断出力、 ライブチューニングの窓口、 Tela による構成の可視化。",
   "presetRules": [],
   "templateRules": [],
   "membership": [
@@ -27,6 +27,18 @@
     },
     {
       "pathPattern": "(^|/)include/(?:.*/)?bind/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/render_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?render_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/tela_graph/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?tela_graph/(?:.*/)?[^/]+$"
     }
   ]
 }

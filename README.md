@@ -70,6 +70,8 @@ ergo/
 | `ergo_character`     | TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替)。エンジン非依存 | `include/ergo/character/`    | — |
 | `ergo_http`          | libcurl バックエンドの同期 HTTP クライアント (`IHttpClient`/`get`/`post`)。公開 API は curl を隠蔽。既定 OFF (opt-in、`ERGO_WITH_CURL` を強制) | `include/ergo/http/`         | — |
 | `ergo_resource`      | タグ駆動リソース自動選択 + 読み込み (JSON マニフェスト + Clio 同重みスコアラ)。MUSA Clio の C++ 移植 | `include/ergo/resource/`     | — |
+| `ergo_tela_graph`    | Ergo 可視化の共通出口。 配置済み関係図 → Tela `TELA_GRAPH 1` (検査付き) / `tela::Graph` | `include/ergo/tela_graph/`   | (外部: Tela `tela_view --graph`) |
+| `ergo_render_viz`    | Pictor 描画パイプライン (パス・アタッチメント・ポストプロセス・CPU 段・GPU 時間) の Tela 可視化 | `include/ergo/render_viz/`   | `ergo_render_viz` CLI (pictor があるとき) |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。

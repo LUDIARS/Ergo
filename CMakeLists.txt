@@ -40,6 +40,8 @@ option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケスト�
 # このオプションはデスクトップ構成を厳格化するためのもの。
 option(ERGO_RENDER_REQUIRE_REAL "ergo_render: 実描画経路を確保できない構成を構成エラーにする" OFF)
 option(ERGO_BUILD_VECTOR       "Build ergo_vector (SVG path mesh + extrude + animation)" ON)
+option(ERGO_BUILD_TELA_GRAPH   "Build ergo_tela_graph (Ergo 可視化の共通出口: Tela 関係図)" ON)
+option(ERGO_BUILD_RENDER_VIZ   "Build ergo_render_viz (Pictor 描画パイプラインの Tela 可視化)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
@@ -1009,6 +1011,99 @@ if(ERGO_BUILD_RENDER)
         add_test(NAME test_render_vulkan_source_define
             COMMAND test_render_vulkan_source_define)
     endif()
+endif()
+
+
+# ---------------------------------------------------------------------------
+# ergo_tela_graph — Ergo の可視化の共通出口。 配置済みの関係図を Tela へ渡す。
+#   * ergo_tela_graph      — 関係図の値型 + TELA_GRAPH 1 の検査・書き出し。
+#                            Tela に依存しない (常時ビルド・テスト可)。
+#   * ergo_tela_graph_tela — 関係図 → tela::Graph (プロセス内描画)。
+#                            `Tela::Graph` ターゲットがあるときだけ (C++20)。
+# 表示は Tela の tela_view / tela_overlay (--graph <file>)。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_TELA_GRAPH)
+    add_library(ergo_tela_graph STATIC src/tela_graph/writer.cpp)
+    target_include_directories(ergo_tela_graph PUBLIC include)
+    if(MSVC)
+        target_compile_options(ergo_tela_graph PUBLIC /utf-8)
+    endif()
+
+    if(NOT TARGET Tela::Graph)
+        find_package(Tela CONFIG QUIET)
+    endif()
+    if(TARGET Tela::Graph)
+        add_library(ergo_tela_graph_tela STATIC src/tela_graph/tela_adapter.cpp)
+        target_link_libraries(ergo_tela_graph_tela PUBLIC ergo_tela_graph Tela::Graph)
+        target_compile_features(ergo_tela_graph_tela PUBLIC cxx_std_20)
+        target_compile_definitions(ergo_tela_graph_tela PUBLIC ERGO_TELA_GRAPH_HAS_TELA=1)
+        message(STATUS "ergo_tela_graph: Tela adapter enabled")
+    else()
+        message(STATUS "ergo_tela_graph: Tela::Graph absent — in-process Tela adapter skipped")
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_tela_graph_writer tests/tela_graph/test_tela_graph_writer.cpp)
+        target_link_libraries(test_tela_graph_writer PRIVATE ergo_tela_graph ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_tela_graph_writer PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_tela_graph_writer COMMAND test_tela_graph_writer)
+        if(TARGET ergo_tela_graph_tela)
+            add_executable(test_tela_graph_adapter tests/tela_graph/test_tela_graph_adapter.cpp)
+            target_link_libraries(test_tela_graph_adapter PRIVATE ergo_tela_graph_tela ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_tela_graph_adapter PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_tela_graph_adapter COMMAND test_tela_graph_adapter)
+        endif()
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_render_viz — Pictor の描画パイプラインを関係図にする (出口は ergo_tela_graph)。
+#   * ergo_render_viz        — スナップショット + 配置。 Pictor に依存しない。
+#   * ergo_render_viz_pictor — PipelineProfileDef / FrameStats → スナップショット。
+#                              `pictor` ターゲットがあるときだけ。
+#   * ergo_render_viz (CLI)  — プロファイル JSON / プリセット → .tela ファイル。
+#                              pictor があるときだけ。
+# ergo_render とは独立 (モジュール間の cross-import をしない)。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_RENDER_VIZ AND TARGET ergo_tela_graph)
+    add_library(ergo_render_viz STATIC
+        src/render_viz/pipeline_labels.cpp
+        src/render_viz/pipeline_layout.cpp
+    )
+    target_include_directories(ergo_render_viz PUBLIC include)
+    target_link_libraries(ergo_render_viz PUBLIC ergo_tela_graph)
+    if(MSVC)
+        target_compile_options(ergo_render_viz PUBLIC /utf-8)
+    endif()
+
+    if(TARGET pictor)
+        add_library(ergo_render_viz_pictor STATIC src/render_viz/pictor_snapshot.cpp)
+        target_link_libraries(ergo_render_viz_pictor PUBLIC ergo_render_viz pictor)
+        target_compile_features(ergo_render_viz_pictor PUBLIC cxx_std_20)
+        target_compile_definitions(ergo_render_viz_pictor PUBLIC ERGO_RENDER_VIZ_HAS_PICTOR=1)
+
+        add_executable(ergo_render_viz_cli tools/render_viz/main.cpp)
+        set_target_properties(ergo_render_viz_cli PROPERTIES OUTPUT_NAME ergo_render_viz)
+        target_link_libraries(ergo_render_viz_cli PRIVATE ergo_render_viz_pictor)
+        message(STATUS "ergo_render_viz: Pictor adapter + CLI enabled")
+    else()
+        message(STATUS "ergo_render_viz: pictor target absent — Pictor adapter / CLI skipped")
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_render_viz_layout tests/render_viz/test_render_viz_layout.cpp)
+        target_link_libraries(test_render_viz_layout PRIVATE ergo_render_viz ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_render_viz_layout PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_render_viz_layout COMMAND test_render_viz_layout)
+    endif()
+elseif(ERGO_BUILD_RENDER_VIZ)
+    message(STATUS "ergo_render_viz: requires ERGO_BUILD_TELA_GRAPH — skipped")
 endif()
 
 

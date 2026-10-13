@@ -33,6 +33,8 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 | `ergo_resource`     | タグ駆動リソース自動選択 + 読み込み。JSON マニフェスト catalog + Clio 同重みスコアラ + バイト列 loader (MUSA Clio の C++ 移植、ネットワーク非依存) | システム | `include/ergo/resource/` | `src/resource/` | `spec/module/resource.md` | — |
 | `ergo_http`         | libcurl バックエンドの同期 HTTP クライアント。`IHttpClient` / `get` / `post`。公開 API は `std::` のみで curl を隠蔽。既定 OFF (`ERGO_WITH_CURL` を強制) | システム | `include/ergo/http/`         | `src/http/`         | `spec/module/http.md`         | (依存: `curl`) |
 | `ergo_render`       | Pictor 横断オーケストレーション層。`RenderContext` / `IRenderLayer` / `FrameComposer` / `ScreenshotBridge` / カメラ math / `StageRenderer` | システム | `include/ergo/render/`       | `src/render/`       | `spec/module/render.md`       | — |
+| `ergo_tela_graph`   | Ergo 可視化の共通出口。 配置済み関係図 → Tela `TELA_GRAPH 1` ファイル (検査付き) / `tela::Graph` (Tela があるとき) | システム | `include/ergo/tela_graph/` | `src/tela_graph/` | `spec/module/tela_graph.md` | (外部: Tela `tela_view --graph`) |
+| `ergo_render_viz`   | Pictor 描画パイプライン (パス・アタッチメント・ポストプロセス・CPU 段・GPU 時間) を関係図にする。 CLI `ergo_render_viz` はプリセット / プロファイル JSON → `.tela` | システム | `include/ergo/render_viz/` | `src/render_viz/` | `spec/module/render_viz.md` | `ergo_render_viz` (CLI、 pictor があるとき) |
 | `ergo_ui_layout`    | Data-driven UI layout runtime. JSON model + binding + layout solve + render adapter emit for live-editable HUD/UI | UI | `include/ergo/ui_layout/` | `src/ui_layout/` | `spec/module/ui_layout.md` | `ui_layout` |
 
 | `ergo_vector`       | SVG path polygon tessellation + extrude 3D mesh + vertex animation scene | UI | `include/ergo/vector/`       | `src/vector/`       | `spec/module/vector.md`       | — |

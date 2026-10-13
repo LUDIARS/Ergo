@@ -47,7 +47,7 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
 | `audio` | `audio` / `sound` |
 | `combat-skill` | `combo_counter` / `health` / `score` / `timing_judge` |
 | `input` | `input` |
-| `observability` | `log` / `profile` / `custos` / `bind` |
+| `observability` | `log` / `profile` / `custos` / `bind` / `render_viz` / `tela_graph` |
 | `physics` | `physics2d` / `math` |
 | `rendering` | `render` / `particle` / `gpu_particle` / `shuriken_migrator` / `shaders` |
 | `resource-io` | `resource` / `io` / `http` |
