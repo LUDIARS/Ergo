@@ -17,6 +17,10 @@
 
 schema_version: 1
 
+# ergo_shuriken_migrator は載せない: Unity Shuriken からの一回きりの移行用で、
+# 使っているタイトルのツール側へ移してから削除する予定
+# (spec/architecture/domains-and-ux.md §5 の L1)。
+
 # モジュールが使う LUDIARS 製パッケージ (Pictor / Tela / Lapilli ...) の版と
 # modules ごとの needs / optional の宣言。形式は spec/data/ergo-packages.md。
 package_manifest: ergo-packages.json
@@ -28,7 +32,7 @@ modules:
     header_dir: include/ergo/input/
     source_dir: src/input/
     test_dir:   tests/input/
-    spec:       spec/module/input.md
+    spec:       spec/feature/module/input.md
     cmake_option: ERGO_BUILD_INPUT
     tool_plugin: null
     status: preview
@@ -39,7 +43,7 @@ modules:
     header_dir: include/ergo/particle/
     source_dir: src/particle/
     test_dir:   tests/particle/
-    spec:       spec/module/particle.md
+    spec:       spec/feature/module/particle.md
     cmake_option: ERGO_BUILD_PARTICLE
     tool_plugin: particle
     status: stable
@@ -50,7 +54,7 @@ modules:
     header_dir: include/ergo/gpu_particle/
     source_dir: src/gpu_particle/
     test_dir:   tests/gpu_particle/
-    spec:       spec/module/gpu_particle.md
+    spec:       spec/feature/module/gpu_particle.md
     cmake_option: ERGO_BUILD_GPU_PARTICLE
     tool_plugin: null
     status: preview   # Burst cycles / shape variants が TODO
@@ -61,7 +65,7 @@ modules:
     header_dir: include/ergo/bind/
     source_dir: src/bind/
     test_dir:   tests/bind/
-    spec:       spec/module/bind.md
+    spec:       spec/feature/module/bind.md
     cmake_option: ERGO_BUILD_BIND
     tool_plugin: variable
     status: stable
@@ -72,7 +76,7 @@ modules:
     header_dir: include/ergo/actor/
     source_dir: src/actor/
     test_dir:   tests/actor/
-    spec:       spec/module/actor.md
+    spec:       spec/feature/module/actor.md
     cmake_option: ERGO_BUILD_ACTOR   # ERGO_BUILD_BIND も ON が必須
     tool_plugin: variable
     status: preview
@@ -83,7 +87,7 @@ modules:
     header_dir: include/ergo/cast/
     source_dir: src/cast/
     test_dir:   tests/cast/
-    spec:       spec/module/cast.md
+    spec:       spec/feature/module/cast.md
     cmake_option: ERGO_BUILD_CAST   # ERGO_BUILD_ACTOR / ERGO_BUILD_BIND も ON が必須
     tool_plugin: null
     status: preview
@@ -94,7 +98,7 @@ modules:
     header_dir: include/ergo/sound/
     source_dir: src/sound/
     test_dir:   tests/sound/
-    spec:       spec/module/sound.md
+    spec:       spec/feature/module/sound.md
     cmake_option: ERGO_BUILD_SOUND
     tool_plugin: null
     status: stable   # WAV only; 圧縮フォーマットは別 commit で stb_vorbis を vendor
@@ -105,7 +109,7 @@ modules:
     header_dir: include/ergo/frame/
     source_dir: src/frame/
     test_dir:   tests/frame/
-    spec:       spec/module/frame.md
+    spec:       spec/feature/module/frame.md
     cmake_option: ERGO_BUILD_FRAME
     tool_plugin: null
     status: stable
@@ -116,7 +120,7 @@ modules:
     header_dir: include/ergo/profile/
     source_dir: src/profile/
     test_dir:   tests/profile/
-    spec:       spec/module/profile.md
+    spec:       spec/feature/module/profile.md
     cmake_option: ERGO_BUILD_PROFILE
     tool_plugin: profile
     status: preview   # tools/ergo profile プラグインは別途追加
@@ -127,7 +131,7 @@ modules:
     header_dir: include/ergo/log/
     source_dir: src/log/
     test_dir:   tests/log/
-    spec:       spec/module/log.md
+    spec:       spec/feature/module/log.md
     cmake_option: ERGO_BUILD_LOG
     tool_plugin: null
     status: stable
@@ -138,7 +142,7 @@ modules:
     header_dir: include/ergo/io/
     source_dir: src/io/
     test_dir:   tests/io/
-    spec:       spec/module/io.md
+    spec:       spec/feature/module/io.md
     cmake_option: ERGO_BUILD_IO
     tool_plugin: null
     status: stable
@@ -149,7 +153,7 @@ modules:
     header_dir: include/ergo/audio/
     source_dir: src/audio/
     test_dir:   tests/audio/
-    spec:       spec/module/audio.md
+    spec:       spec/feature/module/audio.md
     cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/dummy)
     tool_plugin: null
     status: preview
@@ -160,7 +164,7 @@ modules:
     header_dir: include/ergo/world_time/
     source_dir: src/world_time/
     test_dir:   tests/world_time/
-    spec:       spec/module/world_time.md
+    spec:       spec/feature/module/world_time.md
     cmake_option: ERGO_BUILD_WORLD_TIME
     tool_plugin: null
     status: preview
@@ -171,7 +175,7 @@ modules:
     header_dir: include/ergo/blackboard/
     source_dir: src/blackboard/
     test_dir:   tests/blackboard/
-    spec:       spec/module/blackboard.md
+    spec:       spec/feature/module/blackboard.md
     cmake_option: ERGO_BUILD_BLACKBOARD
     tool_plugin: null
     status: preview
@@ -182,7 +186,7 @@ modules:
     header_dir: include/ergo/ui/
     source_dir: src/ui/
     test_dir:   tests/ui/
-    spec:       spec/module/ui.md
+    spec:       spec/feature/module/ui.md
     cmake_option: ERGO_BUILD_UI
     tool_plugin: null
     status: preview
@@ -193,7 +197,7 @@ modules:
     header_dir: include/ergo/custos/
     source_dir: src/custos/
     test_dir:   tests/custos/
-    spec:       spec/module/custos.md
+    spec:       spec/feature/module/custos.md
     cmake_option: ERGO_BUILD_CUSTOS
     tool_plugin: null   # サービス側は LUDIARS/Custos リポ
     status: preview
@@ -204,7 +208,7 @@ modules:
     header_dir: include/ergo/health/
     source_dir: src/health/
     test_dir:   tests/health/
-    spec:       spec/module/health.md
+    spec:       spec/feature/module/health.md
     cmake_option: ERGO_BUILD_HEALTH
     tool_plugin: null
     status: preview
@@ -215,7 +219,7 @@ modules:
     header_dir: include/ergo/score/
     source_dir: src/score/
     test_dir:   tests/score/
-    spec:       spec/module/score.md
+    spec:       spec/feature/module/score.md
     cmake_option: ERGO_BUILD_SCORE
     tool_plugin: null
     status: preview
@@ -226,7 +230,7 @@ modules:
     header_dir: include/ergo/combo_counter/
     source_dir: src/combo_counter/
     test_dir:   tests/combo_counter/
-    spec:       spec/module/combo_counter.md
+    spec:       spec/feature/module/combo_counter.md
     cmake_option: ERGO_BUILD_COMBO_COUNTER
     tool_plugin: null
     status: preview
@@ -237,7 +241,7 @@ modules:
     header_dir: include/ergo/timing_judge/
     source_dir: src/timing_judge/
     test_dir:   tests/timing_judge/
-    spec:       spec/module/timing_judge.md
+    spec:       spec/feature/module/timing_judge.md
     cmake_option: ERGO_BUILD_TIMING_JUDGE
     tool_plugin: null
     status: preview
@@ -248,7 +252,7 @@ modules:
     header_dir: include/ergo/character/
     source_dir: src/character/
     test_dir:   tests/character/
-    spec:       spec/module/character.md
+    spec:       spec/feature/module/character.md
     cmake_option: ERGO_BUILD_CHARACTER
     tool_plugin: null
     status: preview
@@ -259,7 +263,7 @@ modules:
     header_dir: include/ergo/math/
     source_dir: src/math/
     test_dir:   tests/math/
-    spec:       spec/module/math.md
+    spec:       spec/feature/module/math.md
     cmake_option: ERGO_BUILD_MATH
     tool_plugin: null
     status: preview
@@ -270,7 +274,7 @@ modules:
     header_dir: include/ergo/physics2d/
     source_dir: src/physics2d/
     test_dir:   tests/physics2d/
-    spec:       spec/module/physics2d.md
+    spec:       spec/feature/module/physics2d.md
     cmake_option: ERGO_BUILD_PHYSICS2D
     tool_plugin: null
     depends:    [ergo_math]
@@ -294,7 +298,7 @@ modules:
     header_dir: include/ergo/http/
     source_dir: src/http/
     test_dir:   tests/http/
-    spec:       spec/module/http.md
+    spec:       spec/feature/module/http.md
     cmake_option: ERGO_BUILD_HTTP
     tool_plugin: null
     depends:    [curl]
@@ -306,7 +310,7 @@ modules:
     header_dir: include/ergo/render/
     source_dir: src/render/
     test_dir:   tests/render/
-    spec:       spec/module/render.md
+    spec:       spec/feature/module/render.md
     cmake_option: ERGO_BUILD_RENDER   # Vulkan 実描画経路は pictor + Vulkan SDK 検出時のみ
     tool_plugin: null
     status: preview   # Vulkan 非依存部分のみテスト済。 PrivateGame/AC への載せ替えは P2
@@ -317,7 +321,7 @@ modules:
     header_dir: include/ergo/vector/
     source_dir: src/vector/
     test_dir:   tests/vector/
-    spec:       spec/module/vector.md
+    spec:       spec/feature/module/vector.md
     cmake_option: ERGO_BUILD_VECTOR
     tool_plugin: null
     status: preview
@@ -405,9 +409,20 @@ modules:
     header_dir: include/ergo/ui_layout/
     source_dir: src/ui_layout/
     test_dir:   tests/ui_layout/
-    spec:       spec/module/ui_layout.md
+    spec:       spec/feature/module/ui_layout.md
     cmake_option: ERGO_BUILD_UI_LAYOUT
     tool_plugin: ui_layout
+    status: preview
+
+  - name: ergo_ui_kit
+    summary: リテインドモードの UI コンポーネントフレームワーク (uidoc.json のツリー → レイアウト解決 → GPU 非依存の描画リスト、入力バブリング、プロパティアニメ)
+    category: UI
+    header_dir: include/ergo/ui_kit/
+    source_dir: src/ui_kit/
+    test_dir:   tests/ui_kit/
+    spec:       spec/module/ui_kit.md
+    cmake_option: ERGO_BUILD_UI_KIT
+    tool_plugin: null
     status: preview
 
 

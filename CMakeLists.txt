@@ -9,7 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Top-level options. Hosts can flip per-module knobs as needed.
 # ---------------------------------------------------------------------------
 option(ERGO_BUILD_TESTS       "Build module tests"             ON)
-option(ERGO_BUILD_DUMMY       "Build dummy plug libraries"     ON)
+option(ERGO_BUILD_DUMMY       "Build dummy plug libraries"     OFF)
 option(ERGO_BUILD_BENCHMARKS  "Build micro-benchmark executables (opt-in)" OFF)
 
 option(ERGO_BUILD_INPUT        "Build ergo_input"        ON)
@@ -92,7 +92,7 @@ endif()
 
 # ---------------------------------------------------------------------------
 # Managed third-party libraries (fetched + compiled from pinned upstreams:
-# kazmath / curl / ...). The registry declares every managed dependency and
+# curl / ...). The registry declares every managed dependency and
 # opt-in builds the ones whose ERGO_WITH_<NAME> switch is ON. Engine lives in
 # cmake/ErgoDependencies.cmake; per-lib wiring in cmake/deps/<name>.cmake.
 # Header-only vendored libs (earcut/nanosvg/gtest) stay under third_party/ and
@@ -1438,8 +1438,8 @@ endif()
 
 # ---------------------------------------------------------------------------
 # tests/thirdparty/ — smoke test for the managed dependency manager. Proves the
-# fetched libraries (kazmath + curl) link and run. Opt-in via
-# -DERGO_BUILD_THIRDPARTY_SMOKE=ON (which forces ERGO_WITH_KAZMATH/CURL on; see
+# fetched libraries (curl) link and run. Opt-in via
+# -DERGO_BUILD_THIRDPARTY_SMOKE=ON (which forces ERGO_WITH_CURL on; see
 # third_party/dependencies.cmake).
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)

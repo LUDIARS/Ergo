@@ -1,26 +1,13 @@
 // Smoke test for the managed third-party dependency manager.
 //
 // Proves that the fetched libraries are not just present but actually link and
-// run: it exercises a kazmath vector operation and brings libcurl up/down. Built
-// only when -DERGO_BUILD_THIRDPARTY_SMOKE=ON (which forces kazmath + curl on);
+// run: it brings libcurl up/down. Built
+// only when -DERGO_BUILD_THIRDPARTY_SMOKE=ON (which forces curl on);
 // see third_party/dependencies.cmake.
 
-#include <cstdio>
-
-#include <kazmath/vec3.h>
 #include <curl/curl.h>
 
 #include "gtest/gtest.h"
-
-TEST(ThirdPartyKazmath, Vec3LengthIsComputed) {
-    kmVec3 v;
-    kmVec3Fill(&v, 3.0f, 4.0f, 0.0f);
-    EXPECT_FLOAT_EQ(kmVec3Length(&v), 5.0f);
-
-    kmVec3 n;
-    kmVec3Normalize(&n, &v);
-    EXPECT_FLOAT_EQ(kmVec3Length(&n), 1.0f);
-}
 
 TEST(ThirdPartyCurl, GlobalInitAndVersion) {
     ASSERT_EQ(curl_global_init(CURL_GLOBAL_DEFAULT), CURLE_OK);

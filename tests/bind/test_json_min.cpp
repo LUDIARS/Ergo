@@ -1,7 +1,7 @@
-#include "ergo/bind/json_min.h"
+#include "ergo/common/json_min.h"
 #include "gtest/gtest.h"
 
-using namespace ergo::bind::jsonm;
+using namespace ergo::common::jsonm;
 
 TEST(JsonMin, ParsePrimitives) {
     JsonValue v;

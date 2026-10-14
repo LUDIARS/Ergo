@@ -1,8 +1,8 @@
-# サードパーティ・ライブラリ管理 (kazmath / curl / ...)
+# サードパーティ・ライブラリ管理 (curl / ...)
 
 ## 目的
 
-kazmath・curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を、ピン留め
+curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を、ピン留め
 した upstream から取得 (fetch) してビルドし、Ergo の任意モジュール / ホストから
 使えるようにする仕組み。再現性 (= 固定 commit/tag) と「無言フォールバック禁止」
 を満たすことを最優先にした宣言的マネージャ。
@@ -21,7 +21,7 @@ kazmath・curl のような **コンパイルを伴う外部 C/C++ ライブラ�
 | ファイル | 役割 |
 |---|---|
 | `cmake/ErgoDependencies.cmake` | **エンジン**。fetch / populate / target 検証の汎用処理のみ。具体ライブラリ名を一切持たない |
-| `cmake/deps/<name>.cmake` | **各ライブラリの結線**。kazmath / curl など 1 ファイル 1 ライブラリ |
+| `cmake/deps/<name>.cmake` | **各ライブラリの結線**。curl など 1 ファイル 1 ライブラリ |
 | `third_party/dependencies.cmake` | **レジストリ**。全依存の宣言 (pin) と、`ERGO_WITH_<NAME>` が ON のものだけを opt-in ビルド。傘 target `ergo_thirdparty` を公開 |
 
 トップレベル `CMakeLists.txt` は gtest ブロック直後で
@@ -32,9 +32,8 @@ kazmath・curl のような **コンパイルを伴う外部 C/C++ ライブラ�
 | キー | 既定 | 役割 |
 |---|---|---|
 | `ERGO_FETCH_DEPENDENCIES` | ON | 依存を upstream から取得してよいかのマスタースイッチ。OFF かつ source override も無い状態で依存が要求されると **FATAL_ERROR** (無言で素通りしない) |
-| `ERGO_WITH_KAZMATH` | OFF | kazmath を取得してビルド |
 | `ERGO_WITH_CURL` | OFF | libcurl を取得してビルド |
-| `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF | スモークテストをビルド (kazmath + curl を強制 ON) |
+| `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF | スモークテストをビルド (curl を強制 ON) |
 | `ERGO_CURL_USE_SSL` | ON | curl の TLS backend を有効化 (Windows は Schannel = OS 内蔵、外部 SSL SDK 不要) |
 | `ERGO_DEPENDENCY_CACHE_DIR` | (空) | 取得ソースの共有キャッシュ dir。空なら `<build>/_deps` |
 | `ERGO_SOURCE_DIR_<UPPER>` | (空) | その依存を fetch せずローカルチェックアウトで差し替える (オフライン用) |
@@ -46,7 +45,6 @@ kazmath・curl のような **コンパイルを伴う外部 C/C++ ライブラ�
 
 | 名前 | pin | TLS / 備考 | consume |
 |---|---|---|---|
-| kazmath | commit `48dbc191…` (upstream に tag 無し) | C 数学ライブラリ。`GL/` ヘルパは除外し core .c だけで独自 `kazmath` target を組む (kazmath の CMake は `cmake_minimum_required(2.8)` で現行 CMake が拒否するため) | `target_link_libraries(<t> PRIVATE kazmath)` / `#include <kazmath/kazmath.h>` |
 | curl | tag `curl-8_19_0` | static libcurl のみ (CLI/docs/test 無効)。Windows は Schannel | `target_link_libraries(<t> PRIVATE CURL::libcurl)` / `#include <curl/curl.h>` |
 
 傘 target: `ergo_thirdparty` (= `ergo::thirdparty`) は ON になっている依存をまとめて
@@ -55,24 +53,24 @@ kazmath・curl のような **コンパイルを伴う外部 C/C++ ライブラ�
 ## 使い方
 
 ```bash
-# kazmath + curl を取得して使う構成 + スモークテストで疎通確認
+# curl を取得して使う構成 + スモークテストで疎通確認
 cmake -S . -B build -DERGO_BUILD_THIRDPARTY_SMOKE=ON
 cmake --build build --config Debug --target test_thirdparty_deps
 ctest --test-dir build -C Debug -R test_thirdparty_deps
 
-# 個別に欲しい場合 (例: curl だけ)
+# 個別に欲しい場合
 cmake -S . -B build -DERGO_WITH_CURL=ON
 
 # オフライン: 取得せずローカルソースを使う
-cmake -S . -B build -DERGO_WITH_KAZMATH=ON -DERGO_SOURCE_DIR_KAZMATH=C:/src/kazmath
+cmake -S . -B build -DERGO_WITH_CURL=ON -DERGO_SOURCE_DIR_CURL=C:/src/curl
 ```
 
 モジュール側からの利用例:
 
 ```cmake
 # 依存が ON のときだけ結線する (OFF ビルドを壊さない)
-if(TARGET kazmath)
-    target_link_libraries(ergo_<mod> PRIVATE kazmath)
+if(TARGET CURL::libcurl)
+    target_link_libraries(ergo_<mod> PRIVATE CURL::libcurl)
 endif()
 ```
 
@@ -91,8 +89,9 @@ endif()
 - **再現性**: `GIT_TAG` は必ず固定 (tag か full SHA)。`master`/`main` ブランチ名は禁止。
 - **無言フォールバック禁止**: 取得不可・期待 target 不在は必ず FATAL_ERROR
   (`ergo_verify_targets`)。upstream のレイアウト変更を早期に検知する。
-- **CRT 整合 (MSVC)**: kazmath は唯一の C target で、放置すると `cl.exe` 既定の
-  `/MT` (静的 CRT) になり Ergo の動的 CRT C++ target と LNK4098 で衝突する。
-  `cmake/deps/kazmath.cmake` で `MSVC_RUNTIME_LIBRARY` を動的 CRT に固定済み。
+- **CRT 整合 (MSVC)**: 自前で `add_library` を組む C ライブラリは、放置すると
+  `cl.exe` 既定の `/MT` (静的 CRT) になり Ergo の動的 CRT C++ target と LNK4098 で
+  衝突する。`cmake/deps/<n>.cmake` で `MSVC_RUNTIME_LIBRARY` を動的 CRT に固定する。
+  (以前の kazmath はこの対応をしていたが、利用が無いため 2026-10-14 に外した)
 - **curl のビルド時間**: 初回 configure で curl をビルドするため数十秒かかる。
   `ERGO_DEPENDENCY_CACHE_DIR` を共有すると複数 build tree で再取得を避けられる。

@@ -2,7 +2,7 @@
 # ErgoDependencies.cmake — third-party library acquisition engine
 #
 # Generic, library-agnostic plumbing for fetching and wiring external C/C++
-# libraries (kazmath / curl / ...) from pinned upstream sources. This file owns
+# libraries (curl / ...) from pinned upstream sources. This file owns
 # *only* the mechanism (fetch + verify + bookkeeping); per-library integration
 # lives in cmake/deps/<name>.cmake, and the registry that decides which deps to
 # build lives in third_party/dependencies.cmake.

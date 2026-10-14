@@ -63,7 +63,7 @@ Praeforma のコア / ビジネスドメインとの対応・古い処理の一�
 | `scene-composition` | `scene` / `cast` |
 | `gameplay-rules` | `health` / `score` / `combo_counter` / `timing_judge` / `world_time` / `blackboard` |
 | `vendored-third-party` | `third_party/` |
-| `legacy` | `shuriken_migrator`・`tools/shuriken_migrator/`・`review/`・`.anatomia/domains/` (削除するかを人が決めるまで分けて見せる) |
+| `legacy` | `shuriken_migrator`・`tools/shuriken_migrator/` (削除するかを人が決めるまで分けて見せる) |
 
 モジュール名だけの項目は `src/<名>/`・`include/ergo/<名>/`・`tests/<名>/` を指す。
 

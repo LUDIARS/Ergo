@@ -21,9 +21,9 @@ Ergo リポジトリのルートで実行する。
 | 用途 | 生成コマンド | 開くファイル |
 |---|---|---|
 | VS 2022 x64 | `cmake --preset vs2022` | `build/vs2022/Ergo.sln` |
-| VS + kazmath/libcurl | `cmake --preset vs2022-deps` | `build/vs2022-deps/Ergo.sln` |
+| VS + libcurl | `cmake --preset vs2022-deps` | `build/vs2022-deps/Ergo.sln` |
 | Xcode | `cmake --preset xcode` | `build/xcode/Ergo.xcodeproj` |
-| Xcode + kazmath/libcurl | `cmake --preset xcode-deps -DOPENSSL_ROOT_DIR=/absolute/path/to/openssl` | `build/xcode-deps/Ergo.xcodeproj` |
+| Xcode + libcurl | `cmake --preset xcode-deps -DOPENSSL_ROOT_DIR=/absolute/path/to/openssl` | `build/xcode-deps/Ergo.xcodeproj` |
 
 生成コマンドはプロジェクトを構成するだけで、Ergo のビルド・実行・CTest は行わない。
 CMake 自身によるコンパイラ・SDK 検出は行われる。IDE では Debug / Release /
@@ -39,7 +39,7 @@ audio バックエンドは明示的に `dummy` を選択する。
 
 ## 周辺ライブラリのリンク
 
-`-deps` プリセットは既存の固定リビジョン管理を使って kazmath と static libcurl を
+`-deps` プリセットは既存の固定リビジョン管理を使って static libcurl を
 同じ IDE プロジェクト内に取り込む。`ergo_http` も有効にし、libcurl へリンクする。
 include パス・コンパイル定義・システムライブラリ・ビルド順は CMake ターゲットが
 伝播するため、IDE で `.lib` / `.a` のパスを手作業で設定しない。
@@ -48,8 +48,7 @@ include パス・コンパイル定義・システムライブラリ・ビルド
 |---|---|---|
 | Ergo モジュール | `ergo_input`、`ergo_bind` など | Threads / Windows sockets 等も既存の依存設定から伝播 |
 | HTTP | `ergo_http` | libcurl への依存を伝播。Windows TLS は Schannel、Xcode 依存構成は OpenSSL |
-| C 数学ライブラリ | `kazmath` | C コンパイラを有効化。MSVC の CRT は Ergo と同じ動的 CRT |
-| 管理対象ライブラリ一式 | `ergo::thirdparty` | 有効にした kazmath / libcurl をまとめてリンク |
+| 管理対象ライブラリ一式 | `ergo::thirdparty` | 有効にした libcurl をまとめてリンク |
 | FMOD | `ergo_audio` | `FMOD::FMOD` を伝播。実行時の DLL / dylib 配置・macOS の rpath / 署名はホストで設定 |
 | Pictor / Vulkan | `ergo_render`、`ergo_particle` | ホストが先に `pictor` ターゲットを提供し、Vulkan SDK を設定する既存契約を使用 |
 
@@ -60,7 +59,7 @@ include パス・コンパイル定義・システムライブラリ・ビルド
 オフラインで依存込みプロジェクトを生成する例:
 
 ```sh
-cmake --preset vs2022-deps -DERGO_FETCH_DEPENDENCIES=OFF -DERGO_SOURCE_DIR_KAZMATH=C:/deps/kazmath -DERGO_SOURCE_DIR_CURL=C:/deps/curl
+cmake --preset vs2022-deps -DERGO_FETCH_DEPENDENCIES=OFF -DERGO_SOURCE_DIR_CURL=C:/deps/curl
 ```
 
 Xcode も同じ変数を使える。ソース指定が欠けた依存はエラーになり、無言で除外しない。
@@ -78,7 +77,7 @@ project(MyGame LANGUAGES C CXX)
 set(ERGO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ERGO_BUILD_DUMMY OFF CACHE BOOL "" FORCE)
 set(ERGO_AUDIO_BACKEND dummy CACHE STRING "" FORCE)
-set(ERGO_WITH_KAZMATH ON CACHE BOOL "" FORCE)
+set(ERGO_WITH_CURL ON CACHE BOOL "" FORCE)
 set(ERGO_BUILD_HTTP ON CACHE BOOL "" FORCE)
 add_subdirectory(external/ergo)
 add_executable(myapp main.cpp)

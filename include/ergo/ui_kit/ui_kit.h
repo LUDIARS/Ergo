@@ -3,7 +3,7 @@
 /// ergo_ui_kit — リテインドモードの UI コンポーネントフレームワーク。
 ///
 /// 「UI コンポーネントの統括は Ergo、 描画は Pictor、 Input/アニメーションは
-/// Ergo」 の役割分担 (spec/module/ui_framework.md)。 本モジュールはコンポー
+/// Ergo」 の役割分担 (spec/module/ui_kit.md)。 本モジュールはコンポー
 /// ネントツリー・レイアウト解決・(P3+) 入力/アニメを担い、 出力は GPU 非依存の
 /// 描画リスト (`DrawCmd` 配列)。 描画は Pictor `UIRenderer` が請け負う。
 ///

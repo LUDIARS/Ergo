@@ -35,13 +35,6 @@ pinned upstream revisions by the third-party dependency manager
 (`third_party/dependencies.cmake`; see `spec/setup/third-party-deps.md`) and are
 built only when their `ERGO_WITH_<NAME>` switch is enabled.
 
-### kazmath
-
-- Source: https://github.com/Kazade/kazmath
-- Pin: commit `48dbc191da47880ea6708b0a7b3c7b69b6352cad`
-- License: **BSD-2-Clause**
-- Used via: `ERGO_WITH_KAZMATH=ON` → target `kazmath`
-
 ### curl / libcurl
 
 - Source: https://github.com/curl/curl (https://curl.se)

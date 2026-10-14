@@ -24,7 +24,7 @@
 | キー | 既定 | 役割 |
 |---|---|---|
 | `ERGO_BUILD_TESTS`      | ON  | モジュールテストをビルドする (CTest 登録) |
-| `ERGO_BUILD_DUMMY`      | ON  | dummy プラグライブラリ (no-op 実装) をビルドする |
+| `ERGO_BUILD_DUMMY`      | OFF | dummy プラグライブラリ (no-op 実装) をビルドする |
 | `ERGO_BUILD_BENCHMARKS` | OFF | マイクロベンチ実行ファイルをビルドする (opt-in) |
 
 ### モジュール個別スイッチ (`ERGO_BUILD_<名>`、すべて既定 ON)
@@ -100,7 +100,7 @@ CMake 文字列で `\"` を 1 段だけ書く (二重に書くと MSVC で C2017
 
 Visual Studio の `.sln` / Xcode の `.xcodeproj` を生成する場合は
 [IDE プロジェクト生成](ide-projects.md) のプリセットを使う。
-kazmath / libcurl を含む構成と、ホストアプリへのリンク例もそちらに記載する。
+libcurl を含む構成と、ホストアプリへのリンク例もそちらに記載する。
 
 ```bash
 # 1. 構成 (例: テスト込み Release、audio は dummy 固定)

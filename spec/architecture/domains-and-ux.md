@@ -123,7 +123,7 @@
 | `scene-composition` | `scene` / `cast` |
 | `gameplay-rules` | `health` / `score` / `combo_counter` / `timing_judge` / `world_time` / `blackboard` |
 | `vendored-third-party` | `third_party/` |
-| `legacy` | `shuriken_migrator`、`tools/shuriken_migrator/`、`review/`、`.anatomia/domains/` |
+| `legacy` | `shuriken_migrator`、`tools/shuriken_migrator/` (`review/`・`.anatomia/domains/` は §5 の L4・L5 で削除済み) |
 
 モジュール名だけの行は `src/<名>/`・`include/ergo/<名>/`・`tests/<名>/` の 3 本を指す。
 
@@ -153,17 +153,17 @@
 
 ## 5. 古い処理の一覧
 
-| # | 対象 | 何か | 根拠 | 推奨 |
-| --- | --- | --- | --- | --- |
-| L1 | `src` / `include/ergo` / `tests` の `shuriken_migrator`、`tools/shuriken_migrator/` | Unity の ParticleSystem (Shuriken) を Ergo のパーティクル設定に変換するライブラリと CLI | `module_list.md` / `module_list.yaml` / README / `spec/feature/module/` のどれにも載っていない。リポ内で使うのは自分の CLI だけ (`CMakeLists.txt` の `ergo_shuriken_migrator`)。直近の機能追加は特定タイトル向け書き出しの一本化で、Unity からの移行という一回きりの用途 | **移行**: 使っているタイトルのツール側へ移す。移行が済んだら Ergo から削除 |
-| L2 | `tools/ergo/src/plugins/vfx-suggest/ks_export.ts` | VFX 提案の結果を特定タイトルの GPU エミッタ JSON に書き出す処理 | 冒頭コメントのとおり特定タイトル専用。CLAUDE.md の「ゲーム固有のものは Ergo に入れず、ホストのプラグインパックで持つ」に反する | **移行**: ホストのプラグインパックへ。`vfx-suggest` 本体は汎用なので残す |
-| L3 | `include/ergo/bind/json_min.h` | `ergo::common::jsonm` を `ergo::bind::jsonm` として再公開する互換シム | コメントが 2026-04-21 廃止の `ergo_inspector` との共有を前提にしている。利用は `src/bind/bind_engine.cpp` と `tests/bind/test_json_min.cpp` の 2 か所だけ | **移行**: 2 か所を `ergo/common/json_min.h` に直してシムを削除 |
-| L4 | `.anatomia/domains/render-orchestration.json` | spec/domains へ移す前の旧ドメイン定義 | Anatomia は `spec/domains` があるとそちらを優先し、この置き場を読まない。`.gitignore` は `.anatomia/*` を除外しているのに追跡が残っている。範囲は `rendering` と重なる | **削除** |
-| L5 | `review/` (2026-05-13 〜 2026-05-30、`latest.json`) | 日付別のコード規約レビュー記録 | 最終更新は 2026-05-30。現在のレビューはリポの外で別に管理する運用で、ここは更新されていない | **削除** (残したい記録はレビューの管理先へ移す) |
-| L6 | `cmake/deps/kazmath.cmake` と CMake プリセットの kazmath | 外部の数学ライブラリの取り込み | `src/` / `include/` のどこからも参照されず、使うのは疎通テスト `tests/thirdparty/deps_smoke.cpp` だけ。数学は `ergo_math` が持つ | **要確認 → 削除**: 利用側が Ergo 経由で取っていなければ外す |
-| L7 | `*_dummy` プラグライブラリ (`ergo_<名>_dummy`、`ERGO_BUILD_DUMMY` 既定 ON) | API を何もしない実装で差し替えるためのライブラリ | リポ内にリンクする側もテストも無い。`spec/setup/ide-projects.md` は OFF を勧めている。なお `src/audio/audio_engine_dummy.cpp` は FMOD が無いときの実行時フォールバックで別物 | **残す (要確認)**: 利用側が使っていなければ既定を OFF にする |
-| L8 | `spec/feature/tool/acstage.md` / `placer.md` | AdventureCube 固有のツールの仕様 | 実装は AdventureCube 側にあり、`spec/feature/tool/ergo.md` も Ergo から外したと書いている | **移行**: AdventureCube のリポへ |
-| L9 | 一覧のずれ: `module_list.md` / `.yaml` | モジュール一覧 | `ergo_ui_kit` と `ergo_shuriken_migrator` が載っていない。`ergo_ui_kit` には仕様書も無い。仕様書の列は `spec/module/<名>.md` を指すが、多くの実物は `spec/feature/module/` にある | **直す** (別 PR で一覧と仕様書の置き場をそろえる) |
+| # | 対象 | 何か | 根拠 | 推奨 | 結果 (2026-10-14) |
+| --- | --- | --- | --- | --- | --- |
+| L1 | `src` / `include/ergo` / `tests` の `shuriken_migrator`、`tools/shuriken_migrator/` | Unity の ParticleSystem (Shuriken) を Ergo のパーティクル設定に変換するライブラリと CLI | `module_list.md` / `module_list.yaml` / README / `spec/feature/module/` のどれにも載っていない。リポ内で使うのは自分の CLI だけ (`CMakeLists.txt` の `ergo_shuriken_migrator`)。直近の機能追加は特定タイトル向け書き出しの一本化で、Unity からの移行という一回きりの用途 | **移行**: 使っているタイトルのツール側へ移す。移行が済んだら Ergo から削除 | 未着手: 移行先のリポでの作業が先 (別の委託) |
+| L2 | `tools/ergo/src/plugins/vfx-suggest/ks_export.ts` | VFX 提案の結果を特定タイトルの GPU エミッタ JSON に書き出す処理 | 冒頭コメントのとおり特定タイトル専用。CLAUDE.md の「ゲーム固有のものは Ergo に入れず、ホストのプラグインパックで持つ」に反する | **移行**: ホストのプラグインパックへ。`vfx-suggest` 本体は汎用なので残す | 未着手: 移行先のプラグインパックでの作業が先 (別の委託) |
+| L3 | `include/ergo/bind/json_min.h` | `ergo::common::jsonm` を `ergo::bind::jsonm` として再公開する互換シム | コメントが 2026-04-21 廃止の `ergo_inspector` との共有を前提にしている。利用は `src/bind/bind_engine.cpp` と `tests/bind/test_json_min.cpp` の 2 か所だけ | **移行**: 2 か所を `ergo/common/json_min.h` に直してシムを削除 | **済み**: `src/bind/bind_engine.cpp` は翻訳単位内の別名、テストは `ergo::common::jsonm` を直接使う。シムを削除 |
+| L4 | `.anatomia/domains/render-orchestration.json` | spec/domains へ移す前の旧ドメイン定義 | Anatomia は `spec/domains` があるとそちらを優先し、この置き場を読まない。`.gitignore` は `.anatomia/*` を除外しているのに追跡が残っている。範囲は `rendering` と重なる | **削除** | **済み**: 削除して追跡から外した。`legacy` の membership からも外した |
+| L5 | `review/` (2026-05-13 〜 2026-05-30、`latest.json`) | 日付別のコード規約レビュー記録 | 最終更新は 2026-05-30。現在のレビューはリポの外で別に管理する運用で、ここは更新されていない | **削除** (残したい記録はレビューの管理先へ移す) | **済み**: 削除。4 日分の記録 (2026-05-13 / 15 / 17 / 30) はリポ外のレビュー管理先に同じ日付で残っているため移す物は無かった。`legacy` の membership からも外した |
+| L6 | `cmake/deps/kazmath.cmake` と CMake プリセットの kazmath | 外部の数学ライブラリの取り込み | `src/` / `include/` のどこからも参照されず、使うのは疎通テスト `tests/thirdparty/deps_smoke.cpp` だけ。数学は `ergo_math` が持つ | **要確認 → 削除**: 利用側が Ergo 経由で取っていなければ外す | **済み**: 利用側 (Ergo を取り込むゲーム・SDK のリポ) の CMake に `kazmath` / `ERGO_WITH_KAZMATH` の参照が無いことを確かめ、`cmake/deps/kazmath.cmake`・登録・プリセット・疎通テストの kazmath 分・通知を外した。curl は残す |
+| L7 | `*_dummy` プラグライブラリ (`ergo_<名>_dummy`、`ERGO_BUILD_DUMMY` 既定 ON) | API を何もしない実装で差し替えるためのライブラリ | リポ内にリンクする側もテストも無い。`spec/setup/ide-projects.md` は OFF を勧めている。なお `src/audio/audio_engine_dummy.cpp` は FMOD が無いときの実行時フォールバックで別物 | **残す (要確認)**: 利用側が使っていなければ既定を OFF にする | **済み**: 利用側でリンクしている所は無く、Ergo を取り込むリポはどれも `ERGO_BUILD_DUMMY` を OFF に固定していた。既定を OFF にした (ライブラリは残す。`audio_engine_dummy.cpp` は変えていない) |
+| L8 | `spec/feature/tool/acstage.md` / `placer.md` | AdventureCube 固有のツールの仕様 | 実装は AdventureCube 側にあり、`spec/feature/tool/ergo.md` も Ergo から外したと書いている | **移行**: AdventureCube のリポへ | 未着手: 移行先のリポでの作業が先 (別の委託) |
+| L9 | 一覧のずれ: `module_list.md` / `.yaml` | モジュール一覧 | `ergo_ui_kit` と `ergo_shuriken_migrator` が載っていない。`ergo_ui_kit` には仕様書も無い。仕様書の列は `spec/module/<名>.md` を指すが、多くの実物は `spec/feature/module/` にある | **直す** (別 PR で一覧と仕様書の置き場をそろえる) | **済み**: `ergo_ui_kit` を一覧に足し、仕様書 `spec/module/ui_kit.md` のひな形を作った。仕様書の列を実物 (`spec/feature/module/` か `spec/module/`) にそろえた。`ergo_shuriken_migrator` は移行予定なので載せず、両方の一覧に理由を注記 |
 
 古い処理と見えて**残す**もの:
 
@@ -175,7 +175,7 @@
 ## 6. 未決事項 (推奨つき)
 
 1. **コア 4 本の粒度**: 「部品を組み込む」に 7 ビジネスが集まっている。推奨は今のまま。分けるなら「ゲームルールと状態」を別のコアにする。
-2. **L1〜L9 の採否**: 推奨は表のとおり。消すと決めたものは、1 件ずつの削除 PR で `legacy` の membership も一緒に外す。
+2. **L1〜L9 の採否**: 人の判断は「推奨どおり進める」(2026-10-14)。L3〜L7・L9 は 1 本の PR で済ませた (結果は §5 の表)。L1・L2・L8 は移行先のリポでの作業が先なので別に扱う。
 3. **ドメイン名の変更**: `scene-frame` → `scene-composition` などで Anatomia 側の履歴とのつながりが切れる。推奨は受け入れる (旧名が範囲を表していなかったため)。
 4. **キャッチコピー**: §2.1 は AI 案。Pf のキャッチコピー欄は API で保存すると出所が「人」として残るため、欄は空のままにし、案は UX の「体験の設計」に「AI 案・人の承認前」と書いて置いた。推奨は人が案を直して欄へ写すこと (Pf は人の文言を正本にする)。
 5. **`spec/feature/package-hub.md` の記述**: 「可視化は `observability`、`cmake/packages/` は `foundation`」と書いている。並行作業中の設計文書なので本 PR では触らない。推奨は次にその文書を直すときに §4 に合わせること。

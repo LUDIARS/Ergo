@@ -23,7 +23,7 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | キー | 既定 | 役割 |
 |---|---|---|
 | `ERGO_BUILD_TESTS`      | ON  | モジュールテストをビルド (CTest 登録) |
-| `ERGO_BUILD_DUMMY`      | ON  | dummy プラグライブラリをビルド |
+| `ERGO_BUILD_DUMMY`      | OFF | dummy プラグライブラリをビルド |
 | `ERGO_BUILD_BENCHMARKS` | OFF | マイクロベンチをビルド (opt-in) |
 
 ### モジュール個別 (`ERGO_BUILD_<名>`、すべて既定 ON)
@@ -48,7 +48,7 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON     | compute シェーダを `glslc` で SPIR-V に bake |
 | `ERGO_RENDER_REQUIRE_REAL`          | OFF    | 実描画経路の無い desktop 構成を構成エラーにする (Android / iOS は常に必須) |
 
-### サードパーティ・ライブラリ管理 (kazmath / curl)
+### サードパーティ・ライブラリ管理 (curl)
 
 取得 (fetch) してビルドする外部ライブラリのスイッチ。詳細は
 [third-party-deps.md](third-party-deps.md)。
@@ -56,9 +56,8 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | キー | 既定 | 役割 |
 |---|---|---|
 | `ERGO_FETCH_DEPENDENCIES`     | ON     | 依存を upstream から取得してよいかのマスタースイッチ。OFF + override 無しで要求されると FATAL_ERROR |
-| `ERGO_WITH_KAZMATH`           | OFF    | kazmath を取得してビルド (target `kazmath`) |
 | `ERGO_WITH_CURL`              | OFF    | libcurl を取得してビルド (target `CURL::libcurl`) |
-| `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF    | スモークテストをビルド (kazmath + curl を強制 ON) |
+| `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF    | スモークテストをビルド (curl を強制 ON) |
 | `ERGO_CURL_USE_SSL`           | ON     | curl の TLS backend を有効化 (Windows は Schannel) |
 | `ERGO_DEPENDENCY_CACHE_DIR`   | (空)   | 取得ソースの共有キャッシュ dir (空 = `<build>/_deps`) |
 | `ERGO_SOURCE_DIR_<UPPER>`     | (空)   | その依存を fetch せずローカルソースで差し替える (オフライン用) |

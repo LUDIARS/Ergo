@@ -29,10 +29,9 @@
     },
     {
       "name": "vs2022-deps",
-      "displayName": "Visual Studio 2022 (x64, kazmath + libcurl)",
+      "displayName": "Visual Studio 2022 (x64, libcurl)",
       "inherits": "vs2022",
       "cacheVariables": {
-        "ERGO_WITH_KAZMATH": true,
         "ERGO_WITH_CURL": true,
         "ERGO_BUILD_HTTP": true
       }
@@ -58,10 +57,9 @@
     },
     {
       "name": "xcode-deps",
-      "displayName": "Xcode (macOS, kazmath + libcurl/OpenSSL)",
+      "displayName": "Xcode (macOS, libcurl/OpenSSL)",
       "inherits": "xcode",
       "cacheVariables": {
-        "ERGO_WITH_KAZMATH": true,
         "ERGO_WITH_CURL": true,
         "ERGO_BUILD_HTTP": true,
         "CURL_USE_OPENSSL": true

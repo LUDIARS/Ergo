@@ -7,7 +7,7 @@ Ergo が Pictor / Tela などの LUDIARS 製 C++ パッケージの版を 1 か�
 
 - 対象: ホストにリンクされる LUDIARS 製 C++ パッケージ (link)、取得だけするもの (tool: Lapilli)、
   読むだけの関連リポ (observe: MUSA 系・Curare)
-- 対象外: 第三者ライブラリ (kazmath / curl など) は従来どおり
+- 対象外: 第三者ライブラリ (curl など) は従来どおり
   [`third-party-deps.md`](third-party-deps.md) の仕組み
 
 ## 必要なもの

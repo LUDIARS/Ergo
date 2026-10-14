@@ -8,7 +8,7 @@ LUDIARS / AdventureCube などのアプリで共通利用する C++17 モジュ�
 設定・ビルド手順は用途別に [`spec/setup/`](spec/setup/) にまとめてある:
 
 - [C++ モジュールをビルド](spec/setup/build-cpp.md) / [tools/ergo を起動](spec/setup/run-tools-ergo.md) / [外部プラグイン (ERGO_PLUGIN_DIR)](spec/setup/external-plugins.md) / [プラグインのデータルート](spec/setup/plugin-data-roots.md) / [ブランチ+PR 運用](spec/setup/branch-and-pr.md)
-- [サードパーティ・ライブラリ管理 (kazmath / curl)](spec/setup/third-party-deps.md)
+- [サードパーティ・ライブラリ管理 (curl)](spec/setup/third-party-deps.md)
 - [LUDIARS パッケージ・ハブ (Pictor / Tela の版固定・取り込み・照合、`ergo-packages.json`)](spec/setup/packages.md)
 - [Visual Studio / Xcode プロジェクト生成 (依存ライブラリのリンクを含む)](spec/setup/ide-projects.md)
 - 全設定キー: [spec/setup/config-reference.md](spec/setup/config-reference.md)
