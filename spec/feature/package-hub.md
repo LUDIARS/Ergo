@@ -5,7 +5,7 @@
 - 依頼: `spec/tasks/2026-10-14-package-hub-design-request.md`
 - 素案: `spec/plan/2026-10-14-package-hub-fable.md` (Fable)、`spec/plan/2026-10-14-package-hub-opus.md` (Opus)
 - 種別: 設計 (正本)。実装・ビルド・実ホストでの確認は含まない。
-- 実装状況: S1 (マニフェストと規則、記録のみ) を実装済み — `spec/tasks/2026-10-14-package-hub-s1.md`。S2 以降は未着手
+- 実装状況: S1 (マニフェストと規則、記録のみ) — `spec/tasks/2026-10-14-package-hub-s1.md`、S2 (取り込み) — `spec/tasks/2026-10-14-package-hub-s2.md` を実装済み。S3 以降は未着手
 
 人間の指示 (neco 2026-10-14): 「Ergoがコンテンツの各LUDIARSのパッケージをまとめてリンク/管理するようにします。
 各パッケージのバージョン、何をリンクしているか、MUSAや関連パッケージは何を使用しているかなどを可視化します。
@@ -257,6 +257,10 @@ cmake/packages/ErgoPackages.cmake         解決 (経路選択・add_subdirector
 cmake/packages/ErgoPackageManifest.cmake  マニフェストの読み取り (JSON → リスト変数。S1 で分離)
 cmake/packages/ErgoPackageRules.cmake     純粋な検査規則
 cmake/packages/ErgoPackageReport.cmake    resolved.json の書き出しと File API query の設置
+cmake/packages/ErgoPackageRulesAcquire.cmake  取り込み段の純粋な検査規則 (PKG-03/04/05/07/08/09/10/16。S2 で分離)
+cmake/packages/ErgoPackageResolve.cmake   6 経路の選択と取得 (S2 で ErgoPackages.cmake から分離)
+cmake/packages/ErgoPackageGit.cmake       checkout への読み取り専用の git 照会 (HEAD・祖先・dirty・タグ。S2)
+cmake/packages/ErgoPackageWiring.cmake    結線ファイルが呼ぶ部品 (cache 既定値・feature 写像・add_subdirectory・検証・exports。S2)
 cmake/packages/{pictor,tela}.cmake        1 パッケージ 1 ファイルの結線
 include|src|tests/graph_layout/           ergo_graph_layout   汎用の層別配置 → tela_graph::Graph (下層、shared 層)
 include|src|tests/package_model/          ergo_package_model  resolved.json / File API / 観測スキャン → PackageModel (読むだけ)

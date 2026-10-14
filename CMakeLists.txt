@@ -1211,11 +1211,12 @@ if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)
 endif()
 
 # ---------------------------------------------------------------------------
-# tests/packages/ — package hub rule tests (cmake -P, no compiler needed) and
-# the M0 invariance configure test (C-5). See spec/data/ergo-packages.md.
+# tests/packages/ — package hub rule tests (cmake -P, no compiler needed), the
+# M0 invariance configure test (C-5) and the S2 route tests on fake packages
+# (git repositories created by the test). See spec/data/ergo-packages.md.
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_TESTS)
-    foreach(NAME manifest rules cycles features report)
+    foreach(NAME manifest rules cycles features report acquire)
         add_test(NAME test_packages_${NAME}
             COMMAND ${CMAKE_COMMAND}
                 -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -1228,4 +1229,14 @@ if(ERGO_BUILD_TESTS)
             -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/m0_invariance
             -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_m0_invariance.cmake)
+    find_package(Git QUIET)
+    if(GIT_EXECUTABLE)
+        add_test(NAME test_packages_hub_routes
+            COMMAND ${CMAKE_COMMAND}
+                -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/hub_routes
+                -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
+                -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_hub_routes.cmake)
+    endif()
 endif()

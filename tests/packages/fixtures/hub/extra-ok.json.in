@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "packages": {
+    "gamma": {
+      "kind": "link",
+      "code": "Fg",
+      "repository": "@GAMMA_URL@",
+      "rev": "@GAMMA_REV@",
+      "platforms": ["desktop", "emscripten"],
+      "cmake": {
+        "minimum": "3.20",
+        "wiring": "@WIRING_DIR@/gamma.cmake",
+        "targets": ["gamma"],
+        "find_package": null,
+        "cache": {}
+      },
+      "requires": {}
+    }
+  }
+}

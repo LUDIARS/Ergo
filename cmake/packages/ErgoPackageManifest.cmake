@@ -11,17 +11,29 @@
 # Sets in the caller's scope (names are sorted):
 #   <prefix>_SCHEMA, <prefix>_ERRORS (schema problems, one text per entry)
 #   <prefix>_PACKAGES / _LINK / _TOOLS / _MODULES / _OBSERVE
-#   per package  <prefix>_PKG_<n>_{KIND,CODE,REPOSITORY,REV,EXPECT_TAG,
-#                PLATFORMS,CMAKE_MINIMUM,TARGETS,FIND_PACKAGE,REQUIRES,
-#                FEATURES,CACHE,ACQUIRE,PATH}
+#   <prefix>_DIR (directory of the manifest), <prefix>_VARS (names of every
+#   per-entry variable below, for ergo_pkg_manifest_merge)
+#   per package  <prefix>_PKG_<n>_{KIND,CODE,REPOSITORY,REPO_NAME,REV,
+#                EXPECT_TAG,PLATFORMS,CMAKE_MINIMUM,WIRING,TARGETS,
+#                FIND_PACKAGE,REQUIRES,FEATURES,CACHE,EXPORTS,ACQUIRE,PATH,
+#                MANIFEST_DIR}
+#                (REPO_NAME: last path element of `repository` without .git,
+#                 the sibling-checkout directory name; WIRING: absolute path)
 #   per feature  <prefix>_PKG_<n>_FEAT_<f>_{DEFAULT,PLATFORMS,RESERVED,
-#                PROVIDES,CONTRACT,REQUIRES,CONFLICTS}
+#                PROVIDES,CONTRACT,REQUIRES,CONFLICTS,CACHE}
 #   per module   <prefix>_MOD_<m>_{NEEDS,OPTIONAL,NEED_KIND,WHEN,PORTED_FROM,
 #                REAL_PATH_VAR,REASON_VAR}
 #   per observe  <prefix>_OBS_<o>_{CODE,PATH_HINT,GROUP,RELATIONS}
 #                (RELATIONS entries are "<from>:<kind>")
+#
+#   ergo_pkg_manifest_merge(<prefix> <extra_prefix> <out_findings>)
+#
+# Adds the entries of a second loaded manifest (ERGO_PACKAGE_MANIFEST_EXTRA)
+# to <prefix>. A name already present is not merged and becomes a PKG-15
+# error finding (a host extra manifest must not redefine public entries).
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageRules.cmake")
 
 # Internal: string member at <path...>, or "" when absent / null.
 function(_ergo_pkg_json_string out_var json)
@@ -92,6 +104,7 @@ function(ergo_pkg_manifest_load prefix file)
 
     set(_out "")       # names of every variable to hand back
     set(_errors "")
+    get_filename_component(_dir "${file}" DIRECTORY)
 
     _ergo_pkg_json_string(_schema "${_json}" schema)
     if(NOT _schema STREQUAL "1")
@@ -110,16 +123,27 @@ function(ergo_pkg_manifest_load prefix file)
         _ergo_pkg_json_string(${_p}_EXPECT_TAG  "${_json}" packages "${_n}" expect_tag)
         _ergo_pkg_json_array (${_p}_PLATFORMS   "${_json}" packages "${_n}" platforms)
         _ergo_pkg_json_string(${_p}_CMAKE_MINIMUM "${_json}" packages "${_n}" cmake minimum)
+        _ergo_pkg_json_string(${_p}_WIRING      "${_json}" packages "${_n}" cmake wiring)
         _ergo_pkg_json_array (${_p}_TARGETS     "${_json}" packages "${_n}" cmake targets)
         _ergo_pkg_json_string(${_p}_FIND_PACKAGE "${_json}" packages "${_n}" cmake find_package name)
         _ergo_pkg_json_pairs (${_p}_CACHE       "${_json}" packages "${_n}" cmake cache)
+        _ergo_pkg_json_pairs (${_p}_EXPORTS     "${_json}" packages "${_n}" exports)
         _ergo_pkg_json_keys  (${_p}_REQUIRES    "${_json}" packages "${_n}" requires)
         _ergo_pkg_json_string(${_p}_ACQUIRE     "${_json}" packages "${_n}" acquire)
         _ergo_pkg_json_string(${_p}_PATH        "${_json}" packages "${_n}" path)
         _ergo_pkg_json_keys  (${_p}_FEATURES    "${_json}" packages "${_n}" features)
-        list(APPEND _out ${_p}_KIND ${_p}_CODE ${_p}_REPOSITORY ${_p}_REV ${_p}_EXPECT_TAG
-            ${_p}_PLATFORMS ${_p}_CMAKE_MINIMUM ${_p}_TARGETS ${_p}_FIND_PACKAGE ${_p}_CACHE
-            ${_p}_REQUIRES ${_p}_ACQUIRE ${_p}_PATH ${_p}_FEATURES)
+        if(NOT ${_p}_WIRING STREQUAL "" AND NOT IS_ABSOLUTE "${${_p}_WIRING}")
+            set(${_p}_WIRING "${_dir}/${${_p}_WIRING}")
+        endif()
+        set(${_p}_REPO_NAME "")
+        if(${_p}_REPOSITORY MATCHES "([^/:]+)/*$")
+            string(REGEX REPLACE "[.]git$" "" ${_p}_REPO_NAME "${CMAKE_MATCH_1}")
+        endif()
+        set(${_p}_MANIFEST_DIR "${_dir}")
+        list(APPEND _out ${_p}_KIND ${_p}_CODE ${_p}_REPOSITORY ${_p}_REPO_NAME ${_p}_REV
+            ${_p}_EXPECT_TAG ${_p}_PLATFORMS ${_p}_CMAKE_MINIMUM ${_p}_WIRING ${_p}_TARGETS
+            ${_p}_FIND_PACKAGE ${_p}_CACHE ${_p}_EXPORTS ${_p}_REQUIRES ${_p}_ACQUIRE ${_p}_PATH
+            ${_p}_FEATURES ${_p}_MANIFEST_DIR)
 
         if(${_p}_KIND STREQUAL "link")
             list(APPEND _link "${_n}")
@@ -138,13 +162,14 @@ function(ergo_pkg_manifest_load prefix file)
             _ergo_pkg_json_string(${_q}_CONTRACT  "${_json}" packages "${_n}" features "${_f}" contract)
             _ergo_pkg_json_array (${_q}_REQUIRES  "${_json}" packages "${_n}" features "${_f}" requires)
             _ergo_pkg_json_array (${_q}_CONFLICTS "${_json}" packages "${_n}" features "${_f}" conflicts)
+            _ergo_pkg_json_pairs (${_q}_CACHE     "${_json}" packages "${_n}" features "${_f}" cache)
             if(${_q}_RESERVED STREQUAL "ON")
                 set(${_q}_RESERVED TRUE)
             else()
                 set(${_q}_RESERVED FALSE)
             endif()
             list(APPEND _out ${_q}_DEFAULT ${_q}_PLATFORMS ${_q}_RESERVED ${_q}_PROVIDES
-                ${_q}_CONTRACT ${_q}_REQUIRES ${_q}_CONFLICTS)
+                ${_q}_CONTRACT ${_q}_REQUIRES ${_q}_CONFLICTS ${_q}_CACHE)
         endforeach()
     endforeach()
 
@@ -202,7 +227,69 @@ function(ergo_pkg_manifest_load prefix file)
     set(${prefix}_TOOLS    "${_tools}"    PARENT_SCOPE)
     set(${prefix}_MODULES  "${_modules}"  PARENT_SCOPE)
     set(${prefix}_OBSERVE  "${_observe}"  PARENT_SCOPE)
+    set(${prefix}_DIR      "${_dir}"      PARENT_SCOPE)
+    set(${prefix}_VARS     "${_out}"      PARENT_SCOPE)
     foreach(_v IN LISTS _out)
         set(${_v} "${${_v}}" PARENT_SCOPE)
     endforeach()
+endfunction()
+
+# Internal: does variable name <var> belong to entry <name> of <section>
+# (PKG / MOD / OBS) under <prefix>?
+function(_ergo_pkg_manifest_owns out_var var prefix section name)
+    string(LENGTH "${prefix}_${section}_${name}_" _len)
+    string(SUBSTRING "${var}" 0 ${_len} _head)
+    if(_head STREQUAL "${prefix}_${section}_${name}_")
+        set(${out_var} TRUE PARENT_SCOPE)
+    else()
+        set(${out_var} FALSE PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(ergo_pkg_manifest_merge prefix extra out_findings)
+    set(_findings "")
+    set(_base_names ${${prefix}_PACKAGES} ${${prefix}_MODULES} ${${prefix}_OBSERVE})
+    set(_extra_names ${${extra}_PACKAGES} ${${extra}_MODULES} ${${extra}_OBSERVE})
+    ergo_pkg_rule_collisions(_findings BASE_NAMES ${_base_names} EXTRA_NAMES ${_extra_names})
+
+    set(_vars ${${prefix}_VARS})
+    foreach(_e IN LISTS ${extra}_ERRORS)
+        list(APPEND ${prefix}_ERRORS "extra manifest: ${_e}")
+    endforeach()
+    foreach(_pair PKG:PACKAGES MOD:MODULES OBS:OBSERVE)
+        string(REPLACE ":" ";" _pair "${_pair}")
+        list(GET _pair 0 _section)
+        list(GET _pair 1 _list)
+        foreach(_n IN LISTS ${extra}_${_list})
+            if(_n IN_LIST _base_names)
+                continue()
+            endif()
+            list(APPEND ${prefix}_${_list} "${_n}")
+            if(_section STREQUAL "PKG")
+                if(${extra}_PKG_${_n}_KIND STREQUAL "link")
+                    list(APPEND ${prefix}_LINK "${_n}")
+                elseif(${extra}_PKG_${_n}_KIND STREQUAL "tool")
+                    list(APPEND ${prefix}_TOOLS "${_n}")
+                endif()
+            endif()
+            foreach(_v IN LISTS ${extra}_VARS)
+                _ergo_pkg_manifest_owns(_mine "${_v}" "${extra}" "${_section}" "${_n}")
+                if(_mine)
+                    string(LENGTH "${extra}" _plen)
+                    string(SUBSTRING "${_v}" ${_plen} -1 _tail)
+                    set(${prefix}${_tail} "${${_v}}" PARENT_SCOPE)
+                    list(APPEND _vars "${prefix}${_tail}")
+                endif()
+            endforeach()
+        endforeach()
+        list(SORT ${prefix}_${_list})
+        set(${prefix}_${_list} "${${prefix}_${_list}}" PARENT_SCOPE)
+    endforeach()
+    list(SORT ${prefix}_LINK)
+    list(SORT ${prefix}_TOOLS)
+    set(${prefix}_LINK   "${${prefix}_LINK}"   PARENT_SCOPE)
+    set(${prefix}_TOOLS  "${${prefix}_TOOLS}"  PARENT_SCOPE)
+    set(${prefix}_ERRORS "${${prefix}_ERRORS}" PARENT_SCOPE)
+    set(${prefix}_VARS   "${_vars}"            PARENT_SCOPE)
+    set(${out_findings}  "${_findings}"        PARENT_SCOPE)
 endfunction()

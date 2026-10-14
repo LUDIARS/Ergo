@@ -25,17 +25,17 @@
 |---|---|---|
 | `kind` | `"link"` | |
 | `code` | 文字列 | LUDIARS のプロジェクトコード (図の札用) |
-| `repository` | 文字列 | 取得元の URL (取得は S2) |
+| `repository` | 文字列 | 取得元の URL。末尾名 (`.git` を除く) が兄弟チェックアウトのディレクトリ名 (`Pictor`) |
 | `rev` | 文字列 | **40 桁の小文字 commit SHA だけ**。ブランチ名・短縮 SHA・タグは PKG-02 |
-| `expect_tag` | 文字列 / なし | 人向け注釈。checkout にあれば pin がその子孫かを照合する (PKG-08、S2) |
+| `expect_tag` | 文字列 / なし | 人向け注釈。checkout にあれば pin がその子孫かを照合する (PKG-08) |
 | `platforms` | 文字列配列 | `desktop` / `android` / `ios` / `emscripten` |
 | `cmake.minimum` | 文字列 | パッケージが要る CMake。実行中の CMake より新しければ PKG-11 |
-| `cmake.wiring` | 文字列 | 1 パッケージ 1 ファイルの結線 (`cmake/packages/<name>.cmake`、S2) |
-| `cmake.targets` | 文字列配列 | パッケージが作るターゲット。M0 ではこの有無を記録する |
-| `cmake.find_package` | オブジェクト / null | `{ "name": "<Pkg>" }`。インストール済み経路を許すもの (S2) |
-| `cmake.cache` | オブジェクト | パッケージ側キャッシュ変数の既定値 (ホスト未設定なら設定、FORCE しない。S2) |
+| `cmake.wiring` | 文字列 | 1 パッケージ 1 ファイルの結線 (`cmake/packages/<name>.cmake`)。マニフェストのあるディレクトリからの相対 (絶対パスも可) |
+| `cmake.targets` | 文字列配列 | パッケージが作るターゲット。M0 ではこの有無を記録する。どの機能の `provides` にも無いものは常に必須、ある機能の `provides` にも載るもの (Pictor の `pictor` は `vulkan`) はその機能が選ばれたときだけ必須 (PKG-10) |
+| `cmake.find_package` | オブジェクト / null | `{ "name": "<Pkg>" }`。インストール済み経路 (`find_package(<Pkg> CONFIG)`) を許すもの。STRICT では使わない |
+| `cmake.cache` | オブジェクト | パッケージ側キャッシュ変数の既定値 (ホスト未設定なら設定、FORCE しない。ホストの別値とは PKG-15) |
 | `features` | オブジェクト | 機能名 → 機能 (下表) |
-| `exports` | オブジェクト | 親スコープへ渡す名前付きパス (ソースからの相対。S2) |
+| `exports` | オブジェクト | Ergo のディレクトリへ通常変数として渡す名前付きパス (パッケージのルートからの相対、渡すのは絶対パス) |
 | `requires` | オブジェクト | 依存する他の link パッケージ名をキーに持つ。未選択なら PKG-11、循環は PKG-12 |
 
 ### `features.<feature>`
@@ -44,9 +44,9 @@
 |---|---|---|
 | `default` | `"auto"` / `"on"` / `"off"` | `auto` は `platforms` が空か、今の platform を含むとき ON。それ以外の値は PKG-13 |
 | `platforms` | 文字列配列 | 機能が成り立つ platform。外れた platform で選ぶと PKG-13 |
-| `cache` | オブジェクト | 有効時にパッケージ側へ流すキャッシュ変数 (S2) |
+| `cache` | オブジェクト | 有効時にパッケージ側へ流す変数 (結線のスコープ内の通常変数。`option()` は CMP0077 NEW で従う) |
 | `provides` | 文字列配列 | 有効時に存在すべきターゲット。空でない機能を「描画 feature」として扱う |
-| `contract` | 文字列 | ターゲットが公開する compile definition (例 `PICTOR_HAS_VULKAN`) |
+| `contract` | 文字列 | `provides` の先頭ターゲットが `INTERFACE_COMPILE_DEFINITIONS` に公開すべき定義 (例 `PICTOR_HAS_VULKAN`、`=値` 付きも可)。無ければ PKG-10 |
 | `requires` | 文字列配列 | 同じパッケージの機能名 (または `<package>` / `<package>/<feature>`)。未選択は PKG-11、循環は PKG-12 |
 | `conflicts` | 文字列配列 | 同時に選べない機能名。両方選ぶと PKG-13 |
 | `reserved` | 真偽 | 名前だけの予約。選ぶと PKG-13。Pictor の webgpu / d3d12 / metal は multi-RHI の段階に合わせて外す |
@@ -101,23 +101,27 @@
 - `severity`: `error` / `warning` / `record`
 - `subject`: パッケージ名、`<package>/<feature>`、モジュール名、またはキャッシュ変数名
 
-S1 で判定するのは PKG-01 / 02 / 06 / 11 / 12 / 13 / 14 / 15。
+構成時に判定するのは PKG-01〜16 (S1: 01 / 02 / 06 / 11 / 12 / 13 / 14 / 15、S2: 03 / 04 / 05 / 07 / 08 / 09 / 10 / 16。
+規則は `cmake/packages/ErgoPackageRules.cmake` と `ErgoPackageRulesAcquire.cmake`)。PKG-17 は可視化段 (S3)。
 
 ## `<build>/ergo-packages.resolved.json`
 
-構成の最後 (Ergo を含むディレクトリの末尾、`cmake_language(DEFER)`) に `file(CONFIGURE)` で 1 回書く。
+構成の最後 (Ergo を含むディレクトリの末尾、`cmake_language(DEFER)`) に `file(CONFIGURE)` で 1 回書く
+(取り込みの段階で error があり include 時点で止める場合は、そのときに 1 回書く)。
 時刻を持たず、キーと配列はすべて整列済みなので **同じ構成なら同じバイト列** になり、内容が同じなら書き直さない。
 
 | キー | 意味 |
 |---|---|
 | `schema` | `1` |
-| `mode` | `M0` (`ERGO_PACKAGES` 未設定) / `selected` (設定済み。S1 は検査と記録だけ) |
+| `mode` | `M0` (`ERGO_PACKAGES` 未設定) / `M1` (選んだパッケージがすべてホスト供給) / `M2` (すべてハブが取り込み) / `M1+M2` |
 | `strict` | `ERGO_PACKAGES_STRICT` |
+| `fetch` | `ERGO_PACKAGES_FETCH` |
+| `manifest_extra` | `ERGO_PACKAGE_MANIFEST_EXTRA` の絶対パス (なければ null) |
 | `platform` | `desktop` / `android` / `ios` / `emscripten` |
 | `cmake_version` | 実行中の CMake |
 | `manifest` | 読んだマニフェスト (Ergo ルートからの相対) |
 | `selected` | `ERGO_PACKAGES` の中身 |
-| `packages.<n>` (link) | `pin` / `expect_tag` / `rev_override` / `state` / `source_dir` / `imported` / `targets_present` / `features` / `version` |
+| `packages.<n>` (link) | `pin` / `expect_tag` / `rev_override` / `state` / `source_dir` / `imported` / `targets_present` / `features` / `version`、S2: `route` (`host` / `provided` / `source` / `sibling` / `installed` / `fetch` / `none`) / `mode` (`M1` / `M2`) / `head` / `drift` (`none` / `ahead` / `behind` / `diverged` / `unknown`) / `dirty` / `exports` (`<VAR>=<絶対パス>`) |
 | `packages.<n>` (tool) | `path` / `gitlink` / `initialized` / `state` (= `acquire`) |
 | `modules.<m>` | `enabled` (ターゲットの有無) / `needs` / `optional` / `ported_from` / `reason` |
 | `observe.<o>` | マニフェストの写し |
@@ -128,6 +132,7 @@ link パッケージの `state`:
 | 値 | 意味 |
 |---|---|
 | `host-unmanaged` | Ergo を include する前にホストが作っていた (M0 の記録対象) |
+| `hub-managed` | ハブが取り込んだ (`source` / `sibling` / `installed` / `fetch`) |
 | `module-found` | include の後に Ergo のモジュール節が見つけた (例: `ergo_tela_graph` の `find_package(Tela)`) |
 | `absent` | 構成の終わりまで `cmake.targets` のどれも無い |
 

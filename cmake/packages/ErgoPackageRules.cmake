@@ -14,8 +14,9 @@
 #   subject:  package, feature (<package>/<feature>) or module name
 #   message:  plain text without ';' or '|'
 #
-# Rules handled in stage S1: PKG-01/02/06/11/12/13/14/15. The acquisition
-# rules (PKG-03/04/05/07/08/09/10/16) arrive with stage S2.
+# Rules here: PKG-01/02/06/11/12/13/14/15 (stage S1). The acquisition rules
+# (PKG-03/04/05/07/08/09/10/16, stage S2) live in ErgoPackageRulesAcquire.cmake,
+# included at the end of this file so callers include one file.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
 
@@ -481,3 +482,5 @@ function(ergo_pkg_rule_collisions out_var)
     endforeach()
     set(${out_var} "${_findings}" PARENT_SCOPE)
 endfunction()
+
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageRulesAcquire.cmake")

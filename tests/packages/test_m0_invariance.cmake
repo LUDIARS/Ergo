@@ -1,7 +1,8 @@
 # Acceptance C-5 (configure-level): with ERGO_PACKAGES unset the hub leaves
 # the host's target set and compile definitions untouched and only records.
-# Also exercises the selected mode end to end (PKG-01 / PKG-14 stop the
-# configure, a valid selection passes with the S1 "record only" warning).
+# Also exercises the selected mode end to end on the host route (M1):
+# PKG-01 / PKG-13 / PKG-14 stop the configure, a valid selection passes with
+# the host-provided pictor checked against its pin.
 #
 # Configures tests/packages/fixtures/m0_host (project NONE: no compiler).
 # For the whole-tree comparison against a baseline checkout see
@@ -45,9 +46,10 @@ run_case(m0 pass "ergo packages: mode=M0 \\(pictor=host-unmanaged, tela=absent\\
 run_case(selected_unknown fail "PKG-01\\|error\\|picter"
     -DERGO_PACKAGES=picter -DFIXTURE_EXPECT_MODE=selected)
 
-# Selected mode, valid selection with a real path: passes, records only.
-run_case(selected_ok pass "stage S1 only checks and records"
-    -DERGO_PACKAGES=pictor -DFIXTURE_REAL_PATH=ON -DFIXTURE_EXPECT_MODE=selected)
+# Selected mode, valid selection with a real path: the host-created pictor
+# is taken through the host route (M1) and passes.
+run_case(selected_ok pass "ergo packages: mode=M1 [(]pictor=host-unmanaged/host"
+    -DERGO_PACKAGES=pictor -DFIXTURE_REAL_PATH=ON -DFIXTURE_EXPECT_MODE=M1)
 
 # Selected mode, real path missing: PKG-14 is an error outside M0.
 run_case(selected_no_real_path fail "PKG-14\\|error\\|ergo_render"
@@ -62,7 +64,7 @@ run_case(selected_reserved fail "PKG-13\\|error\\|pictor/webgpu"
 run_case(selected_override pass "PKG-06\\|warning\\|pictor"
     -DERGO_PACKAGES=pictor -DFIXTURE_REAL_PATH=ON
     -DERGO_PACKAGE_REV_PICTOR=4142f77c0775e1c3ad93733526085c56523ea9dc
-    -DFIXTURE_EXPECT_MODE=selected)
+    -DFIXTURE_EXPECT_MODE=M1)
 run_case(selected_override_strict fail "PKG-06\\|error\\|pictor"
     -DERGO_PACKAGES=pictor -DFIXTURE_REAL_PATH=ON -DERGO_PACKAGES_STRICT=ON
     -DERGO_PACKAGE_REV_PICTOR=4142f77c0775e1c3ad93733526085c56523ea9dc

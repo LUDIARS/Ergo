@@ -38,6 +38,18 @@
       }
     },
     {
+      "name": "ci-packages",
+      "displayName": "CI: package hub fetch + STRICT (Pictor / Tela at the manifest pins)",
+      "description": "ERGO_PACKAGES=pictor;tela acquired by the hub (ERGO_PACKAGES_FETCH=ON) with every warning-level finding as an error (ERGO_PACKAGES_STRICT=ON). See spec/setup/packages.md.",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "ERGO_PACKAGES": "pictor;tela",
+        "ERGO_PACKAGES_FETCH": true,
+        "ERGO_PACKAGES_STRICT": true,
+        "ERGO_BUILD_TESTS": true
+      }
+    },
+    {
       "name": "xcode",
       "displayName": "Xcode (macOS, host architecture)",
       "inherits": "ide-base",
@@ -61,6 +73,7 @@
     { "name": "vs2022-release", "configurePreset": "vs2022", "configuration": "Release" },
     { "name": "vs2022-deps-debug", "configurePreset": "vs2022-deps", "configuration": "Debug" },
     { "name": "vs2022-deps-release", "configurePreset": "vs2022-deps", "configuration": "Release" },
+    { "name": "ci-packages", "configurePreset": "ci-packages" },
     { "name": "xcode-debug", "configurePreset": "xcode", "configuration": "Debug" },
     { "name": "xcode-release", "configurePreset": "xcode", "configuration": "Release" },
     { "name": "xcode-deps-debug", "configurePreset": "xcode-deps", "configuration": "Debug" },

@@ -3,21 +3,23 @@
 #
 # Included once from the top-level CMakeLists.txt, right after the managed
 # third-party registry and before any module section. Design:
-# spec/feature/package-hub.md (manifest §2, checks §4, modes §6).
+# spec/feature/package-hub.md (manifest §2, routes §3, checks §4, modes §6).
 #
-# Stage S1 (this file): manifest + rules + record only.
-#   * ERGO_PACKAGES unset  -> compatibility mode M0. The hub acquires nothing
+#   * ERGO_PACKAGES unset -> compatibility mode M0. The hub acquires nothing
 #     and changes nothing: link-package targets the host already created are
 #     recorded as host-unmanaged, every finding is recorded, configure never
 #     fails because of the hub.
-#   * ERGO_PACKAGES set    -> the selection is checked (PKG-01/02/06/11/12/
-#     13/14/15) and errors stop the configure, all listed at once. Acquisition
-#     routes (host-provided SHA check, local source, sibling, fetch) arrive in
-#     stage S2; until then nothing is add_subdirectory'd here either.
+#   * ERGO_PACKAGES set   -> every selected package is resolved now, before
+#     the module sections (ErgoPackageResolve.cmake, six routes). A package
+#     the host already created is checked against its pin (M1); the others
+#     are acquired by the hub (M2). Errors stop the configure, all listed at
+#     once: at include time when resolution already failed, otherwise at the
+#     end of the directory (module needs, late "provided" packages, tools).
 #
-# Results: <build>/ergo-packages.resolved.json (written once at the end of
-# this directory, byte-identical for the same configuration) and the File API
-# query <build>/.cmake/api/v1/query/client-ergo/query.json.
+# Results: <build>/ergo-packages.resolved.json (written once, byte-identical
+# for the same configuration) and the File API query
+# <build>/.cmake/api/v1/query/client-ergo/query.json. Each package's
+# `exports` become normal variables of the including directory.
 #
 # This file names no concrete package: everything comes from the manifest.
 # ---------------------------------------------------------------------------
@@ -26,6 +28,7 @@ include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageManifest.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageRules.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageReport.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageResolve.cmake")
 
 # Do not create the cache entry when the host already set a normal variable
 # (set(CACHE) would otherwise drop that binding under CMP0126 OLD).
@@ -35,6 +38,16 @@ if(NOT DEFINED ERGO_PACKAGES)
 endif()
 option(ERGO_PACKAGES_STRICT
     "Ergo package hub: treat warning-level findings as configure errors (CI / shipping)" OFF)
+option(ERGO_PACKAGES_FETCH
+    "Ergo package hub: allow fetching selected packages at their pinned SHA (network)" OFF)
+if(NOT DEFINED ERGO_PACKAGES_SIBLING_ROOT)
+    set(ERGO_PACKAGES_SIBLING_ROOT "" CACHE PATH
+        "Ergo package hub: opt-in sibling checkouts, only <root>/<Repo> is read (empty = off)")
+endif()
+if(NOT DEFINED ERGO_PACKAGE_MANIFEST_EXTRA)
+    set(ERGO_PACKAGE_MANIFEST_EXTRA "" CACHE FILEPATH
+        "Ergo package hub: host-side extra manifest (private packages); reusing a public name is an error")
+endif()
 
 # Test hook: tests/packages/ point this at fixture manifests.
 if(NOT DEFINED ERGO_PACKAGES_MANIFEST_FILE)
@@ -86,7 +99,8 @@ function(_ergo_packages_describe_target target out_source out_imported out_versi
     set(${out_version} "${_version}" PARENT_SCOPE)
 endfunction()
 
-# gitlink SHA recorded in the Ergo tree for a submodule path ("" without git).
+# gitlink SHA recorded in the tree at <root> for a submodule path ("" without
+# git or outside a repository).
 function(_ergo_packages_gitlink out_var root path)
     set(_sha "")
     find_package(Git QUIET)
@@ -102,10 +116,33 @@ function(_ergo_packages_gitlink out_var root path)
     set(${out_var} "${_sha}" PARENT_SCOPE)
 endfunction()
 
+# Load the manifest (plus ERGO_PACKAGE_MANIFEST_EXTRA) into <prefix>_* of the
+# caller; extra-manifest name collisions land in <out_findings>. A macro so
+# the loaded variables stay in the calling function's scope.
+macro(_ergo_packages_load prefix out_findings)
+    get_property(_ergo_pkg_manifest_file GLOBAL PROPERTY ERGO_PACKAGES_MANIFEST)
+    ergo_pkg_manifest_load(${prefix} "${_ergo_pkg_manifest_file}")
+    set(${out_findings} "")
+    if(NOT "${ERGO_PACKAGE_MANIFEST_EXTRA}" STREQUAL "")
+        get_filename_component(_ergo_pkg_extra_file "${ERGO_PACKAGE_MANIFEST_EXTRA}" ABSOLUTE)
+        ergo_pkg_manifest_load(${prefix}_extra "${_ergo_pkg_extra_file}")
+        ergo_pkg_manifest_merge(${prefix} ${prefix}_extra ${out_findings})
+    endif()
+endmacro()
+
 # Snapshot which manifest targets exist before any Ergo module ran, so the
 # report can tell host-created targets from ones a module found later.
 function(_ergo_packages_begin)
-    ergo_pkg_manifest_load(_m "${ERGO_PACKAGES_MANIFEST_FILE}")
+    set_property(GLOBAL PROPERTY ERGO_PACKAGES_MANIFEST "${ERGO_PACKAGES_MANIFEST_FILE}")
+    set_property(GLOBAL PROPERTY ERGO_PACKAGES_ROOT "${_ergo_packages_root}")
+    _ergo_packages_load(_m _extra)
+    # A host extra manifest is an explicit opt-in: reusing a public name
+    # stops the configure in every mode, M0 included.
+    ergo_pkg_findings_with_severity(_clash error ${_extra})
+    if(_clash)
+        string(REPLACE ";" "\n  " _list "${_clash}")
+        message(FATAL_ERROR "ergo packages: ERGO_PACKAGE_MANIFEST_EXTRA rejected:\n  ${_list}")
+    endif()
     set(_present "")
     foreach(_n IN LISTS _m_LINK)
         foreach(_t IN LISTS _m_PKG_${_n}_TARGETS)
@@ -115,28 +152,38 @@ function(_ergo_packages_begin)
         endforeach()
     endforeach()
     set_property(GLOBAL PROPERTY ERGO_PACKAGES_TARGETS_AT_INCLUDE "${_present}")
-    set_property(GLOBAL PROPERTY ERGO_PACKAGES_MANIFEST "${ERGO_PACKAGES_MANIFEST_FILE}")
-    set_property(GLOBAL PROPERTY ERGO_PACKAGES_ROOT "${_ergo_packages_root}")
     ergo_pkg_report_install_query("${CMAKE_BINARY_DIR}")
 endfunction()
 
-# Runs deferred at the end of the including directory: evaluates the rules,
-# writes resolved.json and (outside M0) stops on errors.
-function(_ergo_packages_finalize)
+# Internal: TRUE when some error finding names <package> or <package>/<f>.
+function(_ergo_packages_has_error out_var package)
+    set(_hit FALSE)
+    foreach(_f IN LISTS ARGN)
+        string(REPLACE "|" ";" _parts "${_f}")
+        list(GET _parts 1 _sev)
+        list(GET _parts 2 _subj)
+        if(_sev STREQUAL "error" AND (_subj STREQUAL package OR _subj MATCHES "^${package}/"))
+            set(_hit TRUE)
+        endif()
+    endforeach()
+    set(${out_var} ${_hit} PARENT_SCOPE)
+endfunction()
+
+# Evaluate the rules, resolve (phase "include") or close (phase "final"),
+# write resolved.json and stop on errors.
+#   include: runs once when ERGO_PACKAGES is set, before the module sections.
+#            Resolves every selected package; returns quietly when clean.
+#   final:   deferred to the end of the including directory, in every mode.
+function(_ergo_packages_evaluate phase)
     get_property(_manifest GLOBAL PROPERTY ERGO_PACKAGES_MANIFEST)
     get_property(_at_include GLOBAL PROPERTY ERGO_PACKAGES_TARGETS_AT_INCLUDE)
     get_property(_root GLOBAL PROPERTY ERGO_PACKAGES_ROOT)
-    ergo_pkg_manifest_load(_m "${_manifest}")
+    _ergo_packages_load(_m _extra_findings)
     _ergo_packages_platform(_platform)
 
     set(_selected ${ERGO_PACKAGES})
-    if(_selected)
-        set(_mode selected)
-    else()
-        set(_mode M0)
-    endif()
 
-    set(_findings "")
+    set(_findings ${_extra_findings})
     foreach(_e IN LISTS _m_ERRORS)
         ergo_pkg_add_finding(_findings MANIFEST error manifest "${_e}")
     endforeach()
@@ -177,27 +224,44 @@ function(_ergo_packages_finalize)
     ergo_pkg_rule_collisions(_f STRICT "${ERGO_PACKAGES_STRICT}" PROVIDED ${_provided})
     list(APPEND _findings ${_f})
 
-    # Per link package: pin, override, requires, features, observed state.
+    # Packages the host declared as provided but created after Ergo.
+    if(phase STREQUAL "final")
+        get_property(_pending GLOBAL PROPERTY ERGO_PACKAGES_PENDING)
+        foreach(_n IN LISTS _pending)
+            ergo_pkg_resolve_late(_m "${_n}")
+        endforeach()
+    endif()
+
+    # Per link package: pin, override, requires, features, resolution.
     set(_available "")
+    set(_host_routes 0)
+    set(_hub_routes 0)
+    set(_exports "")
     foreach(_n IN LISTS _m_LINK)
         set(_q "_m_PKG_${_n}")
         set(_r "_r_PKG_${_n}")
         _ergo_packages_upper(_u "${_n}")
+        set(_pkg_findings "")
 
         ergo_pkg_rule_rev_format(_f PACKAGE "${_n}" REV "${${_q}_REV}")
-        list(APPEND _findings ${_f})
+        list(APPEND _pkg_findings ${_f})
         set(_override "${ERGO_PACKAGE_REV_${_u}}")
         ergo_pkg_rule_rev_override(_f PACKAGE "${_n}" PIN "${${_q}_REV}"
             OVERRIDE "${_override}" STRICT "${ERGO_PACKAGES_STRICT}")
-        list(APPEND _findings ${_f})
+        list(APPEND _pkg_findings ${_f})
+        if(NOT _override STREQUAL "")
+            set(_pin "${_override}")
+        else()
+            set(_pin "${${_q}_REV}")
+        endif()
 
         if(_n IN_LIST _selected)
             ergo_pkg_rule_requires(_f PACKAGE "${_n}"
                 REQUIRES ${${_q}_REQUIRES} AVAILABLE ${_selected})
-            list(APPEND _findings ${_f})
+            list(APPEND _pkg_findings ${_f})
             ergo_pkg_rule_cmake_minimum(_f PACKAGE "${_n}"
                 MINIMUM "${${_q}_CMAKE_MINIMUM}" CURRENT "${CMAKE_VERSION}")
-            list(APPEND _findings ${_f})
+            list(APPEND _pkg_findings ${_f})
         endif()
 
         # Feature tables as the rule inputs expect them.
@@ -232,7 +296,7 @@ function(_ergo_packages_finalize)
         endforeach()
 
         # A real-path module that needs this package requires one render
-        # feature (only once the package is selected).
+        # feature (only once the package is selected and modules exist).
         set(_require_any "")
         if(_n IN_LIST _selected)
             foreach(_mod IN LISTS _m_MODULES)
@@ -246,11 +310,36 @@ function(_ergo_packages_finalize)
         ergo_pkg_features_select(_features _f PACKAGE "${_n}" PLATFORM "${_platform}"
             FEATURES ${${_q}_FEATURES} DEFAULTS ${_defaults} PLATFORMS ${_fplatforms}
             RESERVED ${_reserved} REQUEST ${ERGO_PACKAGE_FEATURES_${_u}})
-        list(APPEND _findings ${_f})
+        list(APPEND _pkg_findings ${_f})
         ergo_pkg_rule_feature_combination(_f PACKAGE "${_n}" PLATFORM "${_platform}"
             SELECTED ${_features} PLATFORMS ${_fplatforms} RESERVED ${_reserved}
             CONFLICTS ${_conflicts} REQUIRES ${_freqs} REQUIRE_ANY ${_require_any})
-        list(APPEND _findings ${_f})
+        list(APPEND _pkg_findings ${_f})
+        list(APPEND _findings ${_pkg_findings})
+
+        # Resolve now (include phase), unless this package already failed.
+        if(phase STREQUAL "include" AND _n IN_LIST _selected)
+            _ergo_packages_has_error(_blocked "${_n}" ${_pkg_findings})
+            if(NOT _blocked)
+                ergo_pkg_resolve(_m "${_n}" "${_pin}" ${_features})
+            endif()
+        endif()
+        get_property(_route GLOBAL PROPERTY ERGO_PKG_RES_${_n}_ROUTE)
+        get_property(_head GLOBAL PROPERTY ERGO_PKG_RES_${_n}_HEAD)
+        get_property(_drift GLOBAL PROPERTY ERGO_PKG_RES_${_n}_DRIFT)
+        get_property(_dirty GLOBAL PROPERTY ERGO_PKG_RES_${_n}_DIRTY)
+        get_property(_pkg_exports GLOBAL PROPERTY ERGO_PKG_RES_${_n}_EXPORTS)
+        get_property(_res_source GLOBAL PROPERTY ERGO_PKG_RES_${_n}_SOURCE_DIR)
+        get_property(_res_version GLOBAL PROPERTY ERGO_PKG_RES_${_n}_VERSION)
+        list(APPEND _exports ${_pkg_exports})
+        set(_pkg_mode "")
+        if(_route MATCHES "^(host|provided)$")
+            set(_pkg_mode M1)
+            math(EXPR _host_routes "${_host_routes} + 1")
+        elseif(_route MATCHES "^(source|sibling|installed|fetch)$")
+            set(_pkg_mode M2)
+            math(EXPR _hub_routes "${_hub_routes} + 1")
+        endif()
 
         # Observed state of the declared targets.
         set(_state absent)
@@ -266,6 +355,8 @@ function(_ergo_packages_finalize)
                 endif()
                 if("${_n}:${_t}" IN_LIST _at_include)
                     set(_state host-unmanaged)
+                elseif(_pkg_mode STREQUAL "M2")
+                    set(_state hub-managed)
                 elseif(NOT _state STREQUAL "host-unmanaged")
                     set(_state module-found)
                 endif()
@@ -273,6 +364,12 @@ function(_ergo_packages_finalize)
         endforeach()
         if(_present)
             list(APPEND _available "${_n}")
+        endif()
+        if(NOT _res_source STREQUAL "")
+            set(_source "${_res_source}")
+        endif()
+        if(_version STREQUAL "")
+            set(_version "${_res_version}")
         endif()
 
         set(${_r}_KIND link)
@@ -286,21 +383,46 @@ function(_ergo_packages_finalize)
         set(${_r}_TARGETS_PRESENT ${_present})
         set(${_r}_FEATURES ${_features})
         set(${_r}_VERSION "${_version}")
+        set(${_r}_ROUTE "${_route}")
+        set(${_r}_MODE "${_pkg_mode}")
+        set(${_r}_HEAD "${_head}")
+        set(${_r}_DRIFT "${_drift}")
+        set(${_r}_DIRTY "${_dirty}")
+        set(${_r}_EXPORTS ${_pkg_exports})
     endforeach()
+    get_property(_acquire GLOBAL PROPERTY ERGO_PACKAGES_ACQUIRE_FINDINGS)
+    list(APPEND _findings ${_acquire})
+    set_property(GLOBAL PROPERTY ERGO_PACKAGES_EXPORTS "${_exports}")
+
+    if(NOT _selected)
+        set(_mode M0)
+    elseif(_host_routes GREATER 0 AND _hub_routes GREATER 0)
+        set(_mode M1+M2)
+    elseif(_host_routes GREATER 0)
+        set(_mode M1)
+    else()
+        set(_mode M2)
+    endif()
 
     foreach(_n IN LISTS _m_TOOLS)
         set(_r "_r_PKG_${_n}")
         set(_path "${_m_PKG_${_n}_PATH}")
-        _ergo_packages_gitlink(_sha "${_root}" "${_path}")
+        set(_tool_root "${_m_PKG_${_n}_MANIFEST_DIR}")
+        _ergo_packages_gitlink(_sha "${_tool_root}" "${_path}")
         set(${_r}_KIND tool)
         set(${_r}_CODE "${_m_PKG_${_n}_CODE}")
         set(${_r}_STATE "${_m_PKG_${_n}_ACQUIRE}")
         set(${_r}_PATH "${_path}")
         set(${_r}_GITLINK "${_sha}")
-        if(EXISTS "${_root}/${_path}/.git")
+        if(EXISTS "${_tool_root}/${_path}/.git")
             set(${_r}_INITIALIZED TRUE)
         else()
             set(${_r}_INITIALIZED FALSE)
+        endif()
+        if(phase STREQUAL "final")
+            ergo_pkg_rule_submodule(_f PACKAGE "${_n}" PATH "${_path}"
+                INITIALIZED ${${_r}_INITIALIZED} STRICT "${ERGO_PACKAGES_STRICT}")
+            list(APPEND _findings ${_f})
         endif()
     endforeach()
 
@@ -330,11 +452,13 @@ function(_ergo_packages_finalize)
                 set(_real_path TRUE)
             endif()
         endif()
-        ergo_pkg_rule_module_needs(_f MODULE "${_mod}" ENABLED ${_enabled}
-            NEEDS ${${_q}_NEEDS} AVAILABLE ${_available}
-            NEED_KIND "${${_q}_NEED_KIND}" REAL_PATH ${_real_path}
-            REASON "${_reason}" MODE ${_mode})
-        list(APPEND _findings ${_f})
+        if(phase STREQUAL "final")
+            ergo_pkg_rule_module_needs(_f MODULE "${_mod}" ENABLED ${_enabled}
+                NEEDS ${${_q}_NEEDS} AVAILABLE ${_available}
+                NEED_KIND "${${_q}_NEED_KIND}" REAL_PATH ${_real_path}
+                REASON "${_reason}" MODE ${_mode})
+            list(APPEND _findings ${_f})
+        endif()
 
         set(${_r}_ENABLED ${_enabled})
         set(${_r}_NEEDS ${${_q}_NEEDS})
@@ -349,12 +473,23 @@ function(_ergo_packages_finalize)
         endforeach()
     endforeach()
 
+    ergo_pkg_findings_with_severity(_errors error ${_findings})
+    if(phase STREQUAL "include" AND NOT _errors)
+        return()  # clean: the final phase writes the report
+    endif()
+
     file(RELATIVE_PATH _manifest_rel "${_root}" "${_manifest}")
+    set(_extra_rel "")
+    if(NOT "${ERGO_PACKAGE_MANIFEST_EXTRA}" STREQUAL "")
+        get_filename_component(_extra_rel "${ERGO_PACKAGE_MANIFEST_EXTRA}" ABSOLUTE)
+    endif()
     set(_r_MODE ${_mode})
     set(_r_STRICT ${ERGO_PACKAGES_STRICT})
+    set(_r_FETCH ${ERGO_PACKAGES_FETCH})
     set(_r_PLATFORM ${_platform})
     set(_r_CMAKE_VERSION ${CMAKE_VERSION})
     set(_r_MANIFEST "${_manifest_rel}")
+    set(_r_MANIFEST_EXTRA "${_extra_rel}")
     set(_r_SELECTED ${_selected})
     set(_r_PACKAGES ${_m_PACKAGES})
     set(_r_MODULES ${_m_MODULES})
@@ -364,15 +499,18 @@ function(_ergo_packages_finalize)
     set(_resolved "${CMAKE_BINARY_DIR}/ergo-packages.resolved.json")
     ergo_pkg_report_write("${_resolved}" "${_json}")
 
-    # Summary. M0 only informs; outside M0 every error is listed, then stop.
+    # Summary. M0 only informs; otherwise every error is listed, then stop.
     set(_states "")
     foreach(_n IN LISTS _m_LINK)
-        list(APPEND _states "${_n}=${_r_PKG_${_n}_STATE}")
+        if(_r_PKG_${_n}_ROUTE)
+            list(APPEND _states "${_n}=${_r_PKG_${_n}_STATE}/${_r_PKG_${_n}_ROUTE}")
+        else()
+            list(APPEND _states "${_n}=${_r_PKG_${_n}_STATE}")
+        endif()
     endforeach()
     string(REPLACE ";" ", " _states "${_states}")
     list(LENGTH _findings _count)
     message(STATUS "ergo packages: mode=${_mode} (${_states}), ${_count} finding(s) -> ${_resolved}")
-    ergo_pkg_findings_with_severity(_errors error ${_findings})
     ergo_pkg_findings_with_severity(_warnings warning ${_findings})
     foreach(_w IN LISTS _warnings)
         message(STATUS "ergo packages: ${_w}")
@@ -385,13 +523,24 @@ function(_ergo_packages_finalize)
     endif()
     if(_errors)
         string(REPLACE ";" "\n  " _list "${_errors}")
-        message(FATAL_ERROR "ergo packages: configuration rejected:\n  ${_list}\n(see ${_resolved})")
+        message(FATAL_ERROR "ergo packages: configuration rejected (${phase}):\n  ${_list}\n(see ${_resolved})")
     endif()
-    message(WARNING
-        "ergo packages: ERGO_PACKAGES is set but stage S1 only checks and records. "
-        "Acquisition (host-provided SHA check / local source / fetch) is not implemented yet, "
-        "so the host must still create the package targets itself. See spec/setup/packages.md.")
+endfunction()
+
+function(_ergo_packages_finalize)
+    _ergo_packages_evaluate(final)
 endfunction()
 
 _ergo_packages_begin()
+if(ERGO_PACKAGES)
+    _ergo_packages_evaluate(include)
+    # `exports` of the resolved packages (e.g. PICTOR_SHADER_DIR) as normal
+    # variables of the including directory.
+    get_property(_ergo_packages_exports GLOBAL PROPERTY ERGO_PACKAGES_EXPORTS)
+    foreach(_ergo_packages_pair IN LISTS _ergo_packages_exports)
+        if(_ergo_packages_pair MATCHES "^([^=]+)=(.*)$")
+            set(${CMAKE_MATCH_1} "${CMAKE_MATCH_2}")
+        endif()
+    endforeach()
+endif()
 cmake_language(DEFER CALL _ergo_packages_finalize)

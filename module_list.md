@@ -49,7 +49,7 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
 
 | 名前 | 概要 |
 |---|---|
-| `ergo-packages.json` | Pictor / Tela (link)・Lapilli (tool)・MUSA 系 / Curare (observe) の版と、どのモジュールがどれを要るか (`modules` 節) の宣言。検査と記録は `cmake/packages/`。形式は `spec/data/ergo-packages.md`、ホスト手順は `spec/setup/packages.md` |
+| `ergo-packages.json` | Pictor / Tela (link)・Lapilli (tool)・MUSA 系 / Curare (observe) の版と、どのモジュールがどれを要るか (`modules` 節) の宣言。取り込み (6 経路)・検査・記録は `cmake/packages/`、パッケージごとの結線は `cmake/packages/{pictor,tela}.cmake`。形式は `spec/data/ergo-packages.md`、ホスト手順は `spec/setup/packages.md` |
 
 ## 状態メモ
 

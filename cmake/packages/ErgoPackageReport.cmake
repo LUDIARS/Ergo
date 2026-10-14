@@ -14,11 +14,11 @@
 # The same configuration therefore yields the same bytes (and mtime).
 #
 # Input variables read by ergo_pkg_report_render (all optional, "" = absent):
-#   <p>_MODE <p>_STRICT <p>_PLATFORM <p>_CMAKE_VERSION <p>_MANIFEST
-#   <p>_SELECTED <p>_FINDINGS
+#   <p>_MODE <p>_STRICT <p>_FETCH <p>_PLATFORM <p>_CMAKE_VERSION <p>_MANIFEST
+#   <p>_MANIFEST_EXTRA <p>_SELECTED <p>_FINDINGS
 #   <p>_PACKAGES, per package <p>_PKG_<n>_{KIND,CODE,PIN,EXPECT_TAG,OVERRIDE,
-#       STATE,SOURCE_DIR,IMPORTED,TARGETS_PRESENT,FEATURES,VERSION,PATH,
-#       GITLINK,INITIALIZED}
+#       STATE,SOURCE_DIR,IMPORTED,TARGETS_PRESENT,FEATURES,VERSION,ROUTE,MODE,
+#       HEAD,DRIFT,DIRTY,EXPORTS,PATH,GITLINK,INITIALIZED}
 #   <p>_MODULES, per module <p>_MOD_<m>_{ENABLED,NEEDS,OPTIONAL,PORTED_FROM,
 #       REASON}
 #   <p>_OBSERVE, per entry <p>_OBS_<o>_{CODE,GROUP,PATH_HINT,RELATIONS}
@@ -145,6 +145,12 @@ function(ergo_pkg_report_render out_var p)
             _ergo_pkg_add_list(_f targets_present ${${_q}_TARGETS_PRESENT})
             _ergo_pkg_add_list(_f features ${${_q}_FEATURES})
             _ergo_pkg_add_nullable(_f version "${${_q}_VERSION}")
+            _ergo_pkg_add_nullable(_f route "${${_q}_ROUTE}")
+            _ergo_pkg_add_nullable(_f mode "${${_q}_MODE}")
+            _ergo_pkg_add_nullable(_f head "${${_q}_HEAD}")
+            _ergo_pkg_add_nullable(_f drift "${${_q}_DRIFT}")
+            _ergo_pkg_add_bool(_f dirty "${${_q}_DIRTY}")
+            _ergo_pkg_add_list(_f exports ${${_q}_EXPORTS})
         endif()
         _ergo_pkg_json_object(_obj "    " ${_f})
         _ergo_pkg_kv(_pkg_pairs "${_n}" "${_obj}")
@@ -220,6 +226,8 @@ function(ergo_pkg_report_render out_var p)
     _ergo_pkg_kv(_top schema "1")
     _ergo_pkg_add_nullable(_top mode "${${p}_MODE}")
     _ergo_pkg_add_bool(_top strict "${${p}_STRICT}")
+    _ergo_pkg_add_bool(_top fetch "${${p}_FETCH}")
+    _ergo_pkg_add_nullable(_top manifest_extra "${${p}_MANIFEST_EXTRA}")
     _ergo_pkg_add_nullable(_top platform "${${p}_PLATFORM}")
     _ergo_pkg_add_nullable(_top cmake_version "${${p}_CMAKE_VERSION}")
     _ergo_pkg_add_nullable(_top manifest "${${p}_MANIFEST}")

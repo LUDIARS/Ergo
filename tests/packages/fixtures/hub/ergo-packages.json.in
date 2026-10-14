@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "packages": {
+    "alpha": {
+      "kind": "link",
+      "code": "Fa",
+      "repository": "@ALPHA_URL@",
+      "rev": "@ALPHA_REV@",
+      "expect_tag": "@ALPHA_EXPECT_TAG@",
+      "platforms": ["desktop", "emscripten"],
+      "cmake": {
+        "minimum": "3.20",
+        "wiring": "@WIRING_DIR@/alpha.cmake",
+        "targets": ["alpha"],
+        "find_package": null,
+        "cache": { "ALPHA_BUILD_DEMO": "OFF" }
+      },
+      "features": {
+        "gpu": { "default": "auto", "platforms": ["desktop"], "provides": ["alpha"], "contract": "ALPHA_HAS_GPU" },
+        "web": { "default": "auto", "platforms": ["emscripten"], "cache": { "ALPHA_BUILD_WEB": "ON" }, "provides": ["alpha_web"] },
+        "metal": { "reserved": true }
+      },
+      "exports": { "ALPHA_ASSET_DIR": "assets" },
+      "requires": {}
+    },
+    "beta": {
+      "kind": "link",
+      "code": "Fb",
+      "repository": "@BETA_URL@",
+      "rev": "@BETA_REV@",
+      "platforms": ["desktop"],
+      "cmake": {
+        "minimum": "3.20",
+        "wiring": "@WIRING_DIR@/beta.cmake",
+        "targets": ["Beta::Core"],
+        "find_package": { "name": "Beta" },
+        "cache": {}
+      },
+      "requires": {}
+    }@TOOL_ENTRY@
+  },
+  "modules": {},
+  "observe": {}
+}
