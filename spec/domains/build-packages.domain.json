@@ -10,7 +10,9 @@
     "spec/setup/third-party-deps.md",
     "spec/architecture/domains-and-ux.md",
     "spec/feature/package-manager.md",
-    "spec/module/package_manager.md"
+    "spec/module/package_manager.md",
+    "spec/module/package_watch.md",
+    "spec/data/ergo-watch-report.md"
   ],
   "membership": [
     {
@@ -39,6 +41,15 @@
     },
     {
       "pathPattern": "(^|/)tests/package_manager/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_watch/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/package_watch/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/package_watch/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)tools/package_cli/(?:.*/)?[^/]+$"

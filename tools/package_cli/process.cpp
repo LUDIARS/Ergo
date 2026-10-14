@@ -59,13 +59,22 @@ bool quote_safe(const std::string& value) {
 }
 
 bool capture(const std::vector<std::string>& argv, std::string& out) {
+    return capture_status(argv, out) == 0;
+}
+
+int capture_status(const std::vector<std::string>& argv, std::string& out) {
     out.clear();
-    if (!all_safe(argv)) return false;
+    if (!all_safe(argv)) return -1;
     FILE* pipe = ERGO_PKG_POPEN(shell_line(command_line(argv) + kNullRedirect).c_str(), "r");
-    if (!pipe) return false;
+    if (!pipe) return -1;
     char buffer[256];
     while (std::fgets(buffer, sizeof(buffer), pipe)) out += buffer;
-    return ERGO_PKG_PCLOSE(pipe) == 0;
+    const int status = ERGO_PKG_PCLOSE(pipe);
+#if defined(_WIN32)
+    return status;
+#else
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+#endif
 }
 
 bool run(const std::vector<std::string>& argv) {

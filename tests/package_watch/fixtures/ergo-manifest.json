@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "packages": {
+    "pictor": {
+      "kind": "link",
+      "code": "Pc",
+      "repository": "https://github.com/LUDIARS/Pictor.git",
+      "rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f",
+      "expect_tag": "v2.2.0"
+    },
+    "tela": {
+      "kind": "link",
+      "code": "Tl",
+      "repository": "https://github.com/LUDIARS/Tela.git",
+      "rev": "1111111111111111111111111111111111111111",
+      "track": { "branch": "main" }
+    },
+    "lapilli": { "kind": "tool", "code": "Lp", "acquire": "submodule", "path": "lib/lapilli" }
+  },
+  "modules": {},
+  "observe": {}
+}

@@ -13,6 +13,10 @@
 //   ergo_pkg remove <name>                                [--host <dir>] [--ergo <dir>]
 //   ergo_pkg update <name> --to <tag|main|sha> [--allow-off-main] [--cache <dir>]
 //                                                         [--host <dir>] [--ergo <dir>]
+//   ergo_pkg outdated [--json] [--fail-on <kind>] [--cache <dir>] [--root <dir>]
+//                                                         [--host <dir>] [--ergo <dir>]
+//   ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>] [--cache <dir>] [--root <dir>]
+//                                                         [--ergo <dir>]
 
 #include <string>
 #include <vector>
@@ -37,6 +41,11 @@ struct Args {
     bool                     ergo_explicit  = false;  ///< --ergo を明示した (update の持ち主の照合)
     bool                     optional       = false;
     bool                     allow_off_main = false;
+    std::vector<std::string> hosts;    ///< --host を書いた順 (watch は複数)
+    std::string              state;    ///< watch: 前回状態の置き場所
+    std::string              out;      ///< watch: events.json の置き場所
+    std::string              root;     ///< 兄弟チェックアウトの根 (ERGO_PACKAGES_SIBLING_ROOT)
+    std::string              fail_on;  ///< outdated: この種類があれば終了 1
     bool                     upm    = false;
     bool                     json   = false;
     bool                     strict = false;

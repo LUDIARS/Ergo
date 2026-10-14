@@ -48,6 +48,7 @@ option(ERGO_BUILD_PACKAGE_SCAN  "Build ergo_package_scan (観測対象のチェ�
 option(ERGO_BUILD_PACKAGE_VIZ   "Build ergo_package_viz (パッケージ版一覧 / ターゲットのリンク図 / 使用関係図 + CLI)" ON)
 option(ERGO_BUILD_PACKAGE_MANAGER "Build ergo_package_manager (ホスト宣言の読み取り・検査・漏れ検査)" ON)
 option(ERGO_BUILD_PACKAGE_CLI   "Build the ergo_pkg CLI (init / list / doctor / fetch、 ergo_package_manager が要る)" ON)
+option(ERGO_BUILD_PACKAGE_WATCH "Build ergo_package_watch (更新の検知 + ergo_pkg outdated / watch)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
@@ -1280,7 +1281,7 @@ endif()
 #   * ergo_package_manager — ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査、
 #     漏れ検査 (§8)、 ブートストラップの生成と古さの判定、 init の計画、 一覧。
 #     W2: 書式を保つ書き換え (add / remove / pin)、 持ち主の判定、 版の解決 (IRevResolver)。
-#   * ergo_pkg (CLI、 ターゲット ergo_pkg_cli) — init / list / doctor / fetch、 W2 の add / remove / update。
+#   * ergo_pkg (CLI、 ターゲット ergo_pkg_cli) — init / list / doctor / fetch、 W2 の add / remove / update (W3 の outdated / watch は下の package watch)。
 # 依存は tools/package_cli → package_manager → ergo_common の一方向。 Pictor / Tela に依存せず
 # 常時ビルド・テスト可。 git / cmake の起動は CLI 側だけ (ライブラリはプロセスを起こさない)。
 # ---------------------------------------------------------------------------
@@ -1327,6 +1328,50 @@ if(ERGO_BUILD_PACKAGE_MANAGER)
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# Package watch (spec/feature/package-manager.md §2.3 / §3, stage W3).
+#   * ergo_package_watch — 依存の列挙、 IRefSource / IHistorySource (取得元の interface)、
+#     観測・判定 (tag / track / off-main)、 前回状態と重複の抑止、 報告と出来事の書き手 (漏れ検査つき)。
+# 向きは ergo_package_watch → ergo_package_manager → ergo_common。 git プロセスは CLI のアダプタ
+# (tools/package_cli/git_*_source.cpp) にだけあり、 ライブラリはプロセスを起こさない。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
+    add_library(ergo_package_watch STATIC
+        src/package_watch/watch_dependency.cpp
+        src/package_watch/ref_listing.cpp
+        src/package_watch/semver.cpp
+        src/package_watch/observation.cpp
+        src/package_watch/detect.cpp
+        src/package_watch/time_text.cpp
+        src/package_watch/watch_state.cpp
+        src/package_watch/watch_diff.cpp
+        src/package_watch/watch_report.cpp
+    )
+    target_include_directories(ergo_package_watch PUBLIC include)
+    target_link_libraries(ergo_package_watch PUBLIC ergo_package_manager)
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_package_watch
+            tests/package_watch/test_detect.cpp
+            tests/package_watch/test_diff.cpp
+            tests/package_watch/test_report.cpp)
+        target_link_libraries(test_package_watch PRIVATE ergo_package_watch ergo_gtest_main)
+        target_compile_definitions(test_package_watch PRIVATE
+            ERGO_PACKAGE_WATCH_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_watch/fixtures")
+        add_test(NAME test_package_watch COMMAND test_package_watch)
+    endif()
+elseif(ERGO_BUILD_PACKAGE_WATCH)
+    message(STATUS "ergo_package_watch: requires ERGO_BUILD_PACKAGE_MANAGER — skipped")
+endif()
+
+if(ERGO_BUILD_TESTS AND ERGO_BUILD_PACKAGE_MANAGER)
+    # track キー (W3) は構成時の読み手の出力を変えない。
+    add_test(NAME test_packages_track_key
+        COMMAND ${CMAKE_COMMAND}
+            -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/track_key
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_track_key.cmake)
+endif()
+
 if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
     add_executable(ergo_pkg_cli
         tools/package_cli/main.cpp
@@ -1367,6 +1412,30 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
                     -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
                     -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_cli_edit.cmake)
+        endif()
+    endif()
+    # W3: outdated / watch (ergo_package_watch があるときだけ)。
+    if(TARGET ergo_package_watch)
+        target_sources(ergo_pkg_cli PRIVATE
+            tools/package_cli/git_history.cpp
+            tools/package_cli/git_remote_source.cpp
+            tools/package_cli/git_sibling_source.cpp
+            tools/package_cli/ref_source_router.cpp
+            tools/package_cli/watch_paths.cpp
+            tools/package_cli/watch_host.cpp
+            tools/package_cli/watch_observe.cpp
+            tools/package_cli/cmd_outdated.cpp
+            tools/package_cli/cmd_watch.cpp)
+        target_link_libraries(ergo_pkg_cli PRIVATE ergo_package_watch)
+        target_compile_definitions(ergo_pkg_cli PRIVATE ERGO_PKG_CLI_WITH_WATCH=1)
+        if(ERGO_BUILD_TESTS AND GIT_EXECUTABLE)
+            add_test(NAME test_package_watch_cli
+                COMMAND ${CMAKE_COMMAND}
+                    -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/package_watch_cli
+                    -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
+                    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_watch_cli.cmake)
         endif()
     endif()
 elseif(ERGO_BUILD_PACKAGE_CLI)

@@ -13,6 +13,10 @@ bool quote_safe(const std::string& value);
 /// 標準出力を out に取る (標準エラーは捨てる)。 終了コードが 0 でなければ false。
 bool capture(const std::vector<std::string>& argv, std::string& out);
 
+/// capture と同じだが終了コードを返す (起動できない・引数を渡せないなら -1)。
+/// `git merge-base --is-ancestor` のように 0 / 1 に意味があるものに使う。
+int capture_status(const std::vector<std::string>& argv, std::string& out);
+
 /// 出力をそのまま流して実行し、 終了コードが 0 なら true。
 bool run(const std::vector<std::string>& argv);
 

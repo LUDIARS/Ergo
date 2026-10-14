@@ -4,6 +4,17 @@
 
 namespace ergo::package_manager::detail {
 
+std::string read_track_branch(const jsonm::JsonValue& entry, const std::string& where,
+                              std::vector<Finding>& findings) {
+    const auto* track = entry.find("track");
+    if (!track || track->is_null()) return {};
+    if (!track->is_object()) {
+        manifest_error(findings, where, "track must be an object");
+        return {};
+    }
+    return string_field(*track, "branch", where, findings);
+}
+
 std::vector<ManifestPackage> read_packages(const jsonm::JsonValue& doc,
                                            std::vector<Finding>& findings) {
     std::vector<ManifestPackage> out;
@@ -26,6 +37,7 @@ std::vector<ManifestPackage> read_packages(const jsonm::JsonValue& doc,
         p.repository = string_field(entry, "repository", name, findings);
         p.rev        = string_field(entry, "rev", name, findings);
         p.expect_tag = string_field(entry, "expect_tag", name, findings);
+        p.track_branch = read_track_branch(entry, name, findings);
         out.push_back(std::move(p));
     }
     return out;

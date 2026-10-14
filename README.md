@@ -80,6 +80,7 @@ ergo/
 | `ergo_package_scan`  | 観測対象の兄弟チェックアウトから根拠付きの使用関係を読む (package.json / .gitmodules / gitlink / ported_from) | `include/ergo/package_scan/` | — |
 | `ergo_package_viz`   | パッケージ版一覧 / ターゲットのリンク図 / 使用関係図の Tela 可視化 (簡約・畳み込み・分割) | `include/ergo/package_viz/` | `ergo_package_viz` CLI、 `ergo_package_graphs` |
 | `ergo_package_manager` | パッケージマネージャ: ホストの宣言 (`host` 節) の読み取り・検査・漏れ検査・ブートストラップ・書式を保つ書き換え (add / remove / update) | `include/ergo/package_manager/` | `ergo_pkg` CLI (`init` / `list` / `doctor` / `fetch` / `add` / `remove` / `update`) |
+| `ergo_package_watch` | パッケージの更新の検知: tag / track / off-main の判定・前回状態と重複の抑止・報告と出来事 | `include/ergo/package_watch/` | `ergo_pkg` CLI (`outdated` / `watch`) |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。

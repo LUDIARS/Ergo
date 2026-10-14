@@ -141,3 +141,25 @@ TEST(PackageManagerDeclaration, FindingsAreSortedAndFormatted) {
     ASSERT_EQ(f.size(), static_cast<std::size_t>(2));
     EXPECT_EQ(describe(f[0]), std::string("PKG-01|error|a|y"));
 }
+
+TEST(PackageManagerDeclaration, TrackKey) {
+    // W3: packages.<name>.track.branch と host.ergo.track.branch。 無ければ "" (既定の main)。
+    ergo::common::jsonm::JsonValue doc;
+    ergo::common::jsonm::parse(
+        R"({"schema":1,"host":{"code":"Example","ergo":{"repository":"https://github.com/LUDIARS/Ergo.git",)"
+        R"("rev":"b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","track":{"branch":"develop"}}},)"
+        R"("packages":{"a":{"kind":"link","repository":"https://example.invalid/A.git",)"
+        R"("rev":"2222222222222222222222222222222222222222","track":{"branch":"release"}},)"
+        R"("b":{"kind":"link","repository":"https://example.invalid/B.git",)"
+        R"("rev":"3333333333333333333333333333333333333333"},)"
+        R"("c":{"kind":"link","track":"main"}}})",
+        doc);
+    HostDeclaration h;
+    std::vector<Finding> read;
+    ASSERT_TRUE(read_host_declaration(doc, h, read));
+    EXPECT_EQ(h.ergo.track_branch, std::string("develop"));
+    ASSERT_EQ(h.packages.size(), static_cast<std::size_t>(3));
+    EXPECT_EQ(h.packages[0].track_branch, std::string("release"));
+    EXPECT_EQ(h.packages[1].track_branch, std::string(""));
+    EXPECT_TRUE(has(read, "MANIFEST", Severity::Error, "c"));  // track must be an object
+}

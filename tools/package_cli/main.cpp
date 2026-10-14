@@ -7,6 +7,8 @@
 //   ergo_pkg add    <name> [--optional] [--features <f>] [--kind ..] [--repository <url> --rev <r>]  (W2)
 //   ergo_pkg remove <name>                                                                       (W2)
 //   ergo_pkg update <name> --to <tag|main|sha> [--allow-off-main]                                (W2)
+//   ergo_pkg outdated [--json] [--fail-on <kind>]                    (W3)
+//   ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>]    (W3)
 //
 // main は引数の解析とコマンドへの振り分けだけ。 終了コード: 0 成功 / 1 要対応の検出あり /
 // 2 引数・入力の誤り / 3 書けない・取れない。 コミット・ブランチ作成・PR はしない。
@@ -37,5 +39,15 @@ int main(int argc, char** argv) {
     if (args.command == "add") return run_add(args);
     if (args.command == "remove") return run_remove(args);
     if (args.command == "update") return run_update(args);
+#if defined(ERGO_PKG_CLI_WITH_WATCH)
+    if (args.command == "outdated") return run_outdated(args);
+    if (args.command == "watch") return run_watch(args);
+#else
+    if (args.command == "outdated" || args.command == "watch") {
+        std::fprintf(stderr, "ergo_pkg: %s needs ergo_package_watch (ERGO_BUILD_PACKAGE_WATCH=ON)\n",
+                     args.command.c_str());
+        return kExitInput;
+    }
+#endif
     return run_fetch(args);
 }

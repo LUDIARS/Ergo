@@ -29,6 +29,7 @@
 | `repository` | 文字列 | 取得元の URL。末尾名 (`.git` を除く) が兄弟チェックアウトのディレクトリ名 (`Pictor`) |
 | `rev` | 文字列 | **40 桁の小文字 commit SHA だけ**。ブランチ名・短縮 SHA・タグは PKG-02 |
 | `expect_tag` | 文字列 / なし | 人向け注釈。checkout にあれば pin がその子孫かを照合する (PKG-08) |
+| `track.branch` | 文字列 / なし | 更新の検知 (`ergo_pkg outdated` / `watch`、W3) が追う追跡ブランチ。無ければ `main`。構成時の読み手は読まない (出力不変) |
 | `platforms` | 文字列配列 | `desktop` / `android` / `ios` / `emscripten` |
 | `cmake.minimum` | 文字列 | パッケージが要る CMake。実行中の CMake より新しければ PKG-11 |
 | `cmake.wiring` | 文字列 | 1 パッケージ 1 ファイルの結線 (`cmake/packages/<name>.cmake`)。マニフェストのあるディレクトリからの相対 (絶対パスも可) |
@@ -127,11 +128,12 @@
 | `host.ergo.repository` | 文字列 | Ergo の取得元 (公開 URL)。末尾名 (`.git` を除く) がブートストラップの兄弟チェックアウト名 |
 | `host.ergo.rev` | 文字列 | **40 桁の小文字 commit SHA** (PKG-02) |
 | `host.ergo.expect_tag` | 文字列 / なし | 人向け注釈 |
+| `host.ergo.track.branch` | 文字列 / なし | 更新の検知 (W3) が追う Ergo の追跡ブランチ。無ければ `main` |
 | `host.use` | 文字列配列 | `ERGO_PACKAGES` の既定値 (link パッケージ名。知らない名前は PKG-01)。`ergo_pkg fetch` の既定の対象 |
 | `host.optional` | 文字列配列 | ソースが見つからなければ使わないもの。`use` に無い名前は MANIFEST の warning |
 | `host.features` | オブジェクト | 名前 → `ERGO_PACKAGE_FEATURES_<NAME>` の既定値 (`+vulkan,-web` / `vulkan;web` の形) |
 | `host.legacy_vars` | オブジェクト | 移行中だけの旧変数名 → `ergo.source_dir` / `<package>.source_dir`。ブートストラップは `ergo.source_dir` の別名を DEPRECATION つきで使う。S6 で警告、その後削除 |
-| `packages` | オブジェクト | **非公開パッケージだけ** (形は Ergo のマニフェストの `packages.<name>` と同じ)。Ergo のマニフェストの名前 (`packages` / `modules` / `observe`) と同じなら PKG-15 の error で構成を止める (M0 でも) |
+| `packages` | オブジェクト | **非公開パッケージだけ** (形は Ergo のマニフェストの `packages.<name>` と同じ。`track` も同じ)。Ergo のマニフェストの名前 (`packages` / `modules` / `observe`) と同じなら PKG-15 の error で構成を止める (M0 でも) |
 
 `use` / `optional` / `features` を構成の既定値として流すのは後段 (Ludellus-Native の L2 で使う)。W1 では
 `ergo_pkg` が読んで検査・一覧・事前取得に使い、構成時は非公開 `packages` と `host.code` だけを読む。

@@ -403,6 +403,17 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_package_watch
+    summary: パッケージの更新の検知 (tag / track / off-main の判定・前回状態と重複の抑止・報告と出来事の書き手、 取得元は IRefSource / IHistorySource) + CLI ergo_pkg (outdated / watch)
+    category: システム
+    header_dir: include/ergo/package_watch/
+    source_dir: src/package_watch/
+    test_dir:   tests/package_watch/
+    spec:       spec/module/package_watch.md
+    cmake_option: ERGO_BUILD_PACKAGE_WATCH   # ergo_package_manager が要る。 git の起動は CLI のアダプタだけ
+    tool_plugin: null
+    status: preview
+
   - name: ergo_ui_layout
     summary: Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit.
     category: UI

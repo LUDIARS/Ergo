@@ -34,6 +34,7 @@ bool read_host_declaration(const jsonm::JsonValue& doc, HostDeclaration& out,
             out.ergo.repository = detail::string_field(*ergo, "repository", "ergo", findings);
             out.ergo.rev        = detail::string_field(*ergo, "rev", "ergo", findings);
             out.ergo.expect_tag = detail::string_field(*ergo, "expect_tag", "ergo", findings);
+            out.ergo.track_branch = detail::read_track_branch(*ergo, "ergo", findings);
         }
     }
     out.use         = detail::string_array_field(host, "use", "host", findings);

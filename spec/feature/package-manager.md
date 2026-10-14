@@ -293,6 +293,7 @@ S4 (観測 P3) は並行で実装中。W は S4 が触るファイル (`package_
 新しいトップレベル (`unity/`) と新モジュールは同じ PR で `spec/domains` と `.anatomia/layers.json` を更新する。
 
 実装状況: W1 は `spec/tasks/2026-10-14-package-manager-w1.md`、W2 は `spec/tasks/2026-10-15-package-manager-w2.md` (モジュール `spec/module/package_manager.md`)。
+W3 は `spec/tasks/2026-10-15-package-manager-w3.md` (モジュール `spec/module/package_watch.md`、形式 `spec/data/ergo-watch-report.md`)。
 
 ### 受入条件 (機械で確かめる。テストはネットワークを使わない: git はテスト内の偽リポ、Revisor / Concordia は JSON 見本)
 

@@ -15,6 +15,9 @@ bash.exe.stackdump
 # session logs (lictor 等のローカルセッションログ)
 logs/
 
+# ergo_pkg watch の報告 (<host>/.ergo/watch-report.json)。 Ergo 自身もホストとして見られる
+.ergo/
+
 # デバッグ用メッシュエクスポート
 *.obj
 

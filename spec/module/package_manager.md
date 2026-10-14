@@ -12,7 +12,7 @@ W2 で宣言の書き換え (add / remove) と pin の書き換え (update) を�
 |---|---|---|
 | 検査結果 | `finding.h` | `<id>\|<severity>\|<subject>\|<message>` (構成時の findings と同じ形)、 STRICT の格上げ、 整列 |
 | Ergo のマニフェスト | `ergo_manifest.h` | 名前・種類・取得元・pin と modules / observe の名前だけを読む。 `host` 節のあるファイルは拒む |
-| ホストの宣言 | `host_declaration.h` | `host.code` / `ergo` / `use` / `optional` / `features` / `legacy_vars` と非公開 `packages`。 型違いは MANIFEST の error |
+| ホストの宣言 | `host_declaration.h` | `host.code` / `ergo` / `use` / `optional` / `features` / `legacy_vars` と非公開 `packages`。 `track.branch` (W3) も読む。 型違いは MANIFEST の error |
 | 宣言の検査 | `declaration_check.h` | PKG-01 (知らない名前)、 PKG-02 (40 桁 SHA でない pin)、 PKG-15 (非公開名と Ergo の名前の衝突)、 MANIFEST (Ergo の pin が無い・`optional` が `use` に無い・機能指定の書式・`legacy_vars` の行き先) |
 | 漏れ検査 | `leak_check.h` | §8 の形 (ドライブ文字始まり・`/Users/`・`/home/`・UNC・token / secret / authorization のキー)。 JSON は JSON Pointer、 テキストは行番号で場所を返す |
 | ブートストラップ | `bootstrap.h` | ひな形 (`cmake/packages/ergo-bootstrap.cmake.in`) の生成元 SHA の差し込み、 生成元の読み取り、 古さ (Missing / Current / Stale / Foreign) |
@@ -41,9 +41,10 @@ build-packages (ビルドとパッケージ取り込み。 パッケージ・ハ
 ## 依存
 
 - `ergo_common` (jsonm)。 新しい third-party は無い
-- CLI は `ergo_package_manager` だけに依存する。 `ergo_package_model` / `ergo_package_viz` とは互いに import しない
+- CLI は `ergo_package_manager` と (W3 の `outdated` / `watch` で) `ergo_package_watch` に依存する。
+  `ergo_package_model` / `ergo_package_viz` とは互いに import しない
 
-向き: `tools/package_cli → ergo_package_manager → ergo_common`。
+向き: `tools/package_cli → (ergo_package_watch →) ergo_package_manager → ergo_common`。 W3 は [`package_watch.md`](package_watch.md)。
 
 ## CLI `ergo_pkg` (ターゲット `ergo_pkg_cli`、 `ERGO_BUILD_PACKAGE_CLI`、 置き場所 `tools/package_cli/`)
 

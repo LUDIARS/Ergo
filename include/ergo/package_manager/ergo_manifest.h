@@ -22,6 +22,7 @@ struct ManifestPackage {
     std::string repository;
     std::string rev;
     std::string expect_tag;
+    std::string track_branch;  ///< track.branch (無ければ "" = 既定の main。 W3 の検知だけが使う)
 };
 
 struct ErgoManifest {

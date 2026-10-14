@@ -37,6 +37,11 @@ bool allowed_for(const std::string& command, Allowed& out) {
         out.values.insert({"--to", "--cache"});
         out.flags = {"--allow-off-main"};
         out.names = true;
+    } else if (command == "outdated") {
+        out.values.insert({"--cache", "--root", "--fail-on"});
+        out.flags = {"--json"};
+    } else if (command == "watch") {
+        out.values.insert({"--state", "--out", "--cache", "--root"});
     } else {
         return false;
     }
@@ -44,7 +49,10 @@ bool allowed_for(const std::string& command, Allowed& out) {
 }
 
 void assign(Args& a, const std::string& key, const std::string& value) {
-    if (key == "--host") a.host = value;
+    if (key == "--host") {
+        a.host = value;
+        a.hosts.push_back(value);
+    }
     else if (key == "--ergo") {
         a.ergo          = value;
         a.ergo_explicit = true;
@@ -59,6 +67,10 @@ void assign(Args& a, const std::string& key, const std::string& value) {
     else if (key == "--rev") a.rev = value;
     else if (key == "--wiring") a.wiring = value;
     else if (key == "--to") a.to = value;
+    else if (key == "--state") a.state = value;
+    else if (key == "--out") a.out = value;
+    else if (key == "--root") a.root = value;
+    else if (key == "--fail-on") a.fail_on = value;
 }
 
 void set_flag(Args& a, const std::string& key) {
@@ -116,6 +128,10 @@ const char* usage() {
            "  ergo_pkg doctor [--strict] [--json]                  [--host <dir>] [--ergo <dir>]\n"
            "  ergo_pkg fetch  [<name>...] [--build <dir> | --cache <dir>] [--cmake <exe>]\n"
            "                                                       [--host <dir>] [--ergo <dir>]\n"
+           "  ergo_pkg outdated [--json] [--fail-on tag|track|off-main] [--cache <dir>] [--root <dir>]\n"
+           "                                                       [--host <dir>] [--ergo <dir>]\n"
+           "  ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>] [--cache <dir>] [--root <dir>]\n"
+           "                                                       [--ergo <dir>]\n"
            "exit codes: 0 ok / 1 findings to act on / 2 bad arguments or input / 3 cannot write or fetch\n";
 }
 

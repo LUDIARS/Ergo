@@ -19,6 +19,7 @@ struct ErgoPin {
     std::string repository;
     std::string rev;
     std::string expect_tag;
+    std::string track_branch;  ///< host.ergo.track.branch (無ければ "" = 既定の main)
 };
 
 struct HostDeclaration {
