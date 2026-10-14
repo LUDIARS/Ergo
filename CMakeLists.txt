@@ -1276,10 +1276,11 @@ elseif(ERGO_BUILD_PACKAGE_VIZ)
 endif()
 
 # ---------------------------------------------------------------------------
-# Package manager (spec/feature/package-manager.md §2, stage W1).
+# Package manager (spec/feature/package-manager.md §2, stages W1 / W2).
 #   * ergo_package_manager — ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査、
 #     漏れ検査 (§8)、 ブートストラップの生成と古さの判定、 init の計画、 一覧。
-#   * ergo_pkg (CLI、 ターゲット ergo_pkg_cli) — init / list / doctor / fetch。
+#     W2: 書式を保つ書き換え (add / remove / pin)、 持ち主の判定、 版の解決 (IRevResolver)。
+#   * ergo_pkg (CLI、 ターゲット ergo_pkg_cli) — init / list / doctor / fetch、 W2 の add / remove / update。
 # 依存は tools/package_cli → package_manager → ergo_common の一方向。 Pictor / Tela に依存せず
 # 常時ビルド・テスト可。 git / cmake の起動は CLI 側だけ (ライブラリはプロセスを起こさない)。
 # ---------------------------------------------------------------------------
@@ -1296,6 +1297,13 @@ if(ERGO_BUILD_PACKAGE_MANAGER)
         src/package_manager/init_plan.cpp
         src/package_manager/upm_declaration.cpp
         src/package_manager/package_list.cpp
+        src/package_manager/json_scan.cpp
+        src/package_manager/json_edit.cpp
+        src/package_manager/package_owner.cpp
+        src/package_manager/rev_resolution.cpp
+        src/package_manager/declaration_edit.cpp
+        src/package_manager/declaration_add.cpp
+        src/package_manager/declaration_remove.cpp
     )
     target_include_directories(ergo_package_manager PUBLIC include)
     target_link_libraries(ergo_package_manager PUBLIC ergo_common)
@@ -1307,7 +1315,10 @@ if(ERGO_BUILD_PACKAGE_MANAGER)
             tests/package_manager/test_declaration.cpp
             tests/package_manager/test_leak_check.cpp
             tests/package_manager/test_bootstrap_init.cpp
-            tests/package_manager/test_package_list.cpp)
+            tests/package_manager/test_package_list.cpp
+            tests/package_manager/test_json_edit.cpp
+            tests/package_manager/test_declaration_edit.cpp
+            tests/package_manager/test_rev_resolution.cpp)
         target_link_libraries(test_package_manager PRIVATE ergo_package_manager ergo_gtest_main)
         target_compile_definitions(test_package_manager PRIVATE
             ERGO_PACKAGE_MANAGER_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_manager/fixtures"
@@ -1327,6 +1338,11 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
         tools/package_cli/cmd_list.cpp
         tools/package_cli/cmd_doctor.cpp
         tools/package_cli/cmd_fetch.cpp
+        tools/package_cli/git_rev_resolver.cpp
+        tools/package_cli/edit_support.cpp
+        tools/package_cli/cmd_add.cpp
+        tools/package_cli/cmd_remove.cpp
+        tools/package_cli/cmd_update.cpp
     )
     set_target_properties(ergo_pkg_cli PROPERTIES OUTPUT_NAME ergo_pkg)
     target_link_libraries(ergo_pkg_cli PRIVATE ergo_package_manager)
@@ -1344,6 +1360,13 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
                     -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
                     -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_cli.cmake)
+            add_test(NAME test_package_cli_edit
+                COMMAND ${CMAKE_COMMAND}
+                    -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/package_cli_edit
+                    -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
+                    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_cli_edit.cmake)
         endif()
     endif()
 elseif(ERGO_BUILD_PACKAGE_CLI)

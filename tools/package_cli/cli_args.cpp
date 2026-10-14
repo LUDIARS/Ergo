@@ -27,6 +27,16 @@ bool allowed_for(const std::string& command, Allowed& out) {
     } else if (command == "fetch") {
         out.values.insert({"--build", "--cache", "--cmake"});
         out.names = true;
+    } else if (command == "add") {
+        out.values.insert({"--features", "--kind", "--code", "--repository", "--rev", "--wiring", "--cache"});
+        out.flags = {"--optional", "--allow-off-main"};
+        out.names = true;
+    } else if (command == "remove") {
+        out.names = true;
+    } else if (command == "update") {
+        out.values.insert({"--to", "--cache"});
+        out.flags = {"--allow-off-main"};
+        out.names = true;
     } else {
         return false;
     }
@@ -35,17 +45,28 @@ bool allowed_for(const std::string& command, Allowed& out) {
 
 void assign(Args& a, const std::string& key, const std::string& value) {
     if (key == "--host") a.host = value;
-    else if (key == "--ergo") a.ergo = value;
+    else if (key == "--ergo") {
+        a.ergo          = value;
+        a.ergo_explicit = true;
+    }
     else if (key == "--code") a.code = value;
     else if (key == "--build") a.build = value;
     else if (key == "--cache") a.cache = value;
     else if (key == "--cmake") a.cmake = value;
+    else if (key == "--features") a.features = value;
+    else if (key == "--kind") a.kind = value;
+    else if (key == "--repository") a.repository = value;
+    else if (key == "--rev") a.rev = value;
+    else if (key == "--wiring") a.wiring = value;
+    else if (key == "--to") a.to = value;
 }
 
 void set_flag(Args& a, const std::string& key) {
     if (key == "--upm") a.upm = true;
     else if (key == "--json") a.json = true;
     else if (key == "--strict") a.strict = true;
+    else if (key == "--optional") a.optional = true;
+    else if (key == "--allow-off-main") a.allow_off_main = true;
 }
 
 } // namespace
@@ -82,6 +103,9 @@ bool parse_args(const std::vector<std::string>& argv, Args& out, std::string* er
         }
     }
     if (!out.build.empty() && !out.cache.empty()) return fail("--build and --cache are exclusive");
+    const bool one_name = out.command == "add" || out.command == "remove" || out.command == "update";
+    if (one_name && !out.help && out.names.size() != 1) return fail(out.command + " takes exactly one package name");
+    if (out.command == "update" && !out.help && out.to.empty()) return fail("update needs --to <tag|main|sha>");
     return true;
 }
 

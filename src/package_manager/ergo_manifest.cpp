@@ -18,6 +18,20 @@ std::vector<std::string> object_keys(const jsonm::JsonValue& doc, const std::str
     return out;
 }
 
+std::map<std::string, std::vector<std::string>> read_module_needs(const jsonm::JsonValue& doc) {
+    std::map<std::string, std::vector<std::string>> out;
+    const auto* modules = doc.find("modules");
+    if (!modules || !modules->is_object() || !modules->o) return out;
+    for (const auto& [name, module] : *modules->o) {
+        const auto* needs = module.find("needs");
+        if (!needs || !needs->is_array() || !needs->a) continue;
+        for (const auto& n : *needs->a) {
+            if (n.is_string()) out[name].push_back(n.s);
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 const ManifestPackage* ErgoManifest::find(const std::string& name) const {
@@ -31,6 +45,14 @@ bool ErgoManifest::has_name(const std::string& name) const {
     return find(name) != nullptr ||
            std::find(modules.begin(), modules.end(), name) != modules.end() ||
            std::find(observe.begin(), observe.end(), name) != observe.end();
+}
+
+std::vector<std::string> ErgoManifest::modules_needing(const std::string& name) const {
+    std::vector<std::string> out;
+    for (const auto& [module, needs] : module_needs) {
+        if (std::find(needs.begin(), needs.end(), name) != needs.end()) out.push_back(module);
+    }
+    return out;
 }
 
 bool read_ergo_manifest(const jsonm::JsonValue& doc, ErgoManifest& out, std::string* error) {
@@ -50,6 +72,7 @@ bool read_ergo_manifest(const jsonm::JsonValue& doc, ErgoManifest& out, std::str
     out.packages = detail::read_packages(doc, ignored);
     out.modules  = object_keys(doc, "modules");
     out.observe  = object_keys(doc, "observe");
+    out.module_needs = read_module_needs(doc);
     return true;
 }
 

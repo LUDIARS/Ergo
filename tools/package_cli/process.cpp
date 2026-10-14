@@ -3,16 +3,22 @@
 #include <cstdio>
 #include <cstdlib>
 
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#endif
+
 namespace ergo::package_cli {
 
 namespace {
 
 #if defined(_WIN32)
 constexpr const char* kNullRedirect = " 2>nul";
+constexpr const char* kAllNullRedirect = " >nul 2>nul";
 #define ERGO_PKG_POPEN _popen
 #define ERGO_PKG_PCLOSE _pclose
 #else
 constexpr const char* kNullRedirect = " 2>/dev/null";
+constexpr const char* kAllNullRedirect = " >/dev/null 2>&1";
 #define ERGO_PKG_POPEN popen
 #define ERGO_PKG_PCLOSE pclose
 #endif
@@ -66,6 +72,17 @@ bool run(const std::vector<std::string>& argv) {
     if (!all_safe(argv)) return false;
     std::fflush(stdout);
     return std::system(shell_line(command_line(argv)).c_str()) == 0;
+}
+
+int status(const std::vector<std::string>& argv) {
+    if (!all_safe(argv)) return -1;
+    std::fflush(stdout);
+    const int rc = std::system(shell_line(command_line(argv) + kAllNullRedirect).c_str());
+#if defined(_WIN32)
+    return rc;
+#else
+    return (rc != -1 && WIFEXITED(rc)) ? WEXITSTATUS(rc) : -1;
+#endif
 }
 
 std::string git_head(const std::string& dir) {

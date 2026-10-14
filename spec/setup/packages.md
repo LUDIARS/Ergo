@@ -134,7 +134,7 @@ error はすべて並べてから構成を止める。取り込みの段階で e
 
 `<NAME>` はパッケージ名を大文字にし `-` を `_` にしたもの (`pictor` → `PICTOR`)。
 
-## ホストの宣言と `ergo_pkg` (パッケージマネージャ W1)
+## ホストの宣言と `ergo_pkg` (パッケージマネージャ W1 / W2)
 
 設計は `spec/feature/package-manager.md` §2、形式は `spec/data/ergo-packages.md`「ホストの宣言」。
 
@@ -145,6 +145,11 @@ ergo_pkg init --code <ProjectCode>   # ergo-packages.json (host 節)・cmake/erg
 ergo_pkg doctor                      # 宣言の検査・ブートストラップの古さ・漏れ検査。--strict で warning も止める
 ergo_pkg list [--build <build>]      # 宣言・Ergo のマニフェスト・resolved.json を合わせた一覧
 ergo_pkg fetch --build <build>       # host.use を FetchContent の置き場所へ事前取得 (ネットワーク)
+ergo_pkg add <name> [--optional] [--features +vulkan]   # host.use に足す (共有パッケージ)
+ergo_pkg add <name> --repository <url> --rev <sha|tag> [--kind link|tool]   # 非公開パッケージ (link は結線ファイルが先に要る)
+ergo_pkg remove <name>               # host.use / optional / features / 非公開 packages から外す (needs を壊すなら拒否)
+ergo_pkg update ergo --to <tag>      # host.ergo の rev と expect_tag を書く (ネットワーク)
+ergo_pkg update <shared> --to <tag> --ergo <ergo>   # 共有パッケージの pin は Ergo のマニフェスト側
 ```
 
 - ホストの `CMakeLists.txt` は `add_subdirectory(<ergo>)` の代わりに `include(cmake/ergo-bootstrap.cmake)` にする。
@@ -155,6 +160,10 @@ ergo_pkg fetch --build <build>       # host.use を FetchContent の置き場所
   `<FETCHCONTENT_BASE_DIR>/ergo_pkg_<name>-src` が pin と同じ HEAD ならそれを使う)。
 - `ergo_pkg` はコミット・ブランチ作成・PR をしない。宣言とブートストラップの変更はホストの feat ブランチで PR にする。
 - Ergo は公開リポ。宣言・ブートストラップに開発機の絶対パスやトークンを書かない (`ergo_pkg doctor` の LEAK で止まる)。
+- `add` / `remove` / `update` は該当の値だけを書き換え、キー順・改行・字下げは変えない。`update` は main の祖先でない
+  commit (feature ブランチの先頭など) を拒む (`--allow-off-main` で通す)。`--to main` / `--to <sha>` はタグの無い pin なので
+  STRICT で通らない旨を警告し、`expect_tag` を外す。版の解決はリポごとのツリーレス bare ミラー
+  (`<cache>/mirrors/<Repo>.git`、`<cache>` は `--cache` → `ERGO_PKG_CACHE_DIR` → `ERGO_DEPENDENCY_CACHE_DIR` → 一時ディレクトリ) で行う。
 
 ## 既知の制約
 

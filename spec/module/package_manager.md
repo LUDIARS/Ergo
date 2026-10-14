@@ -2,10 +2,11 @@
 
 ## 概要
 
-パッケージマネージャ (spec/feature/package-manager.md §2、 段階 W1 「宣言と読み取り」) の読み取り層と、
-その CLI `ergo_pkg`。 ホストの宣言 (ホスト側 `ergo-packages.json` の `host` 節、 形式は
+パッケージマネージャ (spec/feature/package-manager.md §2、 段階 W1 「宣言と読み取り」・W2 「書き換え」) の
+読み取り層・書き換え層と、 その CLI `ergo_pkg`。 ホストの宣言 (ホスト側 `ergo-packages.json` の `host` 節、 形式は
 spec/data/ergo-packages.md 「ホストの宣言」) を読んで検査し、 ブートストラップを生成し、 一覧を作る。
-ライブラリはプロセスを起こさず、 ネットワークにも出ない (git / cmake の起動は CLI 側だけ)。
+W2 で宣言の書き換え (add / remove) と pin の書き換え (update) を足した。
+ライブラリはプロセスを起こさず、 ネットワークにも出ない (git / cmake の起動は CLI 側だけ。 版の解決は `IRevResolver` 越し)。
 
 | 部品 | ヘッダ | 中身 |
 |---|---|---|
@@ -18,6 +19,10 @@ spec/data/ergo-packages.md 「ホストの宣言」) を読んで検査し、 �
 | init の計画 | `init_plan.h` | 既存ファイルから書くものを決める純粋関数。 2 回目は無変更、 `.gitignore` に `.ergo/` を 1 行、 `--upm` は `.ergo/host.json` だけ |
 | UPM の宣言 | `upm_declaration.h` | `.ergo/host.json` の code と `Packages/manifest.json` の LUDIARS git 依存 (`#main` などは `branch_ref`) |
 | 一覧 | `package_list.h` | 宣言・Ergo のマニフェスト・resolved.json・UPM を 1 パッケージ 1 行に。 表と JSON |
+| 書式を保つ書き換え (W2) | `json_edit.h` | キーの経路で値の範囲を探し、 その範囲だけを差し替える。 足すメンバ・要素は兄弟の区切り (改行と字下げ / 1 行) を写し、 CRLF の文書には CRLF で書く |
+| 持ち主 (W2) | `package_owner.h` | `ergo` → ホストの `host.ergo`、 非公開 → ホストの `packages.<name>`、 共有 → Ergo のマニフェスト。 非公開と Ergo の同名は Conflict (PKG-15) |
+| 版の解決 (W2) | `rev_resolution.h` | `--to` をタグ (expect_tag つき) / 追跡ブランチ (main) / 40 桁 SHA / その他のブランチの順に解決。 タグの無い pin は STRICT の警告、 main の祖先でない commit は `allow_off_main` が無ければ拒否。 git は `IRevResolver` (CLI のミラー実装、 テストは偽物) |
+| 宣言の書き換え (W2) | `declaration_edit.h` | `plan_add` / `plan_remove` / `plan_pin`。 書き換え後に宣言を検査し直し、 新しく error が出るものは拒む。 remove は `modules.*.needs` を壊すなら拒否、 非公開 link の add は結線ファイルが無ければ拒否 |
 
 ## カテゴリ
 
@@ -50,6 +55,9 @@ build-packages (ビルドとパッケージ取り込み。 パッケージ・ハ
 | `init [--code <c>] [--upm]` | ホストの宣言 (Ergo の pin は Ergo の `git rev-parse HEAD`)・ブートストラップ・`.gitignore` の `.ergo/`。 `--upm` は `.ergo/host.json` だけ。 既存の `ergo-packages.json` が `host` 節を持たなければ終了 2 | ホスト | 無し |
 | `list [--json] [--build <dir>]` | Ergo 自身 → 共有 → 非公開 → UPM の順の一覧 | 無し | 無し |
 | `doctor [--strict] [--json]` | 宣言の検査、 ブートストラップの古さ (Stale は error、 Missing / Foreign は warning)、 漏れ検査 (宣言・ブートストラップ・`.ergo/host.json`)。 error があれば終了 1、 `--strict` は warning も error | 無し | 無し |
+| `add <name> [--optional] [--features <f>] [--kind link\|tool] [--code <c>] [--repository <url> --rev <sha\|tag>] [--wiring <path>]` | `host.use` (と optional / features) に足す。 Ergo のマニフェストに無い名前は非公開 `packages` に足し、 `--repository` / `--rev` が要る (`--rev` がタグ・ブランチならミラーで解決、 40 桁ならネットワークに出ない)。 link は `cmake.wiring` (既定 `cmake/packages/<name>.cmake`) がホストに無ければ終了 2 でファイル不変。 共有パッケージに `--repository` などを渡すと終了 2 | ホスト | 任意 |
+| `remove <name>` | `host.use` / `optional` / `features` と非公開 `packages` (とそれを指す `legacy_vars`) から外す。 Ergo の `modules.*.needs` にある名前は終了 2。 宣言に無ければ無変更 | ホスト | 無し |
+| `update <name> --to <tag\|main\|sha\|branch> [--allow-off-main] [--cache <dir>]` | 40 桁 SHA に解決して持ち主のファイルの `rev` と `expect_tag` だけを書く (タグでなければ `expect_tag` を外す)。 共有パッケージは `--ergo` を明示したときだけ Ergo のマニフェストを書き、 無ければ終了 2。 `ergo` と非公開はホストの宣言 (無ければ終了 2)。 off-main は終了 2 (`--allow-off-main` で通す)。 最後に STRICT で通るかと次の操作 (どのリポで PR か) を表示する | 持ち主 | 要 |
 | `fetch [<name>...] [--build <dir> \| --cache <dir>]` | 名前 (無ければ `host.use`) を `cmake -P cmake/packages/ErgoPackagePrefetch.cmake` で事前取得。 置き場所は `--cache` → `--build` の `FETCHCONTENT_BASE_DIR` (無ければ `<build>/_deps`) → 環境変数 `ERGO_DEPENDENCY_CACHE_DIR` | キャッシュのみ | 要 |
 
 共通: `--host <dir>` (既定 `.`)、 `--ergo <dir>` (既定は環境変数 `ERGO_SOURCE_DIR`、 次にこの CLI を作った Ergo)。
@@ -67,7 +75,7 @@ build-packages (ビルドとパッケージ取り込み。 パッケージ・ハ
 
 - 入力: 上の「必要なデータ」
 - 出力: 検査結果 (findings)、 生成するファイルの中身、 一覧
-- タスク: W2 (add / remove / update の書式を保つ書き換え)、 W3 (ergo_package_watch) はこのモジュールの上に足す
+- タスク: W2 (add / remove / update の書式を保つ書き換え) は実装済み (`spec/tasks/2026-10-15-package-manager-w2.md`)。 W3 (ergo_package_watch) はこのモジュールの上に足す
 
 ## テスト
 
@@ -78,6 +86,8 @@ build-packages (ビルドとパッケージ取り込み。 パッケージ・ハ
 | `test_packages_host_configure` | 構成: ホスト直下の宣言の自動検出、 `host.id` の 3 段の決め方、 PKG-15 で M0 でも停止、 `ERGO_PACKAGE_MANIFEST_EXTRA` |
 | `test_packages_bootstrap` | 偽 Ergo + 偽ホストで `ERGO_SOURCE_DIR` → 旧変数の別名 → 兄弟の順、 取得 OFF ではネットワークに出ない (`_deps` を作らない)、 取得 ON でも pin が SHA でなければ PKG-02 |
 | `test_packages_prefetch` | 事前取得が FetchContent の置き場所に pin で取る (2 回目は触らない)、 取得元を消した後の `ERGO_PACKAGES_FETCH=ON` 構成が経路 5 に当たる |
+| `test_package_manager` (W2) | 書式を保つ書き換え (値だけの差し替え、 兄弟の区切りの写し、 空のコンテナ、 CRLF、 文字列中の括弧)、 持ち主の判定、 `update --to <tag>` が rev と expect_tag だけを書く (バイト一致)、 expect_tag の追加と除去、 add (共有 / 非公開 link の結線 / 拒否する書き換え)、 remove (needs の拒否、 非公開の除去、 add と remove の往復でバイト一致)、 版の解決 (タグ・main・SHA・off-main の拒否と許可・短縮 SHA・取れない) |
+| `test_package_cli_edit` (`cmake -P`) | 偽リポ (file://) で CLI を通しで: add (共有)、 update の持ち主 (共有は `--ergo` 側、 無ければ終了 2、 ホストの宣言でない `--host` で終了 2)、 off-main の拒否と `--allow-off-main`、 `--to main` の STRICT 警告、 `update ergo`、 remove の needs 拒否 (ファイル不変)、 結線ファイルの無い add (終了 2・ファイル不変) と非公開パッケージのタグの解決、 同じ pin への update は無変更 |
 | `test_package_cli` | CLI を通しで: init 2 回、 Ergo のマニフェストへの init は終了 2、 `--upm`、 doctor の古さと漏れの真偽、 list、 非公開パッケージの fetch |
 
 テストはネットワークを使わない (git はテストの中で作る偽リポ、 `file://` で参照)。 `test_packages_m0_invariance` は変えない。

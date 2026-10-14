@@ -292,7 +292,7 @@ S4 (観測 P3) は並行で実装中。W は S4 が触るファイル (`package_
 ライブラリは `IRefSource` / `IReviewSource` / `IRunSource` だけを持つ (テストは偽ソース)。HTTP は既存の `ergo_http`。
 新しいトップレベル (`unity/`) と新モジュールは同じ PR で `spec/domains` と `.anatomia/layers.json` を更新する。
 
-実装状況: W1 は `spec/tasks/2026-10-14-package-manager-w1.md` (モジュール `spec/module/package_manager.md`)。
+実装状況: W1 は `spec/tasks/2026-10-14-package-manager-w1.md`、W2 は `spec/tasks/2026-10-15-package-manager-w2.md` (モジュール `spec/module/package_manager.md`)。
 
 ### 受入条件 (機械で確かめる。テストはネットワークを使わない: git はテスト内の偽リポ、Revisor / Concordia は JSON 見本)
 

@@ -393,7 +393,7 @@ modules:
     status: preview
 
   - name: ergo_package_manager
-    summary: ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧 + CLI ergo_pkg (init / list / doctor / fetch)
+    summary: ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧・書式を保つ書き換えと持ち主の判定 + CLI ergo_pkg (init / list / doctor / fetch / add / remove / update)
     category: システム
     header_dir: include/ergo/package_manager/
     source_dir: src/package_manager/

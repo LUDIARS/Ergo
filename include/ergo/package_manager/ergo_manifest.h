@@ -6,6 +6,7 @@
 
 #include "ergo/common/json_min.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -28,10 +29,14 @@ struct ErgoManifest {
     std::vector<ManifestPackage> packages;  ///< 名前順
     std::vector<std::string>     modules;   ///< 名前順
     std::vector<std::string>     observe;   ///< 名前順
+    /// modules.<m>.needs (モジュール名 → 要るパッケージ)。 needs の無いモジュールは載らない。
+    std::map<std::string, std::vector<std::string>> module_needs;
 
     const ManifestPackage* find(const std::string& name) const;
     /// packages / modules / observe のどれかにある名前か (PKG-15 の照合用)。
     bool has_name(const std::string& name) const;
+    /// name を needs に持つモジュール (名前順)。
+    std::vector<std::string> modules_needing(const std::string& name) const;
 };
 
 /// 失敗 (オブジェクトでない、 `host` 節がある、 schema が 1 でない) なら false と理由。

@@ -79,7 +79,7 @@ ergo/
 | `ergo_package_model` | resolved.json / CMake File API codemodel v2 のリーダ (帰属・層・PKG-17 宣言漏れ) | `include/ergo/package_model/` | — |
 | `ergo_package_scan`  | 観測対象の兄弟チェックアウトから根拠付きの使用関係を読む (package.json / .gitmodules / gitlink / ported_from) | `include/ergo/package_scan/` | — |
 | `ergo_package_viz`   | パッケージ版一覧 / ターゲットのリンク図 / 使用関係図の Tela 可視化 (簡約・畳み込み・分割) | `include/ergo/package_viz/` | `ergo_package_viz` CLI、 `ergo_package_graphs` |
-| `ergo_package_manager` | パッケージマネージャ: ホストの宣言 (`host` 節) の読み取り・検査・漏れ検査・ブートストラップ | `include/ergo/package_manager/` | `ergo_pkg` CLI (`init` / `list` / `doctor` / `fetch`) |
+| `ergo_package_manager` | パッケージマネージャ: ホストの宣言 (`host` 節) の読み取り・検査・漏れ検査・ブートストラップ・書式を保つ書き換え (add / remove / update) | `include/ergo/package_manager/` | `ergo_pkg` CLI (`init` / `list` / `doctor` / `fetch` / `add` / `remove` / `update`) |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。
