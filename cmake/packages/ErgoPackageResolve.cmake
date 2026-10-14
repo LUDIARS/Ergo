@@ -18,16 +18,20 @@
 #                 A source already at the pin in FetchContent's place (left
 #                 by `ergo_pkg fetch` or an earlier configure) is used as is,
 #                 without network (ErgoPackageFetchCache.cmake)
-#   6. none       PKG-03 configure error
+#   6. none       PKG-03 configure error; for an optional package (the caller
+#                 set ERGO_PKG_RES_<name>_OPTIONAL) a record and the package
+#                 is not used (ERGO_PKG_RES_<name>_UNUSED). The same holds for
+#                 an optional "provided" package the host never created
 # The engine names no package: wiring comes from the manifest's
 # `cmake.wiring` (cmake/packages/<name>.cmake).
 #
 # Facts are left in global properties ERGO_PKG_RES_<name>_{ROUTE,SOURCE_DIR,
-# PIN,HEAD,DRIFT,DIRTY,VERSION,PRESENT,EXPORTS}; findings are appended to
-# ERGO_PACKAGES_ACQUIRE_FINDINGS.
+# PIN,HEAD,DRIFT,DIRTY,VERSION,PRESENT,EXPORTS,UNUSED}; findings are appended
+# to ERGO_PACKAGES_ACQUIRE_FINDINGS.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageGit.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageHostDefaults.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageWiring.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageFetchCache.cmake")
 
@@ -270,9 +274,15 @@ function(ergo_pkg_resolve prefix name pin)
         endif()
     endif()
 
-    # 6. nothing hit.
+    # 6. nothing hit (an optional package is then simply not used).
     if(_route STREQUAL "")
-        ergo_pkg_rule_unresolved(_f PACKAGE "${name}" TRIED ${_tried})
+        get_property(_optional GLOBAL PROPERTY ERGO_PKG_RES_${name}_OPTIONAL)
+        if(_optional)
+            ergo_pkg_rule_optional_unused(_f PACKAGE "${name}" TRIED ${_tried})
+            set_property(GLOBAL PROPERTY ERGO_PKG_RES_${name}_UNUSED TRUE)
+        else()
+            ergo_pkg_rule_unresolved(_f PACKAGE "${name}" TRIED ${_tried})
+        endif()
         ergo_pkg_res_add_findings(${_f})
         set_property(GLOBAL PROPERTY ERGO_PKG_RES_${name}_ROUTE none)
         return()
@@ -288,6 +298,14 @@ function(ergo_pkg_resolve_late prefix name)
     get_property(_pin GLOBAL PROPERTY ERGO_PKG_RES_${name}_PIN)
     get_property(_features GLOBAL PROPERTY ERGO_PKG_RES_${name}_FEATURES)
     _ergo_pkg_present_targets(_present "${prefix}" "${name}")
+    get_property(_optional GLOBAL PROPERTY ERGO_PKG_RES_${name}_OPTIONAL)
+    if(_optional AND NOT _present)
+        ergo_pkg_rule_optional_unused(_f PACKAGE "${name}" TRIED provided)
+        ergo_pkg_res_add_findings(${_f})
+        set_property(GLOBAL PROPERTY ERGO_PKG_RES_${name}_UNUSED TRUE)
+        set_property(GLOBAL PROPERTY ERGO_PKG_RES_${name}_ROUTE none)
+        return()
+    endif()
     _ergo_pkg_host_root(_source "${_present}")
     _ergo_pkg_finish("${prefix}" "${name}" provided "${_source}" "${_pin}" "${_features}")
 endfunction()

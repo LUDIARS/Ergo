@@ -214,7 +214,7 @@ P1 (版一覧) と P2 (リンク図) は構成の形を見る図、P4 は 1 ホ�
 |---|---|---|
 | L1 Ergo の pin | `ergo_pkg init --code Ln` で宣言 (Ergo の SHA、`use` は空) とブートストラップを足す。Ergo の取り込みをブートストラップに置き換え、`SUIKA_ERGO_DIR` は `legacy_vars` で `ERGO_SOURCE_DIR` の別名 (渡されれば使い、DEPRECATION を出す)。M0 のまま | 同じ `SUIKA_ERGO_DIR` でターゲット集合と `ctest -N` が変わらない。resolved.json に Ergo の drift が出る |
 | L2 照合 (M1) | `use` / `optional` に `pictor`。Pictor の取り込みはホストのまま (Ergo より後に作るので `provided` 経路)。`SUIKA_PICTOR_DIR` が無いときは使わない | `mode=M1 (pictor=provided)`。PKG-05 と PKG-15 (`PICTOR_BUILD_*` の FORCE) が記録される |
-| L3 委譲 (M2) | Pictor の `add_subdirectory` と FORCE を消し、`SUIKA_PICTOR_DIR` は `ERGO_PACKAGE_SOURCE_DIR_PICTOR` の別名に。`PICTOR_ENABLE_RIVE` は `features` / キャッシュ既定で渡す | `mode=M2 (pictor=source)`。描画ターゲットの有無と compile definitions が L2 と同じ。PKG-15 が消える |
+| L3 委譲 (M2) | Pictor の `add_subdirectory` と FORCE を消し、`SUIKA_PICTOR_DIR` は `ERGO_PACKAGE_SOURCE_DIR_PICTOR` の別名に (`legacy_vars` の `pictor.source_dir`)。`PICTOR_ENABLE_RIVE` は `features` (`"pictor": "+rive"`、Ergo のマニフェストの機能 `rive`) / キャッシュ既定で渡す | `mode=M2 (pictor=source)`。描画ターゲットの有無と compile definitions が L2 と同じ。PKG-15 が消える |
 
 - `ERGO_BUILD_*` によるモジュール選択はホストに残す。FORCE は「未設定なら既定」に直すよう L1 で推奨する。
 - `spec/setup/native-build.md` と CMake のエラー文にある開発機の絶対パス例は L1 で記号 (`<ergo>`) に置き換える。
@@ -298,6 +298,8 @@ W3 は `spec/tasks/2026-10-15-package-manager-w3.md` (モジュール `spec/modu
 W4 は `spec/tasks/2026-10-15-package-manager-w4.md` (同じモジュールと形式に由来を足した)。
 W6 の Ergo 側 (P4 ホスト状態図) は `spec/tasks/2026-10-15-package-manager-w6.md` (`ergo_pkg status` と形式 `spec/data/ergo-packages-status.md`、
 読み手 `package_model/host_state_reader.h`、 図 `package_viz/host_view.h`、 `ergo_package_graphs` の `host.tela`)。 Ludellus-Native の L1〜L3 は Ludellus-Native の PR で行う。
+§2.1 の `use` / `optional` / `features` を構成の既定値として流す処理と Ergo 自身への PKG-04/05/07 (L1〜L3 の前提) は
+`spec/tasks/2026-10-15-package-manager-host-use.md` (`cmake/packages/ErgoPackageHostDefaults.cmake`・`ErgoPackageErgoPin.cmake`)。
 
 ### 受入条件 (機械で確かめる。テストはネットワークを使わない: git はテスト内の偽リポ、Revisor / Concordia は JSON 見本)
 

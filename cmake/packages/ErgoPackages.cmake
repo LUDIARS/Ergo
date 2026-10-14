@@ -5,6 +5,13 @@
 # third-party registry and before any module section. Design:
 # spec/feature/package-hub.md (manifest §2, routes §3, checks §4, modes §6).
 #
+#   * The host declaration (<host>/ergo-packages.json `host` section,
+#     spec/feature/package-manager.md §2.1) gives the defaults: host.use for
+#     ERGO_PACKAGES, host.optional for ERGO_PACKAGES_OPTIONAL, host.features
+#     for ERGO_PACKAGE_FEATURES_<NAME> (ErgoPackageHostDefaults.cmake). A
+#     non-empty cache value wins; resolved.json records which one was used.
+#     The declared Ergo pin (host.ergo.rev) gets PKG-02/04/05/07/08 too
+#     (ErgoPackageErgoPin.cmake).
 #   * ERGO_PACKAGES unset -> compatibility mode M0. The hub acquires nothing
 #     and changes nothing: link-package targets the host already created are
 #     recorded as host-unmanaged, every finding is recorded, configure never
@@ -29,12 +36,18 @@ include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageManifest.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageRules.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageReport.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageResolve.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageHostDefaults.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageErgoPin.cmake")
 
 # Do not create the cache entry when the host already set a normal variable
 # (set(CACHE) would otherwise drop that binding under CMP0126 OLD).
 if(NOT DEFINED ERGO_PACKAGES)
     set(ERGO_PACKAGES "" CACHE STRING
-        "LUDIARS link packages managed by the Ergo package hub (e.g. pictor;tela). Empty = compatibility mode M0")
+        "LUDIARS link packages managed by the Ergo package hub (e.g. pictor;tela). Empty = host.use of the host declaration, else compatibility mode M0")
+endif()
+if(NOT DEFINED ERGO_PACKAGES_OPTIONAL)
+    set(ERGO_PACKAGES_OPTIONAL "" CACHE STRING
+        "Ergo package hub: selected packages that are not used when no route resolves them. Empty = host.optional of the host declaration")
 endif()
 option(ERGO_PACKAGES_STRICT
     "Ergo package hub: treat warning-level findings as configure errors (CI / shipping)" OFF)
@@ -163,12 +176,22 @@ macro(_ergo_packages_load prefix out_findings)
     get_property(_ergo_pkg_host_file GLOBAL PROPERTY ERGO_PACKAGES_HOST_DECLARATION)
     ergo_pkg_manifest_load(${prefix} "${_ergo_pkg_manifest_file}")
     set(${out_findings} "")
-    set(${prefix}_HOST_CODE "")
+    foreach(_ergo_pkg_host_field PRESENT CODE USE OPTIONAL FEATURES ERGO_REV ERGO_EXPECT_TAG LEGACY_VARS)
+        set(${prefix}_HOST_${_ergo_pkg_host_field} "")
+    endforeach()
     if(NOT "${_ergo_pkg_host_file}" STREQUAL "")
         ergo_pkg_manifest_load(${prefix}_extra "${_ergo_pkg_host_file}" HOST)
         ergo_pkg_manifest_merge(${prefix} ${prefix}_extra ${out_findings})
-        set(${prefix}_HOST_CODE "${${prefix}_extra_HOST_CODE}")
+        foreach(_ergo_pkg_host_field PRESENT CODE USE OPTIONAL FEATURES ERGO_REV ERGO_EXPECT_TAG LEGACY_VARS)
+            set(${prefix}_HOST_${_ergo_pkg_host_field} "${${prefix}_extra_HOST_${_ergo_pkg_host_field}}")
+        endforeach()
     endif()
+    # Effective selection: the cache value, else the declaration's default.
+    ergo_pkg_host_default(${prefix}_SELECTED ${prefix}_SELECTED_FROM
+        DECLARED "${${prefix}_HOST_PRESENT}" CACHE ${ERGO_PACKAGES} DEFAULT ${${prefix}_HOST_USE})
+    ergo_pkg_host_default(${prefix}_OPTIONAL ${prefix}_OPTIONAL_FROM
+        DECLARED "${${prefix}_HOST_PRESENT}" CACHE ${ERGO_PACKAGES_OPTIONAL}
+        DEFAULT ${${prefix}_HOST_OPTIONAL})
 endmacro()
 
 # Snapshot which manifest targets exist before any Ergo module ran, so the
@@ -187,6 +210,7 @@ function(_ergo_packages_begin)
         string(REPLACE ";" "\n  " _list "${_clash}")
         message(FATAL_ERROR "ergo packages: host declaration ${_host_file} rejected:\n  ${_list}")
     endif()
+    set_property(GLOBAL PROPERTY ERGO_PACKAGES_SELECTED "${_m_SELECTED}")
     set(_present "")
     foreach(_n IN LISTS _m_LINK)
         foreach(_t IN LISTS _m_PKG_${_n}_TARGETS)
@@ -197,6 +221,19 @@ function(_ergo_packages_begin)
     endforeach()
     set_property(GLOBAL PROPERTY ERGO_PACKAGES_TARGETS_AT_INCLUDE "${_present}")
     ergo_pkg_report_install_query("${CMAKE_BINARY_DIR}")
+endfunction()
+
+# Value of a directory variable a module entry names (reason_var / when /
+# real_path_var): the snapshot taken at the end of Ergo's directory when the
+# final phase runs later in the top-level directory, else the variable.
+function(_ergo_packages_dir_value out_var var)
+    get_property(_snapped GLOBAL PROPERTY ERGO_PACKAGES_SNAP_${var} SET)
+    if(_snapped)
+        get_property(_value GLOBAL PROPERTY ERGO_PACKAGES_SNAP_${var})
+    else()
+        set(_value "${${var}}")
+    endif()
+    set(${out_var} "${_value}" PARENT_SCOPE)
 endfunction()
 
 # Internal: TRUE when some error finding names <package> or <package>/<f>.
@@ -225,7 +262,8 @@ function(_ergo_packages_evaluate phase)
     _ergo_packages_load(_m _extra_findings)
     _ergo_packages_platform(_platform)
 
-    set(_selected ${ERGO_PACKAGES})
+    set(_selected ${_m_SELECTED})
+    set(_unused "")
 
     set(_findings ${_extra_findings})
     foreach(_e IN LISTS _m_ERRORS)
@@ -274,6 +312,14 @@ function(_ergo_packages_evaluate phase)
         foreach(_n IN LISTS _pending)
             ergo_pkg_resolve_late(_m "${_n}")
         endforeach()
+        # Optional packages no route resolved are not selected any more.
+        foreach(_n IN LISTS _m_SELECTED)
+            get_property(_is_unused GLOBAL PROPERTY ERGO_PKG_RES_${_n}_UNUSED)
+            if(_is_unused)
+                list(REMOVE_ITEM _selected "${_n}")
+                list(APPEND _unused "${_n}")
+            endif()
+        endforeach()
     endif()
 
     # Per link package: pin, override, requires, features, resolution.
@@ -281,6 +327,7 @@ function(_ergo_packages_evaluate phase)
     set(_host_routes 0)
     set(_hub_routes 0)
     set(_exports "")
+    set(_features_from "")
     foreach(_n IN LISTS _m_LINK)
         set(_q "_m_PKG_${_n}")
         set(_r "_r_PKG_${_n}")
@@ -351,9 +398,16 @@ function(_ergo_packages_evaluate phase)
             endforeach()
         endif()
 
+        # Feature request: the cache, else the declaration's host.features.
+        ergo_pkg_host_feature_default(_declared_request PACKAGE "${_n}" PAIRS ${_m_HOST_FEATURES})
+        ergo_pkg_host_default(_request _request_from DECLARED "${_m_HOST_PRESENT}"
+            CACHE ${ERGO_PACKAGE_FEATURES_${_u}} DEFAULT ${_declared_request})
+        if(NOT "${_request}" STREQUAL "")
+            list(APPEND _features_from "${_n}=${_request_from}")
+        endif()
         ergo_pkg_features_select(_features _f PACKAGE "${_n}" PLATFORM "${_platform}"
             FEATURES ${${_q}_FEATURES} DEFAULTS ${_defaults} PLATFORMS ${_fplatforms}
-            RESERVED ${_reserved} REQUEST ${ERGO_PACKAGE_FEATURES_${_u}})
+            RESERVED ${_reserved} REQUEST ${_request})
         list(APPEND _pkg_findings ${_f})
         ergo_pkg_rule_feature_combination(_f PACKAGE "${_n}" PLATFORM "${_platform}"
             SELECTED ${_features} PLATFORMS ${_fplatforms} RESERVED ${_reserved}
@@ -365,7 +419,22 @@ function(_ergo_packages_evaluate phase)
         if(phase STREQUAL "include" AND _n IN_LIST _selected)
             _ergo_packages_has_error(_blocked "${_n}" ${_pkg_findings})
             if(NOT _blocked)
+                if(_n IN_LIST _m_OPTIONAL)
+                    set_property(GLOBAL PROPERTY ERGO_PKG_RES_${_n}_OPTIONAL TRUE)
+                endif()
+                # host.legacy_vars "<VAR>": "<name>.source_dir" stands in for
+                # an unset ERGO_PACKAGE_SOURCE_DIR_<NAME> (function scope).
+                ergo_pkg_host_legacy_source(_legacy PACKAGE "${_n}" PAIRS ${_m_HOST_LEGACY_VARS})
+                if("${ERGO_PACKAGE_SOURCE_DIR_${_u}}" STREQUAL "" AND NOT _legacy STREQUAL ""
+                   AND NOT "${${_legacy}}" STREQUAL "")
+                    message(DEPRECATION "${_legacy} is a legacy alias: set ERGO_PACKAGE_SOURCE_DIR_${_u} instead")
+                    set(ERGO_PACKAGE_SOURCE_DIR_${_u} "${${_legacy}}")
+                endif()
                 ergo_pkg_resolve(_m "${_n}" "${_pin}" ${_features})
+                get_property(_is_unused GLOBAL PROPERTY ERGO_PKG_RES_${_n}_UNUSED)
+                if(_is_unused)
+                    list(REMOVE_ITEM _selected "${_n}")
+                endif()
             endif()
         endif()
         get_property(_route GLOBAL PROPERTY ERGO_PKG_RES_${_n}_ROUTE)
@@ -483,9 +552,9 @@ function(_ergo_packages_evaluate phase)
         endif()
         set(_reason "")
         if(${_q}_REASON_VAR)
-            set(_reason "${${${_q}_REASON_VAR}}")
+            _ergo_packages_dir_value(_reason "${${_q}_REASON_VAR}")
         elseif(${_q}_WHEN)
-            set(_when_value "${${${_q}_WHEN}}")
+            _ergo_packages_dir_value(_when_value "${${_q}_WHEN}")
             if(_when_value)
                 set(_reason "${${_q}_WHEN}=ON")
             else()
@@ -494,7 +563,7 @@ function(_ergo_packages_evaluate phase)
         endif()
         set(_real_path FALSE)
         if(${_q}_REAL_PATH_VAR)
-            set(_real_path_value "${${${_q}_REAL_PATH_VAR}}")
+            _ergo_packages_dir_value(_real_path_value "${${_q}_REAL_PATH_VAR}")
             if(_real_path_value)
                 set(_real_path TRUE)
             endif()
@@ -520,6 +589,25 @@ function(_ergo_packages_evaluate phase)
         endforeach()
     endforeach()
 
+    # Ergo itself, against the pin of the host declaration (final only).
+    set(_r_HOST_ERGO_PIN "")
+    if(phase STREQUAL "final" AND NOT "${_m_HOST_ERGO_REV}" STREQUAL "")
+        set(_ergo_route host)
+        if(NOT "${ERGO_BOOTSTRAP_ROUTE}" STREQUAL "")
+            set(_ergo_route "${ERGO_BOOTSTRAP_ROUTE}")
+        endif()
+        ergo_pkg_check_ergo_pin(_ep ROOT "${_root}" PIN "${_m_HOST_ERGO_REV}"
+            ROUTE "${_ergo_route}" EXPECT_TAG "${_m_HOST_ERGO_EXPECT_TAG}"
+            STRICT "${ERGO_PACKAGES_STRICT}")
+        list(APPEND _findings ${_ep_FINDINGS})
+        set(_r_HOST_ERGO_PIN "${_m_HOST_ERGO_REV}")
+        set(_r_HOST_ERGO_EXPECT_TAG "${_m_HOST_ERGO_EXPECT_TAG}")
+        set(_r_HOST_ERGO_ROUTE "${_ergo_route}")
+        set(_r_HOST_ERGO_HEAD "${_ep_HEAD}")
+        set(_r_HOST_ERGO_DRIFT "${_ep_DRIFT}")
+        set(_r_HOST_ERGO_DIRTY "${_ep_DIRTY}")
+    endif()
+
     ergo_pkg_findings_with_severity(_errors error ${_findings})
     if(phase STREQUAL "include" AND NOT _errors)
         return()  # clean: the final phase writes the report
@@ -528,6 +616,12 @@ function(_ergo_packages_evaluate phase)
     file(RELATIVE_PATH _manifest_rel "${_root}" "${_manifest}")
     get_property(_extra_rel GLOBAL PROPERTY ERGO_PACKAGES_HOST_DECLARATION)
     _ergo_packages_host_id(_r_HOST_ID "${_m_HOST_CODE}")
+    set(_r_HOST_DECLARED "${_m_HOST_PRESENT}")
+    set(_r_HOST_SELECTED_FROM "${_m_SELECTED_FROM}")
+    set(_r_HOST_OPTIONAL ${_m_OPTIONAL})
+    set(_r_HOST_OPTIONAL_FROM "${_m_OPTIONAL_FROM}")
+    set(_r_HOST_UNUSED ${_unused})
+    set(_r_HOST_FEATURES_FROM ${_features_from})
     set(_r_MODE ${_mode})
     set(_r_STRICT ${ERGO_PACKAGES_STRICT})
     set(_r_FETCH ${ERGO_PACKAGES_FETCH})
@@ -572,12 +666,35 @@ function(_ergo_packages_evaluate phase)
     endif()
 endfunction()
 
-function(_ergo_packages_finalize)
+function(_ergo_packages_final)
     _ergo_packages_evaluate(final)
 endfunction()
 
+# End of the directory that included the hub. When that is a subdirectory
+# (a host add_subdirectory()s Ergo, e.g. through cmake/ergo-bootstrap.cmake),
+# packages the host creates after Ergo ("provided") exist only at the end of
+# the top-level directory: snapshot the module variables of this directory
+# and run the final phase there.
+function(_ergo_packages_finalize)
+    if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+        _ergo_packages_final()
+        return()
+    endif()
+    _ergo_packages_load(_m _unused_findings)
+    foreach(_mod IN LISTS _m_MODULES)
+        foreach(_field REASON_VAR WHEN REAL_PATH_VAR)
+            set(_var "${_m_MOD_${_mod}_${_field}}")
+            if(NOT _var STREQUAL "")
+                set_property(GLOBAL PROPERTY ERGO_PACKAGES_SNAP_${_var} "${${_var}}")
+            endif()
+        endforeach()
+    endforeach()
+    cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _ergo_packages_final)
+endfunction()
+
 _ergo_packages_begin()
-if(ERGO_PACKAGES)
+get_property(_ergo_packages_selected GLOBAL PROPERTY ERGO_PACKAGES_SELECTED)
+if(_ergo_packages_selected)
     _ergo_packages_evaluate(include)
     # `exports` of the resolved packages (e.g. PICTOR_SHADER_DIR) as normal
     # variables of the including directory.

@@ -19,7 +19,7 @@ endforeach()
 
 # Pictor details used by the rules.
 pkg_assert_eq("pictor targets" "${m_PKG_pictor_TARGETS}" "pictor")
-pkg_assert_eq("pictor features" "${m_PKG_pictor_FEATURES}" "d3d12;metal;vulkan;web;webgpu")
+pkg_assert_eq("pictor features" "${m_PKG_pictor_FEATURES}" "d3d12;metal;rive;vulkan;web;webgpu")
 pkg_assert_eq("pictor vulkan platforms" "${m_PKG_pictor_FEAT_vulkan_PLATFORMS}" "desktop;android;ios")
 pkg_assert_eq("pictor vulkan contract" "${m_PKG_pictor_FEAT_vulkan_CONTRACT}" "PICTOR_HAS_VULKAN")
 pkg_assert_eq("pictor webgpu reserved" "${m_PKG_pictor_FEAT_webgpu_RESERVED}" "TRUE")

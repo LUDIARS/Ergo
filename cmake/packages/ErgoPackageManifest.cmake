@@ -13,7 +13,11 @@
 # §2.1) and stops the configure. With HOST the file is read as a host
 # declaration (or a legacy extra manifest without `host`): its `packages`
 # are the host's private packages, and <prefix>_HOST_PRESENT /
-# <prefix>_HOST_CODE carry the `host` section facts the hub uses.
+# <prefix>_HOST_CODE carry the `host` section facts the hub uses, with the
+# configure defaults <prefix>_HOST_USE / _HOST_OPTIONAL (lists),
+# <prefix>_HOST_FEATURES ("<package>=<token>,<token>" pairs, sorted) and
+# Ergo's own pin <prefix>_HOST_ERGO_REV / _HOST_ERGO_EXPECT_TAG and the
+# legacy aliases <prefix>_HOST_LEGACY_VARS ("<VAR>=<target>" pairs, sorted).
 #
 # Sets in the caller's scope (names are sorted):
 #   <prefix>_SCHEMA, <prefix>_ERRORS (schema problems, one text per entry)
@@ -118,11 +122,28 @@ function(ergo_pkg_manifest_load prefix file)
             "declaration, not an Ergo manifest (spec/data/ergo-packages.md, host declaration)")
     endif()
     set(_host_code "")
+    set(_host_use "")
+    set(_host_optional "")
+    set(_host_features "")
+    set(_host_ergo_rev "")
+    set(_host_ergo_tag "")
+    set(_host_legacy "")
     if(_host_present)
         if(NOT _host_type STREQUAL "OBJECT")
             message(FATAL_ERROR "ergo packages: host declaration '${file}': `host` is not an object")
         endif()
         _ergo_pkg_json_string(_host_code "${_json}" host code)
+        _ergo_pkg_json_array(_host_use "${_json}" host use)
+        _ergo_pkg_json_array(_host_optional "${_json}" host optional)
+        _ergo_pkg_json_keys(_feature_keys "${_json}" host features)
+        foreach(_k IN LISTS _feature_keys)
+            _ergo_pkg_json_string(_v "${_json}" host features "${_k}")
+            string(REPLACE ";" "," _v "${_v}")  # "vulkan;web" stays one list item
+            list(APPEND _host_features "${_k}=${_v}")
+        endforeach()
+        _ergo_pkg_json_string(_host_ergo_rev "${_json}" host ergo rev)
+        _ergo_pkg_json_string(_host_ergo_tag "${_json}" host ergo expect_tag)
+        _ergo_pkg_json_pairs(_host_legacy "${_json}" host legacy_vars)
     endif()
 
     set(_out "")       # names of every variable to hand back
@@ -254,6 +275,12 @@ function(ergo_pkg_manifest_load prefix file)
     set(${prefix}_DIR      "${_dir}"      PARENT_SCOPE)
     set(${prefix}_HOST_PRESENT "${_host_present}" PARENT_SCOPE)
     set(${prefix}_HOST_CODE    "${_host_code}"    PARENT_SCOPE)
+    set(${prefix}_HOST_USE      "${_host_use}"      PARENT_SCOPE)
+    set(${prefix}_HOST_OPTIONAL "${_host_optional}" PARENT_SCOPE)
+    set(${prefix}_HOST_FEATURES "${_host_features}" PARENT_SCOPE)
+    set(${prefix}_HOST_ERGO_REV        "${_host_ergo_rev}" PARENT_SCOPE)
+    set(${prefix}_HOST_ERGO_EXPECT_TAG "${_host_ergo_tag}" PARENT_SCOPE)
+    set(${prefix}_HOST_LEGACY_VARS     "${_host_legacy}"   PARENT_SCOPE)
     set(${prefix}_VARS     "${_out}"      PARENT_SCOPE)
     foreach(_v IN LISTS _out)
         set(${_v} "${${_v}}" PARENT_SCOPE)

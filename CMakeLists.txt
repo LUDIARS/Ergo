@@ -1592,7 +1592,7 @@ endif()
 # (git repositories created by the test). See spec/data/ergo-packages.md.
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_TESTS)
-    foreach(NAME manifest rules cycles features report acquire host_declaration)
+    foreach(NAME manifest rules cycles features report acquire host_declaration host_defaults)
         add_test(NAME test_packages_${NAME}
             COMMAND ${CMAKE_COMMAND}
                 -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -1617,7 +1617,9 @@ if(ERGO_BUILD_TESTS)
         # W1 (spec/feature/package-manager.md §7): host declarations on a
         # configure, the bootstrap's search order, and prefetch -> offline
         # route 5. Fake repositories are created by the tests (no network).
-        foreach(NAME host_configure bootstrap prefetch)
+        # host_use: the declaration's use / optional / features as configure
+        # defaults (Ludellus-Native L1-L3 on a fake host and a fake Ergo).
+        foreach(NAME host_configure bootstrap prefetch host_use)
             add_test(NAME test_packages_${NAME}
                 COMMAND ${CMAKE_COMMAND}
                     -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

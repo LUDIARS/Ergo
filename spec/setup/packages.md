@@ -121,8 +121,9 @@ error はすべて並べてから構成を止める。取り込みの段階で e
 
 | 変数 | 意味 |
 |---|---|
-| `ERGO_PACKAGES` | 使う link パッケージの列 (例 `pictor;tela`)。**未設定なら M0** |
-| `ERGO_PACKAGE_FEATURES_<NAME>` | 機能の足し引き (`+web;-vulkan`、`web` は `+web` と同じ)。不明な名前・予約機能は PKG-13 |
+| `ERGO_PACKAGES` | 使う link パッケージの列 (例 `pictor;tela`)。空ならホストの宣言の `host.use`、**それも無ければ M0** |
+| `ERGO_PACKAGES_OPTIONAL` | 選んだうち、どの経路でも見つからなければ使わないもの (PKG-03 の error の代わりに record)。空なら `host.optional` |
+| `ERGO_PACKAGE_FEATURES_<NAME>` | 機能の足し引き (`+web;-vulkan`、`web` は `+web` と同じ)。不明な名前・予約機能は PKG-13。空なら `host.features.<name>` |
 | `ERGO_PACKAGE_SOURCE_DIR_<NAME>` | ローカルソースを明示 (worktree・オフライン) |
 | `ERGO_PACKAGES_SIBLING_ROOT` | 兄弟チェックアウト探索の明示 opt-in (`<root>/<Repo>` だけ。`.worktrees` は見ない) |
 | `ERGO_PACKAGE_REV_<NAME>` | pin の一時上書き (検証用)。照合はこの値で行う。PKG-06 の警告、STRICT では error。値も 40 桁 SHA であること |
@@ -156,6 +157,14 @@ ergo_pkg update <shared> --to <tag> --ergo <ergo>   # 共有パッケージの p
   Ergo は `ERGO_SOURCE_DIR` → 兄弟チェックアウト `<host>/../Ergo` → 取得 (`-DERGO_BOOTSTRAP_FETCH=ON` のときだけ) の順で見つかる。
 - 宣言の `packages` は非公開パッケージ (旧 `ERGO_PACKAGE_MANIFEST_EXTRA` の中身)。ホスト直下の `ergo-packages.json` が
   `host` 節を持てば、ハブは `ERGO_PACKAGE_MANIFEST_EXTRA` 無しでそれを読む。
+- 宣言の `use` / `optional` / `features` は構成の既定値になる (空でないキャッシュ値が常に勝つ。どちらを使ったかは
+  resolved.json の `host.selected_from` / `optional_from` / `features_from`)。`legacy_vars` の `<package>.source_dir` の
+  旧変数は、`ERGO_PACKAGE_SOURCE_DIR_<NAME>` が空のときだけ DEPRECATION つきでその代わりになる。
+- Ergo の後でパッケージを自分で作るホスト (Ludellus-Native の L2) は `ERGO_PACKAGE_PROVIDED_<NAME>=ON` を設定する。
+  ハブの最終判定はトップのディレクトリの末尾で行うので、ブートストラップの後に作ったターゲットも照合される。
+  `optional` にも入れておけば、作らなかった構成では使わない (M0 のまま)。
+- 宣言に `host.ergo.rev` があれば Ergo 自身のチェックアウトも照合し、resolved.json の `host.ergo` に pin / head / 経路 /
+  drift / dirty を書く (PKG-05 / PKG-07 / PKG-09、`fetch` では PKG-04)。
 - `ergo_pkg fetch` の後は `-DERGO_PACKAGES_FETCH=ON` の構成がネットワーク無しで経路 5 に当たる (取得済みの
   `<FETCHCONTENT_BASE_DIR>/ergo_pkg_<name>-src` が pin と同じ HEAD ならそれを使う)。
 - `ergo_pkg` はコミット・ブランチ作成・PR をしない。宣言とブートストラップの変更はホストの feat ブランチで PR にする。

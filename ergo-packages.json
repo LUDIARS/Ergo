@@ -33,6 +33,11 @@
           "cache": { "PICTOR_BUILD_WEBGL": "ON" },
           "provides": ["pictor_webgl"]
         },
+        "rive": {
+          "default": "off",
+          "platforms": ["desktop"],
+          "cache": { "PICTOR_ENABLE_RIVE": "ON" }
+        },
         "webgpu": { "reserved": true },
         "d3d12": { "reserved": true },
         "metal": { "reserved": true }

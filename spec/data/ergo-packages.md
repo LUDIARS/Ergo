@@ -98,7 +98,8 @@
 
 - 正本の設計: [`spec/feature/package-manager.md`](../feature/package-manager.md) §2.1
 - 置き場所: **ホストの**リポ直下 `ergo-packages.json` (Ergo のマニフェストと同じ名前・同じ schema 番号)。`ergo_pkg init` が作る
-- 読む側: CMake (`ErgoPackages.cmake`、非公開 `packages` と `host.code`)、ブートストラップ (`host.ergo` と `legacy_vars`)、
+- 読む側: CMake (`ErgoPackages.cmake`、非公開 `packages`・`host.code`・構成の既定値 `use` / `optional` / `features` /
+  `legacy_vars` の `<package>.source_dir`・Ergo 自身の pin `host.ergo`)、ブートストラップ (`host.ergo` と `legacy_vars`)、
   C++ (`ergo_package_manager`、`spec/module/package_manager.md`)
 
 トップレベルに `host` 節を持つファイルは **ホストの宣言** で、Ergo のマニフェストとしては読まない。
@@ -130,13 +131,31 @@
 | `host.ergo.expect_tag` | 文字列 / なし | 人向け注釈 |
 | `host.ergo.track.branch` | 文字列 / なし | 更新の検知 (W3) が追う Ergo の追跡ブランチ。無ければ `main` |
 | `host.use` | 文字列配列 | `ERGO_PACKAGES` の既定値 (link パッケージ名。知らない名前は PKG-01)。`ergo_pkg fetch` の既定の対象 |
-| `host.optional` | 文字列配列 | ソースが見つからなければ使わないもの。`use` に無い名前は MANIFEST の warning |
+| `host.optional` | 文字列配列 | `ERGO_PACKAGES_OPTIONAL` の既定値。どの経路でも見つからない (`provided` でホストが最後まで作らなかったものを含む) と PKG-03 の error ではなく `record` を残して使わない。`use` に無い名前は MANIFEST の warning |
 | `host.features` | オブジェクト | 名前 → `ERGO_PACKAGE_FEATURES_<NAME>` の既定値 (`+vulkan,-web` / `vulkan;web` の形) |
-| `host.legacy_vars` | オブジェクト | 移行中だけの旧変数名 → `ergo.source_dir` / `<package>.source_dir`。ブートストラップは `ergo.source_dir` の別名を DEPRECATION つきで使う。S6 で警告、その後削除 |
+| `host.legacy_vars` | オブジェクト | 移行中だけの旧変数名 → `ergo.source_dir` / `<package>.source_dir`。ブートストラップは `ergo.source_dir`、ハブは `<package>.source_dir` の別名を、正式な変数 (`ERGO_SOURCE_DIR` / `ERGO_PACKAGE_SOURCE_DIR_<NAME>`) が空のときだけ DEPRECATION つきで使う。S6 で警告、その後削除 |
 | `packages` | オブジェクト | **非公開パッケージだけ** (形は Ergo のマニフェストの `packages.<name>` と同じ。`track` も同じ)。Ergo のマニフェストの名前 (`packages` / `modules` / `observe`) と同じなら PKG-15 の error で構成を止める (M0 でも) |
 
-`use` / `optional` / `features` を構成の既定値として流すのは後段 (Ludellus-Native の L2 で使う)。W1 では
-`ergo_pkg` が読んで検査・一覧・事前取得に使い、構成時は非公開 `packages` と `host.code` だけを読む。
+### 構成の既定値 (`cmake/packages/ErgoPackageHostDefaults.cmake`)
+
+| 宣言 | 既定値を与える変数 | 上書き |
+|---|---|---|
+| `host.use` | `ERGO_PACKAGES` | キャッシュの値が空でなければそちら |
+| `host.optional` | `ERGO_PACKAGES_OPTIONAL` | 同上 |
+| `host.features.<name>` | `ERGO_PACKAGE_FEATURES_<NAME>` | 同上 |
+
+- キャッシュの値が **空でなければ常に勝つ**。空なら宣言の値を使う (宣言の `use` を後から変えても、既存のビルドディレクトリに
+  そのまま流れる)。宣言のあるホストを一時的に M0 に戻すには、`ERGO_PACKAGE_MANIFEST_EXTRA` で `use` の空の宣言を指す。
+- どちらから来たかは resolved.json の `host` に残る (下の表)。宣言の無いホスト・旧来の追加マニフェストでは今までどおり。
+- `provided` 経路 (ホストが Ergo の後で作る) は `ERGO_PACKAGE_PROVIDED_<NAME>=ON` をホストが設定する。宣言には書かない。
+- 構成の最終判定は、ハブを include したディレクトリがサブディレクトリ (ブートストラップの `add_subdirectory`) なら
+  トップのディレクトリの末尾で行う (Ergo の後でホストが作るターゲットを見るため)。モジュールの `reason_var` / `when` /
+  `real_path_var` は Ergo のディレクトリの末尾の値を控えて使う。
+
+**Ergo 自身の検査** (`cmake/packages/ErgoPackageErgoPin.cmake`): 宣言に `host.ergo.rev` があれば、構成の最後に Ergo の
+チェックアウト (ハブの置き場所のリポ直下だけ。親リポは見ない) を pin と照合する。経路はブートストラップの `ERGO_BOOTSTRAP_ROUTE`
+(無ければホストが自分で入れたとして `host`)。PKG-02 (pin の書式)、PKG-04 (`fetch` で HEAD ≠ pin)、PKG-05 / PKG-09 (drift)、
+PKG-07 (dirty)、PKG-08 (`expect_tag`) を subject `ergo` で記録する。重さは link パッケージと同じ (M0 では記録だけ)。
 
 ### ハブがホストの宣言を見つける順
 
@@ -193,7 +212,7 @@
 | `mode` | `M0` (`ERGO_PACKAGES` 未設定) / `M1` (選んだパッケージがすべてホスト供給) / `M2` (すべてハブが取り込み) / `M1+M2` |
 | `strict` | `ERGO_PACKAGES_STRICT` |
 | `fetch` | `ERGO_PACKAGES_FETCH` |
-| `host` | W1: `{ "id" }`。`id` は `host.code` → `ERGO_PACKAGES_HOST_ID` → `CMAKE_PROJECT_NAME` の順 |
+| `host` | W1: `{ "id" }`。`id` は `host.code` → `ERGO_PACKAGES_HOST_ID` → `CMAKE_PROJECT_NAME` の順。ホストの宣言を読んだときだけ次も載る: `selected_from` (`ERGO_PACKAGES` の出所 `declaration` / `cache`)、`optional` / `optional_from`、`unused` (見つからず使わなかった optional)、`features_from` (`{ <name>: "declaration" \| "cache" }`、機能指定のあるものだけ)、`ergo` (`{ pin, expect_tag, route, head, drift, dirty }`、`host.ergo.rev` が無ければ null) |
 | `manifest_extra` | 読んだホストの宣言 (`ERGO_PACKAGE_MANIFEST_EXTRA`、無ければ `host` 節つきのホスト直下 `ergo-packages.json`) の絶対パス (なければ null) |
 | `platform` | `desktop` / `android` / `ios` / `emscripten` |
 | `cmake_version` | 実行中の CMake |

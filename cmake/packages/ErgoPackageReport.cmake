@@ -16,6 +16,9 @@
 # Input variables read by ergo_pkg_report_render (all optional, "" = absent):
 #   <p>_MODE <p>_STRICT <p>_FETCH <p>_PLATFORM <p>_CMAKE_VERSION <p>_MANIFEST
 #   <p>_MANIFEST_EXTRA <p>_SELECTED <p>_FINDINGS <p>_HOST_ID
+#   with a host declaration (<p>_HOST_DECLARED): <p>_HOST_{SELECTED_FROM,
+#       OPTIONAL,OPTIONAL_FROM,UNUSED,FEATURES_FROM ("<pkg>=<from>" pairs)}
+#       and Ergo's pin <p>_HOST_ERGO_{PIN,EXPECT_TAG,ROUTE,HEAD,DRIFT,DIRTY}
 #   <p>_PACKAGES, per package <p>_PKG_<n>_{KIND,CODE,GROUP,PIN,EXPECT_TAG,
 #       OVERRIDE,STATE,SOURCE_DIR,IMPORTED,TARGETS_PRESENT,FEATURES,REQUIRES,
 #       VERSION,ROUTE,MODE,HEAD,DRIFT,DIRTY,EXPORTS,PATH,GITLINK,INITIALIZED}
@@ -228,6 +231,35 @@ function(ergo_pkg_report_render out_var p)
     _ergo_pkg_kv(_top schema "1")
     set(_host "")
     _ergo_pkg_add_nullable(_host id "${${p}_HOST_ID}")
+    if(${p}_HOST_DECLARED)
+        # Where the configure defaults came from (cache overrides stay
+        # visible) and Ergo itself against the declared pin.
+        _ergo_pkg_add_nullable(_host selected_from "${${p}_HOST_SELECTED_FROM}")
+        _ergo_pkg_add_list(_host optional ${${p}_HOST_OPTIONAL})
+        _ergo_pkg_add_nullable(_host optional_from "${${p}_HOST_OPTIONAL_FROM}")
+        _ergo_pkg_add_list(_host unused ${${p}_HOST_UNUSED})
+        set(_ff "")
+        foreach(_pair IN LISTS ${p}_HOST_FEATURES_FROM)
+            if(_pair MATCHES "^([^=]+)=(.*)$")
+                _ergo_pkg_add_quote(_ff "${CMAKE_MATCH_1}" "${CMAKE_MATCH_2}")
+            endif()
+        endforeach()
+        _ergo_pkg_json_object(_ff_json "    " ${_ff})
+        _ergo_pkg_kv(_host features_from "${_ff_json}")
+        if("${${p}_HOST_ERGO_PIN}" STREQUAL "")
+            _ergo_pkg_kv(_host ergo "null")
+        else()
+            set(_e "")
+            _ergo_pkg_add_nullable(_e pin "${${p}_HOST_ERGO_PIN}")
+            _ergo_pkg_add_nullable(_e expect_tag "${${p}_HOST_ERGO_EXPECT_TAG}")
+            _ergo_pkg_add_nullable(_e route "${${p}_HOST_ERGO_ROUTE}")
+            _ergo_pkg_add_nullable(_e head "${${p}_HOST_ERGO_HEAD}")
+            _ergo_pkg_add_nullable(_e drift "${${p}_HOST_ERGO_DRIFT}")
+            _ergo_pkg_add_bool(_e dirty "${${p}_HOST_ERGO_DIRTY}")
+            _ergo_pkg_json_object(_e_json "    " ${_e})
+            _ergo_pkg_kv(_host ergo "${_e_json}")
+        endif()
+    endif()
     _ergo_pkg_json_object(_host_json "  " ${_host})
     _ergo_pkg_kv(_top host "${_host_json}")
     _ergo_pkg_add_nullable(_top mode "${${p}_MODE}")
