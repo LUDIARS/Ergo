@@ -66,6 +66,10 @@
       "layer": "presentation"
     },
     {
+      "glob": "include/ergo/graph_layout/*",
+      "layer": "shared"
+    },
+    {
       "glob": "include/ergo/health/*",
       "layer": "domain-logic"
     },
@@ -88,6 +92,14 @@
     {
       "glob": "include/ergo/math/*",
       "layer": "shared"
+    },
+    {
+      "glob": "include/ergo/package_model/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/package_viz/*",
+      "layer": "infrastructure"
     },
     {
       "glob": "include/ergo/particle/*",
@@ -194,6 +206,10 @@
       "layer": "presentation"
     },
     {
+      "glob": "src/graph_layout/*",
+      "layer": "shared"
+    },
+    {
       "glob": "src/health/*",
       "layer": "domain-logic"
     },
@@ -216,6 +232,14 @@
     {
       "glob": "src/math/*",
       "layer": "shared"
+    },
+    {
+      "glob": "src/package_model/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/package_viz/*",
+      "layer": "infrastructure"
     },
     {
       "glob": "src/particle/*",
@@ -322,6 +346,10 @@
       "layer": "shared"
     },
     {
+      "glob": "tests/graph_layout/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tests/health/*",
       "layer": "shared"
     },
@@ -343,6 +371,14 @@
     },
     {
       "glob": "tests/math/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/package_model/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/package_viz/*",
       "layer": "shared"
     },
     {
@@ -499,6 +535,10 @@
     },
     {
       "glob": "tools/ergo/src/plugins/visus/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/package_viz/*",
       "layer": "application"
     },
     {

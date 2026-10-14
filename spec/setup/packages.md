@@ -145,6 +145,27 @@ error はすべて並べてから構成を止める。取り込みの段階で e
   `pictor_webgl` だけを作る。マニフェストでは `pictor` を `vulkan` の `provides` にしているので、`vulkan` が外れる
   Emscripten では `pictor` を要求しない。
 
+## 図にする (S3: P1 パッケージ版一覧 / P2 ターゲットのリンク図)
+
+構成するとハブが `<build>/ergo-packages.resolved.json` と File API の問い合わせを置く。generate の後に:
+
+```sh
+cmake --build build --target ergo_package_graphs          # build/graphs/packages.tela と targets.tela
+ergo_package_viz build --view packages --out packages.tela
+ergo_package_viz build --view targets --focus ergo --out targets.tela   # 焦点: パッケージ / 層 / ターゲット
+ergo_package_viz build --view targets --expand pictor --out targets.tela
+ergo_package_viz build --check                            # PKG-17 宣言漏れがあれば終了コード 1
+tela_view --font <file.ttf> --graph packages.tela         # Tela は別インストール (Excubitor 経由で起動)
+```
+
+- 図が Tela の上限 (8 グループ / 128 ノード / 256 辺) を超えるときは、推移簡約 → 畳み込み (host と Ergo 以外の
+  パッケージを 1 ノード) → 分割 (`packages.1.tela` … と索引 `packages.index.tela`) の順に自動で落とす。
+  上限を超えた 1 枚は書かない。
+- 版の札は `revisor version show --repo <checkout>`、使えなければ `git describe --tags --long`、どちらも無ければ
+  resolved.json の project(VERSION) を使い、出所を `[revisor]` / `[git]` / `[cmake]` で添える
+  (`--no-version-probe` で照会しない)。
+- `.tela` はビルドディレクトリに置き、コミットしない。
+
 ## 検証
 
 | 何を | どうやって |
@@ -153,3 +174,4 @@ error はすべて並べてから構成を止める。取り込みの段階で e
 | M0 でターゲット集合と compile definitions が変わらない (偽ホスト) | `ctest -R test_packages_m0_invariance` (`tests/packages/fixtures/m0_host`) |
 | 6 経路・drift 5 種・STRICT・同名衝突・Emscripten 模擬 (偽パッケージ) | `ctest -R test_packages_hub_routes` (`tests/packages/fixtures/{alpha,beta,gamma,hub,hub_host}`。git が要る。テスト内で git リポジトリを作る) |
 | M0 不変 (実ツリー全体、基準チェックアウトとの比較) | `cmake -DBASE_SOURCE=<基準> -DNEW_SOURCE=<新> -DWORK_DIR=<作業> [-DGENERATOR=...] -P tests/packages/compare_m0_build.cmake` |
+| 配置・P1 / P2・簡約・畳み込み・焦点・分割・PKG-17 (同梱の File API 見本) | `ctest -R "test_graph_layout|test_package_model|test_package_viz"` (`tests/package_model/fixtures`)。Tela がある構成では `test_package_viz_tela` が Tela 本体の `load_graph` での受理も確かめる |

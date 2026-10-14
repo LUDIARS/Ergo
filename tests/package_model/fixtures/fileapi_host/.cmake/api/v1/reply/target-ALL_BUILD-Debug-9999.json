@@ -1,0 +1,15 @@
+{
+  "name": "ALL_BUILD",
+  "id": "ALL_BUILD::@99999999999999999999",
+  "type": "UTILITY",
+  "isGeneratorProvided": true,
+  "paths": {
+    "source": ".",
+    "build": "."
+  },
+  "dependencies": [
+    {
+      "id": "demo_app::@00000000000000000000"
+    }
+  ]
+}

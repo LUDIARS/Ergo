@@ -1,0 +1,23 @@
+{
+  "name": "ergo_render",
+  "id": "ergo_render::@00000000000000000001",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/src/render/render_system.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "pictor::@00000000000000000009"
+    },
+    {
+      "id": "ergo_common::@00000000000000000003"
+    }
+  ]
+}

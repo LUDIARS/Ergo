@@ -344,6 +344,39 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_graph_layout
+    summary: 抽象グラフを層別に配置して tela_graph::Graph にする汎用配置 (左 = 使う側、 最長経路の列、 重心法 2 往復、 縦横の折れ線、 決定的)
+    category: システム
+    header_dir: include/ergo/graph_layout/
+    source_dir: src/graph_layout/
+    test_dir:   tests/graph_layout/
+    spec:       spec/module/graph_layout.md
+    cmake_option: ERGO_BUILD_GRAPH_LAYOUT   # ergo_tela_graph が要る
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_package_model
+    summary: ergo-packages.resolved.json と CMake File API codemodel v2 を読むパッケージ構成の値型 (帰属・既定の除外・層・PKG-17 宣言漏れ)
+    category: システム
+    header_dir: include/ergo/package_model/
+    source_dir: src/package_model/
+    test_dir:   tests/package_model/
+    spec:       spec/module/package_model.md
+    cmake_option: ERGO_BUILD_PACKAGE_MODEL
+    tool_plugin: null
+    status: preview
+
+  - name: ergo_package_viz
+    summary: パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs
+    category: システム
+    header_dir: include/ergo/package_viz/
+    source_dir: src/package_viz/
+    test_dir:   tests/package_viz/
+    spec:       spec/module/package_viz.md
+    cmake_option: ERGO_BUILD_PACKAGE_VIZ   # ergo_package_model と ergo_graph_layout が要る
+    tool_plugin: null
+    status: preview
+
   - name: ergo_ui_layout
     summary: Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit.
     category: UI

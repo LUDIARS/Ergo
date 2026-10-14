@@ -35,6 +35,9 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 | `ergo_render`       | Pictor 横断オーケストレーション層。`RenderContext` / `IRenderLayer` / `FrameComposer` / `ScreenshotBridge` / カメラ math / `StageRenderer` | システム | `include/ergo/render/`       | `src/render/`       | `spec/module/render.md`       | — |
 | `ergo_tela_graph`   | Ergo 可視化の共通出口。 配置済み関係図 → Tela `TELA_GRAPH 1` ファイル (検査付き) / `tela::Graph` (Tela があるとき) | システム | `include/ergo/tela_graph/` | `src/tela_graph/` | `spec/module/tela_graph.md` | (外部: Tela `tela_view --graph`) |
 | `ergo_render_viz`   | Pictor 描画パイプライン (パス・アタッチメント・ポストプロセス・CPU 段・GPU 時間) を関係図にする。 CLI `ergo_render_viz` はプリセット / プロファイル JSON → `.tela` | システム | `include/ergo/render_viz/` | `src/render_viz/` | `spec/module/render_viz.md` | `ergo_render_viz` (CLI、 pictor があるとき) |
+| `ergo_graph_layout` | 汎用の層別配置。 抽象グラフ (ノード・グループ・有向辺) → 配置済み関係図 (左 = 使う側、 最長経路の列、 重心法、 縦横の折れ線、 決定的) | システム | `include/ergo/graph_layout/` | `src/graph_layout/` | `spec/module/graph_layout.md` | — |
+| `ergo_package_model` | パッケージ構成の値型。 `ergo-packages.resolved.json` と CMake File API codemodel v2 を読み、 帰属・既定の除外・層・宣言漏れ (PKG-17) を出す (読むだけ) | システム | `include/ergo/package_model/` | `src/package_model/` | `spec/module/package_model.md` | — |
+| `ergo_package_viz`  | パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) を上限内の関係図にする (簡約・畳み込み・焦点・分割)。 CLI `ergo_package_viz` と `ergo_package_graphs` | システム | `include/ergo/package_viz/` | `src/package_viz/` | `spec/module/package_viz.md` | `ergo_package_viz` (CLI、 `--check` で PKG-17) |
 | `ergo_ui_layout`    | Data-driven UI layout runtime. JSON model + binding + layout solve + render adapter emit for live-editable HUD/UI | UI | `include/ergo/ui_layout/` | `src/ui_layout/` | `spec/module/ui_layout.md` | `ui_layout` |
 
 | `ergo_vector`       | SVG path polygon tessellation + extrude 3D mesh + vertex animation scene | UI | `include/ergo/vector/`       | `src/vector/`       | `spec/module/vector.md`       | — |

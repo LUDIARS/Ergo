@@ -1,0 +1,20 @@
+{
+  "name": "ergo_gpu_particle",
+  "id": "ergo_gpu_particle::@00000000000000000004",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/src/gpu_particle/emitter.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "pictor::@00000000000000000009"
+    }
+  ]
+}

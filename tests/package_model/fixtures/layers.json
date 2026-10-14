@@ -1,0 +1,28 @@
+{
+  "layers": [
+    {
+      "glob": "src/render/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/gpu_particle/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/particle/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "src/input/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/common/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/**",
+      "layer": "shared"
+    }
+  ]
+}

@@ -4,6 +4,7 @@
     "pictor": {
       "kind": "link",
       "code": "Pc",
+      "group": "render",
       "repository": "https://github.com/LUDIARS/Pictor.git",
       "rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f",
       "expect_tag": "v2.2.0",
@@ -45,6 +46,7 @@
     "tela": {
       "kind": "link",
       "code": "Tl",
+      "group": "viz",
       "repository": "https://github.com/LUDIARS/Tela.git",
       "rev": "4142f77c0775e1c3ad93733526085c56523ea9dc",
       "platforms": ["desktop"],
@@ -63,6 +65,7 @@
     "lapilli": {
       "kind": "tool",
       "code": "La",
+      "group": "tool",
       "acquire": "submodule",
       "path": "lib/lapilli"
     }

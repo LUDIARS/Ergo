@@ -1,0 +1,20 @@
+{
+  "name": "ergo_input",
+  "id": "ergo_input::@00000000000000000002",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/src/input/input.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "ergo_common::@00000000000000000003"
+    }
+  ]
+}

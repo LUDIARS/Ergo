@@ -1,0 +1,20 @@
+{
+  "name": "pictor",
+  "id": "pictor::@00000000000000000009",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "/work/Pictor",
+    "build": "_deps/pictor-build"
+  },
+  "sources": [
+    {
+      "path": "/work/Pictor/src/core/renderer.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "glfw::@00000000000000000010"
+    }
+  ]
+}

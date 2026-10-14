@@ -81,7 +81,24 @@ bool parse_string(Cursor& c, std::string& out) {
                     char hex[5] = {c.src[c.i], c.src[c.i+1], c.src[c.i+2], c.src[c.i+3], 0};
                     c.i += 4;
                     unsigned long cp = std::strtoul(hex, nullptr, 16);
-                    if (cp < 0x80) out.push_back(static_cast<char>(cp));
+                    // UTF-16 surrogate pair (backslash-u D83D backslash-u DE00): combine into one
+                    // code point so non-BMP characters decode to 4-byte UTF-8.
+                    // A lone surrogate is kept as-is (3-byte form).
+                    if (cp >= 0xD800 && cp <= 0xDBFF && c.src.size() - c.i >= 6 &&
+                        c.src[c.i] == '\\' && c.src[c.i + 1] == 'u') {
+                        char lo_hex[5] = {c.src[c.i+2], c.src[c.i+3], c.src[c.i+4], c.src[c.i+5], 0};
+                        unsigned long lo = std::strtoul(lo_hex, nullptr, 16);
+                        if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                            c.i += 6;
+                            cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                        }
+                    }
+                    if (cp >= 0x10000) {
+                        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+                        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+                        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+                        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+                    } else if (cp < 0x80) out.push_back(static_cast<char>(cp));
                     else if (cp < 0x800) {
                         out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
                         out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));

@@ -39,6 +39,24 @@
     },
     {
       "pathPattern": "(^|/)include/(?:.*/)?tela_graph/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/graph_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?graph_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_model/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?package_model/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?package_viz/(?:.*/)?[^/]+$"
     }
   ]
 }

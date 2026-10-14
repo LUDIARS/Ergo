@@ -1,0 +1,15 @@
+{
+  "name": "ergo_gtest_main",
+  "id": "ergo_gtest_main::@00000000000000000007",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/tests/gtest_main.cpp",
+      "compileGroupIndex": 0
+    }
+  ]
+}

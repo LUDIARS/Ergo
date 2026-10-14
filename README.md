@@ -75,6 +75,9 @@ ergo/
 | `ergo_resource`      | タグ駆動リソース自動選択 + 読み込み (JSON マニフェスト + Clio 同重みスコアラ)。MUSA Clio の C++ 移植 | `include/ergo/resource/`     | — |
 | `ergo_tela_graph`    | Ergo 可視化の共通出口。 配置済み関係図 → Tela `TELA_GRAPH 1` (検査付き) / `tela::Graph` | `include/ergo/tela_graph/`   | (外部: Tela `tela_view --graph`) |
 | `ergo_render_viz`    | Pictor 描画パイプライン (パス・アタッチメント・ポストプロセス・CPU 段・GPU 時間) の Tela 可視化 | `include/ergo/render_viz/`   | `ergo_render_viz` CLI (pictor があるとき) |
+| `ergo_graph_layout`  | 汎用の層別配置 (抽象グラフ → 配置済み関係図、 決定的) | `include/ergo/graph_layout/` | — |
+| `ergo_package_model` | resolved.json / CMake File API codemodel v2 のリーダ (帰属・層・PKG-17 宣言漏れ) | `include/ergo/package_model/` | — |
+| `ergo_package_viz`   | パッケージ版一覧 / ターゲットのリンク図の Tela 可視化 (簡約・畳み込み・分割) | `include/ergo/package_viz/` | `ergo_package_viz` CLI、 `ergo_package_graphs` |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。

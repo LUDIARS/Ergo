@@ -5,7 +5,7 @@
 - 依頼: `spec/tasks/2026-10-14-package-hub-design-request.md`
 - 素案: `spec/plan/2026-10-14-package-hub-fable.md` (Fable)、`spec/plan/2026-10-14-package-hub-opus.md` (Opus)
 - 種別: 設計 (正本)。実装・ビルド・実ホストでの確認は含まない。
-- 実装状況: S1 (マニフェストと規則、記録のみ) — `spec/tasks/2026-10-14-package-hub-s1.md`、S2 (取り込み) — `spec/tasks/2026-10-14-package-hub-s2.md` を実装済み。S3 以降は未着手
+- 実装状況: S1 (マニフェストと規則、記録のみ) — `spec/tasks/2026-10-14-package-hub-s1.md`、S2 (取り込み) — `spec/tasks/2026-10-14-package-hub-s2.md`、S3 (可視化 P1 / P2) — `spec/tasks/2026-10-14-package-hub-s3.md` を実装済み。S4 以降は未着手
 
 人間の指示 (neco 2026-10-14): 「Ergoがコンテンツの各LUDIARSのパッケージをまとめてリンク/管理するようにします。
 各パッケージのバージョン、何をリンクしているか、MUSAや関連パッケージは何を使用しているかなどを可視化します。

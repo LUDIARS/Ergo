@@ -118,6 +118,7 @@ function(ergo_pkg_manifest_load prefix file)
         set(_p "${prefix}_PKG_${_n}")
         _ergo_pkg_json_string(${_p}_KIND        "${_json}" packages "${_n}" kind)
         _ergo_pkg_json_string(${_p}_CODE        "${_json}" packages "${_n}" code)
+        _ergo_pkg_json_string(${_p}_GROUP       "${_json}" packages "${_n}" group)
         _ergo_pkg_json_string(${_p}_REPOSITORY  "${_json}" packages "${_n}" repository)
         _ergo_pkg_json_string(${_p}_REV         "${_json}" packages "${_n}" rev)
         _ergo_pkg_json_string(${_p}_EXPECT_TAG  "${_json}" packages "${_n}" expect_tag)
@@ -140,7 +141,7 @@ function(ergo_pkg_manifest_load prefix file)
             string(REGEX REPLACE "[.]git$" "" ${_p}_REPO_NAME "${CMAKE_MATCH_1}")
         endif()
         set(${_p}_MANIFEST_DIR "${_dir}")
-        list(APPEND _out ${_p}_KIND ${_p}_CODE ${_p}_REPOSITORY ${_p}_REPO_NAME ${_p}_REV
+        list(APPEND _out ${_p}_KIND ${_p}_CODE ${_p}_GROUP ${_p}_REPOSITORY ${_p}_REPO_NAME ${_p}_REV
             ${_p}_EXPECT_TAG ${_p}_PLATFORMS ${_p}_CMAKE_MINIMUM ${_p}_WIRING ${_p}_TARGETS
             ${_p}_FIND_PACKAGE ${_p}_CACHE ${_p}_EXPORTS ${_p}_REQUIRES ${_p}_ACQUIRE ${_p}_PATH
             ${_p}_FEATURES ${_p}_MANIFEST_DIR)

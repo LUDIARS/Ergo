@@ -25,6 +25,7 @@
 |---|---|---|
 | `kind` | `"link"` | |
 | `code` | 文字列 | LUDIARS のプロジェクトコード (図の札用) |
+| `group` | 文字列 / なし | P1 (パッケージ版一覧) のグループ。`render` (描画) / `viz` (可視化)。無ければ `render`。検査には使わない (S3) |
 | `repository` | 文字列 | 取得元の URL。末尾名 (`.git` を除く) が兄弟チェックアウトのディレクトリ名 (`Pictor`) |
 | `rev` | 文字列 | **40 桁の小文字 commit SHA だけ**。ブランチ名・短縮 SHA・タグは PKG-02 |
 | `expect_tag` | 文字列 / なし | 人向け注釈。checkout にあれば pin がその子孫かを照合する (PKG-08) |
@@ -61,6 +62,7 @@
 |---|---|---|
 | `kind` | `"tool"` | |
 | `code` | 文字列 | プロジェクトコード |
+| `group` | 文字列 / なし | P1 のグループ (`tool`)。検査には使わない (S3) |
 | `acquire` | `"submodule"` | 取得方法。既存 submodule を維持する |
 | `path` | 文字列 | Ergo からの相対パス。版は **マニフェストに書かず**、Ergo ツリーの gitlink SHA を resolved.json に記録する |
 
@@ -121,8 +123,8 @@
 | `cmake_version` | 実行中の CMake |
 | `manifest` | 読んだマニフェスト (Ergo ルートからの相対) |
 | `selected` | `ERGO_PACKAGES` の中身 |
-| `packages.<n>` (link) | `pin` / `expect_tag` / `rev_override` / `state` / `source_dir` / `imported` / `targets_present` / `features` / `version`、S2: `route` (`host` / `provided` / `source` / `sibling` / `installed` / `fetch` / `none`) / `mode` (`M1` / `M2`) / `head` / `drift` (`none` / `ahead` / `behind` / `diverged` / `unknown`) / `dirty` / `exports` (`<VAR>=<絶対パス>`) |
-| `packages.<n>` (tool) | `path` / `gitlink` / `initialized` / `state` (= `acquire`) |
+| `packages.<n>` (link) | `pin` / `expect_tag` / `rev_override` / `state` / `source_dir` / `imported` / `targets_present` / `features` / `version`、S2: `route` (`host` / `provided` / `source` / `sibling` / `installed` / `fetch` / `none`) / `mode` (`M1` / `M2`) / `head` / `drift` (`none` / `ahead` / `behind` / `diverged` / `unknown`) / `dirty` / `exports` (`<VAR>=<絶対パス>`)、S3: `group` / `requires` (マニフェストの `requires` のキー、整列済み) |
+| `packages.<n>` (tool) | `path` / `gitlink` / `initialized` / `state` (= `acquire`)、S3: `group` |
 | `modules.<m>` | `enabled` (ターゲットの有無) / `needs` / `optional` / `ported_from` / `reason` |
 | `observe.<o>` | マニフェストの写し |
 | `findings` | 上の形式の配列 (整列済み) |
@@ -141,3 +143,15 @@ link パッケージの `state`:
 ハブは `<build>/.cmake/api/v1/query/client-ergo/query.json` に codemodel v2 の問い合わせを置く。
 返答は generate の後に `<build>/.cmake/api/v1/reply/` にでき、可視化 (S3) と PKG-17 が読む。
 生成されるビルドそのものは変わらない。
+
+読み手は `ergo_package_model` (`spec/module/package_model.md`)。最新の `index-*.json` の `client-ergo` の
+応答 (無ければ `objects`) から codemodel を取り、`version.major` が 2 でなければ明示エラーにする。
+ターゲットは定義したディレクトリの最長一致でパッケージへ帰属させ (どれにも当たらなければ host、ソースの外や
+ビルドツリーの中は project 名の第三者)、テスト・ダミー・ベンチ・`ergo_gtest_main` を既定で除外する。
+
+## PKG-17 (宣言漏れ、構成時には判定しない)
+
+File API の直接の依存のうち「Ergo または link パッケージのターゲット → 別の link パッケージのターゲット」で、
+Ergo 側はターゲット名に最長一致するモジュール (`<module>` か `<module>_…`) の `needs` / `optional`、link 側は
+`requires` に相手が無いもの。図 (P1 のパッケージ札・P2 のターゲット札) に印を付け、
+`ergo_package_viz <build> --check` が 1 件以上で終了コード 1 を返す (CI の 1 段)。

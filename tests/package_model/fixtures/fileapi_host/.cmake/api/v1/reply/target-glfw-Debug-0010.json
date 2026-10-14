@@ -1,0 +1,15 @@
+{
+  "name": "glfw",
+  "id": "glfw::@00000000000000000010",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "build/_deps/glfw-src",
+    "build": "_deps/glfw-build"
+  },
+  "sources": [
+    {
+      "path": "build/_deps/glfw-src/src/window.c",
+      "compileGroupIndex": 0
+    }
+  ]
+}

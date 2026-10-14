@@ -1,0 +1,26 @@
+{
+  "name": "test_render",
+  "id": "test_render::@00000000000000000008",
+  "type": "EXECUTABLE",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/tests/render/test_render.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "ergo_render::@00000000000000000001"
+    },
+    {
+      "id": "ergo_gtest_main::@00000000000000000007"
+    },
+    {
+      "id": "pictor::@00000000000000000009"
+    }
+  ]
+}

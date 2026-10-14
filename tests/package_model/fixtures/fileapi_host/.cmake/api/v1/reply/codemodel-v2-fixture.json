@@ -1,0 +1,157 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2,
+    "minor": 6
+  },
+  "paths": {
+    "source": "/work/demo",
+    "build": "/work/demo/build"
+  },
+  "configurations": [
+    {
+      "name": "Debug",
+      "directories": [
+        {
+          "source": ".",
+          "build": ".",
+          "projectIndex": 0,
+          "jsonFile": "directory-0-Debug.json"
+        },
+        {
+          "source": "external/ergo",
+          "build": "external/ergo",
+          "projectIndex": 1,
+          "jsonFile": "directory-1-Debug.json"
+        },
+        {
+          "source": "/work/Pictor",
+          "build": "_deps/pictor-build",
+          "projectIndex": 2,
+          "jsonFile": "directory-2-Debug.json"
+        },
+        {
+          "source": "build/_deps/glfw-src",
+          "build": "_deps/glfw-build",
+          "projectIndex": 3,
+          "jsonFile": "directory-3-Debug.json"
+        }
+      ],
+      "projects": [
+        {
+          "name": "Demo",
+          "directoryIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "Ergo",
+          "directoryIndexes": [
+            1
+          ],
+          "parentIndex": 0
+        },
+        {
+          "name": "Pictor",
+          "directoryIndexes": [
+            2
+          ],
+          "parentIndex": 0
+        },
+        {
+          "name": "GLFW",
+          "directoryIndexes": [
+            3
+          ],
+          "parentIndex": 2
+        }
+      ],
+      "targets": [
+        {
+          "name": "demo_app",
+          "id": "demo_app::@00000000000000000000",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-demo_app-Debug-0000.json"
+        },
+        {
+          "name": "ergo_render",
+          "id": "ergo_render::@00000000000000000001",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_render-Debug-0001.json"
+        },
+        {
+          "name": "ergo_input",
+          "id": "ergo_input::@00000000000000000002",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_input-Debug-0002.json"
+        },
+        {
+          "name": "ergo_common",
+          "id": "ergo_common::@00000000000000000003",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_common-Debug-0003.json"
+        },
+        {
+          "name": "ergo_gpu_particle",
+          "id": "ergo_gpu_particle::@00000000000000000004",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_gpu_particle-Debug-0004.json"
+        },
+        {
+          "name": "ergo_particle_pictor",
+          "id": "ergo_particle_pictor::@00000000000000000005",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_particle_pictor-Debug-0005.json"
+        },
+        {
+          "name": "ergo_input_dummy",
+          "id": "ergo_input_dummy::@00000000000000000006",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_input_dummy-Debug-0006.json"
+        },
+        {
+          "name": "ergo_gtest_main",
+          "id": "ergo_gtest_main::@00000000000000000007",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_gtest_main-Debug-0007.json"
+        },
+        {
+          "name": "test_render",
+          "id": "test_render::@00000000000000000008",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-test_render-Debug-0008.json"
+        },
+        {
+          "name": "pictor",
+          "id": "pictor::@00000000000000000009",
+          "directoryIndex": 2,
+          "projectIndex": 2,
+          "jsonFile": "target-pictor-Debug-0009.json"
+        },
+        {
+          "name": "glfw",
+          "id": "glfw::@00000000000000000010",
+          "directoryIndex": 3,
+          "projectIndex": 3,
+          "jsonFile": "target-glfw-Debug-0010.json"
+        },
+        {
+          "name": "ALL_BUILD",
+          "id": "ALL_BUILD::@99999999999999999999",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-ALL_BUILD-Debug-9999.json"
+        }
+      ]
+    }
+  ]
+}

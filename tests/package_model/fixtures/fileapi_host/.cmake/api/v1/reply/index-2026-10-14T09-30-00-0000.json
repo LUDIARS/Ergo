@@ -1,0 +1,39 @@
+{
+  "cmake": {
+    "version": {
+      "string": "3.28.0"
+    }
+  },
+  "objects": [
+    {
+      "kind": "codemodel",
+      "version": {
+        "major": 2,
+        "minor": 6
+      },
+      "jsonFile": "codemodel-v2-fixture.json"
+    }
+  ],
+  "reply": {
+    "client-ergo": {
+      "query.json": {
+        "requests": [
+          {
+            "kind": "codemodel",
+            "version": 2
+          }
+        ],
+        "responses": [
+          {
+            "kind": "codemodel",
+            "version": {
+              "major": 2,
+              "minor": 6
+            },
+            "jsonFile": "codemodel-v2-fixture.json"
+          }
+        ]
+      }
+    }
+  }
+}

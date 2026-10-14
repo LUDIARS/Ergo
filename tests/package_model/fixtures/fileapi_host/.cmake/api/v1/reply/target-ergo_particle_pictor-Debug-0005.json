@@ -1,0 +1,20 @@
+{
+  "name": "ergo_particle_pictor",
+  "id": "ergo_particle_pictor::@00000000000000000005",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/src/particle/renderer.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "pictor::@00000000000000000009"
+    }
+  ]
+}

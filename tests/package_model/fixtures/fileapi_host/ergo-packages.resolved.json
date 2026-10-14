@@ -1,0 +1,145 @@
+{
+  "cmake_version": "3.28.0",
+  "fetch": false,
+  "findings": [
+    {
+      "id": "PKG-05",
+      "message": "pictor HEAD is ahead of the pin",
+      "severity": "warning",
+      "subject": "pictor"
+    }
+  ],
+  "manifest": "ergo-packages.json",
+  "manifest_extra": null,
+  "mode": "M1",
+  "modules": {
+    "ergo_particle": {
+      "enabled": true,
+      "needs": [],
+      "optional": [
+        "pictor"
+      ],
+      "ported_from": [],
+      "reason": "ERGO_PARTICLE_HAS_RENDERER=ON"
+    },
+    "ergo_render": {
+      "enabled": true,
+      "needs": [
+        "pictor"
+      ],
+      "optional": [],
+      "ported_from": [],
+      "reason": "vulkan"
+    },
+    "ergo_render_viz": {
+      "enabled": false,
+      "needs": [],
+      "optional": [
+        "pictor"
+      ],
+      "ported_from": [],
+      "reason": null
+    },
+    "ergo_resource": {
+      "enabled": false,
+      "needs": [],
+      "optional": [],
+      "ported_from": [
+        "clio"
+      ],
+      "reason": null
+    },
+    "ergo_tela_graph": {
+      "enabled": true,
+      "needs": [],
+      "optional": [
+        "tela"
+      ],
+      "ported_from": [],
+      "reason": null
+    }
+  },
+  "observe": {
+    "clio": {
+      "code": "Cl",
+      "group": "musa",
+      "path_hint": "Clio",
+      "relations": []
+    },
+    "curare": {
+      "code": "Cu",
+      "group": "related",
+      "path_hint": "Curare",
+      "relations": [
+        "ergo_resource:shares-vocabulary"
+      ]
+    }
+  },
+  "packages": {
+    "lapilli": {
+      "code": "La",
+      "gitlink": "98ed6a213c31304c3a2283a7075a0221f0a734e8",
+      "group": "tool",
+      "initialized": false,
+      "kind": "tool",
+      "path": "lib/lapilli",
+      "state": "submodule"
+    },
+    "pictor": {
+      "code": "Pc",
+      "dirty": true,
+      "drift": "ahead",
+      "expect_tag": "v2.2.0",
+      "exports": [
+        "PICTOR_SHADER_DIR=/work/Pictor/shaders"
+      ],
+      "features": [
+        "vulkan"
+      ],
+      "group": "render",
+      "head": "9b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c",
+      "imported": false,
+      "kind": "link",
+      "mode": "M1",
+      "pin": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f",
+      "requires": [],
+      "rev_override": null,
+      "route": "host",
+      "source_dir": "/work/Pictor",
+      "state": "host-unmanaged",
+      "targets_present": [
+        "pictor"
+      ],
+      "version": "2.2.0"
+    },
+    "tela": {
+      "code": "Tl",
+      "dirty": false,
+      "drift": null,
+      "expect_tag": null,
+      "exports": [],
+      "features": [],
+      "group": "viz",
+      "head": null,
+      "imported": false,
+      "kind": "link",
+      "mode": null,
+      "pin": "4142f77c0775e1c3ad93733526085c56523ea9dc",
+      "requires": [
+        "pictor"
+      ],
+      "rev_override": null,
+      "route": null,
+      "source_dir": null,
+      "state": "absent",
+      "targets_present": [],
+      "version": null
+    }
+  },
+  "platform": "desktop",
+  "schema": 1,
+  "selected": [
+    "pictor"
+  ],
+  "strict": false
+}

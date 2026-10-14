@@ -16,9 +16,9 @@
 # Input variables read by ergo_pkg_report_render (all optional, "" = absent):
 #   <p>_MODE <p>_STRICT <p>_FETCH <p>_PLATFORM <p>_CMAKE_VERSION <p>_MANIFEST
 #   <p>_MANIFEST_EXTRA <p>_SELECTED <p>_FINDINGS
-#   <p>_PACKAGES, per package <p>_PKG_<n>_{KIND,CODE,PIN,EXPECT_TAG,OVERRIDE,
-#       STATE,SOURCE_DIR,IMPORTED,TARGETS_PRESENT,FEATURES,VERSION,ROUTE,MODE,
-#       HEAD,DRIFT,DIRTY,EXPORTS,PATH,GITLINK,INITIALIZED}
+#   <p>_PACKAGES, per package <p>_PKG_<n>_{KIND,CODE,GROUP,PIN,EXPECT_TAG,
+#       OVERRIDE,STATE,SOURCE_DIR,IMPORTED,TARGETS_PRESENT,FEATURES,REQUIRES,
+#       VERSION,ROUTE,MODE,HEAD,DRIFT,DIRTY,EXPORTS,PATH,GITLINK,INITIALIZED}
 #   <p>_MODULES, per module <p>_MOD_<m>_{ENABLED,NEEDS,OPTIONAL,PORTED_FROM,
 #       REASON}
 #   <p>_OBSERVE, per entry <p>_OBS_<o>_{CODE,GROUP,PATH_HINT,RELATIONS}
@@ -131,6 +131,7 @@ function(ergo_pkg_report_render out_var p)
         set(_f "")
         _ergo_pkg_add_nullable(_f kind "${${_q}_KIND}")
         _ergo_pkg_add_nullable(_f code "${${_q}_CODE}")
+        _ergo_pkg_add_nullable(_f group "${${_q}_GROUP}")
         _ergo_pkg_add_nullable(_f state "${${_q}_STATE}")
         if(${_q}_KIND STREQUAL "tool")
             _ergo_pkg_add_nullable(_f path "${${_q}_PATH}")
@@ -144,6 +145,7 @@ function(ergo_pkg_report_render out_var p)
             _ergo_pkg_add_bool(_f imported "${${_q}_IMPORTED}")
             _ergo_pkg_add_list(_f targets_present ${${_q}_TARGETS_PRESENT})
             _ergo_pkg_add_list(_f features ${${_q}_FEATURES})
+            _ergo_pkg_add_list(_f requires ${${_q}_REQUIRES})
             _ergo_pkg_add_nullable(_f version "${${_q}_VERSION}")
             _ergo_pkg_add_nullable(_f route "${${_q}_ROUTE}")
             _ergo_pkg_add_nullable(_f mode "${${_q}_MODE}")
