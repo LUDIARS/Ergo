@@ -46,6 +46,8 @@ option(ERGO_BUILD_GRAPH_LAYOUT  "Build ergo_graph_layout (抽象グラフの層�
 option(ERGO_BUILD_PACKAGE_MODEL "Build ergo_package_model (resolved.json / CMake File API リーダ)" ON)
 option(ERGO_BUILD_PACKAGE_SCAN  "Build ergo_package_scan (観測対象のチェックアウト → 根拠付きの使用関係)" ON)
 option(ERGO_BUILD_PACKAGE_VIZ   "Build ergo_package_viz (パッケージ版一覧 / ターゲットのリンク図 / 使用関係図 + CLI)" ON)
+option(ERGO_BUILD_PACKAGE_MANAGER "Build ergo_package_manager (ホスト宣言の読み取り・検査・漏れ検査)" ON)
+option(ERGO_BUILD_PACKAGE_CLI   "Build the ergo_pkg CLI (init / list / doctor / fetch、 ergo_package_manager が要る)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
@@ -1273,6 +1275,81 @@ elseif(ERGO_BUILD_PACKAGE_VIZ)
     message(STATUS "ergo_package_viz: requires ergo_package_model, ergo_package_scan and ergo_graph_layout — skipped")
 endif()
 
+# ---------------------------------------------------------------------------
+# Package manager (spec/feature/package-manager.md §2, stage W1).
+#   * ergo_package_manager — ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査、
+#     漏れ検査 (§8)、 ブートストラップの生成と古さの判定、 init の計画、 一覧。
+#   * ergo_pkg (CLI、 ターゲット ergo_pkg_cli) — init / list / doctor / fetch。
+# 依存は tools/package_cli → package_manager → ergo_common の一方向。 Pictor / Tela に依存せず
+# 常時ビルド・テスト可。 git / cmake の起動は CLI 側だけ (ライブラリはプロセスを起こさない)。
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_PACKAGE_MANAGER)
+    add_library(ergo_package_manager STATIC
+        src/package_manager/finding.cpp
+        src/package_manager/json_fields.cpp
+        src/package_manager/manifest_packages.cpp
+        src/package_manager/ergo_manifest.cpp
+        src/package_manager/host_declaration.cpp
+        src/package_manager/declaration_check.cpp
+        src/package_manager/leak_check.cpp
+        src/package_manager/bootstrap.cpp
+        src/package_manager/init_plan.cpp
+        src/package_manager/upm_declaration.cpp
+        src/package_manager/package_list.cpp
+    )
+    target_include_directories(ergo_package_manager PUBLIC include)
+    target_link_libraries(ergo_package_manager PUBLIC ergo_common)
+    if(MSVC)
+        target_compile_options(ergo_package_manager PUBLIC /utf-8)
+    endif()
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_package_manager
+            tests/package_manager/test_declaration.cpp
+            tests/package_manager/test_leak_check.cpp
+            tests/package_manager/test_bootstrap_init.cpp
+            tests/package_manager/test_package_list.cpp)
+        target_link_libraries(test_package_manager PRIVATE ergo_package_manager ergo_gtest_main)
+        target_compile_definitions(test_package_manager PRIVATE
+            ERGO_PACKAGE_MANAGER_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_manager/fixtures"
+            ERGO_PACKAGE_MANAGER_SOURCE="${CMAKE_CURRENT_SOURCE_DIR}")
+        add_test(NAME test_package_manager COMMAND test_package_manager)
+    endif()
+endif()
+
+if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
+    add_executable(ergo_pkg_cli
+        tools/package_cli/main.cpp
+        tools/package_cli/cli_args.cpp
+        tools/package_cli/file_io.cpp
+        tools/package_cli/process.cpp
+        tools/package_cli/host_context.cpp
+        tools/package_cli/cmd_init.cpp
+        tools/package_cli/cmd_list.cpp
+        tools/package_cli/cmd_doctor.cpp
+        tools/package_cli/cmd_fetch.cpp
+    )
+    set_target_properties(ergo_pkg_cli PROPERTIES OUTPUT_NAME ergo_pkg)
+    target_link_libraries(ergo_pkg_cli PRIVATE ergo_package_manager)
+    # 既定の Ergo / cmake はこのビルドのもの (--ergo / --cmake で上書き)。 バイナリにだけ入り、 リポには書かない。
+    target_compile_definitions(ergo_pkg_cli PRIVATE
+        ERGO_PKG_CLI_DEFAULT_ERGO_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+        ERGO_PKG_CLI_DEFAULT_CMAKE="${CMAKE_COMMAND}")
+    if(ERGO_BUILD_TESTS)
+        find_package(Git QUIET)
+        if(GIT_EXECUTABLE)
+            add_test(NAME test_package_cli
+                COMMAND ${CMAKE_COMMAND}
+                    -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/package_cli
+                    -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
+                    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_cli.cmake)
+        endif()
+    endif()
+elseif(ERGO_BUILD_PACKAGE_CLI)
+    message(STATUS "ergo_pkg: requires ERGO_BUILD_PACKAGE_MANAGER — skipped")
+endif()
+
 
 # ---------------------------------------------------------------------------
 # ergo_ui_layout — data-driven UI layout runtime with bind/update/emit APIs.
@@ -1377,7 +1454,7 @@ endif()
 # (git repositories created by the test). See spec/data/ergo-packages.md.
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_TESTS)
-    foreach(NAME manifest rules cycles features report acquire)
+    foreach(NAME manifest rules cycles features report acquire host_declaration)
         add_test(NAME test_packages_${NAME}
             COMMAND ${CMAKE_COMMAND}
                 -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -1399,5 +1476,17 @@ if(ERGO_BUILD_TESTS)
                 -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
                 -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_hub_routes.cmake)
+        # W1 (spec/feature/package-manager.md §7): host declarations on a
+        # configure, the bootstrap's search order, and prefetch -> offline
+        # route 5. Fake repositories are created by the tests (no network).
+        foreach(NAME host_configure bootstrap prefetch)
+            add_test(NAME test_packages_${NAME}
+                COMMAND ${CMAKE_COMMAND}
+                    -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/${NAME}
+                    -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
+                    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_${NAME}.cmake)
+        endforeach()
     endif()
 endif()

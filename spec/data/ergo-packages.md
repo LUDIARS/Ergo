@@ -93,13 +93,86 @@
 | `group` | `"musa"` / `"related"` | 図のグループ |
 | `relations` | `[{ "from", "kind" }]` | Ergo 側の起点と関係の種類 (`shares-vocabulary` / `port-of`)。図では破線。他の `kind` は辺にせず注記に残す |
 
+## ホストの宣言 (`host` 節、パッケージマネージャ W1)
+
+- 正本の設計: [`spec/feature/package-manager.md`](../feature/package-manager.md) §2.1
+- 置き場所: **ホストの**リポ直下 `ergo-packages.json` (Ergo のマニフェストと同じ名前・同じ schema 番号)。`ergo_pkg init` が作る
+- 読む側: CMake (`ErgoPackages.cmake`、非公開 `packages` と `host.code`)、ブートストラップ (`host.ergo` と `legacy_vars`)、
+  C++ (`ergo_package_manager`、`spec/module/package_manager.md`)
+
+トップレベルに `host` 節を持つファイルは **ホストの宣言** で、Ergo のマニフェストとしては読まない。
+`ERGO_PACKAGES_MANIFEST_FILE` などでホストの宣言を Ergo のマニフェストとして読ませると構成エラー
+(`ergo_pkg_manifest_load` が `has a host section: it is a host declaration, not an Ergo manifest` で止める)。
+
+```json
+{
+  "schema": 1,
+  "host": {
+    "code": "Example",
+    "ergo": { "repository": "https://github.com/LUDIARS/Ergo.git", "rev": "<40 桁 SHA>", "expect_tag": "v0.9.0" },
+    "use": ["pictor"],
+    "optional": ["pictor"],
+    "features": { "pictor": "+vulkan" },
+    "legacy_vars": { "EXAMPLE_ERGO_DIR": "ergo.source_dir", "EXAMPLE_PICTOR_DIR": "pictor.source_dir" }
+  },
+  "packages": {}
+}
+```
+
+| キー | 型 | 意味 |
+|---|---|---|
+| `schema` | 数値 | `1` 固定 |
+| `host.code` | 文字列 / なし | プロジェクトコード (`LUDIARS/PROJECT-CODES.md` が正本)。resolved.json の `host.id` に写す。見本では `Example` |
+| `host.ergo` | オブジェクト / なし | ホストが乗る Ergo 自身の pin。無ければ `ergo_pkg doctor` が MANIFEST の warning |
+| `host.ergo.repository` | 文字列 | Ergo の取得元 (公開 URL)。末尾名 (`.git` を除く) がブートストラップの兄弟チェックアウト名 |
+| `host.ergo.rev` | 文字列 | **40 桁の小文字 commit SHA** (PKG-02) |
+| `host.ergo.expect_tag` | 文字列 / なし | 人向け注釈 |
+| `host.use` | 文字列配列 | `ERGO_PACKAGES` の既定値 (link パッケージ名。知らない名前は PKG-01)。`ergo_pkg fetch` の既定の対象 |
+| `host.optional` | 文字列配列 | ソースが見つからなければ使わないもの。`use` に無い名前は MANIFEST の warning |
+| `host.features` | オブジェクト | 名前 → `ERGO_PACKAGE_FEATURES_<NAME>` の既定値 (`+vulkan,-web` / `vulkan;web` の形) |
+| `host.legacy_vars` | オブジェクト | 移行中だけの旧変数名 → `ergo.source_dir` / `<package>.source_dir`。ブートストラップは `ergo.source_dir` の別名を DEPRECATION つきで使う。S6 で警告、その後削除 |
+| `packages` | オブジェクト | **非公開パッケージだけ** (形は Ergo のマニフェストの `packages.<name>` と同じ)。Ergo のマニフェストの名前 (`packages` / `modules` / `observe`) と同じなら PKG-15 の error で構成を止める (M0 でも) |
+
+`use` / `optional` / `features` を構成の既定値として流すのは後段 (Ludellus-Native の L2 で使う)。W1 では
+`ergo_pkg` が読んで検査・一覧・事前取得に使い、構成時は非公開 `packages` と `host.code` だけを読む。
+
+### ハブがホストの宣言を見つける順
+
+1. `ERGO_PACKAGE_MANIFEST_EXTRA` が設定されていればそのファイル (ホストの宣言、または `host` 節の無い旧来の追加マニフェスト)
+2. 無ければ `<トップのソース>/ergo-packages.json` が `host` 節を持つときだけそれ (`host` 節が無ければ読まない)
+
+### Unity プロジェクト (UPM ホスト)
+
+`ergo-packages.json` を持たず `Packages/manifest.json` を持つディレクトリ。`ergo_pkg init --upm` が `.ergo/host.json`
+(`{ "schema": 1, "code": "<code>" }`、追跡する) だけを作る。`ergo_pkg list` は `Packages/manifest.json` のうち LUDIARS の
+リポを指す git 依存を一覧に出し、`#<40 桁 SHA>` でないもの (`#main` など) に `branch-ref` を付ける。
+
+### ブートストラップ (`<host>/cmake/ergo-bootstrap.cmake`)
+
+ひな形の正本は Ergo の `cmake/packages/ergo-bootstrap.cmake.in`。`ergo_pkg init` が 2 行目に生成元の Ergo SHA
+(`# ergo-bootstrap-source: <sha>`) を入れて書く。`host.ergo` を `string(JSON)` で読み、`ERGO_SOURCE_DIR` (または
+`legacy_vars` の `ergo.source_dir` の別名) → 兄弟チェックアウト `<host>/../<Repo>` → 取得 (`ERGO_BOOTSTRAP_FETCH=ON`
+のときだけ、pin が 40 桁 SHA でなければ PKG-02) の順で Ergo を見つけて `add_subdirectory` する。結果は
+`ERGO_BOOTSTRAP_ROUTE` (`source` / `sibling` / `fetch`) と `ERGO_BOOTSTRAP_DIR`。
+
+`ergo_pkg doctor` は、ファイルを名乗っている生成元 SHA で今のひな形から作り直した結果と比べ、違えば古い (BOOTSTRAP の error)。
+生成元の印が無いもの (手書き) とファイルが無いときは BOOTSTRAP の warning。`ergo_pkg init` は古いものだけを書き直す。
+
+### 事前取得 (`cmake/packages/ErgoPackagePrefetch.cmake`)
+
+`ergo_pkg fetch` が `cmake -P` で起動する。link パッケージを pin で `<FETCHCONTENT_BASE_DIR>/ergo_pkg_<name>-src`
+(構成時の経路 5 と同じ置き場所、`ErgoPackageFetchCache.cmake`) へ FetchContent で取る。経路 5 は、そこに pin と同じ HEAD の
+チェックアウトがあればそれを取得元として使い、ネットワークに出ない (ホストの `FETCHCONTENT_SOURCE_DIR_<DEP>` /
+`ERGO_SOURCE_DIR_<DEP>` の明示指定が常に優先)。
+
 ## 検査の記録形式 (findings)
 
 規則 (`cmake/packages/ErgoPackageRules.cmake`) は 1 件を
 `<id>|<severity>|<subject>|<message>` の文字列で返し、resolved.json では
 `{ "id", "severity", "subject", "message" }` になる。
 
-- `id`: `PKG-01`〜`PKG-17` (統合設計 §4)、マニフェスト自体の不備は `MANIFEST`
+- `id`: `PKG-01`〜`PKG-17` (統合設計 §4)、マニフェスト自体の不備は `MANIFEST`。`ergo_pkg doctor` は同じ形で
+  漏れ検査の `LEAK` とブートストラップの `BOOTSTRAP` も出す
 - `severity`: `error` / `warning` / `record`
 - `subject`: パッケージ名、`<package>/<feature>`、モジュール名、またはキャッシュ変数名
 
@@ -118,7 +191,8 @@
 | `mode` | `M0` (`ERGO_PACKAGES` 未設定) / `M1` (選んだパッケージがすべてホスト供給) / `M2` (すべてハブが取り込み) / `M1+M2` |
 | `strict` | `ERGO_PACKAGES_STRICT` |
 | `fetch` | `ERGO_PACKAGES_FETCH` |
-| `manifest_extra` | `ERGO_PACKAGE_MANIFEST_EXTRA` の絶対パス (なければ null) |
+| `host` | W1: `{ "id" }`。`id` は `host.code` → `ERGO_PACKAGES_HOST_ID` → `CMAKE_PROJECT_NAME` の順 |
+| `manifest_extra` | 読んだホストの宣言 (`ERGO_PACKAGE_MANIFEST_EXTRA`、無ければ `host` 節つきのホスト直下 `ergo-packages.json`) の絶対パス (なければ null) |
 | `platform` | `desktop` / `android` / `ios` / `emscripten` |
 | `cmake_version` | 実行中の CMake |
 | `manifest` | 読んだマニフェスト (Ergo ルートからの相対) |

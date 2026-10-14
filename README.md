@@ -36,7 +36,7 @@ ergo/
 ├── module_list.md         # モジュール一覧 (人間用)
 ├── module_list.yaml       # モジュール一覧 (機械処理用)
 ├── ergo-packages.json     # LUDIARS パッケージ (Pictor / Tela / Lapilli ...) の版と宣言
-├── cmake/packages/        # パッケージ・ハブ (マニフェスト・検査規則・6 経路の取り込み・記録、pictor/tela の結線)
+├── cmake/packages/        # パッケージ・ハブ (マニフェスト・検査規則・6 経路の取り込み・記録、pictor/tela の結線、ブートストラップのひな形・事前取得)
 ├── spec/
 │   ├── module/<name>.md   # 各モジュールの定義書
 │   └── tool/<name>.md     # Web ツール / プラグインの仕様書
@@ -79,6 +79,7 @@ ergo/
 | `ergo_package_model` | resolved.json / CMake File API codemodel v2 のリーダ (帰属・層・PKG-17 宣言漏れ) | `include/ergo/package_model/` | — |
 | `ergo_package_scan`  | 観測対象の兄弟チェックアウトから根拠付きの使用関係を読む (package.json / .gitmodules / gitlink / ported_from) | `include/ergo/package_scan/` | — |
 | `ergo_package_viz`   | パッケージ版一覧 / ターゲットのリンク図 / 使用関係図の Tela 可視化 (簡約・畳み込み・分割) | `include/ergo/package_viz/` | `ergo_package_viz` CLI、 `ergo_package_graphs` |
+| `ergo_package_manager` | パッケージマネージャ: ホストの宣言 (`host` 節) の読み取り・検査・漏れ検査・ブートストラップ | `include/ergo/package_manager/` | `ergo_pkg` CLI (`init` / `list` / `doctor` / `fetch`) |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として
 外部ミドルウェアに依存せず発展させる (`spec/module/sound.md` 「位置付け」節)。

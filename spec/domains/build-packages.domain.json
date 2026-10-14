@@ -8,7 +8,9 @@
     "spec/data/ergo-packages.md",
     "spec/setup/packages.md",
     "spec/setup/third-party-deps.md",
-    "spec/architecture/domains-and-ux.md"
+    "spec/architecture/domains-and-ux.md",
+    "spec/feature/package-manager.md",
+    "spec/module/package_manager.md"
   ],
   "membership": [
     {
@@ -28,6 +30,18 @@
     },
     {
       "pathPattern": "^\\.gitmodules$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_manager/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/package_manager/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/package_manager/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tools/package_cli/(?:.*/)?[^/]+$"
     }
   ]
 }

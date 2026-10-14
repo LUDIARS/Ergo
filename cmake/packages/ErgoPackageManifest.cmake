@@ -6,7 +6,14 @@
 # the report (ErgoPackageReport.cmake) consume. It only reads the given file;
 # it creates no targets and sets no cache entries.
 #
-#   ergo_pkg_manifest_load(<prefix> <file>)
+#   ergo_pkg_manifest_load(<prefix> <file> [HOST])
+#
+# Without HOST the file must be an Ergo manifest: a file with a top-level
+# `host` section is a host declaration (spec/feature/package-manager.md
+# §2.1) and stops the configure. With HOST the file is read as a host
+# declaration (or a legacy extra manifest without `host`): its `packages`
+# are the host's private packages, and <prefix>_HOST_PRESENT /
+# <prefix>_HOST_CODE carry the `host` section facts the hub uses.
 #
 # Sets in the caller's scope (names are sorted):
 #   <prefix>_SCHEMA, <prefix>_ERRORS (schema problems, one text per entry)
@@ -100,6 +107,22 @@ function(ergo_pkg_manifest_load prefix file)
     string(JSON _type ERROR_VARIABLE _err TYPE "${_json}")
     if(_err OR NOT _type STREQUAL "OBJECT")
         message(FATAL_ERROR "ergo packages: manifest '${file}' is not a JSON object (${_err})")
+    endif()
+    string(JSON _host_type ERROR_VARIABLE _host_err TYPE "${_json}" host)
+    set(_host_present FALSE)
+    if(NOT _host_err)
+        set(_host_present TRUE)
+    endif()
+    if(_host_present AND NOT "HOST" IN_LIST ARGN)
+        message(FATAL_ERROR "ergo packages: '${file}' has a `host` section: it is a host "
+            "declaration, not an Ergo manifest (spec/data/ergo-packages.md, host declaration)")
+    endif()
+    set(_host_code "")
+    if(_host_present)
+        if(NOT _host_type STREQUAL "OBJECT")
+            message(FATAL_ERROR "ergo packages: host declaration '${file}': `host` is not an object")
+        endif()
+        _ergo_pkg_json_string(_host_code "${_json}" host code)
     endif()
 
     set(_out "")       # names of every variable to hand back
@@ -229,6 +252,8 @@ function(ergo_pkg_manifest_load prefix file)
     set(${prefix}_MODULES  "${_modules}"  PARENT_SCOPE)
     set(${prefix}_OBSERVE  "${_observe}"  PARENT_SCOPE)
     set(${prefix}_DIR      "${_dir}"      PARENT_SCOPE)
+    set(${prefix}_HOST_PRESENT "${_host_present}" PARENT_SCOPE)
+    set(${prefix}_HOST_CODE    "${_host_code}"    PARENT_SCOPE)
     set(${prefix}_VARS     "${_out}"      PARENT_SCOPE)
     foreach(_v IN LISTS _out)
         set(${_v} "${${_v}}" PARENT_SCOPE)

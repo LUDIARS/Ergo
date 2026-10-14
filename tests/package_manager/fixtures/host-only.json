@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "host": {
+    "code": "Example",
+    "ergo": { "repository": "https://github.com/LUDIARS/Ergo.git", "rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "expect_tag": "v0.9.0" },
+    "use": [],
+    "optional": [],
+    "features": {},
+    "legacy_vars": {}
+  },
+  "packages": {}
+}

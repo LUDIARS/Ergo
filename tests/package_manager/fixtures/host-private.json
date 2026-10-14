@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "host": {
+    "code": "Example",
+    "ergo": { "repository": "https://github.com/LUDIARS/Ergo.git", "rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    "use": ["pictor", "privlib"],
+    "optional": ["pictor"],
+    "features": { "pictor": "+vulkan" },
+    "legacy_vars": { "EXAMPLE_ERGO_DIR": "ergo.source_dir", "EXAMPLE_PICTOR_DIR": "pictor.source_dir" }
+  },
+  "packages": {
+    "privlib": {
+      "kind": "link",
+      "code": "Example",
+      "repository": "https://example.invalid/Privlib.git",
+      "rev": "2222222222222222222222222222222222222222"
+    }
+  }
+}

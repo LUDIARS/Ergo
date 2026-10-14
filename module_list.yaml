@@ -388,6 +388,17 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_package_manager
+    summary: ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧 + CLI ergo_pkg (init / list / doctor / fetch)
+    category: システム
+    header_dir: include/ergo/package_manager/
+    source_dir: src/package_manager/
+    test_dir:   tests/package_manager/
+    spec:       spec/module/package_manager.md
+    cmake_option: ERGO_BUILD_PACKAGE_MANAGER   # CLI は ERGO_BUILD_PACKAGE_CLI
+    tool_plugin: null
+    status: preview
+
   - name: ergo_ui_layout
     summary: Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit.
     category: UI

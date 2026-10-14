@@ -14,7 +14,10 @@
 #                 that declare it; never under ERGO_PACKAGES_STRICT (U3)
 #   5. fetch      only with ERGO_PACKAGES_FETCH=ON, through _ergo_fc_declare
 #                 of cmake/ErgoDependencies.cmake (GIT_SHALLOW, shared
-#                 ERGO_DEPENDENCY_CACHE_DIR), HEAD == pin verified (PKG-04)
+#                 ERGO_DEPENDENCY_CACHE_DIR), HEAD == pin verified (PKG-04).
+#                 A source already at the pin in FetchContent's place (left
+#                 by `ergo_pkg fetch` or an earlier configure) is used as is,
+#                 without network (ErgoPackageFetchCache.cmake)
 #   6. none       PKG-03 configure error
 # The engine names no package: wiring comes from the manifest's
 # `cmake.wiring` (cmake/packages/<name>.cmake).
@@ -26,6 +29,7 @@
 include_guard(GLOBAL)
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageGit.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageWiring.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageFetchCache.cmake")
 
 # Internal: declared targets (cmake.targets + every feature's provides) that
 # exist now.
@@ -66,13 +70,26 @@ endfunction()
 # Internal: fetch <name>@<pin> through the third-party engine; source dir out.
 function(_ergo_pkg_fetch out_var name repository pin)
     include("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../ErgoDependencies.cmake")
-    set(_dep "ergo_pkg_${name}")
-    string(REPLACE "-" "_" _dep "${_dep}")
+    ergo_pkg_fetch_dep_name(_dep "${name}")
     get_property(_known GLOBAL PROPERTY _ergo_declared_deps)
     if(NOT _dep IN_LIST _known)
         ergo_declare_dependency(NAME ${_dep}
             GIT_REPOSITORY "${repository}" GIT_TAG "${pin}"
             SUMMARY "LUDIARS package '${name}' (Ergo package hub)")
+    endif()
+    # Prefetched (or earlier fetched) source at the pin: hand it to the
+    # engine as its local source so no download step runs. An explicit
+    # FetchContent / Ergo override of the host always wins.
+    string(TOUPPER "${_dep}" _upper)
+    if("${ERGO_SOURCE_DIR_${_upper}}" STREQUAL "" AND "${FETCHCONTENT_SOURCE_DIR_${_upper}}" STREQUAL "")
+        set(_base "${FETCHCONTENT_BASE_DIR}")
+        if("${_base}" STREQUAL "")
+            set(_base "${CMAKE_BINARY_DIR}/_deps")
+        endif()
+        ergo_pkg_fetch_prefetched(_cached "${_base}" "${name}" "${pin}")
+        if(NOT _cached STREQUAL "")
+            set(ERGO_SOURCE_DIR_${_upper} "${_cached}")
+        endif()
     endif()
     # SOURCE_SUBDIR at a missing dir: populate only, the wiring file does
     # the add_subdirectory (with EXCLUDE_FROM_ALL and the feature scope).

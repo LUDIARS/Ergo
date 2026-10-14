@@ -129,9 +129,32 @@ error はすべて並べてから構成を止める。取り込みの段階で e
 | `ERGO_PACKAGE_PROVIDED_<NAME>` | ホストが自分で作ると明示 (恒久の逃げ道。照合は行う) |
 | `ERGO_PACKAGES_FETCH` | 取得を許すか。**既定 OFF** (ネットワークに出るのはこれが ON のときだけ) |
 | `ERGO_PACKAGES_STRICT` | 警告扱いを error にする (CI と出荷構成で ON) |
-| `ERGO_PACKAGE_MANIFEST_EXTRA` | ホスト側の追加マニフェスト (非公開パッケージ用。形式は同じ schema 1、`cmake.wiring` はそのファイルからの相対)。公開マニフェストと同名は PKG-15 の error |
+| `ERGO_PACKAGE_MANIFEST_EXTRA` | ホストの宣言 (または `host` 節の無い旧来の追加マニフェスト) の場所。非公開パッケージ用で形式は同じ schema 1、`cmake.wiring` はそのファイルからの相対。公開マニフェストと同名は PKG-15 の error。空ならホスト直下の `ergo-packages.json` が `host` 節を持つときそれを読む |
+| `ERGO_PACKAGES_HOST_ID` | resolved.json の `host.id`。`host.code` が無いときだけ使う (空なら `CMAKE_PROJECT_NAME`) |
 
 `<NAME>` はパッケージ名を大文字にし `-` を `_` にしたもの (`pictor` → `PICTOR`)。
+
+## ホストの宣言と `ergo_pkg` (パッケージマネージャ W1)
+
+設計は `spec/feature/package-manager.md` §2、形式は `spec/data/ergo-packages.md`「ホストの宣言」。
+
+```bash
+# Ergo をビルドすると ergo_pkg (ターゲット ergo_pkg_cli) ができる
+cd <host>
+ergo_pkg init --code <ProjectCode>   # ergo-packages.json (host 節)・cmake/ergo-bootstrap.cmake・.gitignore の .ergo/
+ergo_pkg doctor                      # 宣言の検査・ブートストラップの古さ・漏れ検査。--strict で warning も止める
+ergo_pkg list [--build <build>]      # 宣言・Ergo のマニフェスト・resolved.json を合わせた一覧
+ergo_pkg fetch --build <build>       # host.use を FetchContent の置き場所へ事前取得 (ネットワーク)
+```
+
+- ホストの `CMakeLists.txt` は `add_subdirectory(<ergo>)` の代わりに `include(cmake/ergo-bootstrap.cmake)` にする。
+  Ergo は `ERGO_SOURCE_DIR` → 兄弟チェックアウト `<host>/../Ergo` → 取得 (`-DERGO_BOOTSTRAP_FETCH=ON` のときだけ) の順で見つかる。
+- 宣言の `packages` は非公開パッケージ (旧 `ERGO_PACKAGE_MANIFEST_EXTRA` の中身)。ホスト直下の `ergo-packages.json` が
+  `host` 節を持てば、ハブは `ERGO_PACKAGE_MANIFEST_EXTRA` 無しでそれを読む。
+- `ergo_pkg fetch` の後は `-DERGO_PACKAGES_FETCH=ON` の構成がネットワーク無しで経路 5 に当たる (取得済みの
+  `<FETCHCONTENT_BASE_DIR>/ergo_pkg_<name>-src` が pin と同じ HEAD ならそれを使う)。
+- `ergo_pkg` はコミット・ブランチ作成・PR をしない。宣言とブートストラップの変更はホストの feat ブランチで PR にする。
+- Ergo は公開リポ。宣言・ブートストラップに開発機の絶対パスやトークンを書かない (`ergo_pkg doctor` の LEAK で止まる)。
 
 ## 既知の制約
 

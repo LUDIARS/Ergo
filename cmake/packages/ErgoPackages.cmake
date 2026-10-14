@@ -46,7 +46,11 @@ if(NOT DEFINED ERGO_PACKAGES_SIBLING_ROOT)
 endif()
 if(NOT DEFINED ERGO_PACKAGE_MANIFEST_EXTRA)
     set(ERGO_PACKAGE_MANIFEST_EXTRA "" CACHE FILEPATH
-        "Ergo package hub: host-side extra manifest (private packages); reusing a public name is an error")
+        "Ergo package hub: host declaration (or legacy extra manifest) whose private packages are added; reusing a public name is an error. Empty = <host>/ergo-packages.json when it has a host section")
+endif()
+if(NOT DEFINED ERGO_PACKAGES_HOST_ID)
+    set(ERGO_PACKAGES_HOST_ID "" CACHE STRING
+        "Ergo package hub: host id written to resolved.json when the host declaration has no host.code (empty = CMAKE_PROJECT_NAME)")
 endif()
 
 # Test hook: tests/packages/ point this at fixture manifests.
@@ -116,17 +120,54 @@ function(_ergo_packages_gitlink out_var root path)
     set(${out_var} "${_sha}" PARENT_SCOPE)
 endfunction()
 
-# Load the manifest (plus ERGO_PACKAGE_MANIFEST_EXTRA) into <prefix>_* of the
-# caller; extra-manifest name collisions land in <out_findings>. A macro so
-# the loaded variables stay in the calling function's scope.
+# The host declaration (spec/feature/package-manager.md §2.1) whose private
+# `packages` are merged: ERGO_PACKAGE_MANIFEST_EXTRA when set (a host
+# declaration or a legacy extra manifest), otherwise <top source>/
+# ergo-packages.json when it carries a `host` section. "" when none.
+function(_ergo_packages_host_declaration out_var manifest)
+    set(_file "")
+    if(NOT "${ERGO_PACKAGE_MANIFEST_EXTRA}" STREQUAL "")
+        get_filename_component(_file "${ERGO_PACKAGE_MANIFEST_EXTRA}" ABSOLUTE)
+    else()
+        get_filename_component(_candidate "${CMAKE_SOURCE_DIR}/ergo-packages.json" ABSOLUTE)
+        if(EXISTS "${_candidate}" AND NOT _candidate STREQUAL manifest)
+            file(READ "${_candidate}" _json)
+            string(JSON _type ERROR_VARIABLE _err TYPE "${_json}" host)
+            if(NOT _err)
+                set(_file "${_candidate}")
+            endif()
+        endif()
+    endif()
+    set(${out_var} "${_file}" PARENT_SCOPE)
+endfunction()
+
+# Host id for resolved.json: host.code -> ERGO_PACKAGES_HOST_ID ->
+# CMAKE_PROJECT_NAME.
+function(_ergo_packages_host_id out_var code)
+    if(NOT "${code}" STREQUAL "")
+        set(_id "${code}")
+    elseif(NOT "${ERGO_PACKAGES_HOST_ID}" STREQUAL "")
+        set(_id "${ERGO_PACKAGES_HOST_ID}")
+    else()
+        set(_id "${CMAKE_PROJECT_NAME}")
+    endif()
+    set(${out_var} "${_id}" PARENT_SCOPE)
+endfunction()
+
+# Load the manifest (plus the host declaration) into <prefix>_* of the
+# caller; private-package name collisions land in <out_findings> and the
+# host code in <prefix>_HOST_CODE. A macro so the loaded variables stay in
+# the calling function's scope.
 macro(_ergo_packages_load prefix out_findings)
     get_property(_ergo_pkg_manifest_file GLOBAL PROPERTY ERGO_PACKAGES_MANIFEST)
+    get_property(_ergo_pkg_host_file GLOBAL PROPERTY ERGO_PACKAGES_HOST_DECLARATION)
     ergo_pkg_manifest_load(${prefix} "${_ergo_pkg_manifest_file}")
     set(${out_findings} "")
-    if(NOT "${ERGO_PACKAGE_MANIFEST_EXTRA}" STREQUAL "")
-        get_filename_component(_ergo_pkg_extra_file "${ERGO_PACKAGE_MANIFEST_EXTRA}" ABSOLUTE)
-        ergo_pkg_manifest_load(${prefix}_extra "${_ergo_pkg_extra_file}")
+    set(${prefix}_HOST_CODE "")
+    if(NOT "${_ergo_pkg_host_file}" STREQUAL "")
+        ergo_pkg_manifest_load(${prefix}_extra "${_ergo_pkg_host_file}" HOST)
         ergo_pkg_manifest_merge(${prefix} ${prefix}_extra ${out_findings})
+        set(${prefix}_HOST_CODE "${${prefix}_extra_HOST_CODE}")
     endif()
 endmacro()
 
@@ -135,13 +176,16 @@ endmacro()
 function(_ergo_packages_begin)
     set_property(GLOBAL PROPERTY ERGO_PACKAGES_MANIFEST "${ERGO_PACKAGES_MANIFEST_FILE}")
     set_property(GLOBAL PROPERTY ERGO_PACKAGES_ROOT "${_ergo_packages_root}")
+    get_filename_component(_manifest_abs "${ERGO_PACKAGES_MANIFEST_FILE}" ABSOLUTE)
+    _ergo_packages_host_declaration(_host_file "${_manifest_abs}")
+    set_property(GLOBAL PROPERTY ERGO_PACKAGES_HOST_DECLARATION "${_host_file}")
     _ergo_packages_load(_m _extra)
-    # A host extra manifest is an explicit opt-in: reusing a public name
-    # stops the configure in every mode, M0 included.
+    # A host declaration is an explicit opt-in: reusing a public name stops
+    # the configure in every mode, M0 included (PKG-15).
     ergo_pkg_findings_with_severity(_clash error ${_extra})
     if(_clash)
         string(REPLACE ";" "\n  " _list "${_clash}")
-        message(FATAL_ERROR "ergo packages: ERGO_PACKAGE_MANIFEST_EXTRA rejected:\n  ${_list}")
+        message(FATAL_ERROR "ergo packages: host declaration ${_host_file} rejected:\n  ${_list}")
     endif()
     set(_present "")
     foreach(_n IN LISTS _m_LINK)
@@ -482,10 +526,8 @@ function(_ergo_packages_evaluate phase)
     endif()
 
     file(RELATIVE_PATH _manifest_rel "${_root}" "${_manifest}")
-    set(_extra_rel "")
-    if(NOT "${ERGO_PACKAGE_MANIFEST_EXTRA}" STREQUAL "")
-        get_filename_component(_extra_rel "${ERGO_PACKAGE_MANIFEST_EXTRA}" ABSOLUTE)
-    endif()
+    get_property(_extra_rel GLOBAL PROPERTY ERGO_PACKAGES_HOST_DECLARATION)
+    _ergo_packages_host_id(_r_HOST_ID "${_m_HOST_CODE}")
     set(_r_MODE ${_mode})
     set(_r_STRICT ${ERGO_PACKAGES_STRICT})
     set(_r_FETCH ${ERGO_PACKAGES_FETCH})

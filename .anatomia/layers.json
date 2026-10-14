@@ -102,6 +102,10 @@
       "layer": "infrastructure"
     },
     {
+      "glob": "include/ergo/package_manager/*",
+      "layer": "infrastructure"
+    },
+    {
       "glob": "include/ergo/package_viz/*",
       "layer": "infrastructure"
     },
@@ -254,6 +258,10 @@
       "layer": "infrastructure"
     },
     {
+      "glob": "src/package_manager/*",
+      "layer": "infrastructure"
+    },
+    {
       "glob": "src/package_viz/*",
       "layer": "infrastructure"
     },
@@ -403,6 +411,10 @@
     },
     {
       "glob": "tests/package_scan/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/package_manager/*",
       "layer": "shared"
     },
     {
@@ -571,6 +583,10 @@
     },
     {
       "glob": "tools/ergo/src/plugins/visus/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/package_cli/*",
       "layer": "application"
     },
     {

@@ -39,6 +39,7 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 | `ergo_package_model` | パッケージ構成の値型。 `ergo-packages.resolved.json` と CMake File API codemodel v2 を読み、 帰属・既定の除外・層・宣言漏れ (PKG-17) を出す (読むだけ) | システム | `include/ergo/package_model/` | `src/package_model/` | `spec/module/package_model.md` | — |
 | `ergo_package_scan` | 観測対象 (マニフェストの `observe`) の兄弟チェックアウトから `package.json` の依存・`.gitmodules` と gitlink・`ported_from` / `relations` を根拠 (ファイル・行・キー) 付きの使用関係にする (読むだけ、 宣言された範囲の外を読まない) | システム | `include/ergo/package_scan/` | `src/package_scan/` | `spec/module/package_scan.md` | — |
 | `ergo_package_viz`  | パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) / 使用関係図 (P3) を上限内の関係図にする (簡約・畳み込み・焦点・分割)。 CLI `ergo_package_viz` と `ergo_package_graphs` | システム | `include/ergo/package_viz/` | `src/package_viz/` | `spec/module/package_viz.md` | `ergo_package_viz` (CLI、 `--check` で PKG-17) |
+| `ergo_package_manager` | パッケージマネージャの読み取り層。 ホストの宣言 (`ergo-packages.json` の `host` 節) の読み取りと検査 (PKG-01/02/15)、 漏れ検査、 ブートストラップの生成と古さ、 `init` の計画、 一覧 | システム | `include/ergo/package_manager/` | `src/package_manager/` | `spec/module/package_manager.md` | `ergo_pkg` (CLI: `init` / `list` / `doctor` / `fetch`) |
 | `ergo_ui_layout`    | Data-driven UI layout runtime. JSON model + binding + layout solve + render adapter emit for live-editable HUD/UI | UI | `include/ergo/ui_layout/` | `src/ui_layout/` | `spec/module/ui_layout.md` | `ui_layout` |
 
 | `ergo_vector`       | SVG path polygon tessellation + extrude 3D mesh + vertex animation scene | UI | `include/ergo/vector/`       | `src/vector/`       | `spec/module/vector.md`       | — |
@@ -54,6 +55,7 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
 | 名前 | 概要 |
 |---|---|
 | `ergo-packages.json` | Pictor / Tela (link)・Lapilli (tool)・MUSA 系 / Curare (observe) の版と、どのモジュールがどれを要るか (`modules` 節) の宣言。取り込み (6 経路)・検査・記録は `cmake/packages/`、パッケージごとの結線は `cmake/packages/{pictor,tela}.cmake`。形式は `spec/data/ergo-packages.md`、ホスト手順は `spec/setup/packages.md` |
+| ホストの宣言 (ホスト側 `ergo-packages.json` の `host` 節) | ホストが乗る Ergo の pin・使うパッケージ・非公開パッケージの宣言。`ergo_pkg init` がブートストラップ (`cmake/ergo-bootstrap.cmake`、ひな形は `cmake/packages/ergo-bootstrap.cmake.in`) と一緒に作る。事前取得は `cmake/packages/ErgoPackagePrefetch.cmake`。設計は `spec/feature/package-manager.md` |
 
 ## 状態メモ
 

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "host": {
+    "code": "Example",
+    "ergo": { "repository": "https://github.com/LUDIARS/Ergo.git", "rev": "main" },
+    "use": ["pictor", "nope"],
+    "optional": "pictor",
+    "features": { "pictor": "+vulkan;;" },
+    "legacy_vars": { "bad-name": "elsewhere" }
+  },
+  "packages": {
+    "pictor": {
+      "kind": "link",
+      "repository": "https://example.invalid/Pictor.git",
+      "rev": "3333333333333333333333333333333333333333"
+    }
+  }
+}

@@ -15,7 +15,7 @@
 #
 # Input variables read by ergo_pkg_report_render (all optional, "" = absent):
 #   <p>_MODE <p>_STRICT <p>_FETCH <p>_PLATFORM <p>_CMAKE_VERSION <p>_MANIFEST
-#   <p>_MANIFEST_EXTRA <p>_SELECTED <p>_FINDINGS
+#   <p>_MANIFEST_EXTRA <p>_SELECTED <p>_FINDINGS <p>_HOST_ID
 #   <p>_PACKAGES, per package <p>_PKG_<n>_{KIND,CODE,GROUP,PIN,EXPECT_TAG,
 #       OVERRIDE,STATE,SOURCE_DIR,IMPORTED,TARGETS_PRESENT,FEATURES,REQUIRES,
 #       VERSION,ROUTE,MODE,HEAD,DRIFT,DIRTY,EXPORTS,PATH,GITLINK,INITIALIZED}
@@ -226,6 +226,10 @@ function(ergo_pkg_report_render out_var p)
     # --- top level ----------------------------------------------------------
     set(_top "")
     _ergo_pkg_kv(_top schema "1")
+    set(_host "")
+    _ergo_pkg_add_nullable(_host id "${${p}_HOST_ID}")
+    _ergo_pkg_json_object(_host_json "  " ${_host})
+    _ergo_pkg_kv(_top host "${_host_json}")
     _ergo_pkg_add_nullable(_top mode "${${p}_MODE}")
     _ergo_pkg_add_bool(_top strict "${${p}_STRICT}")
     _ergo_pkg_add_bool(_top fetch "${${p}_FETCH}")
