@@ -2,7 +2,10 @@
 
 - 正本の設計: [`spec/feature/package-manager.md`](../feature/package-manager.md) §2.3 / §3 / §4 / §8
 - 書く側: `ergo_pkg watch` / `outdated` (`ergo_package_watch`、 [`spec/module/package_watch.md`](../module/package_watch.md))
-- 読む側: Excubitor の配送ジョブ (`events.json`、 W5)、 Unity パッケージ (`watch-report.json`、 W7)、 P4 ホスト状態図 (W6)
+- 読む側: Excubitor の配送ジョブ (`events.json`、 W5)、 Unity パッケージ (`watch-report.json`、 W7: `unity/com.ludiars.ergo.packages` の
+  `WatchReportReader`)、 P4 ホスト状態図 (W6)
+- 見本: `tests/package_watch/fixtures/watch-report.json` (UPM ホストの報告。 Unity の `Tests/Editor/Fixtures` とバイト一致、
+  書き手の出力と同じキーを持つことを `test_package_watch` が確かめる)
 
 Unity とネイティブで共有するのは **この形式** と pin の規則 (40 桁 SHA、 タグは注釈) だけで、 判定は C++ にしか無い。
 JSON はキーを辞書順に並べた 1 行 (改行 1 つで終わる)。 同じ入力なら同じバイト列。
@@ -28,7 +31,7 @@ ergo_package_manager の漏れ検査 (ドライブ文字始まり・`/Users/`・
 | `behind` | 数 / null | pin..上げ先 のコミット数。 ミラーも兄弟チェックアウトも無ければ null |
 | `warning` | 真偽 | off-main |
 | `strict_ok` | 真偽 | 上げ先がタグで STRICT で通る |
-| `next` | 文字列 | 次の操作 (`ergo_pkg update <name> --to <tag\|main\|sha>`)。 `ergo_pkg` は実行しない。 持ち主のリポで feat ブランチ + PR |
+| `next` | 文字列 | 次の操作 (`ergo_pkg update <name> --to <tag\|main\|sha>`)。 `ergo_pkg` は実行しない。 持ち主のリポで feat ブランチ + PR。 UPM ホスト (`owner: "upm"`) では Unity の窓で `#<to_rev>` にする案内 |
 
 run / review / merged だけが持つキー (tag / track / off-main の形は W3 のまま変えない):
 
@@ -74,7 +77,7 @@ merged の `to_rev` は main に入った commit (`mergeCommitSha`、 40 桁で�
 
 | キー | 型 | 意味 |
 |---|---|---|
-| `name` / `code` / `owner` / `private` | | 依存の名前・コード・pin の持ち主 (`host`: Ergo 自身と非公開、 `ergo`: 共有パッケージ。 Ergo のマニフェストを直す)・非公開か |
+| `name` / `code` / `owner` / `private` | | 依存の名前・コード・pin の持ち主 (`host`: Ergo 自身と非公開、 `ergo`: 共有パッケージ。 Ergo のマニフェストを直す、 `upm`: Unity プロジェクトの `Packages/manifest.json`。 名前は UPM のパッケージ名)・非公開か |
 | `observed` | 真偽 | **false なら「更新なし」ではない**。 その回は前回状態を書き換えない |
 | `reason` | 文字列 | observed が false の理由 (`git ls-remote failed (offline or not reachable)`、 `track branch 'x' not found` など) |
 | `as_of` | `"ls-remote"` / `"sibling-last-fetch"` / `""` | 値の時点。 兄弟チェックアウトは最後に fetch した時点 |

@@ -18,6 +18,8 @@ namespace pm = ergo::package_manager;
 extern const char* const kDefaultTrackBranch;
 /// Ergo 自身を指す依存の名前 (host.ergo)。
 extern const char* const kErgoDependency;
+/// Ergo のプロジェクトコード (依存 ergo のコード)。
+extern const char* const kErgoCode;
 /// 宣言を持たない Ergo のチェックアウト自身を見るときのホストのコード。
 extern const char* const kErgoHostCode;
 

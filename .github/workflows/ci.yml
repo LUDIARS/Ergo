@@ -23,3 +23,18 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --build-config Release --output-on-failure
+
+  # W7: Core of the Unity package (unity/com.ludiars.ergo.packages) without Unity. The package structure and the
+  # Fixtures byte match run in ctest above (test_unity_package_structure).
+  unity-package-core:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Test
+        run: dotnet test tests/unity_packages/Ergo.Packages.Core.Tests.csproj

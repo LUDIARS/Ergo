@@ -2,8 +2,10 @@
 
 #include "file_io.h"
 #include "host_context.h"
+#include "upm_host.h"
 
 #include "ergo/package_manager/init_plan.h"
+#include "ergo/package_watch/upm_dependency.h"
 
 #include <filesystem>
 
@@ -34,6 +36,20 @@ bool load_ergo_checkout(const HostContext& ctx, WatchHost& out, std::string* err
     return true;
 }
 
+/// Unity プロジェクト (UPM ホスト): コードは .ergo/host.json (無ければディレクトリ名)。
+bool load_upm_host(const HostContext& ctx, const pm::UpmDeclaration& upm, WatchHost& out,
+                   std::string* error) {
+    out.code = upm.code.empty() ? code_from_dir(out.dir) : upm.code;
+    if (!pm::is_valid_code(out.code)) {
+        if (error) *error = out.dir + ": .ergo/host.json code is missing or not a project code (run `ergo_pkg init --upm`)";
+        return false;
+    }
+    for (const auto& n : ctx.notes) out.notes.push_back(n);
+    out.dependencies = pw::upm_dependencies(upm, ctx.has_ergo_manifest ? &ctx.ergo_manifest : nullptr,
+                                            &out.notes);
+    return true;
+}
+
 } // namespace
 
 bool load_watch_host(const Args& args, const std::string& dir, WatchHost& out, std::string* error) {
@@ -43,7 +59,9 @@ bool load_watch_host(const Args& args, const std::string& dir, WatchHost& out, s
     HostContext ctx;
     if (!load_host_context(a, ctx, error)) return false;
     if (!ctx.declaration_text) {
-        if (error) *error = dir + ": no ergo-packages.json (run `ergo_pkg init`)";
+        pm::UpmDeclaration upm;
+        if (load_upm_declaration(dir, upm)) return load_upm_host(ctx, upm, out, error);
+        if (error) *error = dir + ": no ergo-packages.json nor Packages/manifest.json (run `ergo_pkg init`)";
         return false;
     }
     if (!ctx.has_declaration) return load_ergo_checkout(ctx, out, error);

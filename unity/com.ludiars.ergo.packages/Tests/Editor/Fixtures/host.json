@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "host": {
+    "code": "Example",
+    "ergo": { "repository": "https://github.com/LUDIARS/Ergo.git", "rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "expect_tag": "v0.9.0" },
+    "use": ["pictor", "privlib", "nope"],
+    "optional": ["pictor"]
+  },
+  "packages": {
+    "privlib": {
+      "kind": "link",
+      "code": "Example",
+      "repository": "https://example.invalid/Privlib.git",
+      "rev": "2222222222222222222222222222222222222222",
+      "track": { "branch": "release" }
+    }
+  }
+}

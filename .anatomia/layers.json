@@ -612,6 +612,34 @@
     {
       "glob": "tools/shuriken_migrator/*",
       "layer": "application"
+    },
+    {
+      "glob": "tests/unity_packages/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "unity/com.ludiars.ergo.packages/*",
+      "layer": "application"
+    },
+    {
+      "glob": "unity/com.ludiars.ergo.packages/Editor/*",
+      "layer": "application"
+    },
+    {
+      "glob": "unity/com.ludiars.ergo.packages/Editor/Core/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "unity/com.ludiars.ergo.packages/Tests/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "unity/com.ludiars.ergo.packages/Tests/Editor/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "unity/com.ludiars.ergo.packages/Tests/Editor/Fixtures/*",
+      "layer": "shared"
     }
   ],
   "mergeCouplingThreshold": 1

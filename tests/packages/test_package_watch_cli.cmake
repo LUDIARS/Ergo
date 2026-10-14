@@ -7,6 +7,7 @@
 #   * a report that would leak (§8) is not written: exit 3
 #   * W4: a Revisor / Concordia URL that is not loopback is exit 2 (argument and environment variable);
 #     a loopback URL nobody answers on gives no run / review and sources.* = "unavailable"; no URL is "off"
+#   * W7: a Unity project (Packages/manifest.json + .ergo/host.json, no ergo-packages.json) is read as a UPM host
 # Every repository is a fake one made here and reached by file:// URL; no network.
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir> -DERGO_PKG_CLI=<ergo_pkg>
@@ -49,7 +50,8 @@ function(commit_file dir name)
 endfunction()
 
 # --- upstream: c1 (v1.0.0, annotated) <- c2 (v1.1.0) <- c3 = main ------------------------------
-set(UP "${W}/remote/Privlib")
+# Under a LUDIARS/ directory so the UPM host reader (W7) takes the file:// URL as a LUDIARS git dependency.
+set(UP "${W}/remote/LUDIARS/Privlib")
 file(MAKE_DIRECTORY "${UP}")
 pkg_git("${UP}" init -q)
 commit_file("${UP}" one)
@@ -193,3 +195,42 @@ if(_report MATCHES "127\\.0\\.0\\.1|localhost" OR _events MATCHES "127\\.0\\.0\\
     pkg_fail("the report must not carry the service URL\n${_report}")
 endif()
 pkg_pass("watch: Revisor / Concordia loopback check and unavailable sources")
+
+# --- W7: a Unity project is a UPM host ----------------------------------------------------------
+set(U "${W}/unity")
+file(WRITE "${U}/Packages/manifest.json" "{
+  \"dependencies\": {
+    \"com.example.privlib\": \"${UP_URL}?path=/unity/com.example.privlib#${C1}\",
+    \"com.example.branch\": \"${UP_URL}#main\",
+    \"com.unity.ugui\": \"1.0.0\"
+  }
+}
+")
+file(WRITE "${U}/.ergo/host.json" "{
+  \"schema\": 1,
+  \"code\": \"Unity\"
+}
+")
+pkg(0 watch --host "${U}" --state "${W}/state_upm" --out "${W}/out_upm" --cache "${W}/cache")
+file(READ "${U}/.ergo/watch-report.json" _report)
+string(JSON _host GET "${_report}" host)
+pkg_assert_eq("upm: host code from .ergo/host.json" "${_host}" Unity)
+string(JSON _n LENGTH "${_report}" dependencies)
+pkg_assert_eq("upm: only the #<sha> git dependency is watched" "${_n}" 1)
+string(JSON _owner GET "${_report}" dependencies 0 owner)
+pkg_assert_eq("upm: owner" "${_owner}" upm)
+file(READ "${W}/out_upm/events.json" _events)
+string(JSON _id GET "${_events}" events 0 id)
+pkg_assert_eq("upm: tag event" "${_id}" "Unity/com.example.privlib/tag/v1.1.0")
+string(JSON _next GET "${_events}" events 0 next)
+if(NOT _next MATCHES "Ergo Packages")
+    pkg_fail("upm: next points at the Unity window, got '${_next}'")
+endif()
+if(_events MATCHES "file:" OR _report MATCHES "file:")
+    pkg_fail("upm: the repository URL must not be written
+${_report}")
+endif()
+if(EXISTS "${U}/ergo-packages.json")
+    pkg_fail("upm: watch must not create a host declaration")
+endif()
+pkg_pass("watch: a Unity project is read as a UPM host")

@@ -1349,6 +1349,7 @@ endif()
 #     観測・判定 (tag / track / off-main)、 前回状態と重複の抑止、 報告と出来事の書き手 (漏れ検査つき)。
 #   * W4: IReviewSource / IRunSource (Revisor の local PR と Concordia の委託 run)、 run / review / merged と
 #     由来 (pf / ai / human / unknown)、 loopback の URL の検査。
+#   * W7: UPM ホスト (Unity プロジェクトの Packages/manifest.json の git 依存) の列挙。
 # 向きは ergo_package_watch → ergo_package_manager → ergo_common。 git プロセスと HTTP は CLI のアダプタ
 # (tools/package_cli/git_*_source.cpp、 revisor_review_source.cpp / concordia_run_source.cpp) にだけあり、
 # ライブラリはプロセスを起こさずネットワークにも出ない。
@@ -1367,6 +1368,7 @@ if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
         src/package_watch/loopback_url.cpp
         src/package_watch/provenance_json.cpp
         src/package_watch/provenance.cpp
+        src/package_watch/upm_dependency.cpp
     )
     target_include_directories(ergo_package_watch PUBLIC include)
     target_link_libraries(ergo_package_watch PUBLIC ergo_package_manager)
@@ -1375,7 +1377,8 @@ if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
             tests/package_watch/test_detect.cpp
             tests/package_watch/test_diff.cpp
             tests/package_watch/test_report.cpp
-            tests/package_watch/test_provenance.cpp)
+            tests/package_watch/test_provenance.cpp
+            tests/package_watch/test_upm.cpp)
         target_link_libraries(test_package_watch PRIVATE ergo_package_watch ergo_gtest_main)
         target_compile_definitions(test_package_watch PRIVATE
             ERGO_PACKAGE_WATCH_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_watch/fixtures")
@@ -1383,6 +1386,14 @@ if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
     endif()
 elseif(ERGO_BUILD_PACKAGE_WATCH)
     message(STATUS "ergo_package_watch: requires ERGO_BUILD_PACKAGE_MANAGER — skipped")
+endif()
+
+if(ERGO_BUILD_TESTS)
+    # W7: Unity パッケージ (unity/com.ludiars.ergo.packages) の構造と Fixtures のバイト一致。 Unity も dotnet も要らない。
+    add_test(NAME test_unity_package_structure
+        COMMAND ${CMAKE_COMMAND}
+            -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_unity_package.cmake)
 endif()
 
 if(ERGO_BUILD_TESTS AND ERGO_BUILD_PACKAGE_MANAGER)
@@ -1401,6 +1412,7 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
         tools/package_cli/file_io.cpp
         tools/package_cli/process.cpp
         tools/package_cli/host_context.cpp
+        tools/package_cli/upm_host.cpp
         tools/package_cli/cmd_init.cpp
         tools/package_cli/cmd_list.cpp
         tools/package_cli/cmd_doctor.cpp

@@ -9,10 +9,9 @@ namespace ergo::package_watch {
 const char* const kDefaultTrackBranch = "main";
 const char* const kErgoDependency     = "ergo";
 const char* const kErgoHostCode       = "Ergo";
+const char* const kErgoCode           = "Eg";
 
 namespace {
-
-const char* const kErgoCode = "Eg";
 
 std::string branch_or_default(const std::string& branch) {
     return branch.empty() ? std::string(kDefaultTrackBranch) : branch;

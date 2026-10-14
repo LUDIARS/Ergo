@@ -1,0 +1,14 @@
+{
+  "name": "Ergo.Packages.Core",
+  "rootNamespace": "Ludiars.Ergo.Packages",
+  "references": [],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

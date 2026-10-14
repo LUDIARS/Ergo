@@ -4,7 +4,9 @@
 //
 //   * ホストの宣言 (`host` 節) があればそれ (host.ergo・use の共有パッケージ・非公開パッケージ)
 //   * 無く、 ergo-packages.json が Ergo のマニフェストなら Ergo のチェックアウト自身 (コード "Ergo")
-//   * どちらでもなければ誤り
+//   * ergo-packages.json が無く Packages/manifest.json があれば Unity プロジェクト (UPM ホスト、 W7)。
+//     コードは .ergo/host.json、 依存は manifest.json の LUDIARS の git 依存 (owner "upm")
+//   * どれでもなければ誤り
 
 #include "cli_args.h"
 

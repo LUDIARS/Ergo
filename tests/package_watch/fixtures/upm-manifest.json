@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "com.ludiars.ergo.packages": "https://github.com/LUDIARS/Ergo.git?path=/unity/com.ludiars.ergo.packages#b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "com.ludiars.pictor": "git+https://github.com/LUDIARS/Pictor.git?path=/unity/com.ludiars.pictor#625d83d61c90c30ceed3fab2bd2e11a7edf8d39f",
+    "com.ludiars.tela": "https://github.com/LUDIARS/Tela.git?path=/unity/com.ludiars.tela#main",
+    "com.example.local": "file:../LocalPackages/com.example.local",
+    "com.unity.modules.jsonserialize": "1.0.0"
+  },
+  "scopedRegistries": []
+}

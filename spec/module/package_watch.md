@@ -15,6 +15,7 @@ git の起動は CLI のアダプタ (`tools/package_cli/git_remote_source.*` / 
 | 部品 | ヘッダ | 中身 |
 |---|---|---|
 | 依存の列挙 | `watch_dependency.h` | ホストの宣言 (host.ergo・use の共有パッケージ・非公開 link) と Ergo のマニフェスト (link 全て) から。 `track.branch` (既定 `main`)、 持ち主 (`host` / `ergo`)、 取得元の末尾名 |
+| UPM ホストの依存 (W7) | `upm_dependency.h` | Unity プロジェクトの `Packages/manifest.json` の LUDIARS の git 依存のうち `#<40 桁 SHA>` のもの。 取得元は `git+` と `?path=...` を落とした URL、 コードは Ergo のマニフェストで同じリポを指すパッケージのコード (Ergo 自身は `Eg`、 無ければ末尾名)、 持ち主 `upm`、 追跡ブランチ `main`、 `expect_tag` 無し。 `#main` などブランチ指定は見られない理由を積む |
 | 取得元 | `ref_source.h` | `IRefSource` (タグと追跡ブランチの先頭、 Remote / Sibling) と `IHistorySource` (ミラーの同期・距離・祖先判定、 答えられなければ nullopt) |
 | ref の一覧 | `ref_listing.h` | `git ls-remote` / `git show-ref --dereference` の行の解析 (注釈つきタグは commit へ剥がす)、 指紋 (FNV-1a 64) |
 | 版 | `semver.h` | `v1.2.3` / `v1.2` / `v1.2.3-rc.1` の解析と比較 |
@@ -60,6 +61,10 @@ build-packages (`spec/domains/build-packages.domain.json`。 ergo_package_manage
 
 - ホスト: `host` 節があればホストの宣言、 無く `ergo-packages.json` が Ergo のマニフェストなら Ergo 自身 (コード `Ergo`)。
   コードは `host.code` (無ければディレクトリ名がコードとして書ける形のとき)。 同じコードの 2 ホストは終了 2
+- UPM ホスト (W7): `ergo-packages.json` が無く `Packages/manifest.json` があるディレクトリは Unity プロジェクト。 コードは
+  `.ergo/host.json` の `code` (`ergo_pkg init --upm` が作る。 無ければディレクトリ名)。 報告は同じく `<host>/.ergo/watch-report.json`
+  で、 出来事の `next` は Unity の窓 (Window > LUDIARS > Ergo Packages) を指す (`ergo_pkg update` は UPM の pin を書かない)。
+  読む側は Unity パッケージ `unity/com.ludiars.ergo.packages` (統合設計 §6)
 - 前回状態: `--state` > `%LOCALAPPDATA%/ergo/pkg-watch` (Windows) / `$XDG_STATE_HOME/ergo/pkg-watch` / `~/.local/state/ergo/pkg-watch`
 - ミラー: `--cache` > `ERGO_PKG_CACHE_DIR` > `ERGO_DEPENDENCY_CACHE_DIR` の `<cache>/mirrors/<Repo>.git`。 `watch` は作らない
   (`git clone --bare --filter=tree:0 <repository> <cache>/mirrors/<Repo>.git` で用意する)。 無ければ距離は空欄
@@ -87,7 +92,8 @@ build-packages (`spec/domains/build-packages.domain.json`。 ergo_package_manage
 
 - 入力: 上の「必要なデータ」
 - 出力: 報告・出来事・次の状態 (形式は `spec/data/ergo-watch-report.md`)
-- タスク: W4 (由来) は実装済み。 W5 (構成時の 1 行と Excubitor の配送)、 W7 (UPM ホスト) はこのモジュールの上に足す。 `pin-behind-ergo` は未実装 (Ergo のマニフェストの main を読む経路が要る)
+- タスク: W4 (由来) は実装済み。 W5 (構成時の 1 行と Excubitor の配送) はこのモジュールの上に足す。 `pin-behind-ergo` は未実装 (Ergo のマニフェストの main を読む経路が要る)。
+  W7 (UPM ホスト) は `upm_dependency.h` と CLI の `watch_host` / `upm_host` で実装済み (`spec/tasks/2026-10-15-package-manager-w7.md`)
 
 ## テスト
 
@@ -95,7 +101,9 @@ build-packages (`spec/domains/build-packages.domain.json`。 ergo_package_manage
 |---|---|
 | `test_package_watch` | 偽ソースで: semver、 ref の解析と注釈つきタグ、 指紋、 tag / track / off-main (距離・expect_tag・複数タグの最新 1 つ・pre-release を除く・履歴無しでは距離が空欄)、 取得失敗で `observed: false`、 兄弟は同期しない、 指紋が同じなら同期しない (呼び出し回数)、 `diff` の決定性・2 回目で出来事 0・track の 6 時間畳み込み・pin を上げると解消・取れない依存は前回のまま、 状態の読み直し、 依存の列挙、 漏れ検査で報告を作らない、 URL を載せない |
 | `test_package_watch` (PackageWatchProvenance.* / PackageWatchLoopback.*) | Revisor / Concordia の JSON 見本で: 一覧の読み手、 pf / ai (trigger 写し) / human / unknown の突合、 run と review の対象 (別リポ・別 base・終わった run は出ない)、 open → merged で merged が 1 回 (状態に残さない)、 落ちていると run / review を出さず `unavailable` で既知は前回のまま、 Concordia だけ落ちると review の由来が unknown、 出来事・報告・状態にタイトル・本文・ブランチ名・セッション id が入らない (見本にわざと入れてある)、 入力の並びによらない、 loopback の URL の判定 |
-| `test_package_watch_cli` (`cmake -P`) | 偽リポ (`file://`) で CLI を通しで: `outdated` の tag と track と `--fail-on`、 `watch` の 1 回目と 2 回目 (出来事 0、 状態のバイト一致)、 届かない取得元で状態不変、 兄弟チェックアウトを fetch せずに読む、 漏れる報告で終了 3 と何も書かない、 W4: loopback 以外の URL (引数と環境変数) で終了 2、 誰も聞いていない loopback で `sources.*` が `unavailable` かつ run / review / merged が無い、 URL 無しは `off` |
+| `test_package_watch` (PackageWatchUpm、 W7) | UPM ホスト見本 (`fixtures/upm-*.json`) から依存を列挙 (`#main` は見ない、 コードの対応)、 偽ソースで tag / track の出来事を出す、 取れない依存は `observed:false`、 報告が漏れ検査を通り URL を載せない、 Unity と共有する報告見本 `fixtures/watch-report.json` が書き手の出力と同じキーを持つ |
+| `test_package_watch_cli` (`cmake -P`) | 偽リポ (`file://`) で CLI を通しで: `outdated` の tag と track と `--fail-on`、 `watch` の 1 回目と 2 回目 (出来事 0、 状態のバイト一致)、 届かない取得元で状態不変、 兄弟チェックアウトを fetch せずに読む、 漏れる報告で終了 3 と何も書かない、 W4: loopback 以外の URL (引数と環境変数) で終了 2、 誰も聞いていない loopback で `sources.*` が `unavailable` かつ run / review / merged が無い、 URL 無しは `off`、 W7: Unity プロジェクトを UPM ホストとして読み出来事を出す |
+| `test_unity_package_structure` (`cmake -P`、 W7) | Unity パッケージの構造 (package.json の必須キー・asmdef が Editor 専用・`Runtime/` が無い・全資産に .meta・GUID の重複無し・絶対パス無し) と、 `Tests/Editor/Fixtures` が `tests/package_watch/fixtures/*.json` とバイト一致 |
 | `test_packages_track_key` (`cmake -P`) | `track` を足しても CMake の読み手 (`ergo_pkg_manifest_load`) の出力が変わらない |
 | `test_package_manager` (TrackKey) | C++ の読み手が `track.branch` を読み、 型違いは MANIFEST |
 

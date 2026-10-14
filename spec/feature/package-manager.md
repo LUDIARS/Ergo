@@ -227,7 +227,9 @@ P1 (版一覧) と P2 (リンク図) は構成の形を見る図、P4 は 1 ホ�
 `unity/com.ludiars.ergo.packages/` (UPM、Editor 専用)。Tela の `unity/com.ludiars.tela` と同じ「所有リポに置く」形で、
 報告の形式を変える PR と同じ PR で直せる。導入は
 `"com.ludiars.ergo.packages": "https://github.com/LUDIARS/Ergo.git?path=/unity/com.ludiars.ergo.packages#<40 桁 SHA>"`。
-版は Ergo のタグと独立の `0.x`。依存は `com.unity.modules.jsonserialize` だけ (`JsonUtility` で読める平たい DTO)。
+版は Ergo のタグと独立の `0.x`。依存は無い (W7 で改めた: 当初は `com.unity.modules.jsonserialize` の `JsonUtility` で読む案だったが、
+Core は `noEngineReferences` で `JsonUtility` を使えず、`JsonUtility` は報告の `null` (距離不明) を 0 と区別できない。Core は
+値の位置を覚える最小の JSON 読み手 `JsonParser` を持ち、`ManifestJsonEditor` もそれで 1 値だけを書き換える)。
 
 ```
 unity/com.ludiars.ergo.packages/
@@ -300,6 +302,8 @@ W6 の Ergo 側 (P4 ホスト状態図) は `spec/tasks/2026-10-15-package-manag
 読み手 `package_model/host_state_reader.h`、 図 `package_viz/host_view.h`、 `ergo_package_graphs` の `host.tela`)。 Ludellus-Native の L1〜L3 は Ludellus-Native の PR で行う。
 §2.1 の `use` / `optional` / `features` を構成の既定値として流す処理と Ergo 自身への PKG-04/05/07 (L1〜L3 の前提) は
 `spec/tasks/2026-10-15-package-manager-host-use.md` (`cmake/packages/ErgoPackageHostDefaults.cmake`・`ErgoPackageErgoPin.cmake`)。
+W7 は `spec/tasks/2026-10-15-package-manager-w7.md` (`unity/com.ludiars.ergo.packages`、UPM ホストの読み手 `package_watch/upm_dependency.h`、
+構造検査 `test_unity_package_structure`、Core の `dotnet test` は CI の `unity-package-core`)。
 
 ### 受入条件 (機械で確かめる。テストはネットワークを使わない: git はテスト内の偽リポ、Revisor / Concordia は JSON 見本)
 

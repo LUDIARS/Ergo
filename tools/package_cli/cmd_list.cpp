@@ -3,28 +3,13 @@
 #include "commands.h"
 #include "file_io.h"
 #include "host_context.h"
+#include "upm_host.h"
 
 #include "ergo/package_manager/package_list.h"
 
 #include <cstdio>
 
 namespace ergo::package_cli {
-
-namespace {
-
-/// Unity プロジェクトなら UPM の宣言を読む (無ければ false)。
-bool load_upm(const std::string& host, pm::UpmDeclaration& out) {
-    jsonm::JsonValue manifest;
-    if (!read_json(join(host, "Packages/manifest.json"), manifest, nullptr)) return false;
-    out.dependencies = pm::read_upm_dependencies(manifest);
-    jsonm::JsonValue host_json;
-    if (read_json(join(host, ".ergo/host.json"), host_json, nullptr)) {
-        out.code = pm::read_upm_host_code(host_json);
-    }
-    return true;
-}
-
-} // namespace
 
 int run_list(const Args& args) {
     HostContext ctx;
@@ -44,7 +29,7 @@ int run_list(const Args& args) {
         has_resolved = true;
     }
     pm::UpmDeclaration upm;
-    const bool has_upm = load_upm(args.host, upm);
+    const bool has_upm = load_upm_declaration(args.host, upm);
 
     pm::ListInput in;
     in.host     = ctx.has_declaration ? &ctx.declaration : nullptr;

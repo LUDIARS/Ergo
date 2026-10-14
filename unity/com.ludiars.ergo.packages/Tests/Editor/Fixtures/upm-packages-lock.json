@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "com.ludiars.ergo.packages": {
+      "version": "https://github.com/LUDIARS/Ergo.git?path=/unity/com.ludiars.ergo.packages#b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "com.ludiars.tela": {
+      "version": "https://github.com/LUDIARS/Tela.git?path=/unity/com.ludiars.tela#main",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "3333333333333333333333333333333333333333"
+    },
+    "com.unity.modules.jsonserialize": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {}
+    }
+  }
+}

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Runs the Core tests of unity/com.ludiars.ergo.packages without Unity (spec/feature/package-manager.md §6.4).
+    Core has noEngineReferences, so the same sources compile here and in Unity's EditMode runner.
+      dotnet test tests/unity_packages
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>Ludiars.Ergo.Packages.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../unity/com.ludiars.ergo.packages/Editor/Core/**/*.cs" />
+    <Compile Include="../../unity/com.ludiars.ergo.packages/Tests/Editor/**/*.cs" />
+    <None Include="../../unity/com.ludiars.ergo.packages/Tests/Editor/Fixtures/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+  </ItemGroup>
+</Project>

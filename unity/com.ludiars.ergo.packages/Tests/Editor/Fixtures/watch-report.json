@@ -1,0 +1,117 @@
+{
+  "dependencies": [
+    {
+      "as_of": "ls-remote",
+      "code": "Eg",
+      "name": "com.ludiars.ergo.packages",
+      "observed": true,
+      "owner": "upm",
+      "pin": { "rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "tag": "" },
+      "private": false,
+      "reason": "",
+      "sibling_behind": null,
+      "track": { "behind": 18, "branch": "main", "head": "4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "on_track": true },
+      "updates": [
+        {
+          "behind": 12,
+          "dependency": "com.ludiars.ergo.packages",
+          "from_rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "from_tag": "",
+          "kind": "tag",
+          "next": "Unity: Window > LUDIARS > Ergo Packages, set com.ludiars.ergo.packages to #9c2d4e7ccccccccccccccccccccccccccccccccc",
+          "strict_ok": true,
+          "subject": "v0.10.0",
+          "to_rev": "9c2d4e7ccccccccccccccccccccccccccccccccc",
+          "to_tag": "v0.10.0",
+          "warning": false
+        },
+        {
+          "behind": 18,
+          "dependency": "com.ludiars.ergo.packages",
+          "from_rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "from_tag": "",
+          "kind": "track",
+          "next": "Unity: Window > LUDIARS > Ergo Packages, set com.ludiars.ergo.packages to #4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "strict_ok": false,
+          "subject": "4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "to_rev": "4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "to_tag": "",
+          "warning": false
+        }
+      ]
+    },
+    {
+      "as_of": "",
+      "code": "Pc",
+      "name": "com.ludiars.pictor",
+      "observed": false,
+      "owner": "upm",
+      "pin": { "rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "tag": "" },
+      "private": false,
+      "reason": "git ls-remote failed (offline or not reachable)",
+      "sibling_behind": null,
+      "track": { "behind": null, "branch": "main", "head": "", "on_track": null },
+      "updates": []
+    }
+  ],
+  "events": [
+    {
+      "as_of": "ls-remote",
+      "at": "2026-10-15T00:00:00Z",
+      "behind": 12,
+      "code": "Eg",
+      "dependency": "com.ludiars.ergo.packages",
+      "from_rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "from_tag": "",
+      "host": "Example",
+      "id": "Example/com.ludiars.ergo.packages/tag/v0.10.0",
+      "kind": "tag",
+      "next": "Unity: Window > LUDIARS > Ergo Packages, set com.ludiars.ergo.packages to #9c2d4e7ccccccccccccccccccccccccccccccccc",
+      "owner": "upm",
+      "private": false,
+      "since_notified": null,
+      "strict_ok": true,
+      "subject": "v0.10.0",
+      "to_rev": "9c2d4e7ccccccccccccccccccccccccccccccccc",
+      "to_tag": "v0.10.0",
+      "warning": false
+    }
+  ],
+  "generated_at": "2026-10-15T00:00:00Z",
+  "host": "Example",
+  "pending": [
+    {
+      "behind": 12,
+      "dependency": "com.ludiars.ergo.packages",
+      "first_seen": "2026-10-15T00:00:00Z",
+      "from_rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "from_tag": "",
+      "id": "Example/com.ludiars.ergo.packages/tag/v0.10.0",
+      "kind": "tag",
+      "last_notified": "2026-10-15T00:00:00Z",
+      "next": "Unity: Window > LUDIARS > Ergo Packages, set com.ludiars.ergo.packages to #9c2d4e7ccccccccccccccccccccccccccccccccc",
+      "strict_ok": true,
+      "subject": "v0.10.0",
+      "to_rev": "9c2d4e7ccccccccccccccccccccccccccccccccc",
+      "to_tag": "v0.10.0",
+      "warning": false
+    },
+    {
+      "behind": 18,
+      "dependency": "com.ludiars.ergo.packages",
+      "first_seen": "2026-10-14T12:00:00Z",
+      "from_rev": "b74f127aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "from_tag": "",
+      "id": "Example/com.ludiars.ergo.packages/track/4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "track",
+      "last_notified": "2026-10-14T12:00:00Z",
+      "next": "Unity: Window > LUDIARS > Ergo Packages, set com.ludiars.ergo.packages to #4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "strict_ok": false,
+      "subject": "4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "to_rev": "4f0e9a1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "to_tag": "",
+      "warning": false
+    }
+  ],
+  "schema": 1
+}

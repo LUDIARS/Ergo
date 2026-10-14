@@ -1,0 +1,9 @@
+{
+  "name": "com.ludiars.ergo.packages",
+  "version": "0.1.0",
+  "displayName": "Ergo Packages",
+  "description": "Lists the LUDIARS git packages of this Unity project, shows the updates found by the Ergo package watcher (ergo_pkg watch) and pins a package to a 40-digit commit SHA in Packages/manifest.json. Editor only.",
+  "unity": "2022.3",
+  "author": { "name": "LUDIARS" },
+  "keywords": ["ludiars", "ergo", "packages", "upm"]
+}
