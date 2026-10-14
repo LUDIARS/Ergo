@@ -202,6 +202,8 @@ CMake (`string(JSON)`)・C++ (`ergo_common` jsonm)・Node が同じファイル�
 | PKG-16 | tool の submodule が未初期化 | 警告 (C++ ビルドは止めない) | エラー |
 | PKG-17 | File API の実リンクに宣言 (`needs` / `optional` / `requires`) に無いパッケージ間リンク (宣言漏れ) | 図に印 | `ergo_package_viz --check` が非 0 (CI の 1 段) |
 
+PKG-15 のキャッシュ変数はホストと結線の値を比べ、値が同じなら記録しない。結線の値は選んだ機能の分だけを比べる (選ばれていない機能のキャッシュ既定は比べない)。
+
 PKG-17 だけは構成時に判定しない (File API の返答は generate の後にしかできない)。
 
 ## 5. 収集と可視化
