@@ -16,7 +16,7 @@
 //   ergo_pkg outdated [--json] [--fail-on <kind>] [--cache <dir>] [--root <dir>]
 //                                                         [--host <dir>] [--ergo <dir>]
 //   ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>] [--cache <dir>] [--root <dir>]
-//                                                         [--ergo <dir>]
+//                   [--revisor-url <u>] [--concordia-url <u>]  [--ergo <dir>]
 
 #include <string>
 #include <vector>
@@ -46,6 +46,8 @@ struct Args {
     std::string              out;      ///< watch: events.json の置き場所
     std::string              root;     ///< 兄弟チェックアウトの根 (ERGO_PACKAGES_SIBLING_ROOT)
     std::string              fail_on;  ///< outdated: この種類があれば終了 1
+    std::string              revisor_url;    ///< watch: Revisor (ERGO_WATCH_REVISOR_URL、 loopback だけ)
+    std::string              concordia_url;  ///< watch: Concordia (ERGO_WATCH_CONCORDIA_URL、 loopback だけ)
     bool                     upm    = false;
     bool                     json   = false;
     bool                     strict = false;

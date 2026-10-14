@@ -8,6 +8,9 @@
 //   * 今回の判定に無いもの (pin を上げて解消したもの) は状態から消す
 //   * 観測できなかった依存は、 前回の既知集合と指紋をそのまま残す
 //   * 宣言から消えた依存は状態から消す
+//   * W4: 取得元ごとに見る。 ref (tag / track / off-main) は observation.observed、 review / merged は
+//     reviews_observed、 run は runs_observed。 見られなかった取得元の既知はそのまま残す
+//   * merged は 1 回だけ出し、 状態には残さない (前回の review が消えるので再び出ない)
 
 #include "ergo/package_watch/detect.h"
 #include "ergo/package_watch/observation.h"
@@ -27,7 +30,9 @@ constexpr std::int64_t kTrackFoldSeconds = 6 * 60 * 60;
 struct DependencyResult {
     WatchDependency        dependency;
     Observation            observation;
-    std::vector<Candidate> updates;  ///< detect_updates の結果
+    std::vector<Candidate> updates;  ///< detect_updates の結果 (+ W4 の attach_provenance)
+    bool                   reviews_observed = false;  ///< Revisor に届いた (review / merged を判定した)
+    bool                   runs_observed    = false;  ///< Concordia に届いた (run を判定した)
 };
 
 struct WatchEvent {

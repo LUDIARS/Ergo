@@ -5,6 +5,8 @@
 #   * a repository that cannot be reached is observed:false and leaves the state unchanged
 #   * a sibling checkout is read as it is (no fetch) with as_of sibling-last-fetch
 #   * a report that would leak (§8) is not written: exit 3
+#   * W4: a Revisor / Concordia URL that is not loopback is exit 2 (argument and environment variable);
+#     a loopback URL nobody answers on gives no run / review and sources.* = "unavailable"; no URL is "off"
 # Every repository is a fake one made here and reached by file:// URL; no network.
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir> -DERGO_PKG_CLI=<ergo_pkg>
@@ -28,6 +30,7 @@ function(pkg expected)
     execute_process(
         COMMAND "${CMAKE_COMMAND}" -E env --unset=ERGO_DEPENDENCY_CACHE_DIR --unset=ERGO_PKG_CACHE_DIR
             --unset=ERGO_PACKAGES_SIBLING_ROOT --unset=ERGO_SOURCE_DIR
+            --unset=ERGO_WATCH_REVISOR_URL --unset=ERGO_WATCH_CONCORDIA_URL
             "${ERGO_PKG_CLI}" ${ARGN} --ergo "${W}/ergo"
         RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
     if(NOT _rc EQUAL expected)
@@ -156,3 +159,37 @@ if(EXISTS "${H3}/.ergo/watch-report.json" OR EXISTS "${W}/state3/events.json"
     pkg_fail("nothing may be written when the report would leak")
 endif()
 pkg_pass("watch: leak check blocks the report (exit 3)")
+
+# --- W4: Revisor / Concordia must be loopback; an unreachable one is "unavailable" ---------------
+pkg(2 ${WATCH} --revisor-url "http://example.invalid")
+pkg(2 ${WATCH} --concordia-url "http://192.0.2.1/")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env --unset=ERGO_WATCH_CONCORDIA_URL
+        "ERGO_WATCH_REVISOR_URL=http://user@127.0.0.1/"
+        "${ERGO_PKG_CLI}" ${WATCH} --ergo "${W}/ergo"
+    RESULT_VARIABLE _rc OUTPUT_QUIET ERROR_QUIET)
+pkg_assert_eq("non-loopback URL from the environment" "${_rc}" 2)
+
+pkg(0 ${WATCH})
+file(READ "${H}/.ergo/watch-report.json" _report)
+string(JSON _src GET "${_report}" sources revisor)
+pkg_assert_eq("no Revisor URL: off" "${_src}" off)
+
+# Nothing listens on port 1 of the loopback, so both sources are unreachable (an ergo_pkg built without
+# ergo_http reports the same "unavailable").
+pkg(0 ${WATCH} --revisor-url "http://127.0.0.1:1" --concordia-url "http://localhost:1/")
+file(READ "${H}/.ergo/watch-report.json" _report)
+string(JSON _src GET "${_report}" sources revisor)
+pkg_assert_eq("unreachable Revisor" "${_src}" unavailable)
+string(JSON _src GET "${_report}" sources concordia)
+pkg_assert_eq("unreachable Concordia" "${_src}" unavailable)
+file(READ "${W}/out/events.json" _events)
+string(JSON _src GET "${_events}" sources revisor)
+pkg_assert_eq("events.json carries the source state" "${_src}" unavailable)
+if(_report MATCHES "\"kind\":\"(run|review|merged)\"" OR _events MATCHES "\"kind\":\"(run|review|merged)\"")
+    pkg_fail("an unreachable Revisor / Concordia must not produce run / review / merged\n${_report}")
+endif()
+if(_report MATCHES "127\\.0\\.0\\.1|localhost" OR _events MATCHES "127\\.0\\.0\\.1|localhost")
+    pkg_fail("the report must not carry the service URL\n${_report}")
+endif()
+pkg_pass("watch: Revisor / Concordia loopback check and unavailable sources")

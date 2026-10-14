@@ -34,6 +34,12 @@ jsonm::JsonValue candidate_to_json(const Candidate& c) {
     o.set("warning", detail::boolean(c.warning));
     o.set("strict_ok", detail::boolean(c.strict_ok));
     o.set("next", str(c.next));
+    if (is_provenance_kind(c.kind)) {  // W3 の種類の形 (バイト列) は変えない
+        o.set("origin", str(c.origin));
+        o.set("trigger", str(c.trigger));
+        o.set("review", opt_int(c.review));
+        o.set("head", str(c.head));
+    }
     return o;
 }
 
@@ -50,6 +56,10 @@ bool read_candidate(const jsonm::JsonValue& doc, Candidate& out) {
     out.warning    = get_bool(doc, "warning");
     out.strict_ok  = get_bool(doc, "strict_ok");
     out.next       = get_string(doc, "next");
+    out.origin     = get_string(doc, "origin");
+    out.trigger    = get_string(doc, "trigger");
+    out.review     = get_opt_int(doc, "review");
+    out.head       = get_string(doc, "head");
     return !out.dependency.empty() && !out.subject.empty();
 }
 

@@ -1,0 +1,65 @@
+{
+  "pullRequests": [
+    {
+      "id": "00000000-0000-4000-8000-000000000128",
+      "number": 128,
+      "repository": "LUDIARS/Pictor",
+      "title": "TITLE-MARKER-128 raise the renderer",
+      "body": "BODY-MARKER-128 the task text of the delegation",
+      "status": "open",
+      "baseRef": "main",
+      "headRef": "feat/pf-branch-marker",
+      "headSha": "4f0e9a1000000000000000000000000000000128",
+      "sessionId": "sess-pf-child",
+      "labels": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000131",
+      "number": 131,
+      "repository": "LUDIARS/Pictor",
+      "title": "TITLE-MARKER-131",
+      "body": "BODY-MARKER-131",
+      "status": "open",
+      "baseRef": "main",
+      "headRef": "feat/ai-branch-marker",
+      "headSha": "5a1b2c3000000000000000000000000000000131",
+      "sessionId": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000133",
+      "number": 133,
+      "repository": "LUDIARS/Pictor",
+      "title": "TITLE-MARKER-133",
+      "body": "BODY-MARKER-133",
+      "status": "open",
+      "baseRef": "main",
+      "headRef": "fix/human-branch-marker",
+      "headSha": "6c7d8e9000000000000000000000000000000133",
+      "sessionId": "sess-human-desk"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000140",
+      "number": 140,
+      "repository": "LUDIARS/Tela",
+      "title": "TITLE-MARKER-140",
+      "body": "BODY-MARKER-140",
+      "status": "open",
+      "baseRef": "main",
+      "headRef": "feat/other-repo-branch-marker",
+      "headSha": "7e8f9a0000000000000000000000000000000140",
+      "sessionId": "sess-pf-child"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000141",
+      "number": 141,
+      "repository": "LUDIARS/Pictor",
+      "title": "TITLE-MARKER-141",
+      "body": "BODY-MARKER-141",
+      "status": "open",
+      "baseRef": "develop",
+      "headRef": "feat/other-base-branch-marker",
+      "headSha": "8a9b0c1000000000000000000000000000000141",
+      "sessionId": null
+    }
+  ]
+}

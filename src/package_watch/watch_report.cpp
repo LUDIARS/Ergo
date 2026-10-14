@@ -42,6 +42,13 @@ jsonm::JsonValue dependencies_json(const std::vector<DependencyResult>& results)
     return arr;
 }
 
+jsonm::JsonValue sources_json(const WatchSources& s) {
+    auto o = jsonm::JsonValue::make_object();
+    o.set("concordia", str(s.concordia));
+    o.set("revisor", str(s.revisor));
+    return o;
+}
+
 std::string short_sha(const std::string& sha) { return sha.substr(0, 7); }
 
 std::string version_text(const std::string& tag, const std::string& rev) {
@@ -111,10 +118,12 @@ jsonm::JsonValue host_report_json(const HostWatch& watch, std::int64_t now) {
     auto pending = jsonm::JsonValue::make_array();
     for (const auto& e : watch.diff.next.entries) pending.push(pending_json(watch.host, e));
     doc.set("pending", std::move(pending));
+    doc.set("sources", sources_json(watch.sources));
     return doc;
 }
 
-jsonm::JsonValue events_json(const std::vector<HostWatch>& watches, std::int64_t now) {
+jsonm::JsonValue events_json(const std::vector<HostWatch>& watches, std::int64_t now,
+                             const WatchSources& sources) {
     std::vector<const HostWatch*> ordered;
     for (const auto& w : watches) ordered.push_back(&w);
     std::stable_sort(ordered.begin(), ordered.end(),
@@ -130,6 +139,7 @@ jsonm::JsonValue events_json(const std::vector<HostWatch>& watches, std::int64_t
     }
     doc.set("hosts", std::move(hosts));
     doc.set("events", std::move(events));
+    doc.set("sources", sources_json(sources));
     return doc;
 }
 
@@ -169,14 +179,15 @@ std::string render_outdated_text(const std::string& host, const std::vector<Depe
     return out;
 }
 
-WatchOutputs prepare_watch_outputs(const std::vector<HostWatch>& watches, std::int64_t now) {
+WatchOutputs prepare_watch_outputs(const std::vector<HostWatch>& watches, std::int64_t now,
+                                   const WatchSources& sources) {
     WatchOutputs out;
     for (const auto& w : watches) {
         const auto doc = host_report_json(w, now);
         collect_leaks(doc, w.host, out);
         out.reports.push_back({w.host, jsonm::serialize(doc) + "\n"});
     }
-    const auto events = events_json(watches, now);
+    const auto events = events_json(watches, now, sources);
     collect_leaks(events, "events", out);
     out.events = {"", jsonm::serialize(events) + "\n"};
     out.ok     = out.leaks.empty();

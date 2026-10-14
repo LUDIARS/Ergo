@@ -144,8 +144,9 @@
 | `unknown` | Concordia に届かない・認可されない |
 
 Revisor / Concordia の URL は引数か環境変数 (`ERGO_WATCH_REVISOR_URL` / `ERGO_WATCH_CONCORDIA_URL`) で受け、loopback 以外は
-終了 2。ポートの数字は Ergo に書かない (Excubitor の catalog が正本で、ジョブが渡す)。読み取りに認可が要るかは W4 で
-Revisor の実装を見て決め、要るなら環境変数だけで受ける。届かないときは `run` / `review` を出さず `sources.* = "unavailable"`。
+終了 2。ポートの数字は Ergo に書かない (Excubitor の catalog が正本で、ジョブが渡す)。読み取りの認可は要らない (W4 で確認:
+Revisor の `GET /v1/local-prs` と Concordia の `GET /v1/delegation/runs` は loopback から認可なしで読める) ので、トークンは受け取らない。
+届かないときは `run` / `review` を出さず `sources.* = "unavailable"`。
 
 **頻度**: 定期ジョブは 15 分ごと。1 回の通信はリポごとの ls-remote 1 往復と、Revisor / Concordia の一覧各 1 回。
 
@@ -294,6 +295,7 @@ S4 (観測 P3) は並行で実装中。W は S4 が触るファイル (`package_
 
 実装状況: W1 は `spec/tasks/2026-10-14-package-manager-w1.md`、W2 は `spec/tasks/2026-10-15-package-manager-w2.md` (モジュール `spec/module/package_manager.md`)。
 W3 は `spec/tasks/2026-10-15-package-manager-w3.md` (モジュール `spec/module/package_watch.md`、形式 `spec/data/ergo-watch-report.md`)。
+W4 は `spec/tasks/2026-10-15-package-manager-w4.md` (同じモジュールと形式に由来を足した)。
 
 ### 受入条件 (機械で確かめる。テストはネットワークを使わない: git はテスト内の偽リポ、Revisor / Concordia は JSON 見本)
 

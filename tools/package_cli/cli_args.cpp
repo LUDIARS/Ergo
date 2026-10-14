@@ -41,7 +41,7 @@ bool allowed_for(const std::string& command, Allowed& out) {
         out.values.insert({"--cache", "--root", "--fail-on"});
         out.flags = {"--json"};
     } else if (command == "watch") {
-        out.values.insert({"--state", "--out", "--cache", "--root"});
+        out.values.insert({"--state", "--out", "--cache", "--root", "--revisor-url", "--concordia-url"});
     } else {
         return false;
     }
@@ -71,6 +71,8 @@ void assign(Args& a, const std::string& key, const std::string& value) {
     else if (key == "--out") a.out = value;
     else if (key == "--root") a.root = value;
     else if (key == "--fail-on") a.fail_on = value;
+    else if (key == "--revisor-url") a.revisor_url = value;
+    else if (key == "--concordia-url") a.concordia_url = value;
 }
 
 void set_flag(Args& a, const std::string& key) {
@@ -131,7 +133,7 @@ const char* usage() {
            "  ergo_pkg outdated [--json] [--fail-on tag|track|off-main] [--cache <dir>] [--root <dir>]\n"
            "                                                       [--host <dir>] [--ergo <dir>]\n"
            "  ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>] [--cache <dir>] [--root <dir>]\n"
-           "                                                       [--ergo <dir>]\n"
+           "                  [--revisor-url <loopback url>] [--concordia-url <loopback url>] [--ergo <dir>]\n"
            "exit codes: 0 ok / 1 findings to act on / 2 bad arguments or input / 3 cannot write or fetch\n";
 }
 

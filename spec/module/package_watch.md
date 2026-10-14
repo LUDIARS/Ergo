@@ -9,7 +9,8 @@
 
 ライブラリはプロセスを起こさず、 ネットワークにも出ない。 取得元は interface (`IRefSource` / `IHistorySource`) で受け、
 git の起動は CLI のアダプタ (`tools/package_cli/git_remote_source.*` / `git_sibling_source.*`) だけが行う。
-由来 (Revisor / Concordia の読み手、 `run` / `review` / `merged`) は W4 で `IReviewSource` / `IRunSource` として足す。
+由来 (段階 W4) は `IReviewSource` (Revisor の local PR) / `IRunSource` (Concordia の委託 run) で受け、 HTTP は CLI のアダプタ
+(`tools/package_cli/revisor_review_source.*` / `concordia_run_source.*`、 `ergo_http`) だけが行う。
 
 | 部品 | ヘッダ | 中身 |
 |---|---|---|
@@ -23,6 +24,10 @@ git の起動は CLI のアダプタ (`tools/package_cli/git_remote_source.*` / 
 | 差分 | `watch_diff.h` | 純粋関数 `diff(prev, results, now) → (events, next)`。 同じ主体は 1 回、 track は 6 時間に 1 回へ畳む、 解消したものは消す、 取れなかった依存は前回のまま |
 | 報告 | `watch_report.h` | `<host>/.ergo/watch-report.json`・`<out>/events.json`・`outdated` の表と JSON。 書く前に漏れ検査 (ergo_package_manager の `find_leaks`)、 当たれば何も作らない |
 | 時刻 | `time_text.h` | UTC 秒 ↔ `YYYY-MM-DDTHH:MM:SSZ` (ロケールに依らない) |
+| 由来の取得元 (W4) | `provenance_source.h` | `IReviewSource` (open な local PR と merged) / `IRunSource` (委託 run)。 DTO は突合に要るキーだけで、 PR のタイトル・本文を持たない |
+| 一覧の読み手 (W4) | `provenance_json.h` | Revisor の `{pullRequests}` と Concordia の `{runs}` を DTO に写す。 run の対象リポは `sessions[].repo_origin` → `args.target_repo` の末尾名だけ |
+| 由来の判定 (W4) | `provenance.h` | run (対象リポの進行中の委託 run)・review (base が追跡ブランチの open な local PR)・merged (前回 review だった PR が merged、 1 回だけ) と由来 pf / ai / human / unknown。 `attach_provenance` で依存の結果に足す |
+| URL の検査 (W4) | `loopback_url.h` | `http(s)://` で host が `localhost` / `127.0.0.0/8` / `[::1]`。 `user@` は拒む |
 
 ## カテゴリ
 
@@ -61,6 +66,12 @@ build-packages (`spec/domains/build-packages.domain.json`。 ergo_package_manage
 - 兄弟チェックアウト: `--root` > `ERGO_PACKAGES_SIBLING_ROOT` の `<root>/<Repo>`。 あればそれを読み (fetch しない)、 無ければ ls-remote
 - git の資格情報は利用者の git に任せる。 トークンは引数・ファイルで受け取らない
 - `-DERGO_BUILD_PACKAGE_WATCH=OFF` では CLI は W1 のコマンドだけで作られ、 `outdated` / `watch` は終了 2
+- 由来 (W4): `watch --revisor-url <u>` > `ERGO_WATCH_REVISOR_URL`、 `--concordia-url <u>` > `ERGO_WATCH_CONCORDIA_URL`。
+  loopback 以外は終了 2 (URL そのものは出力しない)。 渡されなければその取得元は見ない (報告の `sources.*` が `off`)。
+  読むのは 1 回の `watch` で Revisor 2 往復 (`GET /v1/local-prs?view=full&state=open`、 `?view=summary&state=merged`) と
+  Concordia 1 往復 (`GET /v1/delegation/runs?limit=500`)。 どちらも loopback から認可なしで読めるので、 トークンは受け取らない。
+  届かない・HTTP 200 以外・形が違うときは `unavailable` にし、 その取得元の `run` / `review` / `merged` を出さず、 その種類の既知は前回のまま残す。
+  リダイレクトは追わない。 HTTP は `ergo_http` (`-DERGO_BUILD_HTTP=ON`) があるときだけ組み込まれ、 無いビルドでは URL を渡しても `unavailable`
 
 ## 変数
 
@@ -69,19 +80,22 @@ build-packages (`spec/domains/build-packages.domain.json`。 ergo_package_manage
 | `ERGO_BUILD_PACKAGE_WATCH` | モジュールと CLI の `outdated` / `watch` (既定 ON、 `ergo_package_manager` が要る) |
 | `ERGO_PKG_CACHE_DIR` / `ERGO_DEPENDENCY_CACHE_DIR` | 実行時: ミラーの `<cache>` |
 | `ERGO_PACKAGES_SIBLING_ROOT` | 実行時: 兄弟チェックアウトの根 |
+| `ERGO_WATCH_REVISOR_URL` / `ERGO_WATCH_CONCORDIA_URL` | 実行時 (W4): Revisor / Concordia の基底 URL (loopback だけ) |
+| `ERGO_BUILD_HTTP` | 構成時: ON なら CLI に Revisor / Concordia の HTTP アダプタを組み込む (既定 OFF、 libcurl を取得してビルドする) |
 
 ## 作業
 
 - 入力: 上の「必要なデータ」
 - 出力: 報告・出来事・次の状態 (形式は `spec/data/ergo-watch-report.md`)
-- タスク: W4 (由来)、 W5 (構成時の 1 行と Excubitor の配送)、 W7 (UPM ホスト) はこのモジュールの上に足す。 `pin-behind-ergo` は W4 以降
+- タスク: W4 (由来) は実装済み。 W5 (構成時の 1 行と Excubitor の配送)、 W7 (UPM ホスト) はこのモジュールの上に足す。 `pin-behind-ergo` は未実装 (Ergo のマニフェストの main を読む経路が要る)
 
 ## テスト
 
 | テスト | 何を確かめるか |
 |---|---|
 | `test_package_watch` | 偽ソースで: semver、 ref の解析と注釈つきタグ、 指紋、 tag / track / off-main (距離・expect_tag・複数タグの最新 1 つ・pre-release を除く・履歴無しでは距離が空欄)、 取得失敗で `observed: false`、 兄弟は同期しない、 指紋が同じなら同期しない (呼び出し回数)、 `diff` の決定性・2 回目で出来事 0・track の 6 時間畳み込み・pin を上げると解消・取れない依存は前回のまま、 状態の読み直し、 依存の列挙、 漏れ検査で報告を作らない、 URL を載せない |
-| `test_package_watch_cli` (`cmake -P`) | 偽リポ (`file://`) で CLI を通しで: `outdated` の tag と track と `--fail-on`、 `watch` の 1 回目と 2 回目 (出来事 0、 状態のバイト一致)、 届かない取得元で状態不変、 兄弟チェックアウトを fetch せずに読む、 漏れる報告で終了 3 と何も書かない |
+| `test_package_watch` (PackageWatchProvenance.* / PackageWatchLoopback.*) | Revisor / Concordia の JSON 見本で: 一覧の読み手、 pf / ai (trigger 写し) / human / unknown の突合、 run と review の対象 (別リポ・別 base・終わった run は出ない)、 open → merged で merged が 1 回 (状態に残さない)、 落ちていると run / review を出さず `unavailable` で既知は前回のまま、 Concordia だけ落ちると review の由来が unknown、 出来事・報告・状態にタイトル・本文・ブランチ名・セッション id が入らない (見本にわざと入れてある)、 入力の並びによらない、 loopback の URL の判定 |
+| `test_package_watch_cli` (`cmake -P`) | 偽リポ (`file://`) で CLI を通しで: `outdated` の tag と track と `--fail-on`、 `watch` の 1 回目と 2 回目 (出来事 0、 状態のバイト一致)、 届かない取得元で状態不変、 兄弟チェックアウトを fetch せずに読む、 漏れる報告で終了 3 と何も書かない、 W4: loopback 以外の URL (引数と環境変数) で終了 2、 誰も聞いていない loopback で `sources.*` が `unavailable` かつ run / review / merged が無い、 URL 無しは `off` |
 | `test_packages_track_key` (`cmake -P`) | `track` を足しても CMake の読み手 (`ergo_pkg_manifest_load`) の出力が変わらない |
 | `test_package_manager` (TrackKey) | C++ の読み手が `track.branch` を読み、 型違いは MANIFEST |
 

@@ -26,18 +26,26 @@ const char* update_kind_name(UpdateKind kind) {
     case UpdateKind::Tag:     return "tag";
     case UpdateKind::Track:   return "track";
     case UpdateKind::OffMain: return "off-main";
+    case UpdateKind::Run:     return "run";
+    case UpdateKind::Review:  return "review";
+    case UpdateKind::Merged:  return "merged";
     }
     return "tag";
 }
 
 bool parse_update_kind(const std::string& text, UpdateKind& out) {
-    for (const UpdateKind k : {UpdateKind::Tag, UpdateKind::Track, UpdateKind::OffMain}) {
+    for (const UpdateKind k : {UpdateKind::Tag, UpdateKind::Track, UpdateKind::OffMain, UpdateKind::Run,
+                               UpdateKind::Review, UpdateKind::Merged}) {
         if (text == update_kind_name(k)) {
             out = k;
             return true;
         }
     }
     return false;
+}
+
+bool is_provenance_kind(UpdateKind kind) {
+    return kind == UpdateKind::Run || kind == UpdateKind::Review || kind == UpdateKind::Merged;
 }
 
 std::vector<Candidate> detect_updates(const WatchDependency& dep, const Observation& obs) {

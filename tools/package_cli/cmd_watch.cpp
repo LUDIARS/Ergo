@@ -5,18 +5,26 @@
 //
 // 書く前に全ての報告と出来事を漏れ検査 (§8) に通し、 当たれば何も書かずに終了 3。 取れなかった依存は
 // その依存の前回状態を変えない。
+//
+// W4: --revisor-url / --concordia-url (loopback だけ。 それ以外は終了 2) があれば、 Revisor の local PR と
+// Concordia の委託 run を各 1 回読み、 run / review / merged と由来 (pf / ai / human / unknown) を足す。
+// 届かなければ run / review を出さず、 報告の sources.* を "unavailable" にする。
 
 #include "commands.h"
 #include "file_io.h"
+#include "provenance_endpoints.h"
+#include "provenance_sources.h"
 #include "ref_source_router.h"
 #include "watch_host.h"
 #include "watch_observe.h"
 #include "watch_paths.h"
 
+#include "ergo/package_watch/provenance.h"
 #include "ergo/package_watch/watch_report.h"
 
 #include <cstdio>
 #include <ctime>
+#include <optional>
 #include <set>
 
 namespace ergo::package_cli {
@@ -72,6 +80,36 @@ bool write_all(const std::vector<LoadedHost>& hosts, const std::vector<pw::HostW
     return true;
 }
 
+/// 由来の取得元を 1 回ずつ読む (URL の無いものは読まない)。
+struct ProvenanceListings {
+    std::optional<pw::ReviewListing> reviews;
+    std::optional<pw::RunListing>    runs;
+
+    pw::ProvenanceInputs inputs() const {
+        return {reviews ? &*reviews : nullptr, runs ? &*runs : nullptr};
+    }
+};
+
+ProvenanceListings read_provenance(const ProvenanceEndpoints& endpoints) {
+    ProvenanceListings out;
+    auto sources = make_provenance_sources(endpoints);
+    if (sources.reviews) {
+        out.reviews = sources.reviews->list_reviews();
+        if (!out.reviews->available) {
+            std::fprintf(stderr, "ergo_pkg watch: Revisor unavailable (%s); no review / merged this time\n",
+                         out.reviews->reason.c_str());
+        }
+    }
+    if (sources.runs) {
+        out.runs = sources.runs->list_runs();
+        if (!out.runs->available) {
+            std::fprintf(stderr, "ergo_pkg watch: Concordia unavailable (%s); no run, origins are unknown\n",
+                         out.runs->reason.c_str());
+        }
+    }
+    return out;
+}
+
 void print_summary(const std::vector<pw::HostWatch>& watches) {
     std::size_t total = 0;
     for (const auto& w : watches) {
@@ -100,12 +138,22 @@ int run_watch(const Args& args) {
     }
     const std::string out_dir = args.out.empty() ? state_dir : args.out;
 
-    std::vector<LoadedHost> hosts;
+    ProvenanceEndpoints endpoints;
     std::string error;
+    if (!resolve_provenance_endpoints(args, endpoints, &error)) {
+        std::fprintf(stderr, "ergo_pkg watch: %s\n", error.c_str());
+        return kExitInput;
+    }
+
+    std::vector<LoadedHost> hosts;
     if (!load_hosts(args, state_dir, hosts, &error)) {
         std::fprintf(stderr, "ergo_pkg watch: %s\n", error.c_str());
         return kExitInput;
     }
+
+    const auto provenance = read_provenance(endpoints);
+    const auto inputs     = provenance.inputs();
+    const auto sources    = pw::source_states(inputs);
 
     RefSourceRouter source(watch_sibling_root(args), watch_cache_dir(args));
     const auto now = static_cast<std::int64_t>(std::time(nullptr));
@@ -115,11 +163,13 @@ int run_watch(const Args& args) {
         pw::HostWatch w;
         w.host    = h.host.code;
         w.results = observe_host(h.host, source, source, h.previous);
+        pw::attach_provenance(w.results, inputs, h.previous);
+        w.sources = sources;
         w.diff    = pw::diff(h.previous, w.host, w.results, now);
         watches.push_back(std::move(w));
     }
 
-    const auto outputs = pw::prepare_watch_outputs(watches, now);
+    const auto outputs = pw::prepare_watch_outputs(watches, now, sources);
     if (!outputs.ok) {
         for (const auto& leak : outputs.leaks) {
             std::fprintf(stderr, "ergo_pkg watch: LEAK %s: %s\n", leak.where.c_str(), leak.reason.c_str());

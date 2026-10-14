@@ -1332,8 +1332,11 @@ endif()
 # Package watch (spec/feature/package-manager.md §2.3 / §3, stage W3).
 #   * ergo_package_watch — 依存の列挙、 IRefSource / IHistorySource (取得元の interface)、
 #     観測・判定 (tag / track / off-main)、 前回状態と重複の抑止、 報告と出来事の書き手 (漏れ検査つき)。
-# 向きは ergo_package_watch → ergo_package_manager → ergo_common。 git プロセスは CLI のアダプタ
-# (tools/package_cli/git_*_source.cpp) にだけあり、 ライブラリはプロセスを起こさない。
+#   * W4: IReviewSource / IRunSource (Revisor の local PR と Concordia の委託 run)、 run / review / merged と
+#     由来 (pf / ai / human / unknown)、 loopback の URL の検査。
+# 向きは ergo_package_watch → ergo_package_manager → ergo_common。 git プロセスと HTTP は CLI のアダプタ
+# (tools/package_cli/git_*_source.cpp、 revisor_review_source.cpp / concordia_run_source.cpp) にだけあり、
+# ライブラリはプロセスを起こさずネットワークにも出ない。
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
     add_library(ergo_package_watch STATIC
@@ -1346,6 +1349,9 @@ if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
         src/package_watch/watch_state.cpp
         src/package_watch/watch_diff.cpp
         src/package_watch/watch_report.cpp
+        src/package_watch/loopback_url.cpp
+        src/package_watch/provenance_json.cpp
+        src/package_watch/provenance.cpp
     )
     target_include_directories(ergo_package_watch PUBLIC include)
     target_link_libraries(ergo_package_watch PUBLIC ergo_package_manager)
@@ -1353,7 +1359,8 @@ if(ERGO_BUILD_PACKAGE_WATCH AND TARGET ergo_package_manager)
         add_executable(test_package_watch
             tests/package_watch/test_detect.cpp
             tests/package_watch/test_diff.cpp
-            tests/package_watch/test_report.cpp)
+            tests/package_watch/test_report.cpp
+            tests/package_watch/test_provenance.cpp)
         target_link_libraries(test_package_watch PRIVATE ergo_package_watch ergo_gtest_main)
         target_compile_definitions(test_package_watch PRIVATE
             ERGO_PACKAGE_WATCH_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_watch/fixtures")
@@ -1425,9 +1432,21 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
             tools/package_cli/watch_host.cpp
             tools/package_cli/watch_observe.cpp
             tools/package_cli/cmd_outdated.cpp
-            tools/package_cli/cmd_watch.cpp)
+            tools/package_cli/cmd_watch.cpp
+            tools/package_cli/provenance_endpoints.cpp
+            tools/package_cli/provenance_sources.cpp)
         target_link_libraries(ergo_pkg_cli PRIVATE ergo_package_watch)
         target_compile_definitions(ergo_pkg_cli PRIVATE ERGO_PKG_CLI_WITH_WATCH=1)
+        # W4: Revisor / Concordia の読み手は ergo_http (ERGO_BUILD_HTTP=ON) があるときだけ。 無ければ
+        # --revisor-url / --concordia-url を渡しても sources.* は "unavailable" になる。
+        if(TARGET ergo_http)
+            target_sources(ergo_pkg_cli PRIVATE
+                tools/package_cli/http_json_get.cpp
+                tools/package_cli/revisor_review_source.cpp
+                tools/package_cli/concordia_run_source.cpp)
+            target_link_libraries(ergo_pkg_cli PRIVATE ergo_http)
+            target_compile_definitions(ergo_pkg_cli PRIVATE ERGO_PKG_CLI_WITH_HTTP=1)
+        endif()
         if(ERGO_BUILD_TESTS AND GIT_EXECUTABLE)
             add_test(NAME test_package_watch_cli
                 COMMAND ${CMAKE_COMMAND}

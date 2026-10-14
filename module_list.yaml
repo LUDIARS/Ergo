@@ -404,7 +404,7 @@ modules:
     status: preview
 
   - name: ergo_package_watch
-    summary: パッケージの更新の検知 (tag / track / off-main の判定・前回状態と重複の抑止・報告と出来事の書き手、 取得元は IRefSource / IHistorySource) + CLI ergo_pkg (outdated / watch)
+    summary: パッケージの更新の検知 (tag / track / off-main の判定、 W4 の run / review / merged と由来 pf / ai / human / unknown、 前回状態と重複の抑止・報告と出来事の書き手、 取得元は IRefSource / IHistorySource / IReviewSource / IRunSource) + CLI ergo_pkg (outdated / watch)
     category: システム
     header_dir: include/ergo/package_watch/
     source_dir: src/package_watch/

@@ -17,7 +17,9 @@ namespace ergo::package_cli {
 
 int run_outdated(const Args& args) {
     pw::UpdateKind fail_kind = pw::UpdateKind::Tag;
-    if (!args.fail_on.empty() && !pw::parse_update_kind(args.fail_on, fail_kind)) {
+    // run / review / merged は watch だけが Revisor / Concordia から作る (outdated は ref だけを見る)。
+    if (!args.fail_on.empty() &&
+        (!pw::parse_update_kind(args.fail_on, fail_kind) || pw::is_provenance_kind(fail_kind))) {
         std::fprintf(stderr, "ergo_pkg outdated: --fail-on wants tag, track or off-main (got '%s')\n",
                      args.fail_on.c_str());
         return kExitInput;

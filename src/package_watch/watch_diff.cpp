@@ -30,22 +30,64 @@ std::vector<Candidate> sorted_updates(std::vector<Candidate> updates) {
     return updates;
 }
 
-void keep_previous(const WatchState& previous, const std::string& dependency, WatchState& next) {
-    if (const auto fp = previous.fingerprints.find(dependency); fp != previous.fingerprints.end()) {
-        next.fingerprints[dependency] = fp->second;
+/// 取得元のまとまり (見られなかったまとまりの既知は残す)。
+enum class Source { Refs, Reviews, Runs };
+
+Source source_of(UpdateKind kind) {
+    switch (kind) {
+    case UpdateKind::Run:    return Source::Runs;
+    case UpdateKind::Review:
+    case UpdateKind::Merged: return Source::Reviews;
+    default:                 return Source::Refs;
     }
+}
+
+bool observed(const DependencyResult& r, Source s) {
+    switch (s) {
+    case Source::Refs:    return r.observation.observed;
+    case Source::Reviews: return r.reviews_observed;
+    case Source::Runs:    return r.runs_observed;
+    }
+    return false;
+}
+
+void keep_previous(const WatchState& previous, const std::string& dependency, Source source, WatchState& next) {
     for (const auto& e : previous.entries) {
-        if (e.update.dependency == dependency) next.entries.push_back(e);
+        if (e.update.dependency == dependency && source_of(e.update.kind) == source) next.entries.push_back(e);
     }
+}
+
+WatchEvent make_event(const std::string& host, const DependencyResult& result, const Candidate& c,
+                      std::int64_t now) {
+    WatchEvent ev;
+    ev.id         = event_id(host, result.dependency.name, c.kind, c.subject);
+    ev.host       = host;
+    ev.dependency = result.dependency;
+    ev.update     = c;
+    ev.as_of      = source_of(c.kind) == Source::Refs ? result.observation.as_of : std::string();
+    ev.at         = now;
+    return ev;
 }
 
 void judge(const WatchState& previous, const std::string& host, const DependencyResult& result,
            std::int64_t now, DiffResult& out) {
     const std::string& name = result.dependency.name;
-    out.next.fingerprints[name] = result.observation.fingerprint;
+    if (result.observation.observed) {
+        out.next.fingerprints[name] = result.observation.fingerprint;
+    } else if (const auto fp = previous.fingerprints.find(name); fp != previous.fingerprints.end()) {
+        out.next.fingerprints[name] = fp->second;
+    }
+    for (const Source s : {Source::Refs, Source::Reviews, Source::Runs}) {
+        if (!observed(result, s)) keep_previous(previous, name, s, out.next);
+    }
     const StateEntry* prev_track = find_track(previous.entries, name);
 
     for (const auto& c : sorted_updates(result.updates)) {
+        if (!observed(result, source_of(c.kind))) continue;
+        if (c.kind == UpdateKind::Merged) {  // 1 回だけ。 状態には残さない
+            out.events.push_back(make_event(host, result, c, now));
+            continue;
+        }
         if (const auto* known = find_entry(previous.entries, name, c.kind, c.subject)) {
             StateEntry e = *known;
             e.update     = c;  // 距離などは今回の値。 時刻は前回のまま
@@ -58,18 +100,11 @@ void judge(const WatchState& previous, const std::string& host, const Dependency
             out.next.entries.push_back({c, now, prev_track->last_notified, prev_track->notified_behind});
             continue;
         }
-        StateEntry e{c, now, now, is_track ? c.behind : std::nullopt};
-        WatchEvent ev;
-        ev.id         = event_id(host, name, c.kind, c.subject);
-        ev.host       = host;
-        ev.dependency = result.dependency;
-        ev.update     = c;
-        ev.as_of      = result.observation.as_of;
-        ev.at         = now;
+        out.next.entries.push_back({c, now, now, is_track ? c.behind : std::nullopt});
+        WatchEvent ev = make_event(host, result, c, now);
         if (is_track && prev_track && prev_track->notified_behind && c.behind) {
             ev.since_notified = *c.behind - *prev_track->notified_behind;
         }
-        out.next.entries.push_back(std::move(e));
         out.events.push_back(std::move(ev));
     }
 }
@@ -99,10 +134,6 @@ DiffResult diff(const WatchState& previous, const std::string& host,
     for (const auto* r : ordered) {
         if (!last.empty() && r->dependency.name == last) continue;  // 同じ名前は最初の 1 つだけ
         last = r->dependency.name;
-        if (!r->observation.observed) {
-            keep_previous(previous, r->dependency.name, out.next);
-            continue;
-        }
         judge(previous, host, *r, now, out);
     }
     sort_entries(out.next.entries);

@@ -1,0 +1,46 @@
+{
+  "runs": [
+    {
+      "id": "run-pf-done",
+      "status": "completed",
+      "triggered_by": "praeforma",
+      "child_session_id": "sess-pf-child",
+      "spawn_branch": "feat/pf-branch-marker",
+      "investigation_summary": "SUMMARY-MARKER the run notes",
+      "args": { "target_repo": "repos/Pictor", "taskflow_reference": "actio:example" },
+      "sessions": [ { "id": "sess-pf-child", "repo_origin": "https://github.com/LUDIARS/Pictor.git", "branch": "feat/pf-branch-marker" } ]
+    },
+    {
+      "id": "run-ai-done",
+      "status": "completed",
+      "triggered_by": "claude-cc",
+      "child_session_id": "sess-ai-child",
+      "spawn_branch": "feat/ai-branch-marker",
+      "args": { "target_repo": "repos/Pictor" },
+      "sessions": []
+    },
+    {
+      "id": "run-ai-active",
+      "status": "running",
+      "triggered_by": "claude-cc",
+      "child_session_id": "sess-ai-active",
+      "spawn_branch": "feat/run-branch-marker",
+      "args": { "target_repo": "repos/Pictor" }
+    },
+    {
+      "id": "run-pf-queued",
+      "status": "queued",
+      "triggered_by": "praeforma",
+      "child_session_id": null,
+      "spawn_branch": null,
+      "args": { "target_repo": "repos/Pictor" }
+    },
+    {
+      "id": "run-other-repo",
+      "status": "running",
+      "triggered_by": "praeforma",
+      "spawn_branch": "feat/other-repo-run-marker",
+      "args": { "target_repo": "repos/Tela" }
+    }
+  ]
+}
