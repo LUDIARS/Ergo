@@ -59,7 +59,7 @@ include パス・コンパイル定義・システムライブラリ・ビルド
 オフラインで依存込みプロジェクトを生成する例:
 
 ```sh
-cmake --preset vs2022-deps -DERGO_FETCH_DEPENDENCIES=OFF -DERGO_SOURCE_DIR_CURL=C:/deps/curl
+cmake --preset vs2022-deps -DERGO_FETCH_DEPENDENCIES=OFF -DERGO_SOURCE_DIR_CURL=<deps>/curl
 ```
 
 Xcode も同じ変数を使える。ソース指定が欠けた依存はエラーになり、無言で除外しない。

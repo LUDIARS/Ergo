@@ -25,6 +25,7 @@ source_session: lictor-f6cd21b6-09b4-4de4-abc7-af88447edf90
 | 5 | L7: 利用側を確認し、`ERGO_BUILD_DUMMY` の既定を OFF に | `CMakeLists.txt`・`spec/setup/` | 済 |
 | 6 | L9: `module_list.md` / `.yaml` に `ergo_ui_kit` を足し、仕様書の列を実物の置き場所にそろえる。`ergo_shuriken_migrator` は載せない理由を注記 | `module_list.*`・`spec/module/ui_kit.md` | 済 |
 | 7 | `legacy` の membership から消したものを外し、§5 に結果を書く (`anatomia domains program --repo .` で unclassified 0) | `spec/domains/`・設計文書 §5 | 済 |
+| 8 | 審査の所見 (公開できない語: local-path) への対応。オフライン手順の例示パスを記号 (`<curl-src>` / `<deps>/curl`) に置き換え | `spec/setup/third-party-deps.md`・`spec/setup/ide-projects.md` | 済 |
 
 
 ### 変更した境界

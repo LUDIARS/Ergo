@@ -62,7 +62,7 @@ ctest --test-dir build -C Debug -R test_thirdparty_deps
 cmake -S . -B build -DERGO_WITH_CURL=ON
 
 # オフライン: 取得せずローカルソースを使う
-cmake -S . -B build -DERGO_WITH_CURL=ON -DERGO_SOURCE_DIR_CURL=C:/src/curl
+cmake -S . -B build -DERGO_WITH_CURL=ON -DERGO_SOURCE_DIR_CURL=<curl-src>
 ```
 
 モジュール側からの利用例:
