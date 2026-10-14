@@ -296,6 +296,9 @@ spec/data/ergo-packages.md  spec/setup/packages.md  spec/module/{graph_layout,pa
 
 ## 7. 段階計画と受入条件
 
+> 2026-10-14 追記: S4 より後の段階は `spec/feature/package-manager.md` §7 (W1〜W7 を差し込んだ段階表) が正本。
+> ホスト側の宣言 (`host` 節) を設けることにしたため、本書の「ホスト側の別マニフェストは作らない」は同書 §2.1 で改めた。
+
 どの段階も単独で main に入り、M0 が既定なので既存ホストは壊れない。実機・実ホストの確認は人の許可に従い、未確認は未確認と書く。
 
 | 段階 | 内容 | 受入 (自動テスト) | 実機・実ホスト |
