@@ -63,6 +63,15 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | `ERGO_DEPENDENCY_CACHE_DIR`   | (空)   | 取得ソースの共有キャッシュ dir (空 = `<build>/_deps`) |
 | `ERGO_SOURCE_DIR_<UPPER>`     | (空)   | その依存を fetch せずローカルソースで差し替える (オフライン用) |
 
+### LUDIARS パッケージ・ハブ ([packages.md](packages.md))
+
+| キー | 既定 | 役割 |
+|---|---|---|
+| `ERGO_PACKAGES`                  | (空) | 使う LUDIARS link パッケージの列 (`pictor;tela`)。空 = 互換モード M0 (取り込まず記録だけ) |
+| `ERGO_PACKAGE_FEATURES_<NAME>`   | (空) | 機能の足し引き (`+web;-vulkan`) |
+| `ERGO_PACKAGE_REV_<NAME>`        | (空) | pin の一時上書き (検証用、PKG-06) |
+| `ERGO_PACKAGES_STRICT`           | OFF  | 警告扱いの検査結果を構成エラーにする |
+
 ### ビルド時に定義されるマクロ (フラグではなく自動分岐)
 
 | マクロ | 条件 |
@@ -70,7 +79,7 @@ Ergo で実在する環境変数・CMake ビルドフラグ・ポートの早見
 | `ERGO_RENDER_HAS_VULKAN=1` | `pictor` が `PICTOR_HAS_VULKAN` を公開し、`ErgoRenderBackend.cmake` が対象 platform の実描画経路を解決したとき |
 | `ERGO_RENDER_PLATFORM_DESKTOP=1` / `ANDROID=1` / `IOS=1` | `ErgoRenderBackend.cmake` が解決した platform に対応する 1 つを定義 |
 
-CMake 必須要件: バージョン `>= 3.16`、C++17、`Threads`
+CMake 必須要件: バージョン `>= 3.20`、C++17、`Threads`
 (`CMakeLists.txt:1-6,50`)。
 
 ## ポート

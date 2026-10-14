@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "packages": {
+    "pictor": {
+      "kind": "link",
+      "code": "Pc",
+      "repository": "https://github.com/LUDIARS/Pictor.git",
+      "rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f",
+      "expect_tag": "v2.2.0",
+      "platforms": ["desktop", "android", "ios", "emscripten"],
+      "cmake": {
+        "minimum": "3.20",
+        "wiring": "cmake/packages/pictor.cmake",
+        "targets": ["pictor"],
+        "find_package": null,
+        "cache": {
+          "PICTOR_BUILD_DEMO": "OFF",
+          "PICTOR_BUILD_TESTS": "OFF",
+          "PICTOR_BUILD_TOOLS": "OFF"
+        }
+      },
+      "features": {
+        "vulkan": {
+          "default": "auto",
+          "platforms": ["desktop", "android", "ios"],
+          "provides": ["pictor"],
+          "contract": "PICTOR_HAS_VULKAN"
+        },
+        "web": {
+          "default": "auto",
+          "platforms": ["emscripten"],
+          "cache": { "PICTOR_BUILD_WEBGL": "ON" },
+          "provides": ["pictor_webgl"]
+        },
+        "webgpu": { "reserved": true },
+        "d3d12": { "reserved": true },
+        "metal": { "reserved": true }
+      },
+      "exports": {
+        "PICTOR_SHADER_DIR": "shaders",
+        "PICTOR_PROFILE_DIR": "profiles"
+      },
+      "requires": {}
+    },
+    "tela": {
+      "kind": "link",
+      "code": "Tl",
+      "repository": "https://github.com/LUDIARS/Tela.git",
+      "rev": "4142f77c0775e1c3ad93733526085c56523ea9dc",
+      "platforms": ["desktop"],
+      "cmake": {
+        "minimum": "3.20",
+        "wiring": "cmake/packages/tela.cmake",
+        "targets": ["Tela::Core", "Tela::Graph"],
+        "find_package": { "name": "Tela" },
+        "cache": {
+          "TELA_BUILD_WINDOWS": "OFF",
+          "TELA_BUILD_PICTOR": "OFF"
+        }
+      },
+      "requires": {}
+    },
+    "lapilli": {
+      "kind": "tool",
+      "code": "La",
+      "acquire": "submodule",
+      "path": "lib/lapilli"
+    }
+  },
+  "modules": {
+    "ergo_render": {
+      "needs": ["pictor"],
+      "need_kind": "real-path",
+      "real_path_var": "ERGO_RENDER_BACKEND_ENABLED",
+      "reason_var": "ERGO_RENDER_BACKEND_REASON"
+    },
+    "ergo_render_viz": { "optional": ["pictor"] },
+    "ergo_tela_graph": { "optional": ["tela"] },
+    "ergo_particle": { "optional": ["pictor"], "when": "ERGO_PARTICLE_HAS_RENDERER" },
+    "ergo_resource": { "ported_from": [{ "package": "clio", "rev": null }] }
+  },
+  "observe": {
+    "clio": { "code": "Cl", "path_hint": "Clio", "group": "musa" },
+    "thaleia": { "code": "Th", "path_hint": "Thaleia", "group": "musa" },
+    "terpsichore": { "code": "Tp", "path_hint": "Terpsichore", "group": "musa" },
+    "ars-musa": { "code": "Au", "path_hint": "Ars-Musa", "group": "musa" },
+    "curare": {
+      "code": "Cu",
+      "path_hint": "Curare",
+      "group": "related",
+      "relations": [{ "from": "ergo_resource", "kind": "shares-vocabulary" }]
+    }
+  }
+}

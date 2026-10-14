@@ -17,6 +17,10 @@
 
 schema_version: 1
 
+# モジュールが使う LUDIARS 製パッケージ (Pictor / Tela / Lapilli ...) の版と
+# modules ごとの needs / optional の宣言。形式は spec/data/ergo-packages.md。
+package_manifest: ergo-packages.json
+
 modules:
   - name: ergo_input
     summary: マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ

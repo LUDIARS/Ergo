@@ -41,7 +41,7 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
 
 | ドメイン | 主な範囲 |
 | --- | --- |
-| `foundation` | 共通型・ユーティリティ・ビルド定義・`tools/`・`tests/`・`benchmarks/` |
+| `foundation` | 共通型・ユーティリティ・ビルド定義 (`cmake/packages/`・`ergo-packages.json` を含む)・`tools/`・`tests/`・`benchmarks/` |
 | `actor-character` | `actor` / `character` / `cast` |
 | `ai-behavior` | `blackboard` |
 | `audio` | `audio` / `sound` |

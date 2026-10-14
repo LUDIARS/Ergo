@@ -7,7 +7,7 @@ Ergo の CMake ターゲットを正本とし、`CMakePresets.json` から IDE �
 ## 前提
 
 - プリセット利用時は CMake 3.21 以上。従来の `cmake -S . -B build` は引き続き
-  CMake 3.16 以上で利用できる。
+  CMake 3.20 以上で利用できる。
 - Windows: Visual Studio 2022 の「C++ によるデスクトップ開発」と Windows SDK。
 - macOS: Xcode 本体と、Xcode 用に選択された developer directory。
   Command Line Tools だけでは Xcode ジェネレータを利用できない。

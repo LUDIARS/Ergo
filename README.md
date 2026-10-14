@@ -9,6 +9,7 @@ LUDIARS / AdventureCube などのアプリで共通利用する C++17 モジュ�
 
 - [C++ モジュールをビルド](spec/setup/build-cpp.md) / [tools/ergo を起動](spec/setup/run-tools-ergo.md) / [外部プラグイン (ERGO_PLUGIN_DIR)](spec/setup/external-plugins.md) / [プラグインのデータルート](spec/setup/plugin-data-roots.md) / [ブランチ+PR 運用](spec/setup/branch-and-pr.md)
 - [サードパーティ・ライブラリ管理 (kazmath / curl)](spec/setup/third-party-deps.md)
+- [LUDIARS パッケージ・ハブ (Pictor / Tela の版固定と記録、`ergo-packages.json`)](spec/setup/packages.md)
 - [Visual Studio / Xcode プロジェクト生成 (依存ライブラリのリンクを含む)](spec/setup/ide-projects.md)
 - 全設定キー: [spec/setup/config-reference.md](spec/setup/config-reference.md)
 
@@ -34,6 +35,8 @@ ergo/
 ├── CMakeLists.txt         # 全モジュールをまとめてビルドするトップレベル
 ├── module_list.md         # モジュール一覧 (人間用)
 ├── module_list.yaml       # モジュール一覧 (機械処理用)
+├── ergo-packages.json     # LUDIARS パッケージ (Pictor / Tela / Lapilli ...) の版と宣言
+├── cmake/packages/        # パッケージ・ハブ (マニフェスト読み取り・検査規則・記録)
 ├── spec/
 │   ├── module/<name>.md   # 各モジュールの定義書
 │   └── tool/<name>.md     # Web ツール / プラグインの仕様書

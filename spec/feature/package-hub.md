@@ -5,6 +5,7 @@
 - 依頼: `spec/tasks/2026-10-14-package-hub-design-request.md`
 - 素案: `spec/plan/2026-10-14-package-hub-fable.md` (Fable)、`spec/plan/2026-10-14-package-hub-opus.md` (Opus)
 - 種別: 設計 (正本)。実装・ビルド・実ホストでの確認は含まない。
+- 実装状況: S1 (マニフェストと規則、記録のみ) を実装済み — `spec/tasks/2026-10-14-package-hub-s1.md`。S2 以降は未着手
 
 人間の指示 (neco 2026-10-14): 「Ergoがコンテンツの各LUDIARSのパッケージをまとめてリンク/管理するようにします。
 各パッケージのバージョン、何をリンクしているか、MUSAや関連パッケージは何を使用しているかなどを可視化します。
@@ -253,6 +254,7 @@ tela_view --font <file.ttf> --graph packages.tela         # Tela は別インス
 ```
 ergo-packages.json                        マニフェスト (正本)
 cmake/packages/ErgoPackages.cmake         解決 (経路選択・add_subdirectory / find_package / 取得)。具体名を持たない
+cmake/packages/ErgoPackageManifest.cmake  マニフェストの読み取り (JSON → リスト変数。S1 で分離)
 cmake/packages/ErgoPackageRules.cmake     純粋な検査規則
 cmake/packages/ErgoPackageReport.cmake    resolved.json の書き出しと File API query の設置
 cmake/packages/{pictor,tela}.cmake        1 パッケージ 1 ファイルの結線

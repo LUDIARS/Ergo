@@ -10,7 +10,7 @@
 
 ## 前提
 
-- CMake `>= 3.16` (`cmake_minimum_required` / `CMakeLists.txt:1`)
+- CMake `>= 3.20` (`cmake_minimum_required` / `CMakeLists.txt:1`)
 - C++17 (`CMAKE_CXX_STANDARD 17`、extensions OFF / `CMakeLists.txt:4-6`)
 - `Threads` は必須依存 (`find_package(Threads REQUIRED)` / `CMakeLists.txt:50`)
 

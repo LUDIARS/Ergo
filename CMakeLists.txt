@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(Ergo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -93,6 +93,12 @@ endif()
 # are not managed here. See spec/setup/third-party-deps.md.
 # ---------------------------------------------------------------------------
 include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
+
+# LUDIARS package hub (Pictor / Tela ...). Must run before the module sections
+# (they branch on if(TARGET pictor)). ERGO_PACKAGES unset = compatibility mode
+# M0: nothing is acquired, existing targets are only recorded into
+# <build>/ergo-packages.resolved.json. See spec/setup/packages.md.
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/packages/ErgoPackages.cmake")
 
 # ---------------------------------------------------------------------------
 # ergo_http — libcurl-backed synchronous HTTP client. The public header hides
@@ -1204,3 +1210,22 @@ if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)
     add_test(NAME test_thirdparty_deps COMMAND test_thirdparty_deps)
 endif()
 
+# ---------------------------------------------------------------------------
+# tests/packages/ — package hub rule tests (cmake -P, no compiler needed) and
+# the M0 invariance configure test (C-5). See spec/data/ergo-packages.md.
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_TESTS)
+    foreach(NAME manifest rules cycles features report)
+        add_test(NAME test_packages_${NAME}
+            COMMAND ${CMAKE_COMMAND}
+                -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/${NAME}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_${NAME}.cmake)
+    endforeach()
+    add_test(NAME test_packages_m0_invariance
+        COMMAND ${CMAKE_COMMAND}
+            -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/m0_invariance
+            -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_m0_invariance.cmake)
+endif()

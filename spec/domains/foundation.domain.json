@@ -1,9 +1,9 @@
 {
   "name": "foundation",
-  "description": "共通土台。 型・ユーティリティ・テンプレート・ビルド定義。 上位の意味づけは持たない。",
+  "description": "共通土台。 型・ユーティリティ・テンプレート・ビルド定義 (パッケージ・ハブのマニフェスト ergo-packages.json と cmake/packages/ を含む)。 上位の意味づけは持たない。",
   "presetRules": [],
   "templateRules": [],
-  "specRefs": ["spec/feature/tool/shared-one-shot.md"],
+  "specRefs": ["spec/feature/tool/shared-one-shot.md", "spec/feature/package-hub.md", "spec/data/ergo-packages.md", "spec/setup/packages.md"],
   "membership": [
     {
       "pathPattern": "(^|/)src/common/(?:.*/)?[^/]+$"
@@ -22,6 +22,9 @@
     },
     {
       "pathPattern": "(^|/)cmake/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)ergo-packages\\.json$"
     },
     {
       "pathPattern": "(^|/)CMakeLists\\.txt$"

@@ -45,6 +45,12 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 |---|---|
 | `ergo_common` | モジュール横断の小物ユーティリティ。現状は `ergo::common::jsonm` (minimal JSON codec) のみ。`ergo_bind` から PUBLIC link されて transitive に取り込まれる |
 
+LUDIARS パッケージ (モジュールではなく、モジュールが使う外部の LUDIARS 製パッケージ):
+
+| 名前 | 概要 |
+|---|---|
+| `ergo-packages.json` | Pictor / Tela (link)・Lapilli (tool)・MUSA 系 / Curare (observe) の版と、どのモジュールがどれを要るか (`modules` 節) の宣言。検査と記録は `cmake/packages/`。形式は `spec/data/ergo-packages.md`、ホスト手順は `spec/setup/packages.md` |
+
 ## 状態メモ
 
 - **`ergo_inspector` は廃止済み (2026-04-21)**: 機能調査の結果 `ergo_bind` の
