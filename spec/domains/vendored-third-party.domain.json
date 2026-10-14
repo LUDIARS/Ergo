@@ -1,8 +1,12 @@
 {
   "name": "vendored-third-party",
-  "description": "ベンダリングした外部コード。 上流の実装をそのまま同梱し、 自前のロジックを足さない。",
+  "description": "【AI 案・人の承認前】ベンダリングした外部コード。 上流の実装をそのまま取り込み、 自前のロジックを足さない。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "THIRD_PARTY_NOTICES.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)third_party/(?:.*/)?[^/]+$"

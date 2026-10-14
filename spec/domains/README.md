@@ -21,9 +21,12 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
 ```
 
 - `pathPattern` は正規表現。 先頭を `(^|/)` にして、 リポジトリ相対でも
-  絶対パスでも同じように当たるようにする
-- C++ モジュールは `src/<名>/` と `include/ergo/<名>/` の 2 本を必ず対で書く
-  (片方だけだとヘッダと実装が別ドメインに割れる)
+  絶対パスでも同じように当たるようにする。 ただしリポジトリ直下だけを指すファイルやツール
+  (`CMakeLists.txt`・`ergo-packages.json`・`CMakePresets.json`・`.gitmodules`・`tools/ergo/`) は
+  `^` で始め、 テスト用フィクスチャの中にある同名ファイルを巻き込まない
+- C++ モジュールは `src/<名>/`・`include/ergo/<名>/`・`tests/<名>/` の 3 本を必ず組で書く
+  (欠けるとヘッダ・実装・テストが別ドメインに割れる)。 `include/` は `include/ergo/<名>/` まで
+  書き切り、 `include/(?:.*/)?<名>/` のような途中一致にしない
 
 ## ルール
 
@@ -39,19 +42,34 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
 
 ## 現在のドメイン
 
+2026-10-14 に 14 本から 16 本へ切り直した (**AI 案・人の承認前**)。 理由・旧ドメインとの対応・
+Praeforma のコア / ビジネスドメインとの対応・古い処理の一覧は
+[spec/architecture/domains-and-ux.md](../architecture/domains-and-ux.md) を参照。
+
 | ドメイン | 主な範囲 |
 | --- | --- |
-| `foundation` | 共通型・ユーティリティ・ビルド定義 (`cmake/packages/`・`ergo-packages.json` を含む)・`tools/`・`tests/`・`benchmarks/` |
-| `actor-character` | `actor` / `character` / `cast` |
-| `ai-behavior` | `blackboard` |
-| `audio` | `audio` / `sound` |
-| `combat-skill` | `combo_counter` / `health` / `score` / `timing_judge` |
+| `foundation` | `common` / `math`・`template/`・直下の `CMakeLists.txt`・`benchmarks/`・`tests/gtest_main.cpp`・`tests/thirdparty/` |
+| `build-packages` | `cmake/`・`ergo-packages.json`・`CMakePresets.json`・`tests/packages/`・`lib/`・`.gitmodules` |
+| `structure-visualization` | `graph_layout` / `tela_graph` / `render_viz` / `package_model` / `package_scan` / `package_viz`・`tools/render_viz/`・`tools/package_viz/` |
+| `observability` | `log` / `frame` / `profile` / `bind` / `custos` |
+| `dev-tools` | `tools/ergo/` |
 | `input` | `input` |
-| `observability` | `log` / `profile` / `custos` / `bind` / `render_viz` / `tela_graph` |
-| `physics` | `physics2d` / `math` |
-| `rendering` | `render` / `particle` / `gpu_particle` / `shuriken_migrator` / `shaders` |
+| `physics` | `physics2d` |
+| `audio` | `audio` / `sound` |
+| `rendering` | `render` / `particle` / `gpu_particle`・`shaders/` |
+| `ui-layout` | `ui` / `ui_kit` / `ui_layout` / `vector` |
 | `resource-io` | `resource` / `io` / `http` |
-| `scene-frame` | `scene` / `frame` |
-| `ui-layout` | `ui` / `ui_layout` / `ui_kit` / `vector` |
-| `vendored-third-party` | `third_party` |
-| `world-time` | `world_time` |
+| `actor-character` | `actor` / `character` |
+| `scene-composition` | `scene` / `cast` |
+| `gameplay-rules` | `health` / `score` / `combo_counter` / `timing_judge` / `world_time` / `blackboard` |
+| `vendored-third-party` | `third_party/` |
+| `legacy` | `shuriken_migrator`・`tools/shuriken_migrator/`・`review/`・`.anatomia/domains/` (削除するかを人が決めるまで分けて見せる) |
+
+モジュール名だけの項目は `src/<名>/`・`include/ergo/<名>/`・`tests/<名>/` を指す。
+
+## legacy ドメイン
+
+`legacy` には、使われ方が細っている・置き換え済み・旧運用の名残と判断したコードを置く。
+入れてもビルドと動作は変わらない。 人が「残す」と決めたら元のドメインへ戻し、
+「消す」と決めたら削除 PR で membership も一緒に外す。 ファイル単位の名残は
+除外パターンで割らず、 設計文書の一覧だけで示す (1 パス 1 ドメインを崩さないため)。

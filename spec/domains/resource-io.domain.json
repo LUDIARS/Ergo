@@ -1,26 +1,41 @@
 {
   "name": "resource-io",
-  "description": "資産と入出力。 リソースの選択と読み込み、 ファイル入出力、 HTTP。",
+  "description": "【AI 案・人の承認前】資産と入出力。 タグ駆動のリソース選択と読み込み (resource)・ファイル入出力 (io)・HTTP (http)。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/module/resource.md",
+    "spec/feature/module/io.md",
+    "spec/feature/module/http.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/resource/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?resource/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/resource/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/resource/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/io/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?io/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/io/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/io/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/http/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?http/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/http/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/http/(?:.*/)?[^/]+$"
     }
   ]
 }

@@ -1,14 +1,21 @@
 {
   "name": "input",
-  "description": "入力。 デバイス入力の取得と正規化。",
+  "description": "【AI 案・人の承認前】入力。 マウス・キーボード・ゲームパッド・USB HID の取得と正規化、 テスト用の注入。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/input.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/input/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?input/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/input/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/input/(?:.*/)?[^/]+$"
     }
   ]
 }

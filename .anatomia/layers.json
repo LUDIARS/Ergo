@@ -122,6 +122,10 @@
       "layer": "presentation"
     },
     {
+      "glob": "include/ergo/render_viz/*",
+      "layer": "infrastructure"
+    },
+    {
       "glob": "include/ergo/resource/*",
       "layer": "infrastructure"
     },
@@ -140,6 +144,10 @@
     {
       "glob": "include/ergo/sound/*",
       "layer": "presentation"
+    },
+    {
+      "glob": "include/ergo/tela_graph/*",
+      "layer": "infrastructure"
     },
     {
       "glob": "include/ergo/timing_judge/*",
@@ -266,6 +274,10 @@
       "layer": "presentation"
     },
     {
+      "glob": "src/render_viz/*",
+      "layer": "infrastructure"
+    },
+    {
       "glob": "src/resource/*",
       "layer": "infrastructure"
     },
@@ -284,6 +296,10 @@
     {
       "glob": "src/sound/*",
       "layer": "presentation"
+    },
+    {
+      "glob": "src/tela_graph/*",
+      "layer": "infrastructure"
     },
     {
       "glob": "src/timing_judge/*",
@@ -410,6 +426,10 @@
       "layer": "shared"
     },
     {
+      "glob": "tests/render_viz/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tests/resource/*",
       "layer": "shared"
     },
@@ -427,6 +447,10 @@
     },
     {
       "glob": "tests/sound/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/tela_graph/*",
       "layer": "shared"
     },
     {
@@ -551,6 +575,10 @@
     },
     {
       "glob": "tools/package_viz/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/render_viz/*",
       "layer": "application"
     },
     {

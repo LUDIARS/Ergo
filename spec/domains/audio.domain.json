@@ -1,20 +1,31 @@
 {
   "name": "audio",
-  "description": "音。 再生と音源の管理。",
+  "description": "【AI 案・人の承認前】音。 ゲーム SE/BGM の再生ファサード (audio) と WAV デコード・ミキサ (sound)。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/audio.md",
+    "spec/feature/module/sound.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/audio/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?audio/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/audio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/audio/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/sound/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?sound/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/sound/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/sound/(?:.*/)?[^/]+$"
     }
   ]
 }

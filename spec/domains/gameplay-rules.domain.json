@@ -1,0 +1,71 @@
+{
+  "name": "gameplay-rules",
+  "description": "【AI 案・人の承認前】ゲームルールの部品。 体力 (health)・スコア (score)・コンボ (combo_counter)・タイミング判定 (timing_judge)・時間の伸縮 (world_time)・名前付きの共有状態 (blackboard)。 エンジン非依存の値と通知。",
+  "presetRules": [],
+  "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/health.md",
+    "spec/feature/module/score.md",
+    "spec/feature/module/combo_counter.md",
+    "spec/feature/module/timing_judge.md",
+    "spec/feature/module/world_time.md",
+    "spec/feature/module/blackboard.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/health/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/health/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/health/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/score/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/score/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/score/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/combo_counter/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/combo_counter/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/combo_counter/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/timing_judge/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/timing_judge/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/timing_judge/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/world_time/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/world_time/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/world_time/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/blackboard/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/blackboard/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/blackboard/(?:.*/)?[^/]+$"
+    }
+  ]
+}

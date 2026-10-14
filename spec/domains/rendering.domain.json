@@ -1,32 +1,41 @@
 {
   "name": "rendering",
-  "description": "描画。 レンダラ、 シェーダ資産、 パーティクル、 GPU 側の処理。",
+  "description": "【AI 案・人の承認前】描画。 Pictor の上に立つ描画オーケストレーション (render)・パーティクル (particle / gpu_particle)・シェーダ資産。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/render.md",
+    "spec/feature/module/particle.md",
+    "spec/feature/module/gpu_particle.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/render/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?render/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/render/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/render/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/particle/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?particle/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/particle/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/particle/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/gpu_particle/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?gpu_particle/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/gpu_particle/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/shuriken_migrator/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?shuriken_migrator/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/gpu_particle/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)shaders/(?:.*/)?[^/]+$"

@@ -1,26 +1,31 @@
 {
   "name": "actor-character",
-  "description": "アクターとキャラクター。 実体の生成と状態、 役割の割り当て、 キャストの管理。",
+  "description": "【AI 案・人の承認前】アクターとキャラクター。 シーングラフ基底 (actor) と Brain/Check/Control/Effect 合成のキャラクター制御 (character)。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/actor.md",
+    "spec/feature/module/character.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/actor/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?actor/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/actor/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/actor/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/character/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?character/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/character/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/cast/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?cast/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/character/(?:.*/)?[^/]+$"
     }
   ]
 }

@@ -1,0 +1,76 @@
+{
+  "name": "structure-visualization",
+  "description": "【AI 案・人の承認前】構成の可視化。 抽象グラフの層別配置 (graph_layout)・Tela 関係図への出口 (tela_graph)・Pictor 描画パイプラインの図 (render_viz)・パッケージ構成と使われ方の読み取りと図 (package_model / package_scan / package_viz) と、 その CLI。 読むだけで、 対象の構成は変えない。",
+  "presetRules": [],
+  "templateRules": [],
+  "specRefs": [
+    "spec/module/graph_layout.md",
+    "spec/module/tela_graph.md",
+    "spec/module/render_viz.md",
+    "spec/module/package_model.md",
+    "spec/module/package_viz.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/graph_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/graph_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/graph_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/tela_graph/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/tela_graph/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/tela_graph/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/render_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/render_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/render_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_model/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/package_model/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/package_model/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_scan/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/package_scan/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/package_scan/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/package_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/package_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/package_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tools/render_viz/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tools/package_viz/(?:.*/)?[^/]+$"
+    }
+  ]
+}

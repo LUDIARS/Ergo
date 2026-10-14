@@ -26,7 +26,7 @@ Tela をプロセス内で使うホスト向けに、 `tela::Graph` への変換
 
 ## 所属ドメイン
 
-`observability` (診断出力・可視化)。
+`structure-visualization` (構成の可視化。 2026-10-14 の切り直しで observability から移動)。
 
 ## 必要なデータ
 

@@ -53,7 +53,7 @@ CLI の終了コード: 0 成功 / 1 宣言漏れ (`--check`) / 2 引数・入�
 
 ## 所属ドメイン
 
-observability (`spec/domains/observability.domain.json`)。 層は infrastructure (CLI は application)。
+structure-visualization (`spec/domains/structure-visualization.domain.json`、 2026-10-14 の切り直しで observability から移動)。 層は infrastructure (CLI は application)。
 
 ## 必要なデータ
 

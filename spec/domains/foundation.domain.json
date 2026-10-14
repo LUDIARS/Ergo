@@ -1,39 +1,49 @@
 {
   "name": "foundation",
-  "description": "共通土台。 型・ユーティリティ・テンプレート・ビルド定義 (パッケージ・ハブのマニフェスト ergo-packages.json と cmake/packages/ を含む)。 上位の意味づけは持たない。",
+  "description": "【AI 案・人の承認前】共通土台。 モジュール横断の小物 (common の JSON コーデック)・汎用数学 (math)・モジュール雛形・リポジトリ直下の CMakeLists.txt・ベンチ・テスト共通の main と外部依存の疎通テスト。 上位の意味づけは持たない。",
   "presetRules": [],
   "templateRules": [],
-  "specRefs": ["spec/feature/tool/shared-one-shot.md", "spec/feature/package-hub.md", "spec/data/ergo-packages.md", "spec/setup/packages.md"],
+  "specRefs": [
+    "spec/feature/module/math.md",
+    "spec/feature/tool/shared-one-shot.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/common/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?common/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/common/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/[^/]+$"
+      "pathPattern": "(^|/)tests/common/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/[^/]+$"
+      "pathPattern": "(^|/)src/math/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/math/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/math/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/[^/]+\\.(?:cpp|cc|h|hpp)$"
+    },
+    {
+      "pathPattern": "(^|/)include/[^/]+\\.(?:h|hpp)$"
     },
     {
       "pathPattern": "(^|/)template/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)cmake/(?:.*/)?[^/]+$"
+      "pathPattern": "^CMakeLists\\.txt$"
     },
     {
-      "pathPattern": "(^|/)ergo-packages\\.json$"
+      "pathPattern": "(^|/)tests/[^/]+$"
     },
     {
-      "pathPattern": "(^|/)CMakeLists\\.txt$"
-    },
-    {
-      "pathPattern": "(^|/)tools/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)tests/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/thirdparty/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)benchmarks/(?:.*/)?[^/]+$"

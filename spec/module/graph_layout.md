@@ -40,7 +40,7 @@ ergo::tela_graph::save_tela_graph("deps.tela", result.graph);
 
 ## 所属ドメイン
 
-observability (`spec/domains/observability.domain.json`)。 層は shared (`.anatomia/layers.json`)。
+structure-visualization (`spec/domains/structure-visualization.domain.json`、 2026-10-14 の切り直しで observability から移動)。 層は shared (`.anatomia/layers.json`)。
 
 ## 必要なデータ
 

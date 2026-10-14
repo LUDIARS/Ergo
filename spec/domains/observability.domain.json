@@ -1,68 +1,61 @@
 {
   "name": "observability",
-  "description": "観測。 ログ、 プロファイル、 診断出力、 ライブチューニングの窓口、 Tela による構成の可視化。",
+  "description": "【AI 案・人の承認前】実行中のアプリを観測・調整する。 ログ (log)・フレーム数と FPS (frame)・性能タイムライン (profile)・変数のライブ公開 (bind)・遠隔テスト用のアプリ内ブリッジ (custos)。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/log.md",
+    "spec/feature/module/frame.md",
+    "spec/feature/module/profile.md",
+    "spec/feature/module/bind.md",
+    "spec/feature/module/custos.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/log/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?log/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/log/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/log/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/frame/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/frame/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/frame/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/profile/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?profile/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/profile/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/custos/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?custos/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/profile/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/bind/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?bind/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/bind/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/render_viz/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/bind/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?render_viz/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)src/custos/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/tela_graph/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/custos/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?tela_graph/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)src/graph_layout/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?graph_layout/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)src/package_model/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?package_model/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)src/package_scan/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?package_scan/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)src/package_viz/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?package_viz/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/custos/(?:.*/)?[^/]+$"
     }
   ]
 }

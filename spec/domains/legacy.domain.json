@@ -1,0 +1,29 @@
+{
+  "name": "legacy",
+  "description": "【AI 案・人の承認前】旧来 (legacy)。 使われ方が細っている・置き換え済み・旧運用の名残として、 削除するかを人が決めるまで分けて見せる置き場。 Unity Shuriken からの一回きりの変換 (shuriken_migrator)・旧日付のレビュー記録 (review/)・spec/domains 移行前の旧ドメイン定義 (.anatomia/domains/)。 根拠と推奨は spec/architecture/domains-and-ux.md の「古い処理の一覧」。",
+  "presetRules": [],
+  "templateRules": [],
+  "specRefs": [
+    "spec/architecture/domains-and-ux.md"
+  ],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/shuriken_migrator/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/shuriken_migrator/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/shuriken_migrator/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tools/shuriken_migrator/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)review/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)\\.anatomia/domains/(?:.*/)?[^/]+$"
+    }
+  ]
+}

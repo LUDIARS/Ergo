@@ -1,32 +1,50 @@
 {
   "name": "ui-layout",
-  "description": "UI とレイアウト。 画面要素の構成と配置、 ベクタ図形の描画。",
+  "description": "【AI 案・人の承認前】UI。 SVG ラスタと 9-slice (ui)・retained-mode の部品 (ui_kit)・データ駆動レイアウト (ui_layout)・SVG パスの三角形分割と押し出し (vector)。",
   "presetRules": [],
   "templateRules": [],
+  "specRefs": [
+    "spec/feature/module/ui.md",
+    "spec/feature/module/ui_layout.md",
+    "spec/feature/module/vector.md",
+    "spec/architecture/domains-and-ux.md"
+  ],
   "membership": [
     {
       "pathPattern": "(^|/)src/ui/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?ui/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/ui/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)src/ui_layout/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?ui_layout/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)src/vector/(?:.*/)?[^/]+$"
-    },
-    {
-      "pathPattern": "(^|/)include/(?:.*/)?vector/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)tests/ui/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/ui_kit/(?:.*/)?[^/]+$"
     },
     {
-      "pathPattern": "(^|/)include/(?:.*/)?ui_kit/(?:.*/)?[^/]+$"
+      "pathPattern": "(^|/)include/ergo/ui_kit/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/ui_kit/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/ui_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/ui_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/ui_layout/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/vector/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/vector/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/vector/(?:.*/)?[^/]+$"
     }
   ]
 }

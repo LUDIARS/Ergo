@@ -58,7 +58,7 @@ File API の直接の依存のうち、 「Ergo または link パッケージ�
 
 ## 所属ドメイン
 
-observability (`spec/domains/observability.domain.json`)。 層は infrastructure。
+structure-visualization (`spec/domains/structure-visualization.domain.json`、 2026-10-14 の切り直しで observability から移動)。 層は infrastructure。
 
 ## 必要なデータ
 
