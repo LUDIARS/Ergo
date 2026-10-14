@@ -1,0 +1,9 @@
+{
+  "name": "thaleia",
+  "version": "0.1.0",
+  "dependencies": {
+    "@ludiars/one-shot": "file:lib/lapilli/packages/one-shot",
+    "@ludiars/terpsichore": "^0.1.0",
+    "left-pad": "1.3.0"
+  }
+}

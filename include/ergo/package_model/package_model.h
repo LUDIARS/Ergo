@@ -97,6 +97,7 @@ struct PackageModel {
     std::string               mode;
     bool                      strict = false;
     std::string               platform;
+    std::string               manifest;     ///< マニフェストのパス (Ergo のソース相対のことがある)
     std::vector<Package>      packages;     ///< 名前順
     std::vector<Module>       modules;      ///< 名前順
     std::vector<ObserveEntry> observe;      ///< 名前順 (packages にも Observe として載る)

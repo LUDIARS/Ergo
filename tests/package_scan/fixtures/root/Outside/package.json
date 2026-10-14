@@ -1,0 +1,6 @@
+{
+  "name": "outside",
+  "dependencies": {
+    "@ludiars/must-not-be-read": "file:../Clio"
+  }
+}

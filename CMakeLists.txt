@@ -44,7 +44,8 @@ option(ERGO_BUILD_TELA_GRAPH   "Build ergo_tela_graph (Ergo 可視化の共通�
 option(ERGO_BUILD_RENDER_VIZ   "Build ergo_render_viz (Pictor 描画パイプラインの Tela 可視化)" ON)
 option(ERGO_BUILD_GRAPH_LAYOUT  "Build ergo_graph_layout (抽象グラフの層別配置 → Tela 関係図)" ON)
 option(ERGO_BUILD_PACKAGE_MODEL "Build ergo_package_model (resolved.json / CMake File API リーダ)" ON)
-option(ERGO_BUILD_PACKAGE_VIZ   "Build ergo_package_viz (パッケージ版一覧 / ターゲットのリンク図 + CLI)" ON)
+option(ERGO_BUILD_PACKAGE_SCAN  "Build ergo_package_scan (観測対象のチェックアウト → 根拠付きの使用関係)" ON)
+option(ERGO_BUILD_PACKAGE_VIZ   "Build ergo_package_viz (パッケージ版一覧 / ターゲットのリンク図 / 使用関係図 + CLI)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
 option(ERGO_BUILD_CHARACTER    "Build ergo_character (TCC-style character controller)" ON)
@@ -1119,10 +1120,13 @@ endif()
 # Package hub visualisation (spec/feature/package-hub.md §5, stage S3).
 #   * ergo_graph_layout  — 抽象グラフ → 配置済み tela_graph::Graph (層別配置)。
 #   * ergo_package_model — resolved.json / File API codemodel v2 → PackageModel。
-#   * ergo_package_viz   — PackageModel → P1 packages / P2 targets (簡約・畳み・分割)。
+#   * ergo_package_scan  — observe の兄弟チェックアウト → 根拠付きの使用関係 (UsageModel)。
+#   * ergo_package_viz   — PackageModel → P1 packages / P2 targets、 UsageModel → P3 usage
+#                          (簡約・畳み・分割)。
 #   * ergo_package_viz (CLI、 ターゲット ergo_package_viz_cli) と
 #     ergo_package_graphs (build/graphs/ に図を書くカスタムターゲット)。
-# 依存は package_viz → package_model / graph_layout → tela_graph の一方向。
+# 依存は package_viz → package_model / package_scan / graph_layout → tela_graph の一方向
+# (package_scan と package_model は互いに import しない)。
 # Pictor / Tela に依存せず常時ビルド・テスト可。 ergo_render_viz とは互いに import しない。
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_GRAPH_LAYOUT AND TARGET ergo_tela_graph)
@@ -1172,7 +1176,35 @@ if(ERGO_BUILD_PACKAGE_MODEL)
     endif()
 endif()
 
-if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_graph_layout)
+if(ERGO_BUILD_PACKAGE_SCAN)
+    add_library(ergo_package_scan STATIC
+        src/package_scan/usage_model.cpp
+        src/package_scan/json_lines.cpp
+        src/package_scan/gitmodules_reader.cpp
+        src/package_scan/git_index_reader.cpp
+        src/package_scan/package_json_reader.cpp
+        src/package_scan/manifest_reader.cpp
+        src/package_scan/scope.cpp
+        src/package_scan/source.cpp
+        src/package_scan/resolver.cpp
+        src/package_scan/scan.cpp
+    )
+    target_include_directories(ergo_package_scan PUBLIC include)
+    target_link_libraries(ergo_package_scan PUBLIC ergo_common)
+    if(MSVC)
+        target_compile_options(ergo_package_scan PUBLIC /utf-8)
+    endif()
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_package_scan tests/package_scan/test_package_scan.cpp)
+        target_link_libraries(test_package_scan PRIVATE ergo_package_scan ergo_gtest_main)
+        target_compile_definitions(test_package_scan PRIVATE
+            ERGO_PACKAGE_SCAN_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_scan/fixtures")
+        add_test(NAME test_package_scan COMMAND test_package_scan)
+    endif()
+endif()
+
+if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_scan
+   AND TARGET ergo_graph_layout)
     add_library(ergo_package_viz STATIC
         src/package_viz/groups.cpp
         src/package_viz/labels.cpp
@@ -1182,37 +1214,50 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_graph_la
         src/package_viz/collapse_focus.cpp
         src/package_viz/split.cpp
         src/package_viz/fit.cpp
+        src/package_viz/usage_view.cpp
     )
     target_include_directories(ergo_package_viz PUBLIC include)
-    target_link_libraries(ergo_package_viz PUBLIC ergo_package_model ergo_graph_layout)
+    target_link_libraries(ergo_package_viz PUBLIC ergo_package_model ergo_package_scan ergo_graph_layout)
 
     add_executable(ergo_package_viz_cli
         tools/package_viz/main.cpp
         tools/package_viz/cli_options.cpp
         tools/package_viz/version_probe.cpp
+        tools/package_viz/usage_command.cpp
     )
     set_target_properties(ergo_package_viz_cli PROPERTIES OUTPUT_NAME ergo_package_viz)
     target_link_libraries(ergo_package_viz_cli PRIVATE ergo_package_viz)
 
-    # cmake --build <build> --target ergo_package_graphs → <build>/graphs/{packages,targets}.tela
-    # (読むのはトップの構成の resolved.json と File API の返答。 P3 usage は S4)。
+    # cmake --build <build> --target ergo_package_graphs → <build>/graphs/{packages,targets,usage}.tela
+    # (P1 / P2 はトップの構成の resolved.json と File API の返答、 P3 はマニフェストの observe が指す
+    # ERGO_PACKAGES_SIBLING_ROOT の兄弟チェックアウト。 未設定なら観測対象は未観測として描く)。
     set(_ergo_graphs_dir "${CMAKE_BINARY_DIR}/graphs")
+    set(_ergo_usage_root "")
+    if(ERGO_PACKAGES_SIBLING_ROOT)
+        set(_ergo_usage_root --root "${ERGO_PACKAGES_SIBLING_ROOT}")
+    endif()
     add_custom_target(ergo_package_graphs
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_ergo_graphs_dir}"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view packages
                 --out "${_ergo_graphs_dir}/packages.tela"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view targets
                 --out "${_ergo_graphs_dir}/targets.tela"
+        COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view usage ${_ergo_usage_root}
+                --manifest "${CMAKE_CURRENT_SOURCE_DIR}/ergo-packages.json"
+                --out "${_ergo_graphs_dir}/usage.tela"
         DEPENDS ergo_package_viz_cli
         COMMENT "ergo_package_viz: writing package graphs to ${_ergo_graphs_dir}"
         VERBATIM)
     unset(_ergo_graphs_dir)
+    unset(_ergo_usage_root)
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_package_viz tests/package_viz/test_package_viz.cpp)
+        add_executable(test_package_viz tests/package_viz/test_package_viz.cpp
+            tests/package_viz/test_usage_view.cpp)
         target_link_libraries(test_package_viz PRIVATE ergo_package_viz ergo_gtest_main)
         target_compile_definitions(test_package_viz PRIVATE
-            ERGO_PACKAGE_MODEL_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_model/fixtures")
+            ERGO_PACKAGE_MODEL_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_model/fixtures"
+            ERGO_PACKAGE_SCAN_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_scan/fixtures")
         add_test(NAME test_package_viz COMMAND test_package_viz)
         if(TARGET ergo_tela_graph_tela)
             # Tela がある構成だけ: 書いた図を Tela 本体の load_graph が受理すること。
@@ -1225,7 +1270,7 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_graph_la
         endif()
     endif()
 elseif(ERGO_BUILD_PACKAGE_VIZ)
-    message(STATUS "ergo_package_viz: requires ergo_package_model and ergo_graph_layout — skipped")
+    message(STATUS "ergo_package_viz: requires ergo_package_model, ergo_package_scan and ergo_graph_layout — skipped")
 endif()
 
 

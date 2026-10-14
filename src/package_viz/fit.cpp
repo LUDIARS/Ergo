@@ -114,6 +114,9 @@ bool fit_view(ViewGraph view, const package_model::PackageModel& model, const Vi
 
 bool make_view(const package_model::PackageModel& model, const ViewOptions& o, FitResult& result,
                std::string* error) {
+    if (o.view == View::Usage) {
+        return fail(error, "the usage view is built from a scan (make_usage_view)");
+    }
     if (o.view == View::Targets && !model.has_codemodel) {
         return fail(error, "the targets view needs the CMake File API reply (codemodel v2)");
     }

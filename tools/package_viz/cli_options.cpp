@@ -46,8 +46,10 @@ bool parse_options(const std::vector<std::string>& args, Options& o, std::string
                 o.view.view = View::Packages;
             } else if (v == "targets") {
                 o.view.view = View::Targets;
+            } else if (v == "usage") {
+                o.view.view = View::Usage;
             } else {
-                return fail(error, "unknown view '" + v + "' (packages|targets)");
+                return fail(error, "unknown view '" + v + "' (packages|targets|usage)");
             }
             have_view = true;
         } else if (a == "--focus") {
@@ -66,6 +68,12 @@ bool parse_options(const std::vector<std::string>& args, Options& o, std::string
             if (!value(o.layers)) return false;
         } else if (a == "--resolved") {
             if (!value(o.resolved)) return false;
+        } else if (a == "--root") {
+            if (!value(o.root)) return false;
+        } else if (a == "--manifest") {
+            if (!value(o.manifest)) return false;
+        } else if (a == "--scan") {
+            o.scan = true;
         } else if (a == "--include-tests") {
             o.view.include_tests = true;
         } else if (a == "--no-version-probe") {
@@ -81,8 +89,9 @@ bool parse_options(const std::vector<std::string>& args, Options& o, std::string
         }
     }
     if (o.build_dir.empty()) return fail(error, "missing <build-dir>");
-    if (o.check) return true;
-    if (!have_view) return fail(error, "missing --view packages|targets");
+    if (o.check && o.scan) return fail(error, "--check and --scan are exclusive");
+    if (o.check || o.scan) return true;
+    if (!have_view) return fail(error, "missing --view packages|targets|usage");
     if (o.out.empty()) return fail(error, "missing --out FILE.tela");
     return true;
 }

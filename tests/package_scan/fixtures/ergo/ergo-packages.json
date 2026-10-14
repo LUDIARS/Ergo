@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "packages": {
+    "lapilli": { "kind": "tool", "code": "La", "group": "tool", "acquire": "submodule", "path": "lib/lapilli" }
+  },
+  "modules": {
+    "ergo_render": { "needs": ["pictor"] },
+    "ergo_resource": {
+      "ported_from": [
+        { "package": "clio", "rev": null }
+      ]
+    }
+  },
+  "observe": {
+    "ars-musa": { "code": "Au", "path_hint": "Ars-Musa", "group": "musa" },
+    "clio": { "code": "Cl", "path_hint": "Clio", "group": "musa" },
+    "curare": {
+      "code": "Cu",
+      "path_hint": "Curare",
+      "group": "related",
+      "relations": [
+        { "from": "ergo_resource", "kind": "shares-vocabulary" },
+        { "from": "ergo_resource", "kind": "rumoured" }
+      ]
+    },
+    "escape": { "code": "Es", "path_hint": "../Outside", "group": "related" },
+    "terpsichore": { "code": "Tp", "path_hint": "Terpsichore", "group": "musa" },
+    "thaleia": { "code": "Th", "path_hint": "Thaleia", "group": "musa" }
+  }
+}

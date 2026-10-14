@@ -166,6 +166,24 @@ tela_view --font <file.ttf> --graph packages.tela         # Tela は別インス
   (`--no-version-probe` で照会しない)。
 - `.tela` はビルドディレクトリに置き、コミットしない。
 
+## 使用関係図 (S4: P3 usage)
+
+マニフェストの `observe` が指す兄弟チェックアウトを読んで、MUSA 系・関連・共有 TS (Lapilli など)・Ergo のモジュール・
+`tools/ergo` の使用関係を描く。読むのは `<root>/<path_hint>` の `package.json` / `.gitmodules` / `.git/index`
+(`.git` がチェックアウト内のディレクトリのときだけ) と、Ergo 自身の `.gitmodules` / `tools/ergo/package.json` / マニフェストだけ。
+
+```sh
+ergo_package_viz build --view usage --root <兄弟チェックアウトの親> --out usage.tela
+ergo_package_viz build --scan --root <兄弟チェックアウトの親>     # 辺を根拠 (ファイル:行 キー) 付きで表示
+ergo_package_viz build --view usage --root <dir> --manifest <ergo>/ergo-packages.json --out usage.tela
+```
+
+- `ergo_package_graphs` は `ERGO_PACKAGES_SIBLING_ROOT` が設定されていればそれを `--root` に渡す。未設定なら観測対象は
+  すべて「未観測」として描く (存在は示す)。
+- 実線 = submodule・`file:` / `workspace:` / `@ludiars/*` 依存、破線 = 移植 (`ported_from`)・語彙共有 (`relations`)。
+  Tela の辺は札を持たないので、根拠は使う側のノードの札に 3 件まで載せる (全件は `--scan`)。
+- `--manifest` を省くと resolved.json に記録されたマニフェストを File API の Ergo の根で解く。
+
 ## 検証
 
 | 何を | どうやって |
@@ -174,4 +192,5 @@ tela_view --font <file.ttf> --graph packages.tela         # Tela は別インス
 | M0 でターゲット集合と compile definitions が変わらない (偽ホスト) | `ctest -R test_packages_m0_invariance` (`tests/packages/fixtures/m0_host`) |
 | 6 経路・drift 5 種・STRICT・同名衝突・Emscripten 模擬 (偽パッケージ) | `ctest -R test_packages_hub_routes` (`tests/packages/fixtures/{alpha,beta,gamma,hub,hub_host}`。git が要る。テスト内で git リポジトリを作る) |
 | M0 不変 (実ツリー全体、基準チェックアウトとの比較) | `cmake -DBASE_SOURCE=<基準> -DNEW_SOURCE=<新> -DWORK_DIR=<作業> [-DGENERATOR=...] -P tests/packages/compare_m0_build.cmake` |
-| 配置・P1 / P2・簡約・畳み込み・焦点・分割・PKG-17 (同梱の File API 見本) | `ctest -R "test_graph_layout|test_package_model|test_package_viz"` (`tests/package_model/fixtures`)。Tela がある構成では `test_package_viz_tela` が Tela 本体の `load_graph` での受理も確かめる |
+| 観測の辺抽出・根拠・範囲外を読まない・未観測 (同梱の見本ディレクトリ) | `ctest -R test_package_scan` (`tests/package_scan/fixtures`)。gitlink はテスト内で一時ディレクトリに index を作って確かめる |
+| 配置・P1 / P2 / P3・簡約・畳み込み・焦点・分割・PKG-17 (同梱の File API 見本) | `ctest -R "test_graph_layout|test_package_model|test_package_viz"` (`tests/package_model/fixtures`)。Tela がある構成では `test_package_viz_tela` が Tela 本体の `load_graph` での受理も確かめる |

@@ -9,12 +9,15 @@
 | 図 | ノード | グループ (≤ 8) | 辺 |
 |---|---|---|---|
 | **P1** `--view packages` | パッケージ (host・Ergo・link・tool・第三者・observe) | host / Ergo / 描画 / 可視化 / ツール / 第三者 / 観測: MUSA / 観測: 関連 | 実線: link の `requires`、 File API の実リンクをパッケージ単位に畳んだもの。 破線: `ported_from`、 observe の `relations` |
+| **P3** `--view usage` | 観測対象 (MUSA 系・関連)・共有 TS (Lapilli・`@ludiars/*`)・Ergo と移植/語彙共有の根拠を持つモジュール・`tools/ergo` | Ergo / ツール / MUSA / 関連 / 共有 TS / 未観測 | 実線: submodule・`file:` / `workspace:` / `@ludiars/*` 依存。 破線: `ported_from`・`relations`。 入力は `ergo_package_scan` の UsageModel |
 | **P2** `--view targets` | ターゲット (既定の除外を除く) | application / presentation / domain-logic / infrastructure / shared (`.anatomia/layers.json`) + 外部パッケージ + 第三者 + 循環 | 直接の依存 (実線)。 循環 (強連結成分 ≥ 2) は `cycle` グループへ |
 
 P1 の札: 名前 (コード) / 版 (出所付き: `revisor` / `git` / `cmake`、 無ければ「版 不明」) / SHA7 (HEAD、 無ければ pin) /
 状態と経路 / 機能 / 印 (`★drift:<値>` `dirty` `上書き` `宣言漏れ` `未観測` `未初期化`)。 link パッケージの描画 / 可視化の
 振り分けはマニフェストの `group` (`render` / `viz`) を見る。 P2 の札: 名前 / 型 / パッケージ · 層 / `★宣言漏れ`。
-P3 (使用関係、 `scan`) は S4。
+P3 の札: 名前 (コード) / 未観測なら理由と宣言の group / package.json の name / 出る辺の根拠 (`→ 先 [種類] ファイル:行 キー (注)`、
+3 件まで、 残りは「…他 N 件」)。 観測対象は辺が無くても出す (統合設計 N5)。 P3 は `make_usage_view` (`usage_view.h`) で作り、
+`make_view` は P3 を受け付けない (scan が要るため)。
 
 ### 上限に収める手順 (`fit.h`、 決定的・収まった所で止める)
 
@@ -31,7 +34,9 @@ P3 (使用関係、 `scan`) は S4。
 ### 使い方
 
 ```sh
-cmake --build build --target ergo_package_graphs     # build/graphs/packages.tela と targets.tela
+cmake --build build --target ergo_package_graphs     # build/graphs/packages.tela・targets.tela・usage.tela
+ergo_package_viz build --view usage --root <兄弟チェックアウトの親> --out usage.tela
+ergo_package_viz build --scan --root <dir>            # 観測の辺を根拠付きで表示
 ergo_package_viz build --view packages --out packages.tela
 ergo_package_viz build --view targets --focus ergo --out targets.tela
 ergo_package_viz build --view targets --expand pictor --out targets.tela

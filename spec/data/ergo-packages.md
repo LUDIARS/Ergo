@@ -89,9 +89,9 @@
 | キー | 型 | 意味 |
 |---|---|---|
 | `code` | 文字列 | プロジェクトコード |
-| `path_hint` | 文字列 | `ERGO_PACKAGES_SIBLING_ROOT` (または CLI の `--root`) からの相対。そこだけを読む (S4) |
+| `path_hint` | 文字列 | `ERGO_PACKAGES_SIBLING_ROOT` (または CLI の `--root`) からの相対。そこだけを読む (S4、 `ergo_package_scan`)。絶対パス・`..`・`:` を含むものは範囲外として読まず「未観測」 |
 | `group` | `"musa"` / `"related"` | 図のグループ |
-| `relations` | `[{ "from", "kind" }]` | Ergo 側の起点と関係の種類 (`shares-vocabulary` など)。図では破線 |
+| `relations` | `[{ "from", "kind" }]` | Ergo 側の起点と関係の種類 (`shares-vocabulary` / `port-of`)。図では破線。他の `kind` は辺にせず注記に残す |
 
 ## 検査の記録形式 (findings)
 

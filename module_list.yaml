@@ -366,14 +366,25 @@ modules:
     tool_plugin: null
     status: preview
 
+  - name: ergo_package_scan
+    summary: 観測対象の兄弟チェックアウト (package.json / .gitmodules / gitlink) とマニフェストの ported_from / relations から根拠付きの使用関係を作る (読むだけ)
+    category: システム
+    header_dir: include/ergo/package_scan/
+    source_dir: src/package_scan/
+    test_dir:   tests/package_scan/
+    spec:       spec/module/package_scan.md
+    cmake_option: ERGO_BUILD_PACKAGE_SCAN
+    tool_plugin: null
+    status: preview
+
   - name: ergo_package_viz
-    summary: パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs
+    summary: パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) / 使用関係図 (P3) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs
     category: システム
     header_dir: include/ergo/package_viz/
     source_dir: src/package_viz/
     test_dir:   tests/package_viz/
     spec:       spec/module/package_viz.md
-    cmake_option: ERGO_BUILD_PACKAGE_VIZ   # ergo_package_model と ergo_graph_layout が要る
+    cmake_option: ERGO_BUILD_PACKAGE_VIZ   # ergo_package_model / ergo_package_scan / ergo_graph_layout が要る
     tool_plugin: null
     status: preview
 

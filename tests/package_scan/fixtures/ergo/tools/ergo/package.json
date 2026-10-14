@@ -1,0 +1,8 @@
+{
+  "name": "ergo-tools",
+  "private": true,
+  "dependencies": {
+    "@ludiars/one-shot": "file:../../lib/lapilli/packages/one-shot",
+    "express": "^4.19.0"
+  }
+}

@@ -5,7 +5,7 @@
 - 依頼: `spec/tasks/2026-10-14-package-hub-design-request.md`
 - 素案: `spec/plan/2026-10-14-package-hub-fable.md` (Fable)、`spec/plan/2026-10-14-package-hub-opus.md` (Opus)
 - 種別: 設計 (正本)。実装・ビルド・実ホストでの確認は含まない。
-- 実装状況: S1 (マニフェストと規則、記録のみ) — `spec/tasks/2026-10-14-package-hub-s1.md`、S2 (取り込み) — `spec/tasks/2026-10-14-package-hub-s2.md`、S3 (可視化 P1 / P2) — `spec/tasks/2026-10-14-package-hub-s3.md` を実装済み。S4 以降は未着手
+- 実装状況: S1 (マニフェストと規則、記録のみ) — `spec/tasks/2026-10-14-package-hub-s1.md`、S2 (取り込み) — `spec/tasks/2026-10-14-package-hub-s2.md`、S3 (可視化 P1 / P2) — `spec/tasks/2026-10-14-package-hub-s3.md`、S4 (観測 P3) — `spec/tasks/2026-10-14-package-hub-s4.md` を実装済み。S5 以降は未着手
 
 人間の指示 (neco 2026-10-14): 「Ergoがコンテンツの各LUDIARSのパッケージをまとめてリンク/管理するようにします。
 各パッケージのバージョン、何をリンクしているか、MUSAや関連パッケージは何を使用しているかなどを可視化します。
@@ -263,18 +263,20 @@ cmake/packages/ErgoPackageGit.cmake       checkout への読み取り専用の g
 cmake/packages/ErgoPackageWiring.cmake    結線ファイルが呼ぶ部品 (cache 既定値・feature 写像・add_subdirectory・検証・exports。S2)
 cmake/packages/{pictor,tela}.cmake        1 パッケージ 1 ファイルの結線
 include|src|tests/graph_layout/           ergo_graph_layout   汎用の層別配置 → tela_graph::Graph (下層、shared 層)
-include|src|tests/package_model/          ergo_package_model  resolved.json / File API / 観測スキャン → PackageModel (読むだけ)
+include|src|tests/package_model/          ergo_package_model  resolved.json / File API → PackageModel (読むだけ)
+include|src|tests/package_scan/           ergo_package_scan   観測スキャン (兄弟チェックアウト) → UsageModel (読むだけ。S4 で package_model から分離)
 include|src|tests/package_viz/            ergo_package_viz    PackageModel → P1/P2/P3 (グループ・簡約・畳み・分割)
 tools/package_viz/main.cpp                CLI ergo_package_viz (ターゲット ergo_package_viz_cli)
 tests/packages/                           cmake -P の規則テストと構成テスト用の偽パッケージ (git 初期化はテスト内)
-spec/data/ergo-packages.md  spec/setup/packages.md  spec/module/{graph_layout,package_model,package_viz}.md
+spec/data/ergo-packages.md  spec/setup/packages.md  spec/module/{graph_layout,package_model,package_scan,package_viz}.md
 ```
 
-- 依存の向きは `package_viz → package_model / graph_layout → tela_graph` の一方向。`ergo_render_viz` とは互いに import しない
+- 依存の向きは `package_viz → package_model / package_scan / graph_layout → tela_graph` の一方向 (`package_scan` と
+  `package_model` は互いに import しない)。`ergo_render_viz` とは互いに import しない
   (`ergo_render_viz` の配置を `ergo_graph_layout` に寄せるかは範囲外、U7)。C++ 側はどれも Pictor / Tela に依存せず常時ビルド・テスト可。
   `ergo_common::jsonm` で File API の JSON が読めるかは S3 着手前に確かめ、足りなければ読み取り専用拡張を足す (新規 third-party は入れない)。
 - `ergo_render` / `cmake/ErgoRenderBackend.cmake` は変えない。変わるのは「`pictor` ターゲットを作る主体がホストからハブへ移り得る」ことだけ。
-- ドメイン: `graph_layout` / `package_model` / `package_viz` は `observability`、`cmake/packages/` と `ergo-packages.json` は `foundation`。
+- ドメイン: `graph_layout` / `package_model` / `package_scan` / `package_viz` は `observability`、`cmake/packages/` と `ergo-packages.json` は `foundation`。
   同じ PR で `spec/domains/*.domain.json` と `.anatomia/layers.json` を更新。`module_list.md` / `.yaml` / `README.md` に行を足す。
 - `tools/ergo` (Web) は触らない。版一覧の Web プラグインは resolved.json を読むだけの任意の後段 (U6)。
 

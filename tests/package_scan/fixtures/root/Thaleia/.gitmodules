@@ -1,0 +1,4 @@
+# synthetic fixture
+[submodule "lib/lapilli"]
+	path = lib/lapilli
+	url = https://example.invalid/LUDIARS/Lapilli.git

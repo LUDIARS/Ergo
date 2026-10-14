@@ -28,6 +28,17 @@ std::vector<graph_layout::LayoutGroup> target_groups() {
     };
 }
 
+std::vector<graph_layout::LayoutGroup> usage_groups() {
+    return {
+        {kGroupErgo,       "Ergo",          {66, 133, 244}},
+        {kGroupTool,       "ツール",        {141, 110, 99}},
+        {kGroupMusa,       "MUSA",          {245, 166, 35}},
+        {kGroupRelated,    "関連",          {255, 112, 67}},
+        {kGroupSharedTs,   "共有 TS",       {0, 150, 136}},
+        {kGroupUnobserved, "未観測",        {158, 158, 158}},
+    };
+}
+
 std::vector<graph_layout::LayoutGroup> index_groups() {
     return {{"part", "分割した図", {66, 133, 244}}};
 }

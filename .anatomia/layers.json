@@ -98,6 +98,10 @@
       "layer": "infrastructure"
     },
     {
+      "glob": "include/ergo/package_scan/*",
+      "layer": "infrastructure"
+    },
+    {
       "glob": "include/ergo/package_viz/*",
       "layer": "infrastructure"
     },
@@ -238,6 +242,10 @@
       "layer": "infrastructure"
     },
     {
+      "glob": "src/package_scan/*",
+      "layer": "infrastructure"
+    },
+    {
       "glob": "src/package_viz/*",
       "layer": "infrastructure"
     },
@@ -375,6 +383,10 @@
     },
     {
       "glob": "tests/package_model/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/package_scan/*",
       "layer": "shared"
     },
     {

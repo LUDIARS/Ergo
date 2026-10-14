@@ -53,6 +53,12 @@
       "pathPattern": "(^|/)include/(?:.*/)?package_model/(?:.*/)?[^/]+$"
     },
     {
+      "pathPattern": "(^|/)src/package_scan/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/(?:.*/)?package_scan/(?:.*/)?[^/]+$"
+    },
+    {
       "pathPattern": "(^|/)src/package_viz/(?:.*/)?[^/]+$"
     },
     {

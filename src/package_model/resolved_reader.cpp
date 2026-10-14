@@ -78,6 +78,7 @@ bool read_resolved_text(const std::string& json, PackageModel& model, std::strin
     model.mode     = get_string(doc, "mode");
     model.strict   = get_bool(doc, "strict");
     model.platform = get_string(doc, "platform");
+    model.manifest = get_string(doc, "manifest");
     model.packages.clear();
     model.modules.clear();
     model.observe.clear();

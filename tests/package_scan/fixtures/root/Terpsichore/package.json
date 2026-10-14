@@ -1,0 +1,7 @@
+{
+  "name": "@ludiars/terpsichore",
+  "devDependencies": {
+    "shared-kit": "workspace:*",
+    "outside-pkg": "file:../Outside/pkg"
+  }
+}

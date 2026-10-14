@@ -2,7 +2,8 @@
 
 /// ergo_package_viz — 図の手前の抽象グラフ (座標なし) と、 図ごとの指定。
 ///
-/// P1 (packages) / P2 (targets) の組み立て (`package_view.h` / `target_view.h`) が
+/// P1 (packages) / P2 (targets) / P3 (usage) の組み立て (`package_view.h` / `target_view.h` /
+/// `usage_view.h`) が
 /// ViewGraph を作り、 上限に収める手順 (`fit.h`) が簡約・畳み込み・焦点・分割を
 /// かけてから ergo_graph_layout で配置する。
 
@@ -16,7 +17,7 @@
 
 namespace ergo::package_viz {
 
-enum class View { Packages, Targets };
+enum class View { Packages, Targets, Usage };
 
 /// 1 枚の上限 (Tela SPEC-TL-GRAPH と同じ既定値)。
 struct Limits {
