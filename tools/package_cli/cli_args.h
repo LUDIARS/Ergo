@@ -17,6 +17,7 @@
 //                                                         [--host <dir>] [--ergo <dir>]
 //   ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>] [--cache <dir>] [--root <dir>]
 //                   [--revisor-url <u>] [--concordia-url <u>]  [--ergo <dir>]
+//   ergo_pkg status --build <dir> [--junit <xml>] [--out <file>] [--host <dir>] [--ergo <dir>]   (W6)
 
 #include <string>
 #include <vector>
@@ -43,7 +44,8 @@ struct Args {
     bool                     allow_off_main = false;
     std::vector<std::string> hosts;    ///< --host を書いた順 (watch は複数)
     std::string              state;    ///< watch: 前回状態の置き場所
-    std::string              out;      ///< watch: events.json の置き場所
+    std::string              out;      ///< watch: events.json の置き場所、 status: 書くファイル
+    std::string              junit;    ///< status: ctest --output-junit の XML
     std::string              root;     ///< 兄弟チェックアウトの根 (ERGO_PACKAGES_SIBLING_ROOT)
     std::string              fail_on;  ///< outdated: この種類があれば終了 1
     std::string              revisor_url;    ///< watch: Revisor (ERGO_WATCH_REVISOR_URL、 loopback だけ)

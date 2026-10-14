@@ -11,6 +11,7 @@
 | **P1** `--view packages` | パッケージ (host・Ergo・link・tool・第三者・observe) | host / Ergo / 描画 / 可視化 / ツール / 第三者 / 観測: MUSA / 観測: 関連 | 実線: link の `requires`、 File API の実リンクをパッケージ単位に畳んだもの。 破線: `ported_from`、 observe の `relations` |
 | **P3** `--view usage` | 観測対象 (MUSA 系・関連)・共有 TS (Lapilli・`@ludiars/*`)・Ergo と移植/語彙共有の根拠を持つモジュール・`tools/ergo` | Ergo / ツール / MUSA / 関連 / 共有 TS / 未観測 | 実線: submodule・`file:` / `workspace:` / `@ludiars/*` 依存。 破線: `ported_from`・`relations`。 入力は `ergo_package_scan` の UsageModel |
 | **P2** `--view targets` | ターゲット (既定の除外を除く) | application / presentation / domain-logic / infrastructure / shared (`.anatomia/layers.json`) + 外部パッケージ + 第三者 + 循環 | 直接の依存 (実線)。 循環 (強連結成分 ≥ 2) は `cycle` グループへ |
+| **P4** `--view host` | ホスト 1・Ergo 1・依存・更新 (タグ・main)・審査中・作業中 (local PR / run)・落ちた検査 | host / Ergo / 依存 / 更新: タグ・main / 更新: 審査中・作業中 / 検査 | 実線: host → Ergo・依存。 破線: 依存 → 更新・審査中・検査 (統合設計 §5.1 の点線は Tela に無いので破線にし、 検査のグループの色で見分ける)。 入力は `package_model::HostState` (spec/feature/package-manager.md §5.1、 段階 W6) |
 
 P1 の札: 名前 (コード) / 版 (出所付き: `revisor` / `git` / `cmake`、 無ければ「版 不明」) / SHA7 (HEAD、 無ければ pin) /
 状態と経路 / 機能 / 印 (`★drift:<値>` `dirty` `上書き` `宣言漏れ` `未観測` `未初期化`)。 link パッケージの描画 / 可視化の
@@ -18,6 +19,17 @@ P1 の札: 名前 (コード) / 版 (出所付き: `revisor` / `git` / `cmake`�
 P3 の札: 名前 (コード) / 未観測なら理由と宣言の group / package.json の name / 出る辺の根拠 (`→ 先 [種類] ファイル:行 キー (注)`、
 3 件まで、 残りは「…他 N 件」)。 観測対象は辺が無くても出す (統合設計 N5)。 P3 は `make_usage_view` (`usage_view.h`) で作り、
 `make_view` は P3 を受け付けない (scan が要るため)。
+
+P4 の札 (`host_labels`、 欠けた値は `—`): host = コード (resolved.json の `host.id` → status.json → 報告) / `HEAD <SHA7>` /
+`モード <M0〜M2>` / テスト (`3/5`、 `1 失敗 (5 中)`、 状態の source が unknown なら `未実行`)。 Ergo = 版 (報告の `pin.tag`) /
+pin SHA7 / 遅れ (`main +18` `新タグ v0.10.0` `off-main`、 無ければ `なし`、 観測できなければ `未観測`)。 依存 = 名前 (コード) /
+版 · pin / 経路 · drift / 機能 / 印 (`★drift` `dirty` `off-main` `未観測` `非公開`)。 依存は resolved.json の link のうち
+`absent` でないものと、 報告の依存 (Ergo 自身を除く) の和。 更新 = `v2.3.0 (41 先)` / `main +41 (うち merged 3)` (依存ごとに 1 ノード)。
+審査中・作業中 = `#128 Pf` / `#131 AI` / `#133 人` / `run AI` (由来の不明は `不明`)。 `kHostReviewNodes` (12) を超えたら
+由来ごとに `review:origin:<由来>` の 1 ノードへ畳み、 件数 (審査中・作業中の内訳) と番号 6 件までを札に、 畳んだことを題に出す。
+検査 = resolved.json の findings のうち error / warning の ID と対象 (record は描かない)。 対象が依存なら依存から、 でなければ
+host から辺を引く。 報告の `sources.*` が `unavailable` なら題に「Revisor に届かず」などを添える (更新なしと取り違えない)。
+P4 は `make_host_view` (`host_view.h`) で作り、 `make_view` は P4 を受け付けない。
 
 ### 上限に収める手順 (`fit.h`、 決定的・収まった所で止める)
 
@@ -34,7 +46,9 @@ P3 の札: 名前 (コード) / 未観測なら理由と宣言の group / packag
 ### 使い方
 
 ```sh
-cmake --build build --target ergo_package_graphs     # build/graphs/packages.tela・targets.tela・usage.tela
+cmake --build build --target ergo_package_graphs     # build/graphs/packages.tela・targets.tela・usage.tela・host.tela
+ergo_pkg status --build build --junit build/ctest-junit.xml   # P4 の入力 build/ergo-packages.status.json
+ergo_package_viz build --view host --host <ホストのリポ> --out host.tela
 ergo_package_viz build --view usage --root <兄弟チェックアウトの親> --out usage.tela
 ergo_package_viz build --scan --root <dir>            # 観測の辺を根拠付きで表示
 ergo_package_viz build --view packages --out packages.tela
@@ -68,6 +82,7 @@ packages 図は無くても書く (題に「実リンク未取得」)。
 ## 変数
 
 `ViewOptions`: `view` / `focus` / `expand` / `include_tests` / `limits` (8 / 128 / 256) / `layout`。
+`kHostReviewNodes` (P4 の審査中・作業中を 1 件 1 ノードで描く上限、 12)。
 
 ## 作業
 
@@ -87,7 +102,9 @@ packages 図は無くても書く (題に「実リンク未取得」)。
 3. `collapse_focus` — 畳み込みと焦点。
 4. `split` — 分割と索引図。
 5. `fit` — 手順の適用、 配置、 検査、 出力名。
-6. CLI `tools/package_viz/` — 引数 (`cli_options`)、 版の照会 (`version_probe`)、 `main`。
+6. `host_view` / `host_labels` — P4 の抽象グラフ・由来ごとの畳み込みと札。
+7. CLI `tools/package_viz/` — 引数 (`cli_options`)、 版の照会 (`version_probe`)、 観測 (`usage_command`)、
+   P4 の入力の場所 (`host_command`: `--resolved` / `--report` か `<host>/.ergo/watch-report.json` / `--status`)、 `main`。
 
 ## テスト
 
@@ -95,6 +112,10 @@ packages 図は無くても書く (題に「実リンク未取得」)。
 上限内で検査を通る、 P2 の層グループと除外、 循環グループ、 推移簡約 (重複・破線・循環)、 畳み込み (複数ターゲットを
 1 ノード、 `--expand`)、 焦点と当たらない焦点、 128 ノードちょうどは 1 枚、 129 ノードは分割と索引と出力名、 辺の上限超過は
 簡約の後に分割、 分割の枚ごとの上限、 決定性、 File API が無いときの targets 図。
+`tests/package_viz/test_host_view.cpp` (P4、 見本は `tests/package_model/fixtures/host_state/`): resolved + 報告 + JUnit 由来の
+状態から作った図のノード・札・辺の種類、 `validate_tela_graph` 通過、 審査中 20 件が由来ごとに 4 ノードへ畳まれ上限ちょうどは
+畳まない、 入力が欠けても描く (札 `—`、 状態だけ欠けた・未実行)、 決定性 (同じ入力で同じ `.tela` のバイト列)。
+`tests/packages/test_package_host_view.cmake`: `ergo_pkg status` → `ergo_package_viz --view host` の通し (欠けた入力・決定性)。
 `tests/package_viz/test_package_viz_tela.cpp` (`Tela::Graph` がある構成だけ): 書いた P1 / P2 を Tela 本体の
 `tela::load_graph` が受理し、 プロセス内変換と同じ図になる。
 

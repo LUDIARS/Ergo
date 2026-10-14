@@ -76,10 +76,10 @@ ergo/
 | `ergo_tela_graph`    | Ergo 可視化の共通出口。 配置済み関係図 → Tela `TELA_GRAPH 1` (検査付き) / `tela::Graph` | `include/ergo/tela_graph/`   | (外部: Tela `tela_view --graph`) |
 | `ergo_render_viz`    | Pictor 描画パイプライン (パス・アタッチメント・ポストプロセス・CPU 段・GPU 時間) の Tela 可視化 | `include/ergo/render_viz/`   | `ergo_render_viz` CLI (pictor があるとき) |
 | `ergo_graph_layout`  | 汎用の層別配置 (抽象グラフ → 配置済み関係図、 決定的) | `include/ergo/graph_layout/` | — |
-| `ergo_package_model` | resolved.json / CMake File API codemodel v2 のリーダ (帰属・層・PKG-17 宣言漏れ) | `include/ergo/package_model/` | — |
+| `ergo_package_model` | resolved.json / CMake File API codemodel v2 のリーダ (帰属・層・PKG-17 宣言漏れ)、 P4 の入力 (watch の報告・status.json) のリーダ | `include/ergo/package_model/` | — |
 | `ergo_package_scan`  | 観測対象の兄弟チェックアウトから根拠付きの使用関係を読む (package.json / .gitmodules / gitlink / ported_from) | `include/ergo/package_scan/` | — |
-| `ergo_package_viz`   | パッケージ版一覧 / ターゲットのリンク図 / 使用関係図の Tela 可視化 (簡約・畳み込み・分割) | `include/ergo/package_viz/` | `ergo_package_viz` CLI、 `ergo_package_graphs` |
-| `ergo_package_manager` | パッケージマネージャ: ホストの宣言 (`host` 節) の読み取り・検査・漏れ検査・ブートストラップ・書式を保つ書き換え (add / remove / update) | `include/ergo/package_manager/` | `ergo_pkg` CLI (`init` / `list` / `doctor` / `fetch` / `add` / `remove` / `update`) |
+| `ergo_package_viz`   | パッケージ版一覧 / ターゲットのリンク図 / 使用関係図 / ホスト状態図 (P4) の Tela 可視化 (簡約・畳み込み・分割) | `include/ergo/package_viz/` | `ergo_package_viz` CLI、 `ergo_package_graphs` |
+| `ergo_package_manager` | パッケージマネージャ: ホストの宣言 (`host` 節) の読み取り・検査・漏れ検査・ブートストラップ・書式を保つ書き換え (add / remove / update)・ホストの状態 (status.json) | `include/ergo/package_manager/` | `ergo_pkg` CLI (`init` / `list` / `doctor` / `fetch` / `add` / `remove` / `update` / `status`) |
 | `ergo_package_watch` | パッケージの更新の検知: tag / track / off-main の判定・run / review / merged と由来 (Revisor / Concordia)・前回状態と重複の抑止・報告と出来事 | `include/ergo/package_watch/` | `ergo_pkg` CLI (`outdated` / `watch`) |
 
 詳細は `spec/module/<名>.md` 参照。`ergo_sound` は Ergo のコア柱として

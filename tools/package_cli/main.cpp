@@ -9,6 +9,7 @@
 //   ergo_pkg update <name> --to <tag|main|sha> [--allow-off-main]                                (W2)
 //   ergo_pkg outdated [--json] [--fail-on <kind>]                    (W3)
 //   ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>]    (W3)
+//   ergo_pkg status --build <dir> [--junit <xml>] [--out <file>]     (W6)
 //
 // main は引数の解析とコマンドへの振り分けだけ。 終了コード: 0 成功 / 1 要対応の検出あり /
 // 2 引数・入力の誤り / 3 書けない・取れない。 コミット・ブランチ作成・PR はしない。
@@ -39,6 +40,7 @@ int main(int argc, char** argv) {
     if (args.command == "add") return run_add(args);
     if (args.command == "remove") return run_remove(args);
     if (args.command == "update") return run_update(args);
+    if (args.command == "status") return run_status(args);
 #if defined(ERGO_PKG_CLI_WITH_WATCH)
     if (args.command == "outdated") return run_outdated(args);
     if (args.command == "watch") return run_watch(args);

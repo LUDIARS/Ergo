@@ -45,6 +45,16 @@ File API の直接の依存のうち、 「Ergo または link パッケージ�
 `revisor version show` / `git describe --tags --long` の結果で置き換える (`version_from_revisor` /
 `version_from_describe` は出力を札の形に直す純粋関数。 `v2.2.0-12-g…` → `2.2.0+12`)。
 
+### P4 ホスト状態図の入力 (段階 W6)
+
+`host_state.h` / `host_state_reader.h`。 P4 (spec/feature/package-manager.md §5.1) の入力 3 つを `HostState` に読む:
+resolved.json (`PackageModel`、 W6 で `host.id` を `host_id` に読むようにした)、 `<host>/.ergo/watch-report.json`
+(`WatchReport`: 依存ごとの pin・追跡ブランチの距離・`updates` のうち図が使うキー、 `sources.*`。 形式は spec/data/ergo-watch-report.md)、
+`<build>/ergo-packages.status.json` (`HostStatus`: コード・HEAD・構成時刻・テストの数。 形式は spec/data/ergo-packages-status.md)。
+`load_host_state` は失敗しない: 無い・読めない・壊れている・schema が 1 でない入力は `has_*` が false で、 理由を `notes` に残す
+(図は出す)。 書き手 (ergo_package_watch / ergo_package_manager) は import せず、 共有するのは形式だけ。 状態の `tests.source` が
+`junit` / `last-test-log` 以外なら数を信じず未実行として扱う。
+
 ### jsonm の確認
 
 `ergo_common::jsonm` で resolved.json・File API・layers.json を読めることを確かめた (オブジェクト・配列・文字列・
@@ -92,6 +102,7 @@ structure-visualization (`spec/domains/structure-visualization.domain.json`、 2
 5. `declaration_check` — PKG-17。
 6. `version_label` — 版の札の文字列。
 7. `loader` — 上をまとめる入口 (File API が無ければ注記を残して飛ばす)。
+8. `watch_report_reader` / `host_status_reader` / `host_state_loader` — P4 の入力の読み手 (W6)。
 
 ## テスト
 
@@ -101,3 +112,6 @@ structure-visualization (`spec/domains/structure-visualization.domain.json`、 2
 サロゲートペア、 resolved の読み取りと schema 拒否、 最新 index と生成器ターゲットの除外、 version 拒否と返答無し、
 帰属 (ビルドツリー内の第三者を含む)、 既定の除外、 glob、 層、 PKG-17 (テストを戻した場合と link の `requires`)、
 File API 無しの読み込み、 版の札、 パスの正規化。
+`tests/package_model/test_host_state.cpp` と見本 `tests/package_model/fixtures/host_state/` (ホスト `Example`、 resolved / 報告 / 状態):
+`host.id` の読み取り、 3 つの読み取り (非公開・未観測の依存、 review / run の番号と由来、 テストの数)、 欠けた入力は誤りでない、
+壊れた・別 schema の拒否、 未知の `tests.source` は未実行。

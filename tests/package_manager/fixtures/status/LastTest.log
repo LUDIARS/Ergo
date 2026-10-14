@@ -1,0 +1,35 @@
+Start testing: Oct 15 10:00 UTC
+----------------------------------------------------------
+1/3 Testing: test_alpha
+1/3 Test: test_alpha
+Command: "test_alpha"
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_alpha" end time: Oct 15 10:00 UTC
+"test_alpha" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/3 Testing: test_beta
+2/3 Test: test_beta
+Output:
+----------------------------------------------------------
+  Test Passed. (indented program output is not a result line)
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Failed.
+"test_beta" end time: Oct 15 10:00 UTC
+----------------------------------------------------------
+
+3/3 Testing: test_gamma
+3/3 Test: test_gamma
+----------------------------------------------------------
+Test Passed.
+"test_gamma" end time: Oct 15 10:00 UTC
+----------------------------------------------------------
+
+End testing: Oct 15 10:00 UTC

@@ -1164,6 +1164,9 @@ if(ERGO_BUILD_PACKAGE_MODEL)
         src/package_model/declaration_check.cpp
         src/package_model/version_label.cpp
         src/package_model/loader.cpp
+        src/package_model/watch_report_reader.cpp
+        src/package_model/host_status_reader.cpp
+        src/package_model/host_state_loader.cpp
     )
     target_include_directories(ergo_package_model PUBLIC include)
     target_link_libraries(ergo_package_model PUBLIC ergo_common)
@@ -1171,7 +1174,8 @@ if(ERGO_BUILD_PACKAGE_MODEL)
         target_compile_options(ergo_package_model PUBLIC /utf-8)
     endif()
     if(ERGO_BUILD_TESTS)
-        add_executable(test_package_model tests/package_model/test_package_model.cpp)
+        add_executable(test_package_model tests/package_model/test_package_model.cpp
+            tests/package_model/test_host_state.cpp)
         target_link_libraries(test_package_model PRIVATE ergo_package_model ergo_gtest_main)
         target_compile_definitions(test_package_model PRIVATE
             ERGO_PACKAGE_MODEL_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_model/fixtures")
@@ -1218,6 +1222,8 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
         src/package_viz/split.cpp
         src/package_viz/fit.cpp
         src/package_viz/usage_view.cpp
+        src/package_viz/host_labels.cpp
+        src/package_viz/host_view.cpp
     )
     target_include_directories(ergo_package_viz PUBLIC include)
     target_link_libraries(ergo_package_viz PUBLIC ergo_package_model ergo_package_scan ergo_graph_layout)
@@ -1227,13 +1233,16 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
         tools/package_viz/cli_options.cpp
         tools/package_viz/version_probe.cpp
         tools/package_viz/usage_command.cpp
+        tools/package_viz/host_command.cpp
     )
     set_target_properties(ergo_package_viz_cli PROPERTIES OUTPUT_NAME ergo_package_viz)
     target_link_libraries(ergo_package_viz_cli PRIVATE ergo_package_viz)
 
-    # cmake --build <build> --target ergo_package_graphs → <build>/graphs/{packages,targets,usage}.tela
+    # cmake --build <build> --target ergo_package_graphs → <build>/graphs/{packages,targets,usage,host}.tela
     # (P1 / P2 はトップの構成の resolved.json と File API の返答、 P3 はマニフェストの observe が指す
-    # ERGO_PACKAGES_SIBLING_ROOT の兄弟チェックアウト。 未設定なら観測対象は未観測として描く)。
+    # ERGO_PACKAGES_SIBLING_ROOT の兄弟チェックアウト。 未設定なら観測対象は未観測として描く。
+    # P4 はトップのソース (ホスト) の .ergo/watch-report.json と <build>/ergo-packages.status.json
+    # (ergo_pkg watch / ergo_pkg status が書く。 無ければ札は "—")。
     set(_ergo_graphs_dir "${CMAKE_BINARY_DIR}/graphs")
     set(_ergo_usage_root "")
     if(ERGO_PACKAGES_SIBLING_ROOT)
@@ -1248,6 +1257,8 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view usage ${_ergo_usage_root}
                 --manifest "${CMAKE_CURRENT_SOURCE_DIR}/ergo-packages.json"
                 --out "${_ergo_graphs_dir}/usage.tela"
+        COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view host --host "${CMAKE_SOURCE_DIR}"
+                --out "${_ergo_graphs_dir}/host.tela"
         DEPENDS ergo_package_viz_cli
         COMMENT "ergo_package_viz: writing package graphs to ${_ergo_graphs_dir}"
         VERBATIM)
@@ -1256,7 +1267,8 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
 
     if(ERGO_BUILD_TESTS)
         add_executable(test_package_viz tests/package_viz/test_package_viz.cpp
-            tests/package_viz/test_usage_view.cpp)
+            tests/package_viz/test_usage_view.cpp
+            tests/package_viz/test_host_view.cpp)
         target_link_libraries(test_package_viz PRIVATE ergo_package_viz ergo_gtest_main)
         target_compile_definitions(test_package_viz PRIVATE
             ERGO_PACKAGE_MODEL_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_model/fixtures"
@@ -1305,6 +1317,8 @@ if(ERGO_BUILD_PACKAGE_MANAGER)
         src/package_manager/declaration_edit.cpp
         src/package_manager/declaration_add.cpp
         src/package_manager/declaration_remove.cpp
+        src/package_manager/test_results.cpp
+        src/package_manager/host_status.cpp
     )
     target_include_directories(ergo_package_manager PUBLIC include)
     target_link_libraries(ergo_package_manager PUBLIC ergo_common)
@@ -1319,7 +1333,8 @@ if(ERGO_BUILD_PACKAGE_MANAGER)
             tests/package_manager/test_package_list.cpp
             tests/package_manager/test_json_edit.cpp
             tests/package_manager/test_declaration_edit.cpp
-            tests/package_manager/test_rev_resolution.cpp)
+            tests/package_manager/test_rev_resolution.cpp
+            tests/package_manager/test_host_status.cpp)
         target_link_libraries(test_package_manager PRIVATE ergo_package_manager ergo_gtest_main)
         target_compile_definitions(test_package_manager PRIVATE
             ERGO_PACKAGE_MANAGER_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/package_manager/fixtures"
@@ -1395,6 +1410,8 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
         tools/package_cli/cmd_add.cpp
         tools/package_cli/cmd_remove.cpp
         tools/package_cli/cmd_update.cpp
+        tools/package_cli/status_inputs.cpp
+        tools/package_cli/cmd_status.cpp
     )
     set_target_properties(ergo_pkg_cli PROPERTIES OUTPUT_NAME ergo_pkg)
     target_link_libraries(ergo_pkg_cli PRIVATE ergo_package_manager)
@@ -1419,6 +1436,16 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
                     -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
                     -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_cli_edit.cmake)
+        endif()
+        if(TARGET ergo_package_viz_cli)
+            # W6: ergo_pkg status → ergo_package_viz --view host (JUnit 見本・欠けた入力・決定性)。
+            add_test(NAME test_package_host_view
+                COMMAND ${CMAKE_COMMAND}
+                    -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/package_host_view
+                    -DERGO_PKG_CLI=$<TARGET_FILE:ergo_pkg_cli>
+                    -DERGO_PACKAGE_VIZ_CLI=$<TARGET_FILE:ergo_package_viz_cli>
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_package_host_view.cmake)
         endif()
     endif()
     # W3: outdated / watch (ergo_package_watch があるときだけ)。

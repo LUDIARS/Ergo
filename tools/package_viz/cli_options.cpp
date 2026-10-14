@@ -17,11 +17,17 @@ const char* usage() {
            "                   [--include-tests] [--config NAME] [--layers FILE] [--resolved FILE]\n"
            "                   [--no-version-probe] --out FILE.tela\n"
            "  ergo_package_viz <build-dir> --check [--include-tests] [--config NAME]\n"
+           "  ergo_package_viz <build-dir> --view usage [--root DIR] [--manifest FILE] --out FILE.tela\n"
+           "  ergo_package_viz <build-dir> --view host [--host DIR] [--report FILE] [--status FILE]\n"
+           "                   [--resolved FILE] --out FILE.tela\n"
            "\n"
            "  --view packages  P1: package versions (pin / SHA / features / marks)\n"
            "  --view targets   P2: target link graph grouped by .anatomia/layers.json\n"
            "  --focus X        keep nodes matching a package / layer / target and their neighbours\n"
            "  --expand P       targets view: do not collapse package P (host and ergo always expand)\n"
+           "  --view usage     P3: usage observed in sibling checkouts\n"
+           "  --view host      P4: one host's state from resolved.json, <host>/.ergo/watch-report.json and\n"
+           "                   <build>/ergo-packages.status.json (a missing input is still drawn)\n"
            "  --check          PKG-17: exit 1 when a real link is missing from the manifest\n"
            "Oversized views are reduced, collapsed and finally split into FILE.N.tela plus\n"
            "FILE.index.tela; a view that exceeds the Tela limits is never written.\n";
@@ -48,8 +54,10 @@ bool parse_options(const std::vector<std::string>& args, Options& o, std::string
                 o.view.view = View::Targets;
             } else if (v == "usage") {
                 o.view.view = View::Usage;
+            } else if (v == "host") {
+                o.view.view = View::Host;
             } else {
-                return fail(error, "unknown view '" + v + "' (packages|targets|usage)");
+                return fail(error, "unknown view '" + v + "' (packages|targets|usage|host)");
             }
             have_view = true;
         } else if (a == "--focus") {
@@ -72,6 +80,12 @@ bool parse_options(const std::vector<std::string>& args, Options& o, std::string
             if (!value(o.root)) return false;
         } else if (a == "--manifest") {
             if (!value(o.manifest)) return false;
+        } else if (a == "--host") {
+            if (!value(o.host_dir)) return false;
+        } else if (a == "--report") {
+            if (!value(o.report)) return false;
+        } else if (a == "--status") {
+            if (!value(o.status)) return false;
         } else if (a == "--scan") {
             o.scan = true;
         } else if (a == "--include-tests") {
@@ -91,7 +105,7 @@ bool parse_options(const std::vector<std::string>& args, Options& o, std::string
     if (o.build_dir.empty()) return fail(error, "missing <build-dir>");
     if (o.check && o.scan) return fail(error, "--check and --scan are exclusive");
     if (o.check || o.scan) return true;
-    if (!have_view) return fail(error, "missing --view packages|targets|usage");
+    if (!have_view) return fail(error, "missing --view packages|targets|usage|host");
     if (o.out.empty()) return fail(error, "missing --out FILE.tela");
     return true;
 }

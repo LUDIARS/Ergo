@@ -12,7 +12,8 @@
     "spec/feature/package-manager.md",
     "spec/module/package_manager.md",
     "spec/module/package_watch.md",
-    "spec/data/ergo-watch-report.md"
+    "spec/data/ergo-watch-report.md",
+    "spec/data/ergo-packages-status.md"
   ],
   "membership": [
     {

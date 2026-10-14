@@ -5,19 +5,23 @@
 //   ergo_package_viz build --check            # PKG-17 宣言漏れで終了コード 1
 //   ergo_package_viz build --view usage --root <兄弟チェックアウトの親> --out usage.tela
 //   ergo_package_viz build --scan --root <dir> # 観測の辺を根拠付きで表示
+//   ergo_package_viz build --view host --host <host> --out host.tela
 //   tela_view --font <file.ttf> --graph packages.tela
 //
 // 入力は構成時にハブが書いた <build>/ergo-packages.resolved.json と CMake File API の返答。
 // usage / scan はマニフェストの observe が指す兄弟チェックアウトを読む (ergo_package_scan)。
+// host は resolved.json・<host>/.ergo/watch-report.json・ergo-packages.status.json を読む (欠けても描く)。
 // 終了コード: 0 成功 / 1 宣言漏れ (--check) / 2 引数・入力の誤り / 3 図にできない・書けない。
 
 #include "cli_options.h"
+#include "host_command.h"
 #include "usage_command.h"
 #include "version_probe.h"
 
 #include "ergo/package_model/declaration_check.h"
 #include "ergo/package_model/loader.h"
 #include "ergo/package_viz/fit.h"
+#include "ergo/package_viz/host_view.h"
 #include "ergo/package_viz/usage_view.h"
 #include "ergo/tela_graph/writer.h"
 
@@ -86,6 +90,18 @@ int run_usage(const package_viz::cli::Options& o) {
     return write_result(result, o.out);
 }
 
+int run_host(const package_viz::cli::Options& o) {
+    const auto state = package_model::load_host_state(package_viz::cli::host_paths_from_options(o));
+    for (const auto& note : state.notes) std::fprintf(stderr, "ergo_package_viz: %s\n", note.c_str());
+    package_viz::FitResult result;
+    std::string error;
+    if (!package_viz::make_host_view(state, o.view, result, &error)) {
+        std::fprintf(stderr, "ergo_package_viz: %s\n", error.c_str());
+        return 3;
+    }
+    return write_result(result, o.out);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -101,6 +117,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (o.scan || (!o.check && o.view.view == package_viz::View::Usage)) return run_usage(o);
+    if (!o.check && o.view.view == package_viz::View::Host) return run_host(o);
 
     package_model::LoadOptions load;
     load.build_dir          = o.build_dir;

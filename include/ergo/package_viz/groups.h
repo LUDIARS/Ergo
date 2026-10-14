@@ -5,6 +5,7 @@
 /// P1 packages: Ergo / 描画 / 可視化 / ツール / 第三者 / 観測: MUSA / 観測: 関連 / host
 /// P2 targets : `.anatomia/layers.json` の 5 層 + 外部パッケージ + 第三者 + 循環
 /// P3 usage   : Ergo / ツール / MUSA / 関連 / 共有 TS / 未観測
+/// P4 host    : host / Ergo / 依存 / 更新: タグ・main / 更新: 審査中・作業中 / 検査
 
 #include "ergo/graph_layout/layered_layout.h"
 
@@ -35,6 +36,12 @@ inline constexpr const char* kGroupCycle          = "cycle";
 inline constexpr const char* kGroupSharedTs   = "shared_ts";
 inline constexpr const char* kGroupUnobserved = "unobserved";
 
+// P4 (host / Ergo は P1 と同じ ID)
+inline constexpr const char* kGroupDependency = "dependency";
+inline constexpr const char* kGroupUpdate     = "update";
+inline constexpr const char* kGroupReview     = "review";
+inline constexpr const char* kGroupCheck      = "check";
+
 /// P1 のグループ (列順)。
 std::vector<graph_layout::LayoutGroup> package_groups();
 
@@ -43,6 +50,9 @@ std::vector<graph_layout::LayoutGroup> target_groups();
 
 /// P3 のグループ (列順)。
 std::vector<graph_layout::LayoutGroup> usage_groups();
+
+/// P4 のグループ (列順)。
+std::vector<graph_layout::LayoutGroup> host_groups();
 
 /// 分割の索引図のグループ。
 std::vector<graph_layout::LayoutGroup> index_groups();

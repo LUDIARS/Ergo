@@ -24,5 +24,6 @@ int run_remove(const Args& args);
 int run_update(const Args& args);
 int run_outdated(const Args& args);
 int run_watch(const Args& args);
+int run_status(const Args& args);
 
 } // namespace ergo::package_cli

@@ -117,6 +117,9 @@ bool make_view(const package_model::PackageModel& model, const ViewOptions& o, F
     if (o.view == View::Usage) {
         return fail(error, "the usage view is built from a scan (make_usage_view)");
     }
+    if (o.view == View::Host) {
+        return fail(error, "the host view is built from the host state (make_host_view)");
+    }
     if (o.view == View::Targets && !model.has_codemodel) {
         return fail(error, "the targets view needs the CMake File API reply (codemodel v2)");
     }

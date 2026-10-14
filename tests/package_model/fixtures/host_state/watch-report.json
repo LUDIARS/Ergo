@@ -1,0 +1,62 @@
+{
+  "dependencies": [
+    {
+      "as_of": "ls-remote",
+      "code": "Ex",
+      "name": "examplepriv",
+      "observed": false,
+      "owner": "host",
+      "pin": {"rev": "0123456789abcdef0123456789abcdef01234567", "tag": ""},
+      "private": true,
+      "reason": "git ls-remote failed (offline or not reachable)",
+      "sibling_behind": null,
+      "track": {"behind": null, "branch": "main", "head": "", "on_track": null},
+      "updates": []
+    },
+    {
+      "as_of": "ls-remote",
+      "code": "Eg",
+      "name": "ergo",
+      "observed": true,
+      "owner": "host",
+      "pin": {"rev": "7ea616e876f6aaaabbbbccccddddeeeeffff0000", "tag": "v0.9.0"},
+      "private": false,
+      "reason": "",
+      "sibling_behind": null,
+      "track": {"behind": 18, "branch": "main", "head": "aaaa000011112222333344445555666677778888", "on_track": true},
+      "updates": [
+        {"behind": 12, "dependency": "ergo", "from_rev": "7ea616e876f6aaaabbbbccccddddeeeeffff0000", "from_tag": "v0.9.0", "kind": "tag", "next": "ergo_pkg update ergo --to v0.10.0", "strict_ok": true, "subject": "v0.10.0", "to_rev": "bbbb000011112222333344445555666677778888", "to_tag": "v0.10.0", "warning": false},
+        {"behind": 18, "dependency": "ergo", "from_rev": "7ea616e876f6aaaabbbbccccddddeeeeffff0000", "from_tag": "v0.9.0", "kind": "track", "next": "ergo_pkg update ergo --to main", "strict_ok": false, "subject": "aaaa000011112222333344445555666677778888", "to_rev": "aaaa000011112222333344445555666677778888", "to_tag": "", "warning": false}
+      ]
+    },
+    {
+      "as_of": "ls-remote",
+      "code": "Pc",
+      "name": "pictor",
+      "observed": true,
+      "owner": "ergo",
+      "pin": {"rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "tag": "v2.2.0"},
+      "private": false,
+      "reason": "",
+      "sibling_behind": null,
+      "track": {"behind": 41, "branch": "main", "head": "cccc000011112222333344445555666677778888", "on_track": true},
+      "updates": [
+        {"behind": 41, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "kind": "tag", "next": "ergo_pkg update pictor --to v2.3.0", "strict_ok": true, "subject": "v2.3.0", "to_rev": "dddd000011112222333344445555666677778888", "to_tag": "v2.3.0", "warning": false},
+        {"behind": 41, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "kind": "track", "next": "ergo_pkg update pictor --to main", "strict_ok": false, "subject": "cccc000011112222333344445555666677778888", "to_rev": "cccc000011112222333344445555666677778888", "to_tag": "", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "1111aaa", "kind": "merged", "next": "", "origin": "pf", "review": 120, "strict_ok": false, "subject": "#120", "to_rev": "", "to_tag": "", "trigger": "", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "2222bbb", "kind": "merged", "next": "", "origin": "ai", "review": 121, "strict_ok": false, "subject": "#121", "to_rev": "", "to_tag": "", "trigger": "concordia", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "3333ccc", "kind": "merged", "next": "", "origin": "human", "review": 122, "strict_ok": false, "subject": "#122", "to_rev": "", "to_tag": "", "trigger": "", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "4f0e9a1", "kind": "review", "next": "", "origin": "pf", "review": 128, "strict_ok": false, "subject": "#128@4f0e9a1", "to_rev": "", "to_tag": "", "trigger": "", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "5a6b7c8", "kind": "review", "next": "", "origin": "ai", "review": 131, "strict_ok": false, "subject": "#131@5a6b7c8", "to_rev": "", "to_tag": "", "trigger": "concordia", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "9d8e7f6", "kind": "review", "next": "", "origin": "human", "review": 133, "strict_ok": false, "subject": "#133@9d8e7f6", "to_rev": "", "to_tag": "", "trigger": "", "warning": false},
+        {"behind": null, "dependency": "pictor", "from_rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f", "from_tag": "v2.2.0", "head": "", "kind": "run", "next": "", "origin": "ai", "review": null, "strict_ok": false, "subject": "run-0001", "to_rev": "", "to_tag": "", "trigger": "concordia", "warning": false}
+      ]
+    }
+  ],
+  "events": [],
+  "generated_at": "2026-10-15T01:15:00Z",
+  "host": "Example",
+  "pending": [],
+  "schema": 1,
+  "sources": {"concordia": "ok", "revisor": "ok"}
+}

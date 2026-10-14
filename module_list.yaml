@@ -360,7 +360,7 @@ modules:
     status: preview
 
   - name: ergo_package_model
-    summary: ergo-packages.resolved.json と CMake File API codemodel v2 を読むパッケージ構成の値型 (帰属・既定の除外・層・PKG-17 宣言漏れ)
+    summary: ergo-packages.resolved.json と CMake File API codemodel v2 を読むパッケージ構成の値型 (帰属・既定の除外・層・PKG-17 宣言漏れ)、 P4 の入力 (watch の報告・status.json) の読み手
     category: システム
     header_dir: include/ergo/package_model/
     source_dir: src/package_model/
@@ -382,7 +382,7 @@ modules:
     status: preview
 
   - name: ergo_package_viz
-    summary: パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) / 使用関係図 (P3) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs
+    summary: パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) / 使用関係図 (P3) / ホスト状態図 (P4) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs
     category: システム
     header_dir: include/ergo/package_viz/
     source_dir: src/package_viz/
@@ -393,7 +393,7 @@ modules:
     status: preview
 
   - name: ergo_package_manager
-    summary: ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧・書式を保つ書き換えと持ち主の判定 + CLI ergo_pkg (init / list / doctor / fetch / add / remove / update)
+    summary: ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧・書式を保つ書き換えと持ち主の判定・テスト結果の集計と status.json の書き手 + CLI ergo_pkg (init / list / doctor / fetch / add / remove / update / status)
     category: システム
     header_dir: include/ergo/package_manager/
     source_dir: src/package_manager/

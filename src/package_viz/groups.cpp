@@ -39,6 +39,17 @@ std::vector<graph_layout::LayoutGroup> usage_groups() {
     };
 }
 
+std::vector<graph_layout::LayoutGroup> host_groups() {
+    return {
+        {kGroupHost,       "host",                {96, 125, 139}},
+        {kGroupErgo,       "Ergo",                {66, 133, 244}},
+        {kGroupDependency, "依存",                {0, 150, 136}},
+        {kGroupUpdate,     "更新: タグ・main",    {245, 166, 35}},
+        {kGroupReview,     "更新: 審査中・作業中", {171, 71, 188}},
+        {kGroupCheck,      "検査",                {229, 57, 53}},
+    };
+}
+
 std::vector<graph_layout::LayoutGroup> index_groups() {
     return {{"part", "分割した図", {66, 133, 244}}};
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Example" tests="5" failures="1" disabled="1" skipped="1" hostname="" time="3" timestamp="2026-10-15T01:00:00">
+	<testcase name="test_alpha" classname="test_alpha" time="0.5" status="run">
+		<system-out>ok</system-out>
+	</testcase>
+	<testcase name="test_beta" classname="test_beta" time="0.5" status="run">
+		<system-out>ok</system-out>
+	</testcase>
+	<testcase name="test_gamma" classname="test_gamma" time="0.5" status="run"/>
+	<testcase name="test_delta" classname="test_delta" time="1.0" status="fail">
+		<failure message="Failed">expected 1, got 2</failure>
+	</testcase>
+	<testcase name="test_epsilon" classname="test_epsilon" time="0" status="disabled">
+		<skipped message="Disabled"/>
+	</testcase>
+</testsuite>

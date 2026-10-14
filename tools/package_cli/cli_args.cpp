@@ -40,6 +40,8 @@ bool allowed_for(const std::string& command, Allowed& out) {
     } else if (command == "outdated") {
         out.values.insert({"--cache", "--root", "--fail-on"});
         out.flags = {"--json"};
+    } else if (command == "status") {
+        out.values.insert({"--build", "--junit", "--out"});
     } else if (command == "watch") {
         out.values.insert({"--state", "--out", "--cache", "--root", "--revisor-url", "--concordia-url"});
     } else {
@@ -69,6 +71,7 @@ void assign(Args& a, const std::string& key, const std::string& value) {
     else if (key == "--to") a.to = value;
     else if (key == "--state") a.state = value;
     else if (key == "--out") a.out = value;
+    else if (key == "--junit") a.junit = value;
     else if (key == "--root") a.root = value;
     else if (key == "--fail-on") a.fail_on = value;
     else if (key == "--revisor-url") a.revisor_url = value;
@@ -134,6 +137,7 @@ const char* usage() {
            "                                                       [--host <dir>] [--ergo <dir>]\n"
            "  ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>] [--cache <dir>] [--root <dir>]\n"
            "                  [--revisor-url <loopback url>] [--concordia-url <loopback url>] [--ergo <dir>]\n"
+           "  ergo_pkg status --build <dir> [--junit <ctest junit xml>] [--out <file>] [--host <dir>]\n"
            "exit codes: 0 ok / 1 findings to act on / 2 bad arguments or input / 3 cannot write or fetch\n";
 }
 

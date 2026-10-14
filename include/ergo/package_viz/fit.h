@@ -27,7 +27,7 @@ struct FitResult {
     std::vector<std::string>       steps;    ///< かけた手順 (表示用)
 };
 
-/// 図を作る (P1 / P2。 P3 は usage_view.h の make_usage_view)。
+/// 図を作る (P1 / P2。 P3 は usage_view.h の make_usage_view、 P4 は host_view.h の make_host_view)。
 /// 焦点が何にも当たらない・分けても上限に収まらないときは false と理由。
 bool make_view(const package_model::PackageModel& model, const ViewOptions& options,
                FitResult& result, std::string* error = nullptr);

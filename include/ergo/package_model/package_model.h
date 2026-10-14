@@ -98,6 +98,7 @@ struct PackageModel {
     bool                      strict = false;
     std::string               platform;
     std::string               manifest;     ///< マニフェストのパス (Ergo のソース相対のことがある)
+    std::string               host_id;      ///< `host.id` (ホストのコード。 宣言が無ければ project 名)
     std::vector<Package>      packages;     ///< 名前順
     std::vector<Module>       modules;      ///< 名前順
     std::vector<ObserveEntry> observe;      ///< 名前順 (packages にも Observe として載る)
