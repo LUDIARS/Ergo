@@ -6,6 +6,7 @@ import {
     DEFAULT_EFFECT,
     SCHEMA_VERSION,
 } from "../particle/schema.js";
+import { PARTICLE_RANGES as R, COLOR_RANGE, type ValueRange } from "../particle/ranges.js";
 import type { VfxPreset } from "./schema.js";
 
 const clamp = (v: unknown, lo: number, hi: number, def: number): number => {
@@ -13,16 +14,18 @@ const clamp = (v: unknown, lo: number, hi: number, def: number): number => {
     return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def;
 };
 
+const within = (v: unknown, r: ValueRange, def: number): number => clamp(v, r.lo, r.hi, def);
+
 const rgba = (
     c: unknown,
     def: [number, number, number, number],
 ): [number, number, number, number] => {
     if (!Array.isArray(c) || c.length < 4) return def;
     return [
-        clamp(c[0], 0, 1, def[0]),
-        clamp(c[1], 0, 1, def[1]),
-        clamp(c[2], 0, 1, def[2]),
-        clamp(c[3], 0, 1, def[3]),
+        within(c[0], COLOR_RANGE, def[0]),
+        within(c[1], COLOR_RANGE, def[1]),
+        within(c[2], COLOR_RANGE, def[2]),
+        within(c[3], COLOR_RANGE, def[3]),
     ];
 };
 
@@ -40,34 +43,34 @@ function sanitizeConfig(raw: unknown): ParticleEffectConfig {
         version: SCHEMA_VERSION,
         name: typeof c.name === "string" && c.name ? c.name : d.name,
         emission: {
-            rate:     clamp(em.rate,     1, 400,  d.emission.rate),
-            maxAlive: clamp(em.maxAlive, 1, 2000, d.emission.maxAlive),
+            rate:     within(em.rate, R["emission.rate"], d.emission.rate),
+            maxAlive: within(em.maxAlive, R["emission.maxAlive"], d.emission.maxAlive),
         },
         initial: {
             positionShape:          "disc",
             svgSource:              "",
             svgScale:               1,
-            positionRadius:         clamp(in_.positionRadius,         0,   256, d.initial.positionRadius),
-            velocityAngleDeg:       clamp(in_.velocityAngleDeg,       0,   360, d.initial.velocityAngleDeg),
-            velocityAngleSpreadDeg: clamp(in_.velocityAngleSpreadDeg, 0,   360, d.initial.velocityAngleSpreadDeg),
-            speedMin:               clamp(in_.speedMin,               0,   600, d.initial.speedMin),
-            speedMax:               clamp(in_.speedMax,               0,   600, d.initial.speedMax),
-            lifetimeMin:            clamp(in_.lifetimeMin,            0.05, 6,  d.initial.lifetimeMin),
-            lifetimeMax:            clamp(in_.lifetimeMax,            0.05, 6,  d.initial.lifetimeMax),
-            size:                   clamp(in_.size,                   0,   64,  d.initial.size),
+            positionRadius:         within(in_.positionRadius, R["initial.positionRadius"], d.initial.positionRadius),
+            velocityAngleDeg:       within(in_.velocityAngleDeg, R["initial.velocityAngleDeg"], d.initial.velocityAngleDeg),
+            velocityAngleSpreadDeg: within(in_.velocityAngleSpreadDeg, R["initial.velocityAngleSpreadDeg"], d.initial.velocityAngleSpreadDeg),
+            speedMin:               within(in_.speedMin, R["initial.speedMin"], d.initial.speedMin),
+            speedMax:               within(in_.speedMax, R["initial.speedMax"], d.initial.speedMax),
+            lifetimeMin:            within(in_.lifetimeMin, R["initial.lifetimeMin"], d.initial.lifetimeMin),
+            lifetimeMax:            within(in_.lifetimeMax, R["initial.lifetimeMax"], d.initial.lifetimeMax),
+            size:                   within(in_.size, R["initial.size"], d.initial.size),
             color:                  rgba(in_.color, d.initial.color),
         },
         overLife: {
-            sizeStart:       clamp(ol.sizeStart,       0, 8, 1),
-            sizeEnd:         clamp(ol.sizeEnd,         0, 8, 0),
+            sizeStart:       within(ol.sizeStart, R["overLife.sizeStart"], 1),
+            sizeEnd:         within(ol.sizeEnd, R["overLife.sizeEnd"], 0),
             colorStart:      rgba(ol.colorStart, d.overLife.colorStart),
             colorEnd:        rgba(ol.colorEnd,   d.overLife.colorEnd),
-            velocityDamping: clamp(ol.velocityDamping, 0, 1, d.overLife.velocityDamping),
+            velocityDamping: within(ol.velocityDamping, R["overLife.velocityDamping"], d.overLife.velocityDamping),
         },
         forces: {
             gravity: [
-                clamp(grav[0], -600, 600, d.forces.gravity[0]),
-                clamp(grav[1], -600, 600, d.forces.gravity[1]),
+                within(grav[0], R["forces.gravity.x"], d.forces.gravity[0]),
+                within(grav[1], R["forces.gravity.y"], d.forces.gravity[1]),
             ],
         },
         render: {

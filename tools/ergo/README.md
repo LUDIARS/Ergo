@@ -18,6 +18,7 @@ Default port: **5170** (override with `PORT=...`).
 | `ws://localhost:5170/particle/ws`  | Particle WS hub (engine clients via `ergo_particle`)   |
 | `http://localhost:5170/variable/`  | Variable editor UI                                     |
 | `ws://localhost:5170/variable/ws`  | Variable WS hub (engine clients via `ergo_bind`)       |
+| `http://localhost:5170/vfx-breed/` | Breed particle effects by picking favourites           |
 | `http://localhost:5170/api/health` | Aggregated health of every plugin                      |
 
 Engine clients always speak to these URLs regardless of whether the

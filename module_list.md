@@ -8,7 +8,7 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 | 名前 | 概要 | カテゴリ | 公開ヘッダ | 実装 | 仕様書 | 付随ツール |
 |---|---|---|---|---|---|---|
 | `ergo_input`        | マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ (inject API でテスト可能) | システム | `include/ergo/input/`        | `src/input/`        | `spec/feature/module/input.md`        | — |
-| `ergo_particle`     | CPU パーティクル sim + Pictor Vulkan ビルボード renderer (optional)                   | システム | `include/ergo/particle/`     | `src/particle/`     | `spec/feature/module/particle.md`     | `tools/ergo/` (`particle` plugin) |
+| `ergo_particle`     | CPU パーティクル sim + Pictor Vulkan ビルボード renderer (optional)                   | システム | `include/ergo/particle/`     | `src/particle/`     | `spec/feature/module/particle.md`     | `tools/ergo/` (`particle` / `vfx-suggest` / `vfx-breed` plugin) |
 | `ergo_gpu_particle` | Shuriken 相当の GPU compute パーティクル。`IGpuBackend` 抽象で Vulkan/WebGPU 両対応   | システム | `include/ergo/gpu_particle/` | `src/gpu_particle/` | `spec/feature/module/gpu_particle.md` | — |
 | `ergo_bind`         | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`). アウトバウンド接続             | システム | `include/ergo/bind/`         | `src/bind/`         | `spec/feature/module/bind.md`         | `tools/ergo/` (`variable` plugin) |
 | `ergo_actor`        | シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (`ergo_bind` に委譲) | システム | `include/ergo/actor/`        | `src/actor/`        | `spec/feature/module/actor.md`        | `tools/ergo/` (`variable` plugin で表示) |
@@ -100,3 +100,4 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
 
 - `particle` — 旧 `tools/particle-editor/` の移植
 - `variable` — 旧 `tools/variable-editor/` の移植
+- `vfx-breed` — 変異体を並べて人間が選び、選んだ個体を親に次世代を作る対話的進化で `ParticleEffectConfig` を育てる (適応度は人間の目、`spec/feature/tool/ergo.md` の「`vfx-breed`」)

@@ -168,6 +168,49 @@ export default (): Plugin => {
 - `BIND_VAR()` 登録を受ける engine ↔ UI ハブ
 - `hello` メッセージでロール (`engine` / `ui`) を識別
 
+### `vfx-breed`
+- エフェクトを「選んで育てる」対話的進化。 変異体を並べ、 人間が選んだ個体を親に
+  次世代を作って `ParticleEffectConfig` を詰める。 適応度は人間の目そのもので、
+  自動の品質指標・画像類似度は持たない。 `vfx-suggest` (文章 → LLM → 設定) と並ぶ
+  もう 1 つの作り方で、 両者は排他ではない (vfx-suggest の結果を起点にできる)
+- 配置: `tools/ergo/src/plugins/vfx-breed/`。 schema は `particle/schema.ts` の
+  `ParticleEffectConfig` をそのまま使う。 数値の値域は `particle/ranges.ts` の 1 表を
+  vfx-suggest の sanitize と共有する (重複実装しない)
+- 遺伝子 (`genes.ts` / `genome.ts`): 数値項目 (emission / initial / overLife /
+  forces) を値域で 0..1 に正規化したもの。 `emission.rate` / `maxAlive` は対数尺度、
+  発射方向と色相は環状 (0 と 1 が同じ)。 色 3 つ (`initial.color` /
+  `overLife.colorStart` / `colorEnd`) は HSV + alpha の 4 遺伝子ずつ。
+  `render.blend` / `render.shape` は離散遺伝子。 `positionShape` / `svgSource` /
+  `svgScale` は遺伝子にせず親から引き継ぐ。 戻すときは値域に丸め、
+  `speedMin ≤ speedMax`・`lifetimeMin ≤ lifetimeMax` を保ち、 `maxAlive` は整数にする
+- 世代 (`breed.ts`): 既定 8 体 (4〜16)。 親が 1 体なら変異だけ、 2 体以上なら
+  子ごとに相異なる 2 親を選んで一様交叉 → 変異。 変異 (`mutate.ts`) は正規化空間で
+  `strength × (bias + N(0,1))`、 離散遺伝子は `min(0.25, 0.5 × strength)` の確率で
+  反転。 乱数は seed 付きの決定的 RNG (mulberry32) で、 同じ入力と seed なら同じ子。
+  seed を省くとサーバが決めて応答に載せる
+- 方向指示 (`direction.ts` / `advisor*.ts`): 自由文 (例「もっと鋭く短く」) が付いた
+  ときだけ、 LLM に「どの遺伝子をどちらへ動かすか」 の重み (-1..1) だけを返させ、
+  変異の平均をずらす。 LLM は値そのものを作らない。 バックエンドは vfx-suggest と同じ
+  `ERGO_VFX_BACKEND` (`cli` / `sdk`) / `ERGO_VFX_MODEL`。 LLM が無い・失敗したときは
+  `direction.status` が `unavailable` / `failed` になるだけで、 進化はそのまま動く
+- API (サーバは状態を持たない。 履歴はブラウザ側):
+  - `POST /vfx-breed/api/generation` — `{ parents, selected?, direction?, strength?,
+    seed?, count?, generation? }` → `{ ok, children: [{ config, parents }], seed,
+    generation, direction: { status, weights?, reason? } }`。 `selected` は parents の
+    添字 (省略で全部)、 親が無ければ既定エフェクトが親
+  - `GET /vfx-breed/api/seeds` — 起点 (既定エフェクト + vfx-suggest のカタログ)
+  - `GET /vfx-breed/api/genes` — 遺伝子表 (id / 値域 / 尺度)
+  - `GET /vfx-breed/api/health` — 方向指示 (LLM) の状態
+- UI (`ui/`): 起点 (既定 / カタログ / particle エディタの現在値 / JSON 貼り付け) →
+  世代のグリッド (各セルでブラウザ内プレビュー)、 複数選択、 方向の自由文、 変異の
+  強さ、 体数、 seed、 次世代ボタン、 世代履歴 (戻れる。 古い世代から育てると以降の
+  履歴は置き換わる)。 各個体は particle プラグインの WS (`replace`) へ送ってエンジン
+  側で即プレビュー、 JSON 書き出し、 vfx-suggest の `ks-emitter` での書き出しができる
+- プレビュー描画は particle エディタの emit / step / draw を ES module にした
+  `particle/ui/preview.js` (`/particle/preview.js`) を使う。 出現位置は disc のみで、
+  svgStroke / svgFill は disc で代用する (ergo_particle と同じ)
+- テスト: `tools/ergo/tests/vfx-breed/` (`npm test`、 node:test + tsx)
+
 > `placer` / `terrain` / `acstage` は AdventureCube 固有のため Ergo から
 > 分離し、`AdventureCube/tools/ac-web/plugins/` の plugin pack へ移設した。
 > 仕様は AC リポ側を参照。
@@ -276,6 +319,9 @@ Electron アプリとして起動した場合のみ、preload 経由で
   使っていた呼び出し側は更新が必要。
 
 ## テスト
+
+単体テストは `npm test` (node:test + tsx、 `tools/ergo/tests/**/*.test.ts`)。
+現状の対象は `vfx-breed` と vfx-suggest の sanitize。
 
 第1弾ではスモークテストのみ:
 - `npm install && npm run start` でサーバが起動すること
