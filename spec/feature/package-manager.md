@@ -298,6 +298,7 @@ S4 (観測 P3) は並行で実装中。W は S4 が触るファイル (`package_
 実装状況: W1 は `spec/tasks/2026-10-14-package-manager-w1.md`、W2 は `spec/tasks/2026-10-15-package-manager-w2.md` (モジュール `spec/module/package_manager.md`)。
 W3 は `spec/tasks/2026-10-15-package-manager-w3.md` (モジュール `spec/module/package_watch.md`、形式 `spec/data/ergo-watch-report.md`)。
 W4 は `spec/tasks/2026-10-15-package-manager-w4.md` (同じモジュールと形式に由来を足した)。
+W5 の Ergo 側 (構成時の 1 行) は `spec/tasks/2026-10-15-package-manager-w5-configure-line.md` (`cmake/packages/ErgoPackageWatchNotice.cmake`)。Excubitor のジョブは Excubitor の PR で行う。
 W6 の Ergo 側 (P4 ホスト状態図) は `spec/tasks/2026-10-15-package-manager-w6.md` (`ergo_pkg status` と形式 `spec/data/ergo-packages-status.md`、
 読み手 `package_model/host_state_reader.h`、 図 `package_viz/host_view.h`、 `ergo_package_graphs` の `host.tela`)。 Ludellus-Native の L1〜L3 は Ludellus-Native の PR で行う。
 §2.1 の `use` / `optional` / `features` を構成の既定値として流す処理と Ergo 自身への PKG-04/05/07 (L1〜L3 の前提) は

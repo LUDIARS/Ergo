@@ -1604,7 +1604,8 @@ endif()
 # (git repositories created by the test). See spec/data/ergo-packages.md.
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_TESTS)
-    foreach(NAME manifest rules cycles features report acquire host_declaration host_defaults)
+    foreach(NAME manifest rules cycles features report acquire host_declaration host_defaults
+                 watch_notice)
         add_test(NAME test_packages_${NAME}
             COMMAND ${CMAKE_COMMAND}
                 -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}

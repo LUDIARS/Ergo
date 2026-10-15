@@ -12,6 +12,9 @@
 #     non-empty cache value wins; resolved.json records which one was used.
 #     The declared Ergo pin (host.ergo.rev) gets PKG-02/04/05/07/08 too
 #     (ErgoPackageErgoPin.cmake).
+#   * When `ergo_pkg watch` left a state file for the host in its default
+#     place, the final phase prints "ergo packages: N update(s) known for
+#     host <code>" (ErgoPackageWatchNotice.cmake). Never fails, no network.
 #   * ERGO_PACKAGES unset -> compatibility mode M0. The hub acquires nothing
 #     and changes nothing: link-package targets the host already created are
 #     recorded as host-unmanaged, every finding is recorded, configure never
@@ -38,6 +41,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageReport.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageResolve.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageHostDefaults.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageErgoPin.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageWatchNotice.cmake")
 
 # Do not create the cache entry when the host already set a normal variable
 # (set(CACHE) would otherwise drop that binding under CMP0126 OLD).
@@ -654,6 +658,15 @@ function(_ergo_packages_evaluate phase)
     foreach(_w IN LISTS _warnings)
         message(STATUS "ergo packages: ${_w}")
     endforeach()
+    # Updates `ergo_pkg watch` already knows for this host (its local state
+    # file only; nothing when there is none, spec/feature/package-manager.md §4).
+    if(phase STREQUAL "final")
+        ergo_pkg_watch_default_state_dir(_watch_dir)
+        ergo_pkg_watch_notice(_watch_line CODE "${_r_HOST_ID}" STATE_DIR "${_watch_dir}")
+        if(NOT _watch_line STREQUAL "")
+            message(STATUS "${_watch_line}")
+        endif()
+    endif()
     if(_mode STREQUAL "M0")
         foreach(_e IN LISTS _errors)
             message(STATUS "ergo packages: ${_e}")
