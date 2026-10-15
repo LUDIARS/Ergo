@@ -17,12 +17,16 @@ GitRemoteSource::GitRemoteSource(std::string cache_dir) : cache_dir_(std::move(c
 pw::RefListing GitRemoteSource::list_refs(const pw::RepoRef& repo) {
     pw::RefListing out;
     out.origin = pw::RefOrigin::Remote;
+    if (!repo.repository.empty() && repo.repository.front() == '-') {
+        out.reason = "repository must not start with '-'";
+        return out;
+    }
     if (!quote_safe(repo.repository)) {
         out.reason = "repository cannot be passed to git";
         return out;
     }
     std::string text;
-    if (!capture({"git", "ls-remote", "--tags", "--heads", repo.repository}, text)) {
+    if (!capture({"git", "ls-remote", "--tags", "--heads", "--", repo.repository}, text)) {
         out.reason = "git ls-remote failed (offline or not reachable)";
         return out;
     }

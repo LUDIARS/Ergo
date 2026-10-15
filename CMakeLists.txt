@@ -1462,6 +1462,16 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
     endif()
     # W3: outdated / watch (ergo_package_watch があるときだけ)。
     if(TARGET ergo_package_watch)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_package_cli_git_remote_source
+                tests/packages/test_git_remote_source.cpp
+                tools/package_cli/git_remote_source.cpp
+                tools/package_cli/git_history.cpp
+                tools/package_cli/file_io.cpp)
+            target_include_directories(test_package_cli_git_remote_source PRIVATE tools/package_cli)
+            target_link_libraries(test_package_cli_git_remote_source PRIVATE ergo_package_watch ergo_package_manager)
+            add_test(NAME test_package_cli_git_remote_source COMMAND test_package_cli_git_remote_source)
+        endif()
         target_sources(ergo_pkg_cli PRIVATE
             tools/package_cli/git_history.cpp
             tools/package_cli/git_remote_source.cpp

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "runtimeFile": "contracts/contract-runtime.mjs",
+  "contractsDir": "tests/packages/contracts",
+  "importFrom": "../../contracts/contract-runtime.mjs",
+  "contracts": [
+    {
+      "id": "C-1",
+      "criterion": "C-1 verifyGitRemoteSource(executable): 先頭ハイフンはプロセス呼び出しなしで未観測となり、通常の取得元はオプション終端後に渡される",
+      "symbol": "verifyGitRemoteSource",
+      "file": "tests/packages/verify_git_remote_source.mjs",
+      "module": "tests/packages/contracts/git-remote-source.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    }
+  ]
+}
