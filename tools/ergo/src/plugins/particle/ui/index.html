@@ -164,7 +164,8 @@
   </aside>
 </div>
 
-<script>
+<script type="module">
+import { emitParticle, advanceParticles, sampleDiscPosition, drawParticles } from "/particle/preview.js";
 "use strict";
 
 // ---------------------------------------------------------------------------
@@ -363,18 +364,6 @@ let lastFrame = performance.now();
 let fps = 0;
 let fpsAccum = 0, fpsCount = 0;
 
-function rand(a, b) { return a + Math.random() * (b - a); }
-function lerp(a, b, t) { return a + (b - a) * t; }
-function lerpColor(a, b, t) {
-  return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t), lerp(a[3],b[3],t)];
-}
-function colorToRgba(c) {
-  const r = Math.round(Math.max(0, Math.min(1, c[0]))*255);
-  const g = Math.round(Math.max(0, Math.min(1, c[1]))*255);
-  const b = Math.round(Math.max(0, Math.min(1, c[2]))*255);
-  return "rgba("+r+","+g+","+b+","+Math.max(0, Math.min(1, c[3]))+")";
-}
-
 // ---------------------------------------------------------------------------
 // SVG emitter support
 // ---------------------------------------------------------------------------
@@ -515,28 +504,12 @@ function sampleSpawnPosition() {
     if (p) return p;
   }
   // Default: uniform inside circle of radius positionRadius.
-  const a = Math.random() * Math.PI * 2;
-  const r = Math.sqrt(Math.random()) * cfg.initial.positionRadius;
-  return [Math.cos(a) * r, Math.sin(a) * r];
+  return sampleDiscPosition(cfg);
 }
 
 function emit() {
-  if (particles.length >= cfg.emission.maxAlive) return;
-  const p = {};
-  const [sx, sy] = sampleSpawnPosition();
-  p.x = sx;
-  p.y = sy;
-  // velocity
-  const ang = (cfg.initial.velocityAngleDeg + rand(-1, 1) * cfg.initial.velocityAngleSpreadDeg/2) * Math.PI / 180;
-  const speed = rand(cfg.initial.speedMin, cfg.initial.speedMax);
-  p.vx = Math.cos(ang) * speed;
-  p.vy = Math.sin(ang) * speed;
-  // life
-  p.lifetime = rand(cfg.initial.lifetimeMin, cfg.initial.lifetimeMax);
-  p.age = 0;
-  p.initSize = cfg.initial.size;
-  p.initColor = cfg.initial.color.slice();
-  particles.push(p);
+  const p = emitParticle(cfg, particles, sampleSpawnPosition);
+  if (p) p.initColor = cfg.initial.color.slice();
 }
 
 function burst(n) {
@@ -550,19 +523,7 @@ function step(dt) {
     while (emitAccum >= 1) { emit(); emitAccum -= 1; }
   }
 
-  // damping factor = velocityDamping^dt (per second)
-  const damp = Math.pow(cfg.overLife.velocityDamping, dt);
-  const gx = cfg.forces.gravity[0], gy = cfg.forces.gravity[1];
-
-  for (let i = particles.length - 1; i >= 0; --i) {
-    const p = particles[i];
-    p.age += dt;
-    if (p.age >= p.lifetime) { particles.splice(i, 1); continue; }
-    p.vx = p.vx * damp + gx * dt;
-    p.vy = p.vy * damp + gy * dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-  }
+  advanceParticles(cfg, particles, dt);
 }
 
 function draw() {
@@ -619,27 +580,7 @@ function draw() {
     ctx.restore();
   }
 
-  // Blend mode
-  ctx.globalCompositeOperation = (cfg.render.blend === "additive") ? "lighter" : "source-over";
-
-  for (const p of particles) {
-    const t = Math.min(1, Math.max(0, p.age / p.lifetime));
-    const sizeMul = lerp(cfg.overLife.sizeStart, cfg.overLife.sizeEnd, t);
-    const size = p.initSize * sizeMul * dpr;
-    if (size <= 0.5) continue;
-    const col = lerpColor(cfg.overLife.colorStart, cfg.overLife.colorEnd, t);
-
-    ctx.fillStyle = colorToRgba(col);
-    if (cfg.render.shape === "square") {
-      ctx.fillRect(ox + p.x*dpr - size/2, oy + p.y*dpr - size/2, size, size);
-    } else {
-      ctx.beginPath();
-      ctx.arc(ox + p.x*dpr, oy + p.y*dpr, size/2, 0, Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-  ctx.globalCompositeOperation = "source-over";
+  drawParticles(cv, ctx, cfg, particles, dpr);
 }
 
 function loop(now) {

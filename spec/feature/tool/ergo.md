@@ -328,3 +328,22 @@ Electron アプリとして起動した場合のみ、preload 経由で
 - `/api/plugins` が JSON で 2 件返すこと
 - `/particle/` / `/variable/` の UI が 200 で返ること
 - ws 接続で `state` / `registry` メッセージが受信できること
+
+## Particle preview shared implementation
+
+Actio: cefe617a-e0ee-445f-93c1-ac6db8c67108. The editor imports the shared
+emission, integration and drawing entry points from /particle/preview.js.
+particle-simulation.js owns particle math; particle-draw.js owns particle canvas
+rendering. Each caller retains its particle array, emission clock and frame loop.
+The editor retains SVG sampling/guides, burst, pause, reset and device-pixel scale.
+Embedded previews retain disc fallback, config-reset semantics and shared frame
+scheduling/disposal. Neither module changes configuration or WebSocket contracts.
+Regression coverage: tools/ergo/tests/particle/preview.test.ts (cap and supplied
+spawn point, damping/gravity/lifetime, scaling/blending/shape, reset/dispose).
+
+Validation for this refactor: node --check passed for the shared JavaScript,
+preview adapter, editor inline module and test source; git diff --check passed.
+Unit tests and browser/service startup were not run by this session. Review must
+verify those separately. Rollback is a revert of this task commit; no data or
+configuration migration is involved. Domain membership: dev-tools (supporting
+developer-tool boundary), existing tools/ergo source/test membership unchanged.
