@@ -12,6 +12,15 @@
       "module": "tests/packages/contracts/git-remote-source.contract.mjs",
       "mode": "observe",
       "sample": 1
+    },
+    {
+      "id": "C-2",
+      "criterion": "C-2 verifyCustosContentLength(executable): 不正な Content-Length は 400 となり、同じサーバで後続の正常リクエストと妥当な本文長が処理される",
+      "symbol": "verifyCustosContentLength",
+      "file": "tests/custos/verify_content_length.mjs",
+      "module": "tests/custos/contracts/content-length.contract.mjs",
+      "mode": "observe",
+      "sample": 1
     }
   ]
 }

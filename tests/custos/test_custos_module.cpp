@@ -157,3 +157,44 @@ TEST(CustosModule, unknown_path_404) {
     EXPECT_NE(resp.find("HTTP/1.0 404"), std::string::npos);
     ergo::custos::shutdown();
 }
+
+TEST(CustosModule, content_length_invalid_returns_400_and_server_survives) {
+    const auto port = start_and_get_port();
+    ASSERT_NE(port, 0);
+
+    for (const std::string value : {"", " \t", "not-a-number",
+                                    "9999999999999999999999999999999999999999"}) {
+        const auto response = http_request(port,
+            "GET /health HTTP/1.0\r\nContent-Length: " + value + "\r\n\r\n");
+        EXPECT_NE(response.find("HTTP/1.0 400 Bad Request"), std::string::npos);
+        EXPECT_NE(response.find("\r\n\r\nbad request"), std::string::npos);
+
+        const auto subsequent = http_request(port, "GET /health HTTP/1.0\r\n\r\n");
+        EXPECT_NE(subsequent.find("HTTP/1.0 200 OK"), std::string::npos);
+    }
+    ergo::custos::shutdown();
+}
+
+TEST(CustosModule, content_length_valid_preserves_body_and_zero_length) {
+    const auto port = start_and_get_port();
+    ASSERT_NE(port, 0);
+    std::atomic<int> calls{0};
+    ergo::custos::set_key_handler([&](int code, bool down) {
+        EXPECT_EQ(code, 87);
+        EXPECT_TRUE(down);
+        ++calls;
+    });
+
+    const std::string body = R"({"code":87,"down":true})";
+    for (const auto& value : {std::to_string(body.size()),
+                              "\t00" + std::to_string(body.size()) + " \t"}) {
+        const auto response = http_request(port,
+            "POST /key HTTP/1.0\r\nContent-Length: " + value + "\r\n\r\n" + body);
+        EXPECT_NE(response.find("HTTP/1.0 204"), std::string::npos);
+    }
+    EXPECT_EQ(calls.load(), 2);
+    const auto zero = http_request(port,
+        "GET /health HTTP/1.0\r\nContent-Length: 0\r\n\r\n");
+    EXPECT_NE(zero.find("HTTP/1.0 200 OK"), std::string::npos);
+    ergo::custos::shutdown();
+}

@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <stdexcept>
 
 #if defined(_WIN32)
 #  define WIN32_LEAN_AND_MEAN
@@ -95,7 +96,14 @@ bool read_request(socket_t fd, HttpRequest& out) {
                 std::string val  = line.substr(colon + 1);
                 while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(0, 1);
                 if (iequals(name, "Content-Length")) {
-                    content_length = std::stoul(val);
+                    try {
+                        content_length = std::stoul(val);
+                    } catch (const std::invalid_argument&) {
+                        // Invalid lengths use the existing bad-request path.
+                        return false;
+                    } catch (const std::out_of_range&) {
+                        return false;
+                    }
                 }
             }
             pos = eol + 2;

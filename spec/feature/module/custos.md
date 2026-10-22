@@ -76,5 +76,19 @@ void on_main_init(VulkanContext& vk_ctx) {
 
 ## テスト
 
+### Content-Length の変換失敗
+
+関連タスク: `actio:45d56235-e75d-4b58-b8db-0e0c87fb54fe`。
+数値に変換できない、または既存の `std::stoul` の範囲外となる
+Content-Length は、リクエスト解析失敗として既存の `400 bad request` を返す。
+変換例外を受信スレッドへ漏らさず、後続の接続を処理できること。
+正常な長さの変換と本文受信は従来どおりとし、本文上限は追加しない。
+
+Augur 計画 (`bug_fix` / `investigate_first`) に対応する回帰ケースは
+`tests/custos/test_custos_module.cpp` の `content_length_*` に追加する。
+空値・空白のみ・非数値・変換範囲外の 400 と後続接続の成功、および
+正常値・前後の空白・先頭ゼロ・ゼロ長の既存動作を確認する。
+依頼に従い、この変更の実装セッションではテストとサービス操作を実行しない。
+
 `tests/custos/test_http.cpp` で HTTP request パーサ単体。
 `tests/custos/test_module.cpp` で start/shutdown のスモーク。
