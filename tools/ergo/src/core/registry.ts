@@ -21,8 +21,10 @@ import makeUiLayoutPlugin       from "../plugins/ui_layout/index.js";
 import makeVfxSuggestPlugin     from "../plugins/vfx-suggest/index.js";
 import makeVfxBreedPlugin       from "../plugins/vfx-breed/index.js";
 import makeSceneEditorPlugin    from "../plugins/scene_editor/index.js";
+import makeStudioPlugin         from "../plugins/studio/index.js";
 
 export const PLUGIN_FACTORIES: PluginFactory[] = [
+    makeStudioPlugin,
     makeParticlePlugin,
     makeVariablePlugin,
     makeRivePlugin,

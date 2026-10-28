@@ -155,8 +155,16 @@ export default (): Plugin => {
 - 既存の plugin pack:
   - PrivateGame: `tools/game-web/plugins/{spawn,skill}`
   - AdventureCube: `tools/ac-web/plugins/{placer,terrain,acstage}`
+- **取得した plugin pack**: `studio` プラグインの「プラグイン」画面で GitHub から取得・承認した
+  pack は `<studio home>/plugins/ledger.json` (`src/core/plugin-ledger.ts`) に記録され、有効なものを
+  `ERGO_PLUGIN_DIR` と同じ扱いで次回起動時に読み込む。取得元の許可・リビジョン固定・承認は
+  [studio.md](studio.md)。
 
 ## 現行プラグイン (組み込み・汎用)
+
+### `studio`
+- デスクトップでゲームを AI と作る画面。LUDIARS の各サービス (Cc / Actio / Br / Curare / Revisor /
+  Excubitor) と Ergo のサーバ側で話す。仕様は [studio.md](studio.md)
 
 ### `particle`
 - 旧 `tools/particle-editor/` の移植

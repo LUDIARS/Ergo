@@ -1,3 +1,4 @@
+// @implements SPEC-ergo-studio-plugins
 /// External plugin loading.
 ///
 /// On top of the built-in plugins (registry.ts), the tool loads plugins
@@ -11,6 +12,9 @@
 ///   PrivateGame -> tools/game-web/plugins/{spawn,skill}
 ///   AdventureCube -> tools/ac-web/plugins/{placer,terrain,acstage}
 ///
+/// Packs fetched and approved in the Studio plugin screen are recorded in
+/// the plugin ledger and loaded the same way when enabled.
+///
 /// A broken pack entry is logged and skipped — it never aborts startup.
 
 import { existsSync } from "node:fs";
@@ -19,6 +23,7 @@ import { delimiter, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { PluginFactory } from "./plugin.js";
+import { enabledPackDirs, readLedger, studioHome } from "./plugin-ledger.js";
 
 /// Load every plugin under a single pack directory.
 async function loadPack(dir: string): Promise<PluginFactory[]> {
@@ -58,14 +63,17 @@ async function loadPack(dir: string): Promise<PluginFactory[]> {
     return out;
 }
 
-/// Collect plugin factories from every directory in `ERGO_PLUGIN_DIR`.
+/// Collect plugin factories from every directory in `ERGO_PLUGIN_DIR`, then
+/// from the packs enabled in the Studio plugin ledger (core/plugin-ledger.ts).
 export async function loadExternalFactories(): Promise<PluginFactory[]> {
-    const raw = process.env.ERGO_PLUGIN_DIR;
-    if (!raw) return [];
-    const dirs = raw.split(delimiter).map((d) => d.trim()).filter(Boolean);
+    const raw = process.env.ERGO_PLUGIN_DIR ?? "";
+    const dirs = raw.split(delimiter).map((d) => d.trim()).filter(Boolean).map((d) => resolve(d));
+    for (const d of enabledPackDirs(readLedger(studioHome()))) {
+        if (!dirs.includes(d)) dirs.push(d);
+    }
     const all: PluginFactory[] = [];
     for (const d of dirs) {
-        all.push(...(await loadPack(resolve(d))));
+        all.push(...(await loadPack(d)));
     }
     return all;
 }

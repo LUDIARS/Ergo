@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- @implements SPEC-ergo-studio -->
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ergo Studio</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Ergo Studio</h1>
+    <label class="project-picker">
+      プロジェクト
+      <select id="project-select"></select>
+    </label>
+    <span id="status-line" class="muted"></span>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button data-tab="projects" class="active">プロジェクト</button>
+    <button data-tab="tasks">タスク</button>
+    <button data-tab="sources">ソース</button>
+    <button data-tab="resources">リソース</button>
+    <button data-tab="plugins">プラグイン</button>
+    <button data-tab="connections">連携</button>
+  </nav>
+  <main id="view"></main>
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
