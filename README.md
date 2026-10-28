@@ -107,10 +107,10 @@ ctest --test-dir build -C Release
 不要。AdventureCube のような利用側はリポジトリ全体を `external/ergo/` に
 clone (or worktree) して、CMake で `add_subdirectory` するだけでよい。
 
-## デモ集 (ErgoDemo)
+## デモ集 (Pinacotheca)
 
-Pictor のシェーダー / パイプラインプリセットのデモは [LUDIARS/ErgoDemo](https://github.com/LUDIARS/ErgoDemo) にある。
+Pictor のシェーダー / パイプラインプリセットのデモは [LUDIARS/Pinacotheca](https://github.com/LUDIARS/Pinacotheca) (ラテン語で「絵画館」) にある。
 各デモは `ergo_bind` で値を公開しており、`tools/ergo` の variable plugin から実行中に調整できる
-(手順は ErgoDemo の README と [tools/ergo を起動](spec/setup/run-tools-ergo.md))。
-ErgoDemo が Ergo / Pictor を取り込む一方向で、Ergo から ErgoDemo は参照しない。
-個別に作ったゲームは ErgoDemo ではなく、それぞれのゲームのリポジトリに置く。
+(手順は Pinacotheca の README と [tools/ergo を起動](spec/setup/run-tools-ergo.md))。
+Pinacotheca が Ergo / Pictor を取り込む一方向で、Ergo から Pinacotheca は参照しない。
+個別に作ったゲームは Pinacotheca ではなく、それぞれのゲームのリポジトリに置く。
