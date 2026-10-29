@@ -1,6 +1,7 @@
 #include "ergo/particle/particle_system.h"
 #include "gtest/gtest.h"
 
+#include <atomic>
 #include <thread>
 
 using namespace ergo::particle;
