@@ -23,7 +23,18 @@ schema / protocol の変更は **モジュール側ヘッダとツール側コ�
 (理想は同一コミット)** で更新する。バージョン分裂を防ぐため必ず両方触る
 ([`../../CLAUDE.md`](../../CLAUDE.md) 「横断変更」)。
 
-## 手順
+## 取り込みの流れ
+
+実際の取り込みは次の 2 通り。どちらも下の「CI ゲート」を通ってから main に入る。
+
+- **Revisor local PR** (AI の委託作業の通常経路): feat/* ブランチで作業し、
+  base `main` の Revisor local PR として提出する。Revisor が審査し、現在の
+  main の上に squash したコミット (候補) を作り、その SHA の CI が緑になって
+  から main をその SHA へ進める (fast-forward)。GitHub PR は作らない。
+- **GitHub PR**: 下の手順で feat ブランチを push して `gh pr create`。CI は
+  pull_request で自動で走り、squash merge で main に入る。
+
+## 手順 (GitHub PR)
 
 ```bash
 # 1. main からブランチを切る
@@ -48,6 +59,28 @@ git checkout main
 git reset --hard <prev>                # main を巻き戻し
 # → feat/<name> から PR を作る
 ```
+
+## CI ゲート
+
+main に入る SHA は、入る前にその SHA 自体で CI が緑であること。レグの中身と
+手元での再現は [ci.md](ci.md)。
+
+- **必須チェック** (名前は完全一致):
+  `build-and-test (windows-msvc)` / `build-and-test (linux-gcc-cmake320)` /
+  `build-and-test (linux-clang)` / `build-and-test (linux-asan)` /
+  `tools-ergo` / `unity-package-core`。GitHub PR 経由なら `harness / harness` も。
+- **候補 SHA は現在の main の上に載せてから検査する。** 古い main を土台に
+  緑になった SHA は数えない。main が先に進んだら rebase (squash し直し) して
+  新しい SHA で CI をやり直す。並行作業がそれぞれ古い土台で緑になり、main で
+  合わさって赤になるのを防ぐため。
+- PR を作らない候補 (Revisor local PR) は、候補コミットをブランチに push して
+  `gh workflow run ci.yml --ref <branch>` で CI を起動し、その SHA の必須
+  チェックがすべて success になるのを待ってから main を進める。
+- **main が赤の間は main に push しない。** 先に赤を直す変更を同じゲートで
+  通す。赤の上に別の変更を積むと原因の切り分けができなくなる。
+- 必須チェックの強制 (main のルールセット)・merge commit / rebase merge の
+  無効化・Revisor が候補 SHA の check-run を待つ設定は、リポジトリの外
+  (GitHub の管理設定と Revisor 側) で行う。
 
 ## 注意点
 
