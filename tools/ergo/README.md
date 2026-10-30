@@ -16,6 +16,7 @@ Default port: **5170** (override with `PORT=...`).
 | URL                                      | Role                                                   |
 |------------------------------------------|--------------------------------------------------------|
 | `http://localhost:5170/`                 | Plugin picker shell (also loaded by the Electron app)  |
+| `http://localhost:5170/studio/`          | Ergo Studio — build games with AI alongside LUDIARS services (Cc / Actio / Br / Curare / Revisor). See `spec/feature/tool/studio.md` |
 | `http://localhost:5170/api/plugins`      | Registered plugins (the shell's sidebar)               |
 | `http://localhost:5170/api/health`       | Aggregated health of every plugin, plus skipped external entries under `rejected` |
 | `http://localhost:5170/particle/`        | Particle editor. WS `/particle/ws`; engine client `ergo_particle_link` (receive-only) |

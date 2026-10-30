@@ -151,6 +151,7 @@ bool connect_abortable(socket_t s, const sockaddr* addr, int addrlen,
         if (n < 0) return false;
         int err = 0;
         socklen_t len = sizeof(err);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): getsockopt takes char* on Winsock (§C2.5)
         if (::getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &len) != 0) return false;
         return err == 0;
     }

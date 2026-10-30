@@ -1,6 +1,6 @@
 {
   "name": "build-packages",
-  "description": "【AI 案・人の承認前】ビルドとパッケージ取り込み。 パッケージ・ハブのマニフェスト (ergo-packages.json)・cmake/ の取り込み / 検査 / 結線・外部依存 (cmake/deps)・CMake プリセット・取り込みの CMake テスト・tool パッケージの置き場 (lib/ と .gitmodules)・パッケージマネージャの Unity パッケージ (unity/com.ludiars.ergo.packages)・テストの契約ランタイム (contracts/)・CI のワークフロー (.github/workflows/)。",
+  "description": "【AI 案・人の承認前】ビルドとパッケージ取り込み。 パッケージ・ハブのマニフェスト (ergo-packages.json)・cmake/ の取り込み / 検査 / 結線・外部依存 (cmake/deps)・CMake プリセット・取り込みの CMake テスト・tool パッケージの置き場 (lib/ と .gitmodules)・パッケージマネージャの Unity パッケージ (unity/com.ludiars.ergo.packages)・テストの契約ランタイム (contracts/)・CI のワークフロー (.github/workflows/)・C++ 規約のツール設定 (.clang-format / .clang-tidy / .editorconfig / cpp-rules.json / tools/cpp-rules/。 正本は AIFormat/cpp の同期コピー)。",
   "presetRules": [],
   "templateRules": [],
   "specRefs": [
@@ -26,6 +26,15 @@
     },
     {
       "pathPattern": "^CMakePresets\\.json$"
+    },
+    {
+      "pathPattern": "^\\.(clang-format|clang-tidy|editorconfig)$"
+    },
+    {
+      "pathPattern": "^cpp-rules\\.json$"
+    },
+    {
+      "pathPattern": "^tools/cpp-rules/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)tests/packages/(?:.*/)?[^/]+$"

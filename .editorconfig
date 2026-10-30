@@ -1,0 +1,65 @@
+# synced-from AIFormat/cpp@1f027a3
+# AIFormat/cpp/.editorconfig — LUDIARS C++ リポのエディタ設定の正本
+#
+# 規約の正本: AIFormat/RULE_CODE_CPP.md §C9.3。同期の手順は AIFormat/cpp/README.md。
+# コピー先の 1 行目は "# synced-from AIFormat/cpp@<commit>"。
+# 文字コードは UTF-8 (BOM なし) に揃える。MSVC は §C4.2 の usage target が付ける
+# /utf-8 で読むので BOM は要らない。シェーダは glslc / SPIR-V 系が BOM を受け付けない。
+# C++ の整形そのものは .clang-format が決める。ここではエディタの既定値を揃えるだけ。
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# C++ (.clang-format の IndentWidth 4 / ColumnLimit 100 と揃える)
+[*.{h,hh,hpp,hxx,inl,ipp,c,cc,cpp,cxx,m,mm}]
+indent_size = 4
+max_line_length = 100
+
+# CMake (Ergo の CMakeLists.txt / cmake/*.cmake は 4 スペース)
+[{CMakeLists.txt,*.cmake,*.cmake.in}]
+indent_size = 4
+
+# CMakePresets.json などの JSON (Ergo の CMakePresets.json は 2 スペース)
+[*.json]
+indent_size = 2
+
+# シェーダ (GLSL / HLSL。Ergo の shaders/ は 4 スペース)
+[*.{glsl,vert,frag,comp,geom,tesc,tese,mesh,task,rgen,rchit,rmiss,hlsl,hlsli}]
+indent_size = 4
+
+# clang-format / clang-tidy / YAML
+[{.clang-format,.clang-tidy,*.yml,*.yaml}]
+indent_size = 2
+
+# シェルスクリプト
+[*.sh]
+indent_size = 2
+
+# Markdown は行末の空白 2 個が改行の意味を持つので消さない
+[*.md]
+trim_trailing_whitespace = false
+
+# Windows のバッチは CRLF で扱う
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# PowerShell 5.1 は非 ASCII を含む .ps1 に BOM を要求する (RULE_CODE §17)
+[*.ps1]
+charset = utf-8-bom
+
+# third_party は上流の書式を保つ (§C4.8 / §C9.3)。触るのは上流の版を更新するときだけ。
+[third_party/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+max_line_length = unset

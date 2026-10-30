@@ -48,10 +48,11 @@ bool patch_vec3(const JsonValue& v, Vec3& field) {
 bool patch_quat(const JsonValue& v, Quat& field) {
     float f[4];
     if (!read_numbers(v, 4, f)) return false;
-    const double len = std::sqrt(double(f[0]) * f[0] + double(f[1]) * f[1] +
-                                 double(f[2]) * f[2] + double(f[3]) * f[3]);
+    const double len = std::sqrt(static_cast<double>(f[0]) * f[0] + static_cast<double>(f[1]) * f[1] +
+                                 static_cast<double>(f[2]) * f[2] + static_cast<double>(f[3]) * f[3]);
     if (!(len > 1e-6)) return false;  // zero quaternion has no rotation
-    field = Quat{float(f[0] / len), float(f[1] / len), float(f[2] / len), float(f[3] / len)};
+    field = Quat{static_cast<float>(f[0] / len), static_cast<float>(f[1] / len),
+                 static_cast<float>(f[2] / len), static_cast<float>(f[3] / len)};
     return true;
 }
 

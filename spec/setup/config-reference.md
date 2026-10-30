@@ -37,6 +37,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_POSITION_INDEPENDENT_CODE` | ON | Ergo のスコープで `CMAKE_POSITION_INDEPENDENT_CODE` を設定する。静的ライブラリをホストの共有ライブラリ / プラグインにリンクできる | — | — |
 | `ERGO_BUILD_DUMMY` | OFF | `ergo_<名>_dummy` (no-op 実装): `input` / `particle` / `bind` / `actor` / `sound` / `gpu_particle` / `frame` / `profile` / `log` / `io` / `world_time` / `blackboard` | 各モジュールの `ERGO_BUILD_<名>` | そのモジュールの dummy を作らない |
 | `ERGO_BUILD_BENCHMARKS` | OFF | マイクロベンチ `bench_particle_cpu` / `bench_curve` (CTest には登録しない) | `GPU_PARTICLE` | 作らない (メッセージなし) |
+| `ERGO_CXX_BASELINE` | OFF | `cmake/LudiarsCxxBaseline.cmake` (AIFormat/cpp の同期コピー) を include し、configure の最後に baseline 未リンクの `ergo_` target を WARNING で一覧する。C++20 移行まで既定 OFF ([cpp-rules.md](cpp-rules.md)) | — | — |
 | **モジュール (`ERGO_BUILD_<名>`)** | | | | |
 | `ERGO_BUILD_INPUT` | ON | `ergo_input` | — | — |
 | `ERGO_BUILD_PARTICLE` | ON | `ergo_particle` | — | — |

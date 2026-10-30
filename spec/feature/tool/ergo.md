@@ -181,6 +181,10 @@ export default (): Plugin => {
 - 既存の plugin pack:
   - PrivateGame: `tools/game-web/plugins/{spawn,skill}`
   - AdventureCube: `tools/ac-web/plugins/{placer,terrain,acstage}`
+- **取得した plugin pack**: `studio` プラグインの「プラグイン」画面で GitHub から取得・承認した
+  pack は `<studio home>/plugins/ledger.json` (`src/core/plugin-ledger.ts`) に記録され、有効なものを
+  `ERGO_PLUGIN_DIR` と同じ扱いで次回起動時に読み込む。取得元の許可・リビジョン固定・承認は
+  [studio.md](studio.md)。
 
 ### プラグイン id と読み込みの規則
 
@@ -227,6 +231,7 @@ export default (): Plugin => {
 <!-- plugin-matrix:begin -->
 | id | C++ モジュール | 供給元 | ワイヤ契約と主なエンドポイント | 仕様 |
 |---|---|---|---|---|
+| `studio` | — | LUDIARS の各サービス (Cc / Actio / Br / Curare / Revisor / Excubitor) を Ergo のサーバ側から呼ぶ。接続先は Excubitor catalog | REST `/studio/api/{projects,tasks,runs,templates,sources,resources,plugins,connections,endpoints,status}`。変更系は loopback の Host・同一 Origin・JSON のみ。WS なし | [studio.md](studio.md) |
 | `particle` | `ergo_particle` | リポ内クライアント: `ergo_particle_link` (受信のみ、`include/ergo/particle/editor_link.h`) | WS `/particle/ws`: UI が `set` / `replace` を送り、全接続へ `state` を配信。REST `GET` / `POST /particle/api/effect` | 本書「`particle`」、[particle.md](../module/particle.md) |
 | `variable` | `ergo_bind` (`ergo_actor` の変数も) | リポ内クライアント: `ergo::bind::Engine::connect` (既定 `127.0.0.1:5170`、`/variable/ws`) | WS `/variable/ws`: `hello` でロール (`engine` / `ui`) を名乗り、登録と値を中継。REST `GET /variable/api/vars`・`/api/actors` | 本書「`variable`」、[bind.md](../module/bind.md) |
 | `rive` | — | ブラウザのみ (`.riv` はブラウザで読む) | WS `/rive/ws`: `publish` (メタ情報) を全接続へ `meta` で配信。REST `GET /rive/api/meta` | [rive.md](rive.md) |
@@ -244,6 +249,10 @@ export default (): Plugin => {
 ポートを変えた場合 (`PORT`) は、エンジン側クライアントの `connect` にも同じポートを渡す。
 
 ## 現行プラグイン (組み込み・汎用)
+
+### `studio`
+- デスクトップでゲームを AI と作る画面。LUDIARS の各サービス (Cc / Actio / Br / Curare / Revisor /
+  Excubitor) と Ergo のサーバ側で話す。仕様は [studio.md](studio.md)
 
 ### `particle`
 - 旧 `tools/particle-editor/` の移植

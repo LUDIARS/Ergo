@@ -702,6 +702,14 @@
       "layer": "shared"
     },
     {
+      "glob": "tools/cpp-rules/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/cpp-rules/lib/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tools/package_cli/*",
       "layer": "application"
     },
@@ -743,6 +751,42 @@
     },
     {
       "glob": "unity/com.ludiars.ergo.packages/Tests/Editor/Fixtures/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/clients/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/net/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/domain/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/usecases/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/routes/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/ui/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/studio/ui/views/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "tools/ergo/tests/studio/*",
       "layer": "shared"
     }
   ],

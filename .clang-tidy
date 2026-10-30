@@ -1,0 +1,276 @@
+# synced-from AIFormat/cpp@1f027a3
+# AIFormat/cpp/.clang-tidy — LUDIARS C++ clang-tidy 設定の正本
+#
+# 規約の正本: AIFormat/RULE_CODE_CPP.md。各 check の前の "# §Cn.m" が、その check で
+# 担保する規約。担保の全体像は RULE_CODE_CPP.md の担保マトリクスを見る。
+# 固定版: clang-tidy 19 (LLVM 19, §C9.3)。"(19+)" と書いた check / option は 18 以前に
+#   無い。古い版で読むと、check は黙って無効になり、option は --verify-config で
+#   "unknown check option" と出る。版を下げて運用しない。
+#   全項目を clang-tidy 19.1.0 の --verify-config と --list-checks で確認している。
+#   LLVM 20 で入る名前・option (bugprone-unchecked-string-to-number-conversion、
+#   bugprone-unsafe-functions.CustomFunctions / ReportDefaultFunctions、
+#   optin.taint.GenericTaint) は 19 で unknown になるので使わない。20 へ上げるときに入れ直す。
+# 同期: AIFormat/cpp/README.md の手順でコピーし、1 行目を
+#   "# synced-from AIFormat/cpp@<commit>" にする。プレースホルダ ERGO は
+#   同期時に自リポのマクロ prefix (例: ERGO) へ置き換える。
+# 上書き: リポ側で足せるのは CheckOptions の末尾追記だけ (§C9.3)。CheckOptions は
+#   この順でリスト形式にしてあり、同じ key を後ろに追記すると後勝ちで上書きになる。
+#   Checks / WarningsAsErrors などトップレベルのキーは重複させない。
+# 実行: clang-tidy-diff で merge-base からの変更行だけに掛ける (§C9.3 / §C9.6)。
+#   compile_commands.json は Ninja preset が出したものに限る (§C4.4)。
+#   clang-tidy は PostToolUse フックに入れない (§C9.5)。
+# 抑制: `// NOLINT(<check>): <理由> (§Cn)` の形だけ (§C9.4)。
+#   clang-analyzer-* の警告は抑制せずにコードを直す。
+#
+# 使わない check (RULE_CODE_CPP.md「採らなかった論点」):
+#   cppcoreguidelines-pro-bounds-*  … Vulkan / C API と衝突 (§C1.6)
+#   cppcoreguidelines-owning-memory / cppcoreguidelines-no-malloc … GSL 前提 (§C6.1)
+#   modernize-use-nodiscard  … getter への一律付与は求めない (§C5.4)
+#   misc-const-correctness   … 既存ファイル全体の修正を強いる (RULE_CODE §19 で足りる)
+#   concurrency-mt-unsafe    … 採らない
+#   modernize-avoid-c-arrays … (ptr,size) / vector 引数を検出できず §C1.6 の担保にならない
+#   cert-msc32-c / cert-msc51-cpp … 固定 seed を違反と判定し §C7.2 と逆向き
+#   cppcoreguidelines-pro-type-union-access … Vulkan の C union と衝突 (§C2.5)
+# グループのワイルドカード (bugprone-* など) は使わず、名前で列挙する (§C9.3)。
+# clang-diagnostic-* (コンパイラ警告) も "-*" で外す。警告は §C4.3 の warnings
+# target がビルドで担保するので、clang-tidy で二重に出さない。
+
+Checks:
+  - '-*'
+
+  # ---------------------------------------------------------------- C1 Concept と型による契約
+  # §C1.2 SFINAE の禁止 (enable_if / void_t → requires 節)
+  - modernize-use-constraints
+  # §C1.5 I<Name> は public virtual デストラクタを持ち、コピーを禁止する
+  - cppcoreguidelines-virtual-class-destructor
+  - cppcoreguidelines-special-member-functions
+
+  # ---------------------------------------------------------------- C2 Revisor の脆弱性対応
+  # §C2.1 禁止 API (LLVM 19 の既定一覧と More 一覧。§C2.1 で足した関数は規則表が主担保)
+  - bugprone-unsafe-functions
+  # §C2.1 rand / std::rand の禁止 (§C7.2 の固定 seed とは衝突しない。msc32-c / msc51-cpp は使わない)
+  - cert-msc50-cpp
+  # §C2.1 / §C2.13 C 関数の戻り値検査 (snprintf の戻り値、変換 API の 0 など)
+  - cert-err33-c
+  # §C2.1 / §C2.2 文字列から数値への変換 (atoi / sscanf の成否を検査しない書き方)
+  #   LLVM 20 で bugprone-unchecked-string-to-number-conversion に改名される。19 には
+  #   この名前しか無い (19.1.0 で atoi の検出を確認)。20 へ上げるときに新しい名前へ替える。
+  - cert-err34-c
+  # §C2.3 信頼境界のバイト列 (外部由来の長さをそのまま確保に渡さない)
+  #   (19+) TaintedAlloc は 19 で optin.taint に入った (18 の check 一覧には無い)。
+  #   GenericTaint は 19 では alpha なので有効にしない。TaintedAlloc は単独で scanf 系を
+  #   source として追跡するが、fread / recv で読んだ長さは追わない (§C2.3 の主担保は
+  #   §C3.8 のコーパス再生 CTest と規則表)。recv / read / fread を source にする
+  #   GenericTaint の Config は LLVM 20 以降で入れる (RULE_CODE_CPP「未実装の担保」)。
+  - clang-analyzer-optin.taint.TaintedAlloc
+  # §C2.5 reinterpret_cast は許可リスト制 (NOLINT に理由と §C2.5 を書く)
+  - cppcoreguidelines-pro-type-reinterpret-cast
+  - bugprone-casting-through-void
+  # §C2.6 C スタイルキャストと関数形式キャストの禁止
+  - cppcoreguidelines-pro-type-cstyle-cast
+  - google-readability-casting
+  # §C2.8 未初期化を作らない
+  #   pro-type-member-init は警告扱い (WarningsAsErrors から外す)
+  - cppcoreguidelines-init-variables
+  - cppcoreguidelines-pro-type-member-init
+
+  # ---------------------------------------------------------------- C5 失敗の型と例外の境界
+  # §C5.2 / §C5.3 noexcept の境界から例外を漏らさない
+  - bugprone-exception-escape
+  # §C5.3 ムーブ構築・ムーブ代入・デストラクタ・swap は noexcept
+  - performance-noexcept-move-constructor
+  - performance-noexcept-destructor
+  - performance-noexcept-swap
+  # §C5.4 / §C5.5 戻り値を捨てない (Vulkan の VkResult を含む。CheckOptions 参照)
+  - bugprone-unused-return-value
+  # §C5.6 空の catch の禁止 (RULE_CODE §7)
+  - bugprone-empty-catch
+
+  # ---------------------------------------------------------------- C6 所有権・寿命・並行
+  # §C6.1 所有は型で表す (生の new → make_unique / make_shared)
+  - modernize-make-unique
+  - modernize-make-shared
+  # §C6.4 C コールバックへの所有権の受け渡し (二重 delete / リーク)
+  # §C9.3 clang-analyzer-cplusplus.* は名前で列挙する (モデリング用の
+  #   SmartPtrModeling / VirtualCallModeling / SelfAssignment は依存で自動有効)。
+  #   clang-tidy は analyzer の check を 1 つでも有効にすると clang-analyzer-core.*
+  #   も自動で有効にする (path-sensitive な check の前提)。--list-checks に
+  #   core.* が出るのはこのため。Praesidium (core,unix,security) と一部重なる。
+  - clang-analyzer-cplusplus.NewDelete
+  - clang-analyzer-cplusplus.NewDeleteLeaks
+  - clang-analyzer-cplusplus.InnerPointer
+  - clang-analyzer-cplusplus.Move
+  - clang-analyzer-cplusplus.PlacementNew
+  - clang-analyzer-cplusplus.PureVirtualCall
+  - clang-analyzer-cplusplus.StringChecker
+  #   (19+) 18 の check 一覧には無い (19 で入った名前)。
+  - clang-analyzer-cplusplus.ArrayDelete
+  # §C6.5 ビュー型の寿命 (一時オブジェクトから作った string_view / span)
+  - bugprone-dangling-handle
+  #   (19+) const T& 引数をそのまま返して一時オブジェクトを指す。18 以前には無い。
+  - bugprone-return-const-ref-from-parameter
+
+  # ---------------------------------------------------------------- C8 API の形・命名・依存の衛生
+  # §C8.1 命名 (規則は CheckOptions の readability-identifier-naming.*)
+  - readability-identifier-naming
+  # §C8.2 名前空間とマクロの衛生
+  - google-global-names-in-headers
+  - cppcoreguidelines-macro-usage
+  # §C8.6 数学定数は std::numbers
+  - modernize-use-std-numbers
+
+# §C2.8 の pro-type-member-init だけ警告にとどめ、ほかは全てエラーにする。
+WarningsAsErrors: '*,-cppcoreguidelines-pro-type-member-init'
+
+# 自リポのヘッダ (include/ src/ tests/ fuzz/ benchmarks/ 配下) の診断を出す。
+# third_party は §C4.3 で SYSTEM include にするので SystemHeaders: false で外れる。
+# (19+) の ExcludeHeaderFilterRegex は 18 以前が "unknown key" で設定全体を
+# 読めなくなるので使わない。clang-tidy-diff の行フィルタで変更行以外は出ない。
+HeaderFilterRegex: '.*/(include|src|tests|fuzz|benchmarks)/.*'
+SystemHeaders: false
+FormatStyle: none
+
+# CheckOptions は必ずファイルの末尾に置く (リポ側の追記がこのリストに続くように)。
+CheckOptions:
+  # ---- §C1.5 I<Name>: virtual デストラクタだけを = default で書いたクラスにも
+  #      コピー / ムーブの宣言を求める。コピーを delete すればムーブは省略してよい。
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: 'false'
+  - key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions
+    value: 'false'
+  - key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted
+    value: 'true'
+
+  # ---- §C2.1 禁止 API。LLVM 19 の bugprone-unsafe-functions は既定一覧 (gets・asctime・
+  #      setbuf・rewind など) と、次の option で足す More 一覧 (vfork・bcopy など) だけを
+  #      報告する (19.1.0 で確認)。§C2.1 はこの 2 つの一覧を全部禁止に含める。
+  #      §C2.1 で足した関数 (strncpy / strtok / scanf 系 / ato* / std::sto* / alloca /
+  #      rand 系) を名前で足す CustomFunctions と、ReportDefaultFunctions は LLVM 20 の
+  #      option で、19 では unknown になり効かない。これらは規則表 (cpp-rules.mjs の
+  #      banned-api) と Praesidium tripwire で担保する。ato* は cert-err34-c、rand は
+  #      cert-msc50-cpp でも出る。非リテラル書式はコンパイラ側 (-Wformat=2 / /w44774)。
+  - key: bugprone-unsafe-functions.ReportMoreUnsafeFunctions
+    value: 'true'
+
+  # ---- §C5.2 / §C5.3 noexcept の入口として名前で固定するもの
+  #      (fuzz ハーネス §C3.8、JNI の入口 §C5.3)
+  - key: bugprone-exception-escape.FunctionsThatShouldNotThrow
+    value: 'LLVMFuzzerTestOneInput;LLVMFuzzerInitialize;JNI_OnLoad;JNI_OnUnload'
+
+  # ---- §C5.4 / §C5.5 戻り値を捨てない関数・型。
+  #      LLVM 19 では CheckedFunctions / CheckedReturnTypes の各要素が正規表現になる。
+  #      anchor (^...$) しないと部分一致で ergo::bind:: の関数 (::bind に一致) や
+  #      Socket::connected() などに誤爆するので、全要素を ^...$ で書く。
+  #      CheckedFunctions は既定値を置き換える option なので、19 の既定一覧
+  #      (clang-tidy --dump-config -checks='-*,bugprone-unused-return-value' の出力) を
+  #      そのまま写したうえで、§C5.5 の Vulkan 呼び出しを足している (vkCreate* は正規表現)。
+  - key: bugprone-unused-return-value.CheckedFunctions
+    value: "\
+      ^::std::async$;^::std::launder$;^::std::remove$;^::std::remove_if$;^::std::unique$;\
+      ^::std::unique_ptr::release$;^::std::basic_string::empty$;^::std::vector::empty$;\
+      ^::std::back_inserter$;^::std::distance$;^::std::find$;^::std::find_if$;^::std::inserter$;\
+      ^::std::lower_bound$;^::std::make_pair$;^::std::map::count$;^::std::map::find$;\
+      ^::std::map::lower_bound$;^::std::multimap::equal_range$;^::std::multimap::upper_bound$;\
+      ^::std::set::count$;^::std::set::find$;^::std::setfill$;^::std::setprecision$;^::std::setw$;\
+      ^::std::upper_bound$;^::std::vector::at$;^::bsearch$;^::ferror$;^::feof$;^::isalnum$;^::isalpha$;\
+      ^::isblank$;^::iscntrl$;^::isdigit$;^::isgraph$;^::islower$;^::isprint$;^::ispunct$;^::isspace$;\
+      ^::isupper$;^::iswalnum$;^::iswprint$;^::iswspace$;^::isxdigit$;^::memchr$;^::memcmp$;^::strcmp$;\
+      ^::strcoll$;^::strncmp$;^::strpbrk$;^::strrchr$;^::strspn$;^::strstr$;^::wcscmp$;^::access$;^::bind$;\
+      ^::connect$;^::difftime$;^::dlsym$;^::fnmatch$;^::getaddrinfo$;^::getopt$;^::htonl$;^::htons$;\
+      ^::iconv_open$;^::inet_addr$;^::isascii$;^::isatty$;^::mmap$;^::newlocale$;^::openat$;^::pathconf$;\
+      ^::pthread_equal$;^::pthread_getspecific$;^::pthread_mutex_trylock$;^::readdir$;^::readlink$;\
+      ^::recvmsg$;^::regexec$;^::scandir$;^::semget$;^::setjmp$;^::shm_open$;^::shmget$;^::sigismember$;\
+      ^::strcasecmp$;^::strsignal$;^::ttyname$;\
+      ^::vkCreate[A-Za-z0-9]*$;^::vkAllocate[A-Za-z0-9]*$;^::vkMapMemory$;^::vkQueueSubmit$;\
+      ^::vkQueuePresentKHR$;^::vkAcquireNextImageKHR$;^::vkWaitForFences$;\
+      ^::vkBeginCommandBuffer$;^::vkEndCommandBuffer$;^::vkBind(Buffer|Image)Memory$"
+  #      VkResult を返す呼び出しと、§C5.1 の Expected を返す呼び出しは型で拾う (§C5.1 / §C5.5)。
+  #      19 の既定 5 型に ::VkResult と <repo>::Expected (自前実装。alias モードでは
+  #      ::std::expected で拾われる) を足す。関数ポインタ (volk / PFN_vk*) 経由の呼び出しと
+  #      HRESULT (long の typedef) は型では拾えないので、検査マクロ (§C5.5 の
+  #      ERGO_VK_CHECK など) で受ける。
+  - key: bugprone-unused-return-value.CheckedReturnTypes
+    value: '^::std::error_code$;^::std::error_condition$;^::std::errc$;^::std::expected$;^::boost::system::error_code$;^::VkResult$;^::[a-z][a-z0-9_]*::Expected$'
+  - key: bugprone-unused-return-value.AllowCastToVoid
+    value: 'false'
+
+  # ---- §C6.5 一時オブジェクトから作ってはいけないビュー型。§C1.6 で span を入れるので足す。
+  - key: bugprone-dangling-handle.HandleClasses
+    value: 'std::basic_string_view;std::experimental::basic_string_view;std::span'
+
+  # ---- §C8.2 マクロは <REPO>_<MODULE>_UPPER_SNAKE。例外は共通マクロ表の <REPO>_ 直下だけ。
+  #      ERGO は同期時に置き換える。共通マクロ表 (Ergo: HOT / EXPECTS /
+  #      GUARDED_BY / REQUIRES / CAPABILITY / ACQUIRE / RELEASE / VK_CHECK /
+  #      LIFETIMEBOUND / LOG_*) が違うリポは、この key を末尾に追記して上書きする。
+  - key: cppcoreguidelines-macro-usage.AllowedRegexp
+    value: '^ERGO_[A-Z0-9]+_[A-Z0-9_]+$|^ERGO_(HOT|EXPECTS|GUARDED_BY|REQUIRES|CAPABILITY|ACQUIRE|RELEASE|VK_CHECK|LIFETIMEBOUND|LOG_[A-Z0-9_]+)$'
+  - key: cppcoreguidelines-macro-usage.CheckCapsOnly
+    value: 'false'
+  - key: cppcoreguidelines-macro-usage.IgnoreCommandLineMacros
+    value: 'true'
+
+  # ---- §C8.1 命名。型・concept・enum 値は PascalCase (CamelCase)、関数と変数は
+  #      snake_case (lower_case)、private メンバは末尾 _、constexpr 定数は k + PascalCase。
+  #      interface の I 接頭辞は機械検査しない (AbstractClassPrefix は抽象基底全般に
+  #      掛かるので使わない)。レビューで見る (§C8.1)。§C1.5 の規則表が見るのは
+  #      I<Name> クラスのデータメンバだけ。get/set 接頭辞は禁止しない。
+  - key: readability-identifier-naming.IgnoreMainLikeFunctions
+    value: 'true'
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.UnionCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.ScopedEnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConceptCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+  #      標準ライブラリ互換のメンバ型 (value_type など) は標準の綴りを使う
+  - key: readability-identifier-naming.TypeAliasIgnoredRegexp
+    value: '^(value_type|size_type|difference_type|reference|const_reference|pointer|const_pointer|iterator|const_iterator|reverse_iterator|const_reverse_iterator|element_type|key_type|mapped_type|allocator_type|is_transparent)$'
+  - key: readability-identifier-naming.TypeTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.ValueTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  #      C ABI で名前が決まっている入口 (§C3.8 の fuzz、§C5.3 の JNI export)
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '^(LLVMFuzzerTestOneInput|LLVMFuzzerInitialize|JNI_OnLoad|JNI_OnUnload|Java_[A-Za-z0-9_]+)$'
+  - key: readability-identifier-naming.MethodCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.LocalVariableCase
+    value: lower_case
+  #      データメンバは public (Config などの集約) と private だけを見る。protected の
+  #      データメンバは §C8.1 に定めが無いので検査しない (MemberCase を置くと
+  #      protected の `foo_` まで違反になる)。lower_case は末尾 _ を許さないので、
+  #      public メンバに _ を付けると違反になる。
+  - key: readability-identifier-naming.PublicMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: '_'
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConstexprVariablePrefix
+    value: 'k'
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE

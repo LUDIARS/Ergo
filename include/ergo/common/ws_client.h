@@ -12,6 +12,10 @@
 /// every successful handshake, including reconnects). Inbound frames larger
 /// than 1 MiB drop the connection, which is then retried.
 ///
+/// Thread-safety: thread-compatible — start() / stop() / set_on_*() are called
+/// from the owner's thread; send_text() / unsent() / is_connected() are safe
+/// from any thread.
+///
 /// Kept separate from `ergo_common` so the JSON codec stays socket-free.
 
 #include <atomic>

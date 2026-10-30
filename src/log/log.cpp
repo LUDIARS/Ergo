@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <climits>
 #include <cstdarg>
 #include <cstdio>
 #include <memory>
@@ -25,10 +26,13 @@ public:
         const auto tag = level_tag(r.level);
         std::FILE* out = (r.level == Level::Error || r.level == Level::Warn) ? stderr : stdout;
         std::lock_guard<std::mutex> g(print_mtx_);
+        // %.*s takes an int precision; clamp so an oversized message is cut, never negative.
+        const int tag_len = static_cast<int>(std::min<std::size_t>(tag.size(), INT_MAX));
+        const int msg_len = static_cast<int>(std::min<std::size_t>(r.msg.size(), INT_MAX));
         std::fprintf(out, "[F%08llu][%.*s] %.*s\n",
                      static_cast<unsigned long long>(r.frame),
-                     static_cast<int>(tag.size()), tag.data(),
-                     static_cast<int>(r.msg.size()), r.msg.data());
+                     tag_len, tag.data(),
+                     msg_len, r.msg.data());
         std::fflush(out);
     }
 

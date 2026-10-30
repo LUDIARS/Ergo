@@ -19,6 +19,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(ERGO_BUILD_TESTS       "Build module tests (default: only when Ergo is the top-level project)" ${_ergo_top})
 option(ERGO_BUILD_DUMMY       "Build dummy plug libraries"     OFF)
 option(ERGO_BUILD_BENCHMARKS  "Build micro-benchmark executables (opt-in)" OFF)
+# AIFormat RULE_CODE_CPP §C4 の baseline (cmake/LudiarsCxxBaseline.cmake、 AIFormat/cpp の同期コピー)。
+# baseline は C++20 を下限にするため、 C++17 の Ergo とホストを移行するまで既定 OFF。
+# ON にすると ergo_ target の baseline 未リンク等を configure の最後に WARNING で一覧する。
+option(ERGO_CXX_BASELINE      "Include LudiarsCxxBaseline and report ergo_ targets against it (RULE_CODE_CPP §C4)" OFF)
+if(ERGO_CXX_BASELINE)
+    include(cmake/LudiarsCxxBaseline.cmake)
+endif()
 
 option(ERGO_BUILD_INPUT        "Build ergo_input"        ON)
 option(ERGO_BUILD_PARTICLE     "Build ergo_particle"     ON)
@@ -1230,7 +1237,8 @@ if(ERGO_BUILD_RENDER_VIZ AND TARGET ergo_tela_graph)
         target_compile_definitions(ergo_render_viz_pictor PUBLIC ERGO_RENDER_VIZ_HAS_PICTOR=1)
 
         add_executable(ergo_render_viz_cli tools/render_viz/main.cpp)
-        set_target_properties(ergo_render_viz_cli PROPERTIES OUTPUT_NAME ergo_render_viz)
+        # PDB_NAME: 同名ライブラリの ergo_render_viz.pdb と MSVC のリンカ PDB を取り合わない (LNK1201)
+        set_target_properties(ergo_render_viz_cli PROPERTIES OUTPUT_NAME ergo_render_viz PDB_NAME ergo_render_viz_cli)
         target_link_libraries(ergo_render_viz_cli PRIVATE ergo_render_viz_pictor)
         message(STATUS "ergo_render_viz: Pictor adapter + CLI enabled")
     else()
@@ -1365,7 +1373,8 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
         tools/package_viz/usage_command.cpp
         tools/package_viz/host_command.cpp
     )
-    set_target_properties(ergo_package_viz_cli PROPERTIES OUTPUT_NAME ergo_package_viz)
+    # PDB_NAME: 同名ライブラリの ergo_package_viz.pdb と MSVC のリンカ PDB を取り合わない (LNK1201)
+    set_target_properties(ergo_package_viz_cli PROPERTIES OUTPUT_NAME ergo_package_viz PDB_NAME ergo_package_viz_cli)
     target_link_libraries(ergo_package_viz_cli PRIVATE ergo_package_viz)
 
     # cmake --build <build> --target ergo_package_graphs → <build>/graphs/{packages,targets,usage,host}.tela
@@ -1845,4 +1854,8 @@ if(ERGO_BUILD_TESTS)
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/thirdparty/test_host_cache_isolation.cmake)
     set_tests_properties(test_host_cache_isolation PROPERTIES LABELS host TIMEOUT 600)
     unset(_ergo_host_test_args)
+endif()
+
+if(ERGO_CXX_BASELINE)
+    ludiars_cxx_check_targets(PREFIX ergo_ MODE WARNING)
 endif()

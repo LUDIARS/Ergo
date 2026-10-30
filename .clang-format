@@ -1,0 +1,118 @@
+# synced-from AIFormat/cpp@1f027a3
+# AIFormat/cpp/.clang-format — LUDIARS C++ 整形設定の正本
+#
+# 規約の正本: AIFormat/RULE_CODE_CPP.md §C9.3 (ツール設定の正本と版の固定)。
+# 固定版: clang-format 19 (LLVM 19)。他の版で整形すると差分が揺れるので使わない。
+# 同期: 各 C++ リポへは AIFormat/cpp/README.md の手順でコピーする。コピー先の
+#   1 行目は "# synced-from AIFormat/cpp@<commit>"。プレースホルダ ergo は
+#   同期時に自リポの include prefix (例: ergo) へ置き換える。
+# 上書き: YAML はキーの重複を許さない (clang-format はエラーで止まる)。リポ側で
+#   足せるのは、この正本に無いキーの末尾追記だけ。既存キーを変えたいときは
+#   正本へ PR を出す。third_party/ には "DisableFormat: true" と
+#   "SortIncludes: Never" だけの .clang-format を置く (§C9.3)。
+# 検査: git clang-format --diff <merge-base> の出力で判定する (§C9.3 / §C9.6)。
+#
+# 値は Ergo の実コード (include/ergo/health/health.h, include/ergo/math/vec.h ほか
+# include/ src/ の .h/.cpp 471 本) に合わせた。手で桁揃えした箇所 (引数の縦揃え、
+# メンバ宣言の揃え) は再現しない。整形は変更行だけに掛かるので、既存の揃えを
+# 一括で崩すことはない (§C9.6、一括整形は専用 PR に限る)。
+
+BasedOnStyle: Google
+Standard: c++20
+
+# ---- 幅とインデント (Ergo: 4 スペース、タブ 0 件) ----
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+# public: / private: を class と同じ桁に置く (Ergo: 列 0 が 157 件、字下げ 2 件)
+AccessModifierOffset: -4
+IndentCaseLabels: true
+IndentPPDirectives: None
+LineEnding: LF
+InsertNewlineAtEOF: true
+
+# ---- ポインタと参照 (Ergo: 左寄せ 821 件、右寄せ 19 件) ----
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+
+# ---- 名前空間 ----
+# `namespace ergo::health {` の入れ子 1 行宣言、本体は字下げしない。
+# 閉じ括弧には `}  // namespace ergo::health` 形式の注釈を自動で付ける。
+NamespaceIndentation: None
+FixNamespaceComments: true
+CompactNamespaces: false
+ShortNamespaceLines: 0
+# 行末コメント前の空白は 1 個 (Ergo: `} // namespace` が 452 件、2 個は 29 件。
+# Google 既定の 2 個にすると変更行のたびに揺れるので実態に合わせる)
+SpacesBeforeTrailingComments: 1
+
+# ---- 短い文 (Ergo の `if (x) return;` `case 0: return S::Sphere;` を保つ) ----
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: All
+
+# ---- テンプレートと concept (§C1) ----
+# `template <std::size_t N, Scalar T>` の後で改行し、requires 節は独立行に置く。
+# テンプレート宣言後の改行は Google 既定 (Yes) に任せる。キー名が 19 で
+# AlwaysBreakTemplateDeclarations → BreakTemplateDeclarations に変わったため、
+# 版をまたいで読めるよう明示しない。
+SpaceAfterTemplateKeyword: true
+RequiresClausePosition: OwnLine
+IndentRequiresClause: true
+BreakBeforeConceptDeclarations: Always
+
+# ---- 波括弧と初期化子 (§C8.3 の指示付き初期化子 `{ .port = 5198 }` を崩さない) ----
+BreakBeforeBraces: Attach
+Cpp11BracedListStyle: true
+InsertBraces: false
+
+# ---- インクルード順 ----
+# 自ヘッダ → 自リポ → LUDIARS 他パッケージ → third_party・OS SDK → 標準ライブラリ。
+# グループ間は空行 1 つ。グループ内は辞書順。#if で囲んだ include は別ブロック扱いで
+# 動かない。順序依存のある include は `// clang-format off` / `on` で囲み、
+# 直前の行に理由を書く (§C9.4 の抑制の作法に準じる)。
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+# 自ヘッダ: src/render/stage_renderer.cpp → "ergo/render/stage_renderer.h" のように
+# ファイル名の幹が一致する include を先頭 (Priority 0) に置く。
+IncludeIsMainRegex: '([-_](test|unittest))?$'
+IncludeCategories:
+  # 自リポ (prefix 付き)。ergo は同期時に自リポの include prefix へ置き換える。
+  # prefix を持たないリポ (例: Ludellus-Native の "world/...") は末尾の `^"` で拾う。
+  - Regex: '^"ergo/'
+    Priority: 2
+    SortPriority: 2
+  # LUDIARS 他パッケージ (コアエンジン / SDK のリポ)。新しいパッケージは正本に追記する。
+  - Regex: '^[<"](ars|ergo|pictor|lapilli|vestigium|canalis|lector|fundamentum)/'
+    Priority: 3
+    SortPriority: 3
+  # third_party を "" で書いている既存の取り込み (gtest / nanosvg / earcut / httplib / stb)
+  - Regex: '^"(gtest|nanosvg|earcut|httplib|stb_[a-z_]+\.h)'
+    Priority: 4
+    SortPriority: 5
+  # C 標準ヘッダの .h 形 (<math.h> など) は標準グループへ寄せる
+  - Regex: '^<(assert|ctype|errno|fenv|float|inttypes|limits|locale|math|setjmp|signal|stdarg|stddef|stdint|stdio|stdlib|string|time|uchar|wchar|wctype)\.h>$'
+    Priority: 5
+    SortPriority: 6
+  # 標準ライブラリ (拡張子なし・スラッシュなし: <cstdint> <string_view> <concepts>)
+  - Regex: '^<[a-z0-9_]+>$'
+    Priority: 5
+    SortPriority: 6
+  # winsock2.h は windows.h より前に置く必要があるので、同じグループの先頭へ並べる
+  - Regex: '^<(winsock2|ws2tcpip)\.h>$'
+    Priority: 4
+    SortPriority: 4
+  # third_party・OS SDK (<vulkan/...> <fmod.hpp> <windows.h> <sys/...> <opencv2/...>)
+  - Regex: '^<'
+    Priority: 4
+    SortPriority: 5
+  # それ以外の "..." は自リポ (相対 include を含む)
+  - Regex: '^"'
+    Priority: 2
+    SortPriority: 2

@@ -11,6 +11,11 @@
 ///   PrivateGame -> tools/game-web/plugins/{spawn,skill}
 ///   AdventureCube -> tools/ac-web/plugins/{placer,terrain,acstage}
 ///
+/// Packs fetched and approved in the Studio plugin screen are recorded in
+/// the plugin ledger; the entry points (main.ts / electron/main.cjs) append
+/// the enabled ones to `ERGO_PLUGIN_DIR` (core/plugin-ledger.ts
+/// `pluginDirsWithLedger()`) so they load the same way.
+///
 /// A broken pack entry is logged and skipped — it never aborts startup.
 /// This module only imports the entries; calling the factories, validating
 /// the returned plugin and rejecting duplicate ids happens in

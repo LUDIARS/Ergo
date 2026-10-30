@@ -1,0 +1,4 @@
+{
+  "prefix": "ERGO",
+  "logger": { "files": ["src/log/log.cpp"] }
+}

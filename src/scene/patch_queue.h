@@ -6,6 +6,8 @@
 /// until the host applies them on its own thread in EditorLink::poll(). Same
 /// shape as ergo_bind's PendingWriteQueue, plus a bound so a host that never
 /// polls cannot grow it without limit (the oldest patch is dropped first).
+///
+/// Thread-safety: thread-safe (every member takes mtx_).
 
 #include <cstddef>
 #include <deque>

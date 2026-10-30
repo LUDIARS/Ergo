@@ -66,8 +66,13 @@ app.whenReady().then(async () => {
     const { boot }                 = await import(pathToFileUrl("dist/core/server.js"));
     const { PLUGIN_FACTORIES }      = await import(pathToFileUrl("dist/core/registry.js"));
     const { loadExternalFactories } = await import(pathToFileUrl("dist/core/external.js"));
+    const { pluginDirsWithLedger, readLedger, studioHome } =
+        await import(pathToFileUrl("dist/core/plugin-ledger.js"));
 
-    const external = await loadExternalFactories();
+    // ERGO_PLUGIN_DIR plus the packs enabled in the Studio plugin ledger.
+    const external = await loadExternalFactories(
+        pluginDirsWithLedger(process.env.ERGO_PLUGIN_DIR, readLedger(studioHome())),
+    );
     boot({ port: PORT, factories: [...PLUGIN_FACTORIES, ...external] });
 
     // Give the listener a tick to bind before the renderer tries to
