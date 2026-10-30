@@ -112,10 +112,14 @@ struct EditorLink::Impl {
         p.field    = string_field(msg, "field");
         const jsonm::JsonValue* value = msg.find("value");
         if (p.scene_id.empty() || p.actor_id.empty() || p.field.empty() || !value) return false;
+        p.value_json = jsonm::serialize(*value);
         // The relay only forwards patches for scenes this engine published;
         // anything else is stale (unpublished meanwhile) and never polled.
-        if (!is_published(p.scene_id)) return false;
-        p.value_json = jsonm::serialize(*value);
+        // Check and enqueue under the lock unpublish() erases under, so a
+        // patch is either refused here or queued before unpublish()'s
+        // discard() runs -- never queued after it.
+        std::lock_guard<std::mutex> lk(mtx);
+        if (find_locked(p.scene_id) == published.end()) return false;
         patches.push(std::move(p));
         return true;
     }

@@ -7,8 +7,10 @@
 #include "ergo/scene/editor_link.h"
 #include "ergo/scene/scene.h"
 
+#include <atomic>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace ergo::scene;
@@ -225,6 +227,42 @@ TEST(SceneEditorLink, UnpublishSendsRemoveAndDropsPatches) {
     link.set_transport(again.hook());
     ASSERT_EQ(again.frames.size(), 1u);
     EXPECT_EQ(Wire::op(again.at(0)), "hello");
+}
+
+TEST(SceneEditorLink, PatchRacingUnpublishIsNeverApplied) {
+    // receive() on another thread (the socket worker) races unpublish(): a
+    // patch that passed the "is it published" check just before the erase
+    // must not be queued after unpublish() discarded the scene's patches.
+    auto a = make_scene("a");
+    EditorLink link;
+    link.set_transport([](const std::string&) {});
+    const std::string frame = patch("a", "crate", "name", R"("x")");
+
+    std::atomic<bool> quit{false};
+    std::atomic<unsigned long long> done{0};
+    std::thread worker([&] {
+        while (!quit.load()) {
+            link.receive(frame);
+            done.fetch_add(1);
+        }
+    });
+    auto wait_receives = [&](unsigned long long n) {
+        const unsigned long long target = done.load() + n;
+        while (done.load() < target) std::this_thread::yield();
+    };
+
+    std::size_t stale = 0;
+    for (int i = 0; i < 2000; ++i) {
+        link.publish(*a);
+        wait_receives(static_cast<unsigned long long>(i % 3));
+        link.poll(*a);          // patches that arrived while published
+        link.unpublish("a");    // discards the scene's queued patches
+        wait_receives(2);       // any receive() in flight at unpublish has finished
+        stale += link.poll(*a);
+    }
+    quit = true;
+    worker.join();
+    EXPECT_EQ(stale, 0u);
 }
 
 TEST(SceneEditorLink, IgnoresNonPatchAndMalformedFrames) {

@@ -235,7 +235,8 @@ link.poll(*scene);
 - `test_scene_editor_link` (ソケット不要): 接続時の hello + publish 済み
   シーンの再送 / publish のフレーム内容 / パッチのキューイングと poll での
   適用 / 拒否後も再 publish / `poll(SceneGraph&)` のルーティング /
-  `poll(Scene&)` が他シーンのパッチを残す / unpublish / 不正フレームの無視
+  `poll(Scene&)` が他シーンのパッチを残す / unpublish / 別スレッドの
+  受信と競合した unpublish の後にパッチが適用されない / 不正フレームの無視
 
 ## 制約 / 先送り
 - **描画結線は未実装**。 アクター → drawable 変換と `PostProcess` のパス構成
