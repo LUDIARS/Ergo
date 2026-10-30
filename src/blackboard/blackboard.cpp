@@ -1,7 +1,9 @@
 #include "ergo/blackboard/blackboard.h"
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <tuple>
 
 namespace ergo::blackboard {
 
@@ -13,15 +15,6 @@ std::string normalize(const std::string& category) {
     return category.empty() ? std::string(kDefaultCategory) : category;
 }
 
-struct Entry {
-    void*           ptr;
-    std::type_index type;
-    std::string     category;
-
-    Entry(void* p, std::type_index t, std::string c)
-        : ptr(p), type(t), category(std::move(c)) {}
-};
-
 struct CleanupRecord {
     std::shared_ptr<bool> fired;
     std::function<void()> cleanup;
@@ -32,7 +25,33 @@ struct CleanupRecord {
             if (cleanup) cleanup();
         }
     }
+
+    bool done() const { return !fired || *fired; }
 };
+
+struct Entry {
+    void*           ptr;
+    std::type_index type;
+    std::string     category;
+    /// Cleanups of by-name subscriptions on this registration. They share
+    /// the `fired` flag with the category record and the Subscription
+    /// handle, so whichever path runs first wins and the others no-op.
+    std::vector<CleanupRecord> name_subs;
+
+    Entry(void* p, std::type_index t, std::string c)
+        : ptr(p), type(t), category(std::move(c)) {}
+};
+
+/// Close every by-name subscription bound to `e`. Called while the
+/// registered Property is still alive (the registration contract), right
+/// before the entry is replaced or erased.
+void close_name_subs(Entry& e) {
+    auto subs = std::move(e.name_subs);
+    e.name_subs.clear();
+    for (auto rit = subs.rbegin(); rit != subs.rend(); ++rit) {
+        rit->run_once();
+    }
+}
 
 } // namespace
 
@@ -56,6 +75,7 @@ void Engine::register_erased(std::string name, void* property,
     auto it  = impl_->entries.find(name);
     if (it != impl_->entries.end()) {
         warn("register_property: replacing existing '" + name + "'");
+        close_name_subs(it->second);
         it->second = Entry(property, type, cat);
     } else {
         impl_->entries.emplace(std::move(name), Entry(property, type, std::move(cat)));
@@ -63,7 +83,55 @@ void Engine::register_erased(std::string name, void* property,
 }
 
 void Engine::unregister(const std::string& name) {
-    impl_->entries.erase(name);
+    auto it = impl_->entries.find(name);
+    if (it == impl_->entries.end()) return;
+    close_name_subs(it->second);
+    impl_->entries.erase(it);
+}
+
+void* Engine::find_erased(const std::string& name, std::type_index type,
+                          bool warn_missing) const {
+    auto it = impl_->entries.find(name);
+    if (it == impl_->entries.end()) {
+        if (warn_missing) {
+            warn("lookup: '" + name + "' is not registered "
+                 "(register it before subscribing by name)");
+        }
+        return nullptr;
+    }
+    if (it->second.type != type) {
+        warn(std::string("lookup: '") + name + "' is registered as "
+             + it->second.type.name() + " but requested as " + type.name());
+        return nullptr;
+    }
+    return it->second.ptr;
+}
+
+void Engine::attach_to_entry(const std::string&    name,
+                             std::shared_ptr<bool> fired,
+                             std::function<void()> cleanup) {
+    auto it = impl_->entries.find(name);
+    if (it == impl_->entries.end()) return;
+    auto& subs = it->second.name_subs;
+    // Drop records already closed through their handle / category so a
+    // subscribe-reset churn does not grow the list without bound.
+    subs.erase(std::remove_if(subs.begin(), subs.end(),
+                              [](const CleanupRecord& r) { return r.done(); }),
+               subs.end());
+    subs.push_back(CleanupRecord{ std::move(fired), std::move(cleanup) });
+}
+
+void Engine::visit(const std::function<void(const std::string&, std::type_index,
+                                            const void*)>& fn) const {
+    if (!fn) return;
+    // Snapshot first so a misbehaving callback cannot invalidate the
+    // iteration (mutating the registry from `fn` is still unsupported).
+    std::vector<std::tuple<std::string, std::type_index, const void*>> rows;
+    rows.reserve(impl_->entries.size());
+    for (const auto& [name, entry] : impl_->entries) {
+        rows.emplace_back(name, entry.type, entry.ptr);
+    }
+    for (const auto& [name, type, ptr] : rows) fn(name, type, ptr);
 }
 
 void Engine::release(const std::string& category) {
@@ -77,9 +145,11 @@ void Engine::release(const std::string& category) {
         impl_->category_cleanups.erase(it);
     }
 
-    // Drop entries tagged with this category.
+    // Drop entries tagged with this category, closing their by-name
+    // subscriptions (which may live in other categories) first.
     for (auto eit = impl_->entries.begin(); eit != impl_->entries.end(); ) {
         if (eit->second.category == cat) {
+            close_name_subs(eit->second);
             eit = impl_->entries.erase(eit);
         } else {
             ++eit;
@@ -88,6 +158,7 @@ void Engine::release(const std::string& category) {
 }
 
 void Engine::release_all() {
+    for (auto& [_name, entry] : impl_->entries) close_name_subs(entry);
     for (auto& [_cat, vec] : impl_->category_cleanups) {
         for (auto rit = vec.rbegin(); rit != vec.rend(); ++rit) {
             rit->run_once();
