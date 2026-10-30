@@ -1,0 +1,27 @@
+{
+  "cmake": {
+    "version": {
+      "string": "3.28.0"
+    }
+  },
+  "objects": [
+    {
+      "kind": "codemodel",
+      "version": {
+        "major": 2,
+        "minor": 6
+      },
+      "jsonFile": "codemodel-v2-shared.json"
+    }
+  ],
+  "reply": {
+    "codemodel-v2": {
+      "kind": "codemodel",
+      "version": {
+        "major": 2,
+        "minor": 6
+      },
+      "jsonFile": "codemodel-v2-shared.json"
+    }
+  }
+}

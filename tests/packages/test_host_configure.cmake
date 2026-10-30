@@ -9,6 +9,8 @@
 #   * a host declaration given as the Ergo manifest is a configure error
 #   * ERGO_PACKAGE_MANIFEST_EXTRA may point at a host declaration elsewhere
 #   * a host-root ergo-packages.json without `host` is not read
+#   * one configure leaves a File API reply on CMake 3.27+ (the graphs need
+#     no second run); before 3.27 the hub says one more run is needed
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir>
 #         [-DERGO_TEST_GENERATOR=<gen>] -P tests/packages/test_host_configure.cmake
@@ -92,6 +94,24 @@ if(NOT _extra MATCHES "/code/host/ergo-packages[.]json$")
     pkg_fail("declaration recorded: manifest_extra is '${_extra}'")
 endif()
 pkg_pass("host.id from host.code")
+
+# The File API reply the graphs read (P2 / --check): cmake_file_api(QUERY) is
+# answered by this same configure on 3.27+; the client-ergo query file only by
+# the next run, which the hub says on older CMake.
+if(CMAKE_VERSION VERSION_LESS 3.27)
+    run_case(file_api pass "P2 / --check need one more cmake run" "${W}/decl-example.json")
+    pkg_pass("CMake < 3.27: the hub says the File API reply needs one more run")
+else()
+    file(GLOB _reply_index "${CASE_BUILD}/.cmake/api/v1/reply/index-*.json")
+    if(NOT _reply_index)
+        pkg_fail("no File API reply index after one configure (CMake ${CMAKE_VERSION})")
+    endif()
+    list(GET _reply_index 0 _index_file)
+    file(READ "${_index_file}" _index)
+    string(JSON _kind ERROR_VARIABLE _e GET "${_index}" reply codemodel-v2 kind)
+    pkg_assert_eq("shared codemodel reply after one configure" "${_kind}" codemodel)
+    pkg_pass("one configure answers the File API query (CMake 3.27+)")
+endif()
 
 # Private packages of the declaration join the manifest (M0 records them).
 run_case(private pass "mode=M0" "${W}/decl-private.json")

@@ -1,0 +1,61 @@
+{
+  "kind": "codemodel",
+  "version": {
+    "major": 2,
+    "minor": 6
+  },
+  "paths": {
+    "source": "/work/demo",
+    "build": "/work/demo/build"
+  },
+  "configurations": [
+    {
+      "name": "",
+      "directories": [
+        {
+          "source": ".",
+          "build": ".",
+          "projectIndex": 0,
+          "jsonFile": "directory-0.json"
+        },
+        {
+          "source": "external/ergo",
+          "build": "external/ergo",
+          "projectIndex": 1,
+          "jsonFile": "directory-1.json"
+        }
+      ],
+      "projects": [
+        {
+          "name": "Demo",
+          "directoryIndexes": [
+            0
+          ]
+        },
+        {
+          "name": "Ergo",
+          "directoryIndexes": [
+            1
+          ],
+          "parentIndex": 0
+        }
+      ],
+      "targets": [
+        {
+          "name": "demo_app",
+          "id": "demo_app::@00000000000000000000",
+          "directoryIndex": 0,
+          "projectIndex": 0,
+          "jsonFile": "target-demo_app-0000.json"
+        },
+        {
+          "name": "ergo_common",
+          "id": "ergo_common::@00000000000000000001",
+          "directoryIndex": 1,
+          "projectIndex": 1,
+          "jsonFile": "target-ergo_common-0001.json"
+        }
+      ]
+    }
+  ]
+}

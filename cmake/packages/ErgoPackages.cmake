@@ -28,8 +28,10 @@
 #
 # Results: <build>/ergo-packages.resolved.json (written once, byte-identical
 # for the same configuration) and the File API query
-# <build>/.cmake/api/v1/query/client-ergo/query.json. Each package's
-# `exports` become normal variables of the including directory.
+# <build>/.cmake/api/v1/query/client-ergo/query.json (answered by the next
+# cmake run; on CMake 3.27+ also cmake_file_api(QUERY), answered by this
+# one). Each package's `exports` become normal variables of the including
+# directory.
 #
 # This file names no concrete package: everything comes from the manifest.
 # ---------------------------------------------------------------------------
@@ -666,6 +668,15 @@ function(_ergo_packages_evaluate phase)
         ergo_pkg_watch_notice(_watch_line CODE "${_r_HOST_ID}" STATE_DIR "${_watch_dir}")
         if(NOT _watch_line STREQUAL "")
             message(STATUS "${_watch_line}")
+        endif()
+        # Before 3.27 the File API query is answered only by the next run: say
+        # so once instead of letting ergo_package_viz --view targets fail.
+        if(CMAKE_VERSION VERSION_LESS 3.27)
+            file(GLOB _reply_index "${CMAKE_BINARY_DIR}/.cmake/api/v1/reply/index-*.json")
+            if(NOT _reply_index)
+                message(STATUS "ergo packages: P2 / --check need one more cmake run "
+                    "(CMake < 3.27 answers the File API query on the next configure)")
+            endif()
         endif()
     endif()
     if(_mode STREQUAL "M0")
