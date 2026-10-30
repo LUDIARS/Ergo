@@ -34,6 +34,7 @@
 # This file names no concrete package: everything comes from the manifest.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageManifest.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageRules.cmake")

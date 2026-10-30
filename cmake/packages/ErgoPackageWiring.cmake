@@ -29,6 +29,7 @@
 #   ERGO_PKG_RES_<name>_IMPORTED / _VERSION  facts of the first present target
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 
 # Append findings to the hub-wide acquisition list.
 function(ergo_pkg_res_add_findings)

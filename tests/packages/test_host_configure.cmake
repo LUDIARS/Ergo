@@ -47,7 +47,7 @@ function(run_case name expect pattern decl)
     set(_build "${W}/${name}/build")
     file(COPY "${CMAKE_CURRENT_LIST_DIR}/fixtures/decl_host/" DESTINATION "${_host}")
     if(decl)
-        file(COPY_FILE "${decl}" "${_host}/ergo-packages.json")
+        configure_file("${decl}" "${_host}/ergo-packages.json" COPYONLY)  # file(COPY_FILE) needs CMake 3.21
     endif()
     execute_process(
         COMMAND "${CMAKE_COMMAND}" ${_gen_args} -S "${_host}" -B "${_build}"

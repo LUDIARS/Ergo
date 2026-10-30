@@ -30,6 +30,7 @@
 # to ERGO_PACKAGES_ACQUIRE_FINDINGS.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageGit.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageHostDefaults.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageWiring.cmake")
