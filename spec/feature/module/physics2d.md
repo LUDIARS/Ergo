@@ -22,9 +22,12 @@
 
 ## 依存
 
-- `ergo_math` (Vec/Mat/ObjectPool)
-- C++20 標準ライブラリ (`<cmath>`, `<set>`, `<vector>`, `<algorithm>` 等)
-- 他 Ergo モジュールへの依存なし
+- `ergo_math` (Vec/Mat/ObjectPool) — PUBLIC リンク。`ERGO_BUILD_MATH=OFF` で
+  `ERGO_BUILD_PHYSICS2D=ON` は構成時エラー (リンク時まで遅らせない)
+- C++20 標準ライブラリ (`<cmath>`, `<set>`, `<vector>`, `<algorithm>` 等)。
+  C++20 は `ergo_math` の usage requirement (`cxx_std_20`) として伝播するので、
+  `ergo_physics2d` をリンクしたホストは自動で C++20 になる
+- `ergo_math` 以外の Ergo モジュールには依存しない
 
 ## データ型
 

@@ -2,48 +2,73 @@
 
 ## 目的
 
-`ergo_<domain>` の C++17 モジュール (例: `ergo_input` / `ergo_render` /
+`ergo_<domain>` の C++ モジュール (例: `ergo_input` / `ergo_render` /
 `ergo_particle`) をビルド・テストする。Ergo はトップレベル `CMakeLists.txt`
 が全モジュールを `add_library(ergo_<name>)` として公開する単一 CMake ツリーで、
 **premake は使わない**。ホストアプリは `add_subdirectory(<ergo>)` で取り込む
-(詳細は [`../../README.md`](../../README.md) 「ホストアプリからの利用」)。
+(下記「ホストアプリからの取り込み」)。
 
 ## 前提
 
-- CMake `>= 3.20` (`cmake_minimum_required` / `CMakeLists.txt:1`)
-- C++17 (`CMAKE_CXX_STANDARD 17`、extensions OFF / `CMakeLists.txt:4-6`)
-- `Threads` は必須依存 (`find_package(Threads REQUIRED)` / `CMakeLists.txt:50`)
+- CMake `>= 3.20` (`cmake_minimum_required`)
+- C++17 が基準 (`CMAKE_CXX_STANDARD 17`、extensions OFF)。例外は
+  `ergo_math` (C++20 concepts) と、それをリンクする `ergo_physics2d` で C++20。
+  どちらの標準も各ターゲットの usage requirement (`target_compile_features`) として
+  利用側へ伝播する (`cmake/ErgoTargets.cmake`)
+- `Threads` は必須依存 (`find_package(Threads REQUIRED)`)
 
 ## ビルドフラグ (CMake オプション)
 
-すべて `CMakeLists.txt` の `option()` / `set(... CACHE)` で定義。`-D<KEY>=<値>`
-で渡す。
+`-D<KEY>=<値>` で渡す。全オプションの一覧と既定値の正本は
+[`config-reference.md`](config-reference.md)。ここではビルドの形とモジュールの
+組み合わせに関わるものだけを扱う。
 
 ### 全体スイッチ
 
 | キー | 既定 | 役割 |
 |---|---|---|
-| `ERGO_BUILD_TESTS`      | ON  | モジュールテストをビルドする (CTest 登録) |
-| `ERGO_BUILD_DUMMY`      | OFF | dummy プラグライブラリ (no-op 実装) をビルドする |
-| `ERGO_BUILD_BENCHMARKS` | OFF | マイクロベンチ実行ファイルをビルドする (opt-in) |
+| `ERGO_BUILD_TESTS`               | トップレベル: ON / サブプロジェクト: OFF | モジュールテストをビルドする (CTest 登録) |
+| `ERGO_EXCLUDE_FROM_ALL`          | サブプロジェクトでテスト OFF のとき ON、それ以外 OFF | Ergo のターゲットを既定ビルド (`all`) から外す。ホストがリンクしたものだけがビルドされる |
+| `ERGO_POSITION_INDEPENDENT_CODE` | ON  | Ergo のライブラリを PIC でビルドする (ホストの共有ライブラリ / プラグインにリンクできる) |
+| `ERGO_BUILD_DUMMY`               | OFF | dummy プラグライブラリ (no-op 実装) をビルドする |
+| `ERGO_BUILD_BENCHMARKS`          | OFF | マイクロベンチ実行ファイルをビルドする (opt-in) |
 
-### モジュール個別スイッチ (`ERGO_BUILD_<名>`、すべて既定 ON)
+「トップレベル」は Ergo 自身を `cmake -S <ergo>` で構成した場合、
+「サブプロジェクト」はホストの `add_subdirectory` / FetchContent /
+`ergo_pkg` のブートストラップで取り込まれた場合 (判定は
+`CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR`)。
 
-`INPUT` / `PARTICLE` / `GPU_PARTICLE` / `BIND` / `ACTOR` / `SOUND` / `FRAME` /
-`PROFILE` / `LOG` / `IO` / `AUDIO` / `WORLD_TIME` / `BLACKBOARD` / `UI` /
-`CUSTOS` / `HEALTH` / `SCORE` / `COMBO_COUNTER` / `TIMING_JUDGE` / `UI_KIT` /
-`SHURIKEN_MIGRATOR` / `RENDER`。
+### モジュール個別スイッチ (`ERGO_BUILD_<名>`)
 
-不要なモジュールは `-DERGO_BUILD_<名>=OFF` で外せる
-(例 `-DERGO_BUILD_AUDIO=OFF`)。正本は `CMakeLists.txt:15-36`。
+不要なモジュールは `-DERGO_BUILD_<名>=OFF` で外せる (例 `-DERGO_BUILD_AUDIO=OFF`)。
+一覧と既定は [`config-reference.md`](config-reference.md)。
+
+モジュール間の前提は構成時に検査する。リンク時 (`cannot find -lergo_io` など) まで
+遅らせない:
+
+| モジュール | 前提 | 前提が OFF のとき |
+|---|---|---|
+| `PHYSICS2D` | `MATH` | 構成エラー |
+| `UI_KIT` / `UI_LAYOUT` / `RESOURCE` | `IO` | 構成エラー |
+| `HTTP` | 管理対象の libcurl (`ERGO_WITH_CURL`、`HTTP=ON` で自動 ON) | 取得できなければ構成エラー |
+| `ACTOR` | `BIND` | スキップ (`ergo_actor: requires ERGO_BUILD_BIND — skipped`) |
+| `CAST` | `ACTOR` + `BIND` | スキップ (STATUS) |
+| `SHURIKEN_MIGRATOR` | `PARTICLE` + `GPU_PARTICLE` | スキップ (STATUS) |
+| `RENDER_VIZ` / `GRAPH_LAYOUT` | `TELA_GRAPH` | スキップ (STATUS) |
+| `PACKAGE_VIZ` | `PACKAGE_MODEL` + `PACKAGE_SCAN` + `GRAPH_LAYOUT` | スキップ (STATUS) |
+| `PACKAGE_WATCH` / `PACKAGE_CLI` | `PACKAGE_MANAGER` | スキップ (STATUS) |
+
+構成エラーは欠けている組み合わせをすべて 1 つのメッセージに並べる
+(`ERGO_BUILD_UI_KIT=ON but ERGO_BUILD_IO=OFF. ... No silent fallback.`)。
+検査は `cmake/ErgoModuleRequirements.cmake`。
 
 ### モジュール固有ノブ
 
 | キー | 既定 | 役割 |
 |---|---|---|
-| `ERGO_AUDIO_BACKEND`              | `auto` | `ergo_audio` のバックエンド。`auto` (FMOD 検出 → 無ければ dummy) / `fmod` (SDK 必須・無ければエラー) / `dummy` (no-op 強制) (`CMakeLists.txt:45`) |
-| `ERGO_PARTICLE_HAS_RENDERER`      | OFF    | `ergo_particle` の Vulkan ビルボード描画を有効化。`pictor` ターゲット + Vulkan SDK が必要 (`CMakeLists.txt:39`) |
-| `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON   | `ergo_gpu_particle` の GLSL compute を `glslc` で SPIR-V に bake する (`CMakeLists.txt:40`) |
+| `ERGO_AUDIO_BACKEND`              | `auto` | `ergo_audio` のバックエンド。`auto` (FMOD 検出 → 無ければ dummy) / `fmod` (SDK 必須・無ければエラー) / `dummy` (no-op 強制) |
+| `ERGO_PARTICLE_HAS_RENDERER`      | OFF    | `ergo_particle` の Vulkan ビルボード描画を有効化。`pictor` ターゲット + Vulkan SDK が必要 |
+| `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON   | `ergo_gpu_particle` の GLSL compute を `glslc` で SPIR-V に bake する |
 | `ERGO_RENDER_REQUIRE_REAL`        | OFF    | `ergo_render` の実描画経路を確保できないデスクトップ構成を構成エラーにする。Android / iOS は常に必須なのでこのノブに関係なくエラー |
 
 ## Pictor / Vulkan 連携 (描画系モジュール)
@@ -53,8 +78,8 @@
 自動分岐する。`pictor` ターゲットはホスト統合側 (例: AdventureCube /
 PrivateGame のスーパープロジェクト、モバイルホスト) が
 `add_subdirectory(Pictor ...)` 等で提供する。Ergo 単体ビルドでは通常
-Vulkan 非依存ビルドになる。正本は `CMakeLists.txt:118-160` (particle) /
-`CMakeLists.txt:695-758` (render)。
+Vulkan 非依存ビルドになる。正本は `CMakeLists.txt` の `ergo_particle` /
+`ergo_render` 各セクション。
 
 ### ergo_render のクロスプラットフォーム契約 (KD-MOB-001)
 
@@ -100,7 +125,7 @@ CMake 文字列で `\"` を 1 段だけ書く (二重に書くと MSVC で C2017
 
 Visual Studio の `.sln` / Xcode の `.xcodeproj` を生成する場合は
 [IDE プロジェクト生成](ide-projects.md) のプリセットを使う。
-libcurl を含む構成と、ホストアプリへのリンク例もそちらに記載する。
+libcurl を含む構成と、ホストアプリの雛形もそちらに記載する。
 
 ```bash
 # 1. 構成 (例: テスト込み Release、audio は dummy 固定)
@@ -113,21 +138,52 @@ cmake --build build --config Release
 ctest --test-dir build -C Release
 ```
 
-ホストアプリから取り込む場合:
+## ホストアプリからの取り込み
 
 ```cmake
 add_subdirectory(<path-to-ergo>)
-target_link_libraries(myapp PRIVATE ergo_input ergo_bind)
+target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
 ```
+
+`ergo_pkg init` が生成するブートストラップ経由でも同じ扱いになる
+([`packages.md`](packages.md))。ホスト側で次の設定を書き足す必要はない:
+
+- **ターゲット名**: `Ergo::<名>` (`ergo_<名>` の ALIAS) を推奨する。全 `ergo_*`
+  ライブラリに付く (`Ergo::log`、`Ergo::physics2d`、`Ergo::thirdparty` など)。
+  綴り違いや OFF のモジュールは構成時エラーになる (素の `ergo_<名>` は
+  `-lergo_<名>` としてリンク時まで残る)。素の名前も従来どおり使える。
+- **サブプロジェクトの既定**: `ERGO_BUILD_TESTS=OFF` (Ergo のテストを登録しない) と
+  `ERGO_EXCLUDE_FROM_ALL=ON` (ホストがリンクしたライブラリだけをビルドする)。
+  ホストの `ctest` に Ergo のテストは出ず、ホストのターゲット名 (`test_math` 等) とも
+  衝突しない。既存のビルドディレクトリはキャッシュの `ERGO_BUILD_TESTS=ON` を
+  持ち続けるので、ビルドディレクトリを作り直すか `-DERGO_BUILD_TESTS=OFF` を渡す
+  (テスト ON の間は `ERGO_EXCLUDE_FROM_ALL` も既定 OFF)。明示的に上書きしたい場合は
+  `set(ERGO_BUILD_TESTS ON CACHE BOOL "" FORCE)` のように `add_subdirectory` の前で設定する。
+- **C++ 標準**: 各ライブラリが `cxx_std_17` (`ergo_math` は `cxx_std_20`) を PUBLIC に
+  持つので、ホストが C++14 (MSVC の既定) でもリンクしたターゲットは自動で
+  引き上がる。`ergo_physics2d` / `ergo_math` をリンクすると C++20 になる。
+- **MSVC の `/utf-8`**: 公開ヘッダは BOM なし UTF-8 の日本語コメントを含むため、
+  全ライブラリが `/utf-8` を PUBLIC に持つ (ホストに伝播する)。
+- **静的ライブラリのみ・PIC**: Ergo のライブラリは常に STATIC。Ergo には export
+  マクロ (dllexport) が無いため、ホストの `BUILD_SHARED_LIBS=ON` は Ergo の中では
+  無視する (`ergo: module libraries are always STATIC; BUILD_SHARED_LIBS ignored`)。
+  ホスト自身の `BUILD_SHARED_LIBS` は変えない。既定で PIC なので、ホストの
+  共有ライブラリ / プラグイン (`add_library(... SHARED)`) にもリンクできる。
+
+回帰テスト: `test_host_consume` (C++14 + `BUILD_SHARED_LIBS=ON` のホストが
+`Ergo::input` / `Ergo::log` / `Ergo::bind` / `Ergo::physics2d` と SHARED プラグインを
+ビルドする)。実際にホストプロジェクトを構成・ビルドする (ctest ラベル `host`)。
 
 ## 注意点
 
 - **`glslc` が無い環境** では SPIR-V bake がスキップされるだけでビルド自体は
   通る (`ERGO_GPU_PARTICLE_COMPILE_SHADERS=ON` でも非致命)。
-- **MSVC で日本語コメントを含むヘッダ** を consumer 側でビルドする場合、
-  `/utf-8` が consumer に伝播しない既知の罠がある。`ergo_render` は
-  `target_compile_options(... PUBLIC /utf-8)` を付けている (`CMakeLists.txt:721`)
-  が、テストターゲット等は個別に `/utf-8` を要する場合がある。
+- **MSVC で日本語コメントを含むヘッダ**: `/utf-8` は全ライブラリの usage
+  requirement なので、リンクしたターゲットには自動で付く。Ergo のライブラリを
+  リンクせずにヘッダだけを読むターゲットは自分で `/utf-8` を付ける。
 - 新規モジュール追加時は `CMakeLists.txt` への `add_library` 追加 +
   `module_list.md` / `module_list.yaml` 更新が必要 (手順は
-  [`../../CLAUDE.md`](../../CLAUDE.md) 「新規モジュール追加手順」)。
+  [`../../CLAUDE.md`](../../CLAUDE.md) 「新規モジュール追加手順」)。`Ergo::<名>`
+  エイリアス・C++ 標準・`/utf-8` は `cmake/ErgoTargets.cmake` が全 `ergo_*`
+  ライブラリに付けるので、モジュール側で書く必要はない。別のモジュールが無いと
+  成り立たないモジュールは `cmake/ErgoModuleRequirements.cmake` の表に足す。

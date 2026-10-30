@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 project(Ergo LANGUAGES CXX)
 
+# Ergo itself, or a host's add_subdirectory / FetchContent / ergo_pkg bootstrap?
+# (PROJECT_IS_TOP_LEVEL needs CMake 3.21.) Picks the subproject defaults below.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_ergo_top ON)
+else()
+    set(_ergo_top OFF)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -8,7 +16,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ---------------------------------------------------------------------------
 # Top-level options. Hosts can flip per-module knobs as needed.
 # ---------------------------------------------------------------------------
-option(ERGO_BUILD_TESTS       "Build module tests"             ON)
+option(ERGO_BUILD_TESTS       "Build module tests (default: only when Ergo is the top-level project)" ${_ergo_top})
 option(ERGO_BUILD_DUMMY       "Build dummy plug libraries"     OFF)
 option(ERGO_BUILD_BENCHMARKS  "Build micro-benchmark executables (opt-in)" OFF)
 
@@ -71,6 +79,24 @@ option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute s
 set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / dummy")
 set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy)
 
+# As a subproject Ergo keeps its targets out of the host's `all`: only what the
+# host links is built. (Not while ERGO_BUILD_TESTS is ON, so registered tests
+# are also built.) Libraries are PIC so they also link into host shared
+# modules / plugins.
+if(_ergo_top OR ERGO_BUILD_TESTS)
+    set(_ergo_exclude_default OFF)
+else()
+    set(_ergo_exclude_default ON)
+endif()
+option(ERGO_EXCLUDE_FROM_ALL
+    "Keep Ergo's targets out of the default build (default: ON as a subproject without tests)"
+    ${_ergo_exclude_default})
+if(ERGO_EXCLUDE_FROM_ALL)
+    set_property(DIRECTORY PROPERTY EXCLUDE_FROM_ALL ON)
+endif()
+option(ERGO_POSITION_INDEPENDENT_CODE "Build Ergo's libraries as position-independent code" ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ${ERGO_POSITION_INDEPENDENT_CODE})
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 find_package(Threads REQUIRED)
@@ -106,6 +132,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
 # M0: nothing is acquired, existing targets are only recorded into
 # <build>/ergo-packages.resolved.json. See spec/setup/packages.md.
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/packages/ErgoPackages.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoModuleRequirements.cmake")
 
 # ---------------------------------------------------------------------------
 # ergo_http — libcurl-backed synchronous HTTP client. The public header hides
@@ -1648,4 +1675,30 @@ if(ERGO_BUILD_TESTS)
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_${NAME}.cmake)
         endforeach()
     endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Host-facing target finish (keep last: walks every ergo_* library defined
+# above). Ergo::<name> aliases, the C++ standard (cxx_std_17, ergo_math 20)
+# and MSVC /utf-8 as usage requirements. See cmake/ErgoTargets.cmake.
+# ---------------------------------------------------------------------------
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoTargets.cmake")
+ergo_finalize_targets()
+
+# Host consumption test: a real compiled host project add_subdirectory()s this
+# checkout (C++14 host, BUILD_SHARED_LIBS=ON, Ergo:: names, a SHARED plugin,
+# configure-time module requirements).
+if(ERGO_BUILD_TESTS)
+    set(_ergo_host_test_args
+        -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
+        -DERGO_TEST_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+        -DERGO_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        -DERGO_TEST_CXX_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER})
+    add_test(NAME test_host_consume
+        COMMAND ${CMAKE_COMMAND} ${_ergo_host_test_args}
+            -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/host_consume
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_host_consume.cmake)
+    set_tests_properties(test_host_consume PROPERTIES LABELS host TIMEOUT 900)
+    unset(_ergo_host_test_args)
 endif()

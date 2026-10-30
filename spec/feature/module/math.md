@@ -22,6 +22,10 @@ SIMD は SoA バッチ経路に限定し、scalar フォールバックを必ず
 
 - C++20 標準ライブラリのみ (`<concepts>`, `<cmath>`, `<memory>`, `<new>`, `<vector>` 等)
 - 他 Ergo モジュールへの依存なし
+- **C++20 は利用側へ伝播する**: `ergo_math` は `target_compile_features(PUBLIC cxx_std_20)`
+  を持つ (`cmake/ErgoTargets.cmake`)。公開ヘッダが concepts を使うため、リンクした
+  ターゲット (`ergo_physics2d`、ホストの実行ファイル) は CMake が自動で C++20 に
+  引き上げる。ホスト側で `cxx_std_20` を書き足す必要はない
 - `ergo::vector::Vec2 / Vec3` との相互変換は
   `ergo/math/vec_vector_convert.h` を明示インクルードで有効化 (opt-in)
 
