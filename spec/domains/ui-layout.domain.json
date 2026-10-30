@@ -5,6 +5,7 @@
   "templateRules": [],
   "specRefs": [
     "spec/feature/module/ui.md",
+    "spec/module/ui_kit.md",
     "spec/feature/module/ui_layout.md",
     "spec/feature/module/vector.md",
     "spec/architecture/domains-and-ux.md"

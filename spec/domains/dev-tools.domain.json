@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "description": "【AI 案・人の承認前】開発者ツールのプラグインホスト (tools/ergo)。 Node サーバ・Electron シェル・組み込みプラグイン (particle / variable / profile / render_pipeline / pictor_perf / visus / rive / ui_layout / scene_editor / vfx-suggest / vfx-breed)。 ゲーム固有のエディタは持たない。",
+  "description": "【AI 案・人の承認前】開発者ツールのプラグインホスト (tools/ergo)。 Node サーバ・Electron シェル・組み込みプラグイン (particle / variable / rive / profile / pictor_perf / render_pipeline / visus / ui_layout / vfx-suggest / vfx-breed / scene_editor / log)。 ゲーム固有のエディタは持たない。",
   "presetRules": [],
   "templateRules": [],
   "specRefs": [
@@ -8,6 +8,14 @@
     "spec/feature/tool/ergo-redesign.md",
     "spec/setup/run-tools-ergo.md",
     "spec/setup/external-plugins.md",
+    "spec/feature/tool/rive.md",
+    "spec/feature/tool/pictor_perf.md",
+    "spec/feature/tool/render_pipeline.md",
+    "spec/feature/tool/render_pipeline_system_b.md",
+    "spec/feature/tool/scene_editor.md",
+    "spec/feature/tool/log.md",
+    "spec/setup/plugin-data-roots.md",
+    "spec/setup/ci.md",
     "spec/architecture/domains-and-ux.md"
   ],
   "membership": [
