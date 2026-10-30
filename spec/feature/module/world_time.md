@@ -122,12 +122,17 @@ ergo::world_time::Engine::instance().hit_slow(
     /*center_hold_time*/ 0.2f,     // 中央のホールド時間
     ergo::world_time::Ease::InOutQuad);
 
-// メインループ:
-float real_dt = clock.tick();
+// メインループ (1 フレームに 1 回だけ update する):
+float real_dt = host_clock_dt();   // ホストの実時間 dt (例: ergo::frame::dt_seconds())
 float game_dt = ergo::world_time::Engine::instance().update(real_dt);
 world.update(game_dt);
 ui.update(real_dt);
 ```
+
+他モジュール (input / actor / character / health / bind / audio) と組み合わせた
+フレーム内の呼び出し順と、real / world のどちらの dt を渡すかは
+[`spec/setup/integrate-modules.md`](../../setup/integrate-modules.md) にまとめてあり、
+`examples/compose_loop/main.cpp` が動く参照実装 (CI の `example_compose_loop`)。
 
 # テスト
 

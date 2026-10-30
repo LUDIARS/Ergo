@@ -13,7 +13,9 @@ Ergo 版は R3 / Unity 依存を取り払った C++17 ポート。
 ## 用途
 
 - グローバル State (score / time / health) を疎結合に配信
-- UI / システム間通信を「名前で結ぶ」(直接参照を避けてビルド分離を保つ)
+- UI / システム間通信を「名前で結ぶ」(直接参照を避けてビルド分離を保つ)。
+  表示側は `find<T>(name)` / `subscribe<T>(name, cb)` で名前と型だけを知り、
+  ゲームルール側の構造体を include しない
 - カテゴリ単位での一括購読解除 (シーン破棄時に「stage」カテゴリの全
   購読を一発解除、など)
 
@@ -25,7 +27,8 @@ Ergo 版は R3 / Unity 依存を取り払った C++17 ポート。
 
 ## 必要なデータ
 
-- 名前 → 型消し Property* + std::type_index 登録テーブル
+- 名前 → 型消し Property* + std::type_index 登録テーブル。各登録は、名前で
+  結んだ購読の cleanup record も持つ (登録が消えるときに先に閉じるため)
 - カテゴリ → cleanup record リスト (`shared_ptr<bool>` で fired flag を
   共有し、RAII Subscription とカテゴリ release が二重実行しても安全)
 - 名前 → 購読数カウンタ (デバッグ用)
@@ -48,6 +51,19 @@ Ergo 版は R3 / Unity 依存を取り払った C++17 ポート。
 - **二重 cleanup 安全**: Subscription の RAII デストラクタとカテゴリ
   release が同じ subscription を消そうとしても idempotent (shared_ptr
   内 fired フラグでガード)。
+- **名前で結ぶ購読は登録に紐づく**: `subscribe<T>(name, cb, category)` の
+  購読は、自分のカテゴリに加えて `name` の登録にも cleanup を残す。
+  `unregister(name)` / 同名の再登録 (上書き) / 登録側カテゴリの
+  `release` / `release_all` は、登録を消す **前に** その購読を閉じる
+  (Property がまだ生きているうちに unsubscribe する)。これにより HUD など
+  別カテゴリの購読者は、producer が `release("stage")` して Property を
+  破棄した後に自分の `Subscription` を捨てても安全。ポインタ版
+  `subscribe<T>(name, &prop, cb)` は登録に紐づかない (Property を持つ側が
+  寿命を管理する)。
+- **購読より先に登録する**: 名前で購読する時点で未登録・型違いなら警告 +
+  無効な Subscription を返す。後から登録しても自動では結ばない (遅延
+  バインドはしない)。型は `std::type_index` の完全一致で照合する
+  (`int` と `int64_t` は別型)。
 - **マクロ**: Foundation の `[BlackboardAttribute]` (C# reflection) は
   C++ では不可能。代替として `BLACKBOARD_REGISTER(name, prop, category)`
   マクロを提供。
@@ -91,12 +107,30 @@ class Engine {
 
     void unregister(const std::string& name);
 
+    // 名前で引く (型が違えば警告 + nullptr、未登録は nullptr)
+    template <typename T>
+    Property<T>* find(const std::string& name) const;
+
+    // 名前だけで購読 (未登録・型違い・null cb は警告 + 無効な Subscription)。
+    // 登録が消えるときに自動で閉じる。
+    template <typename T>
+    [[nodiscard]] Subscription subscribe(
+        const std::string& name,
+        std::function<void(const T&)> on_change,
+        std::string        category = "");
+
+    // Property を持っている側の購読 (name はデバッグ用ラベル)
     template <typename T>
     [[nodiscard]] Subscription subscribe(
         const std::string& name,
         Property<T>*       property,
         std::function<void(const T&)> on_change,
         std::string        category = "");
+
+    // 全登録を (名前, 型, 型消しポインタ) で列挙。順序は不定。
+    // ホスト側アダプタ用。fn の中で登録 / 解除 / release しないこと。
+    void visit(const std::function<void(const std::string&, std::type_index,
+                                        const void*)>& fn) const;
 
     void release(const std::string& category);
     void release_all();
@@ -143,17 +177,72 @@ auto& bb = ergo::blackboard::Engine::instance();
 BLACKBOARD_REGISTER("score",  state.score,  "stage");
 BLACKBOARD_REGISTER("health", state.health, "stage");
 
-// 購読
-auto sub = bb.subscribe<int>("score", &state.score,
-    [](int new_score) { hud.set_score(new_score); },
+// 購読 (表示側は GameState を知らず、名前と型だけで結ぶ)
+auto sub = bb.subscribe<int>("score",
+    [](const int& new_score) { hud.set_score(new_score); },
+    "hud");
+
+// 初期値は find で引く
+if (const auto* hp = bb.find<float>("health")) hud.set_health(hp->get());
+
+// Property を持っている側はポインタ版でもよい (登録には紐づかない)
+auto own = bb.subscribe<int>("score", &state.score,
+    [](const int& v) { log_score(v); },
     "stage");
 
 // 値を更新
 state.score.set(100);                  // → コールバック発火
 
-// シーン終了: stage カテゴリの全購読 + 登録を解除
+// シーン終了: stage カテゴリの全購読 + 登録を解除。
+// 登録が消えるので "hud" カテゴリの名前購読 (sub) もここで閉じる。
 bb.release("stage");
 ```
+
+### ホスト側アダプタ: ergo_ui_layout の BindContext に流す
+
+blackboard と ui_layout はお互いを include しない (モジュール間 import 禁止)。
+HUD を `ergo::ui_layout::Document` で描くホストは、次のような小さな
+アダプタを **ホスト側** に置く (どちらのモジュールにも入れない)。
+
+```cpp
+#include "ergo/blackboard/blackboard.h"
+#include "ergo/ui_layout/ui_layout.h"
+
+ergo::ui_layout::BindContext blackboard_to_bind_context() {
+    namespace bb = ergo::blackboard;
+    using ergo::ui_layout::BindValue;
+
+    ergo::ui_layout::BindContext ctx;
+    bb::Engine::instance().visit(
+        [&ctx](const std::string& name, std::type_index type, const void* p) {
+            if (type == std::type_index(typeid(std::int32_t))) {
+                ctx[name] = BindValue::from_number(
+                    static_cast<const bb::Property<std::int32_t>*>(p)->get());
+            } else if (type == std::type_index(typeid(std::int64_t))) {
+                ctx[name] = BindValue::from_number(static_cast<double>(
+                    static_cast<const bb::Property<std::int64_t>*>(p)->get()));
+            } else if (type == std::type_index(typeid(float))) {
+                ctx[name] = BindValue::from_number(
+                    static_cast<const bb::Property<float>*>(p)->get());
+            } else if (type == std::type_index(typeid(bool))) {
+                ctx[name] = BindValue::from_bool(
+                    static_cast<const bb::Property<bool>*>(p)->get());
+            } else if (type == std::type_index(typeid(std::string))) {
+                ctx[name] = BindValue::from_string(
+                    static_cast<const bb::Property<std::string>*>(p)->get());
+            }   // それ以外の型は HUD に出さない
+        });
+    return ctx;
+}
+
+// 毎フレーム (ゲームルールの更新の後):
+document.update(blackboard_to_bind_context(), real_dt);
+```
+
+使う名前と型が決まっているなら `find<T>` で必要な分だけ詰めればよい
+([`spec/setup/integrate-modules.md`](../../setup/integrate-modules.md)
+「HUD への値の受け渡し」)。フレームループ全体の参照実装は
+`examples/compose_loop/main.cpp` (producer が "stage"、HUD が "hud" カテゴリ)。
 
 ## 作業
 
@@ -162,6 +251,9 @@ bb.release("stage");
 - `register_property(name, ptr, category)` — 既存 Property を登録
 - `unregister(name)` — 名前指定で登録解除
 - `subscribe<T>(name, ptr, cb, category)` — 購読、Subscription RAII を返す
+- `subscribe<T>(name, cb, category)` — 名前だけで購読 (登録に紐づく)
+- `find<T>(name)` — 型を照合して登録済み Property を引く
+- `visit(fn)` — 全登録を (名前, 型, ポインタ) で列挙
 - `release(category)` — カテゴリ単位で全購読 + 登録を解除
 - `release_all()` — 全状態を初期化
 - `Property<T>::set(value)` — 値更新、distinct なら購読者に通知
@@ -179,6 +271,9 @@ bb.release("stage");
 - Subscription の destructor またはカテゴリ release のどちらが先でも
   cleanup は **1 度だけ** 実行 (shared_ptr<bool> fired flag)
 - nullptr を渡された場合は no-op + 警告
+- 名前購読: 未登録・型違い・null コールバックは警告 + 無効な Subscription
+- `unregister` / 再登録 / 登録側カテゴリの `release` / `release_all` は、
+  その登録に紐づく名前購読を先に閉じてから登録を消す
 - `release_all` は internal state を完全初期化 (テスト間の独立性確保用)
 
 ### プラットフォーム別タスク
@@ -200,3 +295,15 @@ bb.release("stage");
 - release_all で全ての登録 / 購読がリセットされる
 - subscription_count(name) が増減を正しく反映
 - debug_info() に登録名とカテゴリ名が含まれる
+- `find<T>` が登録済みの Property を返し、型違い・未登録では nullptr
+- 名前購読が `set` で発火し、reset 後は発火しない
+- 名前購読の型違い・未登録・null コールバックは無効 (購読数 0、後から
+  登録しても結ばれない)
+- `subscribe<T>(name, nullptr, cb)` は従来のポインタ版に解決される
+- `unregister` / 登録側カテゴリの `release` で、別カテゴリにある名前購読が
+  閉じる。以降 `set` しても発火せず、Property 破棄後に Subscription を
+  捨てても安全 (ASan で検証)
+- 同名の再登録で古い名前購読が閉じ、新しい登録に購読し直せる
+- 購読側カテゴリの `release` は登録を残す / `release_all` は名前購読も閉じる
+- `visit` が全登録の名前・型・ポインタを列挙する
+- ポインタ購読と名前購読が混在しても `subscription_count` が整合する
