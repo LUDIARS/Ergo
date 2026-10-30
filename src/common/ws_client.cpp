@@ -163,22 +163,6 @@ std::string encode_text_masked(const std::string& payload) {
     return out;
 }
 
-bool recv_blocking(socket_t s, std::string& dst, std::size_t want) {
-    while (want > 0) {
-        char buf[2048];
-        int chunk = static_cast<int>(want < sizeof(buf) ? want : sizeof(buf));
-        int n = ::recv(s, buf, chunk, 0);
-        if (n > 0) { dst.append(buf, static_cast<std::size_t>(n)); want -= static_cast<std::size_t>(n); }
-        else if (n == 0) return false;
-        else if (EAGAIN_OR_WOULDBLOCK(sock_last_err())) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
-        } else {
-            return false;
-        }
-    }
-    return true;
-}
-
 } // namespace
 
 Client::Client() {
