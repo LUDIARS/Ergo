@@ -1,9 +1,9 @@
 ﻿import { Hono } from "hono";
 import { WebSocket as WS } from "ws";
 import { promises as fs } from "node:fs";
-import path from "node:path";
 
 import type { Plugin, PluginFactory } from "../../core/plugin.js";
+import { resolveWithin } from "../../core/safe_path.js";
 
 interface BridgeConfig {
     patchUrl: string;
@@ -25,12 +25,10 @@ const factory: PluginFactory = () => {
 
     function normalizeUserPath(inputPath: string, ext = ".uilayout.json"): string {
         if (!inputPath.trim()) throw new Error("path is empty");
-        const absPath = path.isAbsolute(inputPath) ? inputPath : path.join(rootDir, inputPath);
-        const out = path.normalize(absPath);
-        if (!out.endsWith(ext)) throw new Error(`file extension must be ${ext}`);
         // Containment guard: never read/write outside rootDir (path-traversal protection).
-        const rel = path.relative(rootDir, out);
-        if (rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("path must stay within the tool root");
+        const out = resolveWithin(rootDir, inputPath);
+        if (out === null) throw new Error("path must stay within the tool root");
+        if (!out.endsWith(ext)) throw new Error(`file extension must be ${ext}`);
         return out;
     }
 

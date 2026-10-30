@@ -30,6 +30,7 @@ import { promises as fsp, existsSync } from "node:fs";
 import { join, resolve, relative, sep } from "node:path";
 
 import type { Plugin, PluginContext, PluginFactory } from "../../core/plugin.js";
+import { resolveWithin } from "../../core/safe_path.js";
 
 const SCHEMA_VERSION = 1;
 
@@ -54,19 +55,6 @@ function rootAt(idx: number): string | null {
     const roots = configuredRoots();
     if (!Number.isFinite(idx) || idx < 0 || idx >= roots.length) return null;
     return roots[idx];
-}
-
-/// 与えられた相対パスが root 配下に収まることを検証して絶対パスに解決する。
-/// `..` でエスケープしようとしたら null。
-function resolveSafe(root: string, rel: string): string | null {
-    const target = resolve(root, rel);
-    const rel2   = relative(root, target);
-    if (rel2.startsWith("..") || rel2.startsWith(sep + "..") || rel2 === ".." ||
-        (rel2.length >= 1 && rel2[0] === sep))
-    {
-        return null;
-    }
-    return target;
 }
 
 async function listVisusFiles(root: string): Promise<VisusSummary[]> {
@@ -156,7 +144,7 @@ const factory: PluginFactory = () => {
                 const root = rootAt(idx);
                 if (!root) return c.json({ ok: false, err: "invalid root index" }, 400);
                 if (!rel)  return c.json({ ok: false, err: "missing path"        }, 400);
-                const full = resolveSafe(root, rel);
+                const full = resolveWithin(root, rel);
                 if (!full) return c.json({ ok: false, err: "path outside root"   }, 400);
                 try {
                     const buf = await fsp.readFile(full, "utf-8");
@@ -180,7 +168,7 @@ const factory: PluginFactory = () => {
                 if (!rel.endsWith(".visus.json")) {
                     return c.json({ ok: false, err: "path must end with .visus.json" }, 400);
                 }
-                const full = resolveSafe(root, rel);
+                const full = resolveWithin(root, rel);
                 if (!full) return c.json({ ok: false, err: "path outside root" }, 400);
 
                 // 構文だけ検証 (schema は Pictor 側が permissive なので緩く)
