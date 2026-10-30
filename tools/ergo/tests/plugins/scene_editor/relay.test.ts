@@ -62,7 +62,9 @@ test("an engine scene reaches connected UIs", () => {
     eng.deliver({ op: "scene", id: "stage", json: sceneJson("stage") });
 
     assert.deepEqual(view.ops(), ["scenes", "scene_update"]);
-    const update = view.sent[1] as { scene: { id: string; app: string; actors: Array<{ id: string }> } };
+    // `unknown` first: the deepEqual assertion above narrowed `view.sent` to
+    // the snapshot frame's type.
+    const update = view.sent[1] as unknown as { scene: { id: string; app: string; actors: Array<{ id: string }> } };
     assert.equal(update.scene.id, "stage");
     assert.equal(update.scene.app, "lookdev");
     assert.deepEqual(update.scene.actors.map((a) => a.id), ["crate"]);
