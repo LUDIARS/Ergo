@@ -1702,6 +1702,23 @@ if(ERGO_BUILD_VECTOR)
 endif()
 
 # ---------------------------------------------------------------------------
+# examples/ — headless composition examples (consumers of the public targets,
+# not modules; spec/setup/integrate-modules.md). ON by default only when Ergo
+# is the top-level project, so a host's add_subdirectory(<ergo>) does not
+# build them. Kept after every module target: examples/ tests if(TARGET ...).
+# (PROJECT_IS_TOP_LEVEL needs CMake 3.21; the minimum here is 3.20.)
+# ---------------------------------------------------------------------------
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_ergo_examples_default ON)
+else()
+    set(_ergo_examples_default OFF)
+endif()
+option(ERGO_BUILD_EXAMPLES "Build headless composition examples" ${_ergo_examples_default})
+if(ERGO_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ---------------------------------------------------------------------------
 # benchmarks/ — micro-benchmarks, opt-in via ERGO_BUILD_BENCHMARKS.
 #
 # Each benchmark is a standalone executable that uses the tiny harness in

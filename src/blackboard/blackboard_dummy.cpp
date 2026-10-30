@@ -17,6 +17,11 @@ Engine::~Engine() {}
 
 void Engine::register_erased(std::string, void*, std::type_index, std::string) {}
 void Engine::unregister(const std::string&)                                   {}
+void* Engine::find_erased(const std::string&, std::type_index, bool) const    { return nullptr; }
+void Engine::attach_to_entry(const std::string&, std::shared_ptr<bool>,
+                             std::function<void()>)                          {}
+void Engine::visit(const std::function<void(const std::string&, std::type_index,
+                                            const void*)>&) const             {}
 void Engine::release(const std::string&)                                       {}
 void Engine::release_all()                                                     {}
 void Engine::bump_count(const std::string&)                                    {}

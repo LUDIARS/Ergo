@@ -101,7 +101,7 @@ public:
 };
 
 // メインループ:
-float real_dt  = clock.tick();
+float real_dt  = host_clock_dt();   // ホストの実時間 dt (例: ergo::frame::dt_seconds())
 float world_dt = ergo::world_time::Engine::instance().update(real_dt);
 
 // ヒットストップ中は world_dt = 0 → actor も止まる (ワールド連動)
@@ -110,6 +110,11 @@ enemy.tick(world_dt);
 // UI アクターはリアル時間基準で動かしたい場合
 ui_actor.tick(ui_actor.scaled_dt(real_dt));
 ```
+
+`ergo_character` の Brain や `ergo_health` の自然回復まで含めたフレーム内の
+呼び出し順は [`spec/setup/integrate-modules.md`](../../setup/integrate-modules.md)
+を参照。`examples/compose_loop/main.cpp` の `Player` が、`scaled_dt` を
+`BrainBase::update` と `Health::tick` に渡す Actor の参照実装。
 
 ## 制約 / 先送り
 
