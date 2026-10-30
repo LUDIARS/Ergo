@@ -288,6 +288,34 @@ TEST_F(SinkTest, RemoveSinkWaitsForCallsInProgress) {
 }
 
 namespace {
+/// Uninstalls itself on its first record, then stays inside on_record().
+class SlowSelfRemovingSink : public Sink {
+public:
+    std::atomic<bool> entered{false};
+    std::atomic<int>  inside{0};
+    void on_record(const Record&) override {
+        ++inside;
+        remove_sink(this);  // from inside a sink: uninstalls, does not wait
+        entered = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        --inside;
+    }
+};
+} // namespace
+
+TEST_F(SinkTest, RemoveSinkWaitsAfterSelfRemoval) {
+    SlowSelfRemovingSink self;
+    add_sink(&self);
+    std::thread logger([] { ERGO_LOG_INFO("self"); });
+    while (!self.entered.load()) std::this_thread::yield();
+    // Already uninstalled by the sink itself, but the owner's remove_sink
+    // must still wait for the logger thread before `self` is destroyed.
+    remove_sink(&self);
+    EXPECT_EQ(self.inside.load(), 0);
+    logger.join();
+}
+
+namespace {
 /// Fails the test if it is called after its remove_sink() returned.
 class TrackedSink : public Sink {
 public:

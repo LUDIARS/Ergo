@@ -94,9 +94,11 @@ public:
 void add_sink(Sink* sink);
 
 /// Uninstall `sink`. When this returns, no thread is still inside
-/// `sink->on_record()`, so the sink may be destroyed right away — except
-/// when called from inside a sink, where it only uninstalls and does not
-/// wait. A sink that is not installed is a no-op.
+/// `sink->on_record()`, so the sink may be destroyed right away. This also
+/// holds when `sink` is no longer installed (e.g. it removed itself from
+/// inside on_record()): the call still waits, so the owner of such a sink
+/// calls remove_sink() before destroying it. Called from inside a sink, it
+/// only uninstalls and does not wait. nullptr is a no-op.
 void remove_sink(Sink* sink);
 
 /// The built-in console sink (stdout / stderr, format above). Installed

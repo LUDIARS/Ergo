@@ -136,17 +136,17 @@ void dispatch(const Record& rec) {
     }
 }
 
-/// Publish a copy of the sink list without `sink`. Caller holds sinks_mtx.
-bool erase_locked(State& s, Sink* sink) {
+/// Publish a copy of the sink list without `sink` (no-op if it is not in
+/// the list). Caller holds sinks_mtx.
+void erase_locked(State& s, Sink* sink) {
     const SinkList& cur = *s.sinks;
-    if (std::find(cur.begin(), cur.end(), sink) == cur.end()) return false;
+    if (std::find(cur.begin(), cur.end(), sink) == cur.end()) return;
     SinkList next;
     next.reserve(cur.size() - 1);
     for (Sink* k : cur) {
         if (k != sink) next.push_back(k);
     }
     s.sinks = std::make_shared<const SinkList>(std::move(next));
-    return true;
 }
 
 } // namespace
@@ -191,7 +191,10 @@ void remove_sink(Sink* sink) {
     unsigned old_slot = 0;
     {
         std::lock_guard<std::mutex> g(s.sinks_mtx);
-        if (!erase_locked(s, sink)) return;
+        // Drain even when `sink` is already gone: a remove_sink() made from
+        // inside a sink (possibly `sink` itself) uninstalled it without
+        // waiting, so dispatches holding an older list may still be in it.
+        erase_locked(s, sink);
         old_slot = s.slot;
         s.slot ^= 1u;
     }
