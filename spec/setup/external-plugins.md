@@ -32,6 +32,9 @@ placer / terrain / acstage) を、`tools/ergo` の core/shell を fork せずに
 - 壊れた外部エントリは **ログを出してスキップ** し、起動は止めない: import の失敗、
   `default` (または `factory`) の関数 export が無い、ファクトリや `routes()` の例外、
   形の違反、id の重複
+- 動いてからの `onUpgrade` の例外はログを出してその接続だけを 1011 で閉じる (サーバは
+  止まらない)。プラグインが後から自分のソケットに付けたリスナの中の例外は同じプロセスで
+  起きるので止められない
 - id が重なったら先に名乗ったものが勝つ。組み込みが先、外部は `ERGO_PLUGIN_DIR` の
   順、pack の中はエントリ名の順。組み込みの id (`particle` など) は外部から上書きできない
 - ファクトリ・形・重複・`routes()` で外したものは `/api/health` の

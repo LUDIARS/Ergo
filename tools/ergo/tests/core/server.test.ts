@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import type { AddressInfo } from "node:net";
+import { connect as netConnect, type AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { fileURLToPath } from "node:url";
 
@@ -257,6 +257,70 @@ test("attachWs routes upgrades by plugin id", { timeout: 15_000 }, async () => {
         for (const path of ["/nope/ws", "/vfx-breed/ws", "/particle/x", "/"]) {
             assert.equal(await refused(open(path)), true, path);
         }
+    } finally {
+        for (const c of clients) c.terminate();
+        for (const c of wss.clients) c.terminate();
+        wss.close();
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+});
+
+test("an onUpgrade that throws closes that connection with 1011 and the server keeps serving", { timeout: 15_000 }, async () => {
+    const logs: string[] = [];
+    const ctx = quietContext(logs);
+    const ext = (id: string, onUpgrade: Plugin["onUpgrade"]) =>
+        ({ source: `pack/${id}`, factory: plain(id, { onUpgrade }) });
+    const loaded = instantiatePlugins([], [
+        ext("boom", () => { throw new Error("pack bug"); }),
+        ext("echo", (_req, ws) => { ws.send(JSON.stringify({ op: "hi" })); }),
+    ], ctx.log);
+    const { app, plugins } = createApp(loaded.plugins, loaded.rejected, ctx);
+    const server = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }) as Server;
+    await once(server, "listening");
+    const wss = attachWs(server, plugins, ctx);
+    const base = `ws://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const clients: WebSocket[] = [];
+    const open = (path: string) => { const ws = new WebSocket(`${base}${path}`); clients.push(ws); return ws; };
+    try {
+        const boom = open("/boom/ws");
+        // Bounded wait: without the guard the close never comes and the
+        // finally below must still run so the listener is released.
+        const [code] = (await once(boom, "close", { signal: AbortSignal.timeout(5_000) })) as [number];
+        assert.equal(code, 1011);
+        assert.ok(logs.some((l) => l.includes("boom") && l.includes("pack bug")), logs.join("\n"));
+        assert.equal((await frame(open("/echo/ws"), (m) => m.op === "hi")).op, "hi");
+        assert.equal((await app.request("/api/health")).status, 200);
+    } finally {
+        for (const c of clients) c.terminate();
+        for (const c of wss.clients) c.terminate();
+        wss.close();
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+});
+
+test("an upgrade whose request target is not a valid URL is dropped, not fatal", { timeout: 15_000 }, async () => {
+    const { app, plugins, ctx } = builtinApp();
+    const server = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }) as Server;
+    await once(server, "listening");
+    const wss = attachWs(server, plugins, ctx);
+    const port = (server.address() as AddressInfo).port;
+    const clients: WebSocket[] = [];
+    try {
+        // llhttp accepts these targets; `new URL` rejects them.
+        for (const target of ["//[/ws", "http://[", "http://a:99999/particle/ws"]) {
+            const sock = netConnect(port, "127.0.0.1");
+            sock.on("error", () => { /* reset is fine too */ });
+            await once(sock, "connect");
+            sock.write(`GET ${target} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nUpgrade: websocket\r\n` +
+                       "Connection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+                       "Sec-WebSocket-Version: 13\r\n\r\n");
+            await once(sock, "close", { signal: AbortSignal.timeout(5_000) });
+        }
+        const ws = new WebSocket(`ws://127.0.0.1:${port}/particle/ws`);
+        clients.push(ws);
+        assert.equal(typeof (await frame(ws, (m) => m.op === "state")).config, "object");
     } finally {
         for (const c of clients) c.terminate();
         for (const c of wss.clients) c.terminate();

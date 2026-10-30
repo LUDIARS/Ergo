@@ -115,7 +115,10 @@ belong here: keep them in the host repo as an external plugin pack.
 `ERGO_PLUGIN_DIR` (OS path separator, several allowed) names plugin packs in
 host repos; every subdirectory with an `index.js` / `index.ts` is loaded on
 top of the built-ins. A broken pack entry is logged and skipped, never fatal,
-and the first plugin to claim an id wins (built-ins first). See
+and the first plugin to claim an id wins (built-ins first). An `onUpgrade`
+that throws is logged and only that connection is closed (1011); errors a
+plugin throws later from its own socket listeners still run in-process and
+are not contained. See
 [`spec/setup/external-plugins.md`](../../spec/setup/external-plugins.md).
 
 ## Extending the shell window

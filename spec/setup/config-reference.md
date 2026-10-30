@@ -162,7 +162,7 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 | 変数 | 既定 | 読むもの | 役割 | 出典 |
 |---|---|---|---|---|
 | `PORT` | `5170` | サーバ全体 | listen ポート (Electron とヘッドレスの両方) | `tools/ergo/src/main.ts:10` / `tools/ergo/electron/main.cjs:17` |
-| `ERGO_HOST` | `127.0.0.1` | サーバ全体 (ヘッドレスのみ) | bind するアドレス。LAN に出したいときだけ `0.0.0.0` などにする。この名前は `Host` 検査でも信頼される (ブラウザからは IP アドレスかこの名前で開く)。Electron (`npm start`) は読まない | `tools/ergo/src/main.ts:11` / `tools/ergo/src/core/server.ts:315` |
+| `ERGO_HOST` | `127.0.0.1` | サーバ全体 (ヘッドレスのみ) | bind するアドレス。LAN に出したいときだけ `0.0.0.0` などにする。この名前は `Host` 検査でも信頼される (ブラウザからは IP アドレスかこの名前で開く)。Electron (`npm start`) は読まない | `tools/ergo/src/main.ts:11` / `tools/ergo/src/core/server.ts:336` |
 | `ERGO_PLUGIN_DIR` | (なし) | 外部プラグインの読み込み | ゲーム固有の plugin pack のディレクトリ。OS のパス区切りで複数可 ([external-plugins.md](external-plugins.md)) | `tools/ergo/src/core/external.ts:90` |
 | `ERGO_PICTOR_PROFILE_DIR` | `../../../Pictor/profiles` → `./profiles` (cwd 相対) | `render_pipeline` | `*.profile.json` の場所 ([plugin-data-roots.md](plugin-data-roots.md)) | `tools/ergo/src/plugins/render_pipeline/profile_store.ts:31` |
 | `VISUS_PROJECT_ROOTS` | `process.cwd()` | `visus` | 描画定義のプロジェクトルート。`;` 区切りで複数可 | `tools/ergo/src/plugins/visus/index.ts:48` |

@@ -261,9 +261,13 @@ export function createApp(
 }
 
 /// Route WebSocket upgrades on `server` by URL before accepting: only
-/// /${id}/ws of a plugin with onUpgrade is accepted, anything else has its
-/// socket destroyed. A handshake from another site (an Origin that is not
-/// the tool's own) is answered 403. One WebSocketServer serves every plugin.
+/// /${id}/ws of a plugin with onUpgrade is accepted, anything else (an
+/// unparsable request target included) has its socket destroyed. A
+/// handshake from another site (an Origin that is not the tool's own) is
+/// answered 403. One WebSocketServer serves every plugin. A plugin whose
+/// onUpgrade throws is logged and that connection closed with 1011; the
+/// server keeps running. (Errors thrown later from the plugin's own socket
+/// listeners are not contained: plugins run in-process.)
 export function attachWs(
     server:    ServerType,
     plugins:   Plugin[],
@@ -276,9 +280,18 @@ export function attachWs(
     const wss = new WebSocketServer({ noServer: true });
 
     server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-        const url = new URL(req.url ?? "/", "http://localhost");
+        // `req.url` is the raw request target. llhttp accepts some targets the
+        // WHATWG URL parser rejects (e.g. "//[/ws", "http://a:99999/"), and a
+        // throw in this listener is uncaught and would kill the process.
+        let pathname: string;
+        try {
+            pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+        } catch {
+            socket.destroy();
+            return;
+        }
         // Accept only /${id}/ws style paths.
-        const m = url.pathname.match(/^\/([^/]+)\/ws\/?$/);
+        const m = pathname.match(/^\/([^/]+)\/ws\/?$/);
         const plugin = m ? byId.get(m[1]) : undefined;
         if (!plugin) {
             socket.destroy();
@@ -288,12 +301,20 @@ export function attachWs(
         // handshake from another site (native engine clients send no Origin).
         const problem = wsHandshakeProblem(req.headers.host, req.headers.origin, bindHost);
         if (problem !== null) {
-            ctx.log("warn", `[ergo] refused WS ${url.pathname}: ${problem}`);
+            ctx.log("warn", `[ergo] refused WS ${pathname}: ${problem}`);
             socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
             return;
         }
         wss.handleUpgrade(req, socket, head, (ws) => {
-            plugin.onUpgrade!(req, ws, ctx);
+            // This runs synchronously inside the http "upgrade" listener, so
+            // a throw would escape as an uncaught exception and stop the
+            // whole server. Contain it to this one connection.
+            try {
+                plugin.onUpgrade!(req, ws, ctx);
+            } catch (err) {
+                ctx.log("error", `[ergo] plugin '${plugin.id}' onUpgrade threw: ${errorMessage(err)}`);
+                ws.close(1011, "plugin error");
+            }
         });
     });
 
