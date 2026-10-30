@@ -82,6 +82,10 @@ SSE2 経路: `#if ERGO_MATH_SIMD` で有効化 (x64 デフォルト ON)。
 - **ObjectPool\<T\>**: 固定容量連続スラブ + free-list。
   `create(args...)` → Handle、`destroy(h)` で返却 (デストラクタ呼び出し)。
   per-要素 heap alloc ゼロ。Handle は `std::size_t` のインデックス。
+  move-only (コピー不可)。ムーブ代入 (`noexcept`) は代入先の生存オブジェクトを
+  破棄してスラブを解放し、移動元のスラブを引き取る。移動元は容量 0 の空になる
+  (ムーブ構築と同じ)。これで `physics2d::World` などの所有者が既定の
+  ムーブ代入 (`= default`) を持てる。
 
 ## テスト
 
@@ -89,7 +93,8 @@ SSE2 経路: `#if ERGO_MATH_SIMD` で有効化 (x64 デフォルト ON)。
 - `Mat`: 単位行列・乗算・転置・MatVec、Mat2/Mat3/Mat4 の逆行列 × 元 ≈ I
 - `batch`: SSE2 有無に関わらず scalar ループと一致
 - `pool`: Arena コンストラクタ呼び出しカウント・bump 順序・overflow 返却 null。
-  ObjectPool create/get/destroy/free-list 再利用・slab 連続性
+  ObjectPool create/get/destroy/free-list 再利用・slab 連続性・ムーブ代入
+  (代入先の生存オブジェクトの破棄回数、移動元が空になること、二重破棄しないこと)
 
 ## 使用例
 

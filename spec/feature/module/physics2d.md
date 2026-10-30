@@ -116,6 +116,10 @@ private:
 };
 ```
 
+`World` は move-only (コピー不可)。ムーブ構築・ムーブ代入とも `= default` で、
+`ObjectPool` のムーブ代入に乗る。ムーブ先は移動元のボディ・重力・接触状態を
+引き継いでそのまま `step()` できる。
+
 ## アルゴリズム
 
 ### Semi-implicit Euler 積分
@@ -200,6 +204,7 @@ Body* b = world.get_body(h);
 | Friction | 摩擦係数 0.8 の面上で 3 秒後に横速度 < 1 m/s |
 | ContactBeginEvent | 衝突時に Begin イベントが user_data 付きで発火 |
 | StackStability | 5 個積み上げ後に爆発せず位置が有限範囲に収まる |
+| MoveAssignedWorldKeepsStepping | ムーブ代入した World が移動元のボディと重力を引き継いで step できる (`static_assert(std::is_move_assignable_v<World>)` も同ファイル) |
 
 ## 使用例 (スイカゲーム型)
 
