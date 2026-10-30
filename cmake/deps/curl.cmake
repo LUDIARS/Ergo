@@ -15,20 +15,27 @@ include_guard(GLOBAL)
 
 option(ERGO_CURL_USE_SSL "Enable a TLS backend for the managed libcurl build" ON)
 
-# Trim curl to a library-only static build. These must be set before the
-# upstream CMakeLists runs (FetchContent_MakeAvailable below).
-set(BUILD_CURL_EXE      OFF CACHE BOOL "" FORCE)  # no curl.exe
-set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)  # static libcurl
-set(BUILD_STATIC_LIBS   ON  CACHE BOOL "" FORCE)
-set(BUILD_TESTING       OFF CACHE BOOL "" FORCE)
-set(CURL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
-set(CURL_USE_LIBPSL     OFF CACHE BOOL "" FORCE)  # avoid optional libpsl probe
-set(CURL_ENABLE_EXPORT_TARGET OFF CACHE BOOL "" FORCE)
+# Trim curl to a library-only static build. The knobs are normal variables in
+# this function's scope: FetchContent's add_subdirectory inherits them and
+# curl's option() calls honour them (CMP0077 NEW), while nothing is written to
+# the cache. The host's own BUILD_SHARED_LIBS / BUILD_TESTING (and Ergo's
+# scope) stay as they were.
+function(_ergo_wire_curl)
+    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    set(BUILD_CURL_EXE      OFF)  # no curl.exe
+    set(BUILD_SHARED_LIBS   OFF)  # static libcurl
+    set(BUILD_STATIC_LIBS   ON)
+    set(BUILD_TESTING       OFF)
+    set(CURL_DISABLE_INSTALL ON)
+    set(CURL_USE_LIBPSL     OFF)  # avoid optional libpsl probe
+    set(CURL_ENABLE_EXPORT_TARGET OFF)
 
-if(ERGO_CURL_USE_SSL AND WIN32)
-    set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)   # system TLS, no OpenSSL needed
-elseif(NOT ERGO_CURL_USE_SSL)
-    set(CURL_ENABLE_SSL OFF CACHE BOOL "" FORCE)
-endif()
+    if(ERGO_CURL_USE_SSL AND WIN32)
+        set(CURL_USE_SCHANNEL ON)   # system TLS, no OpenSSL needed
+    elseif(NOT ERGO_CURL_USE_SSL)
+        set(CURL_ENABLE_SSL OFF)
+    endif()
 
-ergo_require_dependency(curl VERIFY_TARGETS CURL::libcurl)
+    ergo_require_dependency(curl VERIFY_TARGETS CURL::libcurl)
+endfunction()
+_ergo_wire_curl()

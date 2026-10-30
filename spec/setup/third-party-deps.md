@@ -45,7 +45,7 @@ curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を�
 
 | 名前 | pin | TLS / 備考 | consume |
 |---|---|---|---|
-| curl | tag `curl-8_19_0` | static libcurl のみ (CLI/docs/test 無効)。Windows は Schannel | `target_link_libraries(<t> PRIVATE CURL::libcurl)` / `#include <curl/curl.h>` |
+| curl | tag `curl-8_19_0` | static libcurl のみ (CLI/docs/test/install 無効、関数スコープの通常変数で指定)。Windows は Schannel | `target_link_libraries(<t> PRIVATE CURL::libcurl)` / `#include <curl/curl.h>` |
 
 傘 target: `ergo_thirdparty` (= `ergo::thirdparty`) は ON になっている依存をまとめて
 リンクする。どのスイッチが ON かを気にせず依存できる。
@@ -78,7 +78,7 @@ endif()
 
 1. `third_party/dependencies.cmake` に `ergo_declare_dependency(NAME <n> GIT_REPOSITORY … GIT_TAG <pin> LICENSE … )` を追加 (pin は full SHA か不変 tag)。
 2. `cmake/deps/<n>.cmake` を作る:
-   - upstream の CMake が新しく素直 → `ergo_require_dependency(<n> VERIFY_TARGETS <target>)`。option は呼ぶ前に `set(... CACHE BOOL "" FORCE)`。
+   - upstream の CMake が新しく素直 → `ergo_require_dependency(<n> VERIFY_TARGETS <target>)`。upstream の option は `function(_ergo_wire_<n>)` の中で **通常変数** (`set(BUILD_TESTING OFF)` など) と `set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)` で絞り、同じ関数の中から `ergo_require_dependency` を呼ぶ (`cmake/deps/curl.cmake` が見本)。FetchContent の `add_subdirectory` は関数のスコープを引き継ぐので upstream の `option()` には効き、キャッシュには何も書かない。**`set(... CACHE ... FORCE)` は使わない** (`BUILD_SHARED_LIBS` / `BUILD_TESTING` などホストと共有する名前を上書きしてしまう)。
    - upstream の CMake を走らせたくない (古い min / 余計な target) → `ergo_populate_dependency(<n> OUT_SOURCE_DIR src)` でソースだけ取得し、自前で `add_library` を組む。
 3. `option(ERGO_WITH_<N> ... OFF)` を足し、ON のとき `include(deps/<n>)`。必要なら傘 target に追加。
 4. `THIRD_PARTY_NOTICES.md` に attribution を追記。
@@ -89,6 +89,13 @@ endif()
 - **再現性**: `GIT_TAG` は必ず固定 (tag か full SHA)。`master`/`main` ブランチ名は禁止。
 - **無言フォールバック禁止**: 取得不可・期待 target 不在は必ず FATAL_ERROR
   (`ergo_verify_targets`)。upstream のレイアウト変更を早期に検知する。
+- **ホストのキャッシュを変えない**: curl を ON にしても、ホストの
+  `BUILD_SHARED_LIBS` / `BUILD_TESTING` は書き換わらない (curl 用の値は
+  `_ergo_wire_curl()` の関数スコープだけで効く)。`include(CTest)` のホストの
+  テストも、`BUILD_SHARED_LIBS=ON` のホストの共有ライブラリもそのまま残る。
+  Ergo 自身のライブラリはホストの `BUILD_SHARED_LIBS` に関係なく常に STATIC
+  ([`build-cpp.md`](build-cpp.md))。回帰テストは `test_host_cache_isolation`
+  (`tests/thirdparty/test_host_cache_isolation.cmake`、偽の curl ソースで 2 回構成する)。
 - **CRT 整合 (MSVC)**: 自前で `add_library` を組む C ライブラリは、放置すると
   `cl.exe` 既定の `/MT` (静的 CRT) になり Ergo の動的 CRT C++ target と LNK4098 で
   衝突する。`cmake/deps/<n>.cmake` で `MSVC_RUNTIME_LIBRARY` を動的 CRT に固定する。

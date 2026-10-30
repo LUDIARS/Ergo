@@ -46,11 +46,11 @@ include パス・コンパイル定義・システムライブラリ・ビルド
 
 | 利用対象 | ホストがリンクするターゲット | 補足 |
 |---|---|---|
-| Ergo モジュール | `ergo_input`、`ergo_bind` など | Threads / Windows sockets 等も既存の依存設定から伝播 |
-| HTTP | `ergo_http` | libcurl への依存を伝播。Windows TLS は Schannel、Xcode 依存構成は OpenSSL |
-| 管理対象ライブラリ一式 | `ergo::thirdparty` | 有効にした libcurl をまとめてリンク |
-| FMOD | `ergo_audio` | `FMOD::FMOD` を伝播。実行時の DLL / dylib 配置・macOS の rpath / 署名はホストで設定 |
-| Pictor / Vulkan | `ergo_render`、`ergo_particle` | ホストが先に `pictor` ターゲットを提供し、Vulkan SDK を設定する既存契約を使用 |
+| Ergo モジュール | `Ergo::input`、`Ergo::bind` など (`ergo_input` 等の素の名前も可) | Threads / Windows sockets 等も既存の依存設定から伝播。C++ 標準と MSVC の `/utf-8` も伝播 |
+| HTTP | `Ergo::http` | libcurl への依存を伝播。Windows TLS は Schannel、Xcode 依存構成は OpenSSL |
+| 管理対象ライブラリ一式 | `Ergo::thirdparty` (旧名 `ergo::thirdparty` も可) | 有効にした libcurl をまとめてリンク |
+| FMOD | `Ergo::audio` | `FMOD::FMOD` を伝播。DLL / .so / .dylib は `ergo_audio_stage_runtime(<exe>)` で exe の隣へ配置できる。macOS の rpath / 署名はホストで設定 |
+| Pictor / Vulkan | `Ergo::render`、`Ergo::particle` | ホストが先に `pictor` ターゲットを提供し、Vulkan SDK を設定する既存契約を使用 |
 
 基本プリセットは管理対象ライブラリを取得しない。Pictor は自動取得しない。
 描画統合の条件は [build-cpp.md](build-cpp.md)、依存の固定リビジョンと
@@ -74,19 +74,22 @@ Xcode も同じ変数を使える。ソース指定が欠けた依存はエラ�
 ```cmake
 cmake_minimum_required(VERSION 3.21)
 project(MyGame LANGUAGES C CXX)
-set(ERGO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(ERGO_BUILD_DUMMY OFF CACHE BOOL "" FORCE)
 set(ERGO_AUDIO_BACKEND dummy CACHE STRING "" FORCE)
 set(ERGO_WITH_CURL ON CACHE BOOL "" FORCE)
 set(ERGO_BUILD_HTTP ON CACHE BOOL "" FORCE)
 add_subdirectory(external/ergo)
 add_executable(myapp main.cpp)
-target_compile_features(myapp PRIVATE cxx_std_17)
-target_link_libraries(myapp PRIVATE ergo_input ergo_bind ergo_http ergo::thirdparty)
-if(MSVC)
-    target_compile_options(myapp PRIVATE /utf-8)
-endif()
+target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind Ergo::http Ergo::thirdparty)
 ```
+
+サブプロジェクトとして取り込まれた Ergo は、テストを登録せず
+(`ERGO_BUILD_TESTS=OFF`)、ホストがリンクしたライブラリだけをビルドする
+(`ERGO_EXCLUDE_FROM_ALL=ON`)。C++ 標準 (C++17、`ergo_math` / `ergo_physics2d` は
+C++20) と MSVC の `/utf-8` はリンクしたターゲットへ伝播するので、ホスト側で
+`target_compile_features` や `/utf-8` を書く必要はない。既定を明示的に変えたい
+場合だけ `add_subdirectory` の前で上書きする
+(例: Ergo のテストもホストでビルドする `set(ERGO_BUILD_TESTS ON CACHE BOOL "" FORCE)`)。
+詳細は [build-cpp.md](build-cpp.md)「ホストアプリからの取り込み」。
 
 ホストのルートで、Windows は
 `cmake -S . -B build/vs2022 -G "Visual Studio 17 2022" -A x64`、macOS は

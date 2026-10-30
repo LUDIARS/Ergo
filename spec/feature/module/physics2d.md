@@ -22,9 +22,12 @@
 
 ## 依存
 
-- `ergo_math` (Vec/Mat/ObjectPool)
-- C++20 標準ライブラリ (`<cmath>`, `<set>`, `<vector>`, `<algorithm>` 等)
-- 他 Ergo モジュールへの依存なし
+- `ergo_math` (Vec/Mat/ObjectPool) — PUBLIC リンク。`ERGO_BUILD_MATH=OFF` で
+  `ERGO_BUILD_PHYSICS2D=ON` は構成時エラー (リンク時まで遅らせない)
+- C++20 標準ライブラリ (`<cmath>`, `<set>`, `<vector>`, `<algorithm>` 等)。
+  C++20 は `ergo_math` の usage requirement (`cxx_std_20`) として伝播するので、
+  `ergo_physics2d` をリンクしたホストは自動で C++20 になる
+- `ergo_math` 以外の Ergo モジュールには依存しない
 
 ## データ型
 
@@ -116,6 +119,10 @@ private:
 };
 ```
 
+`World` は move-only (コピー不可)。ムーブ構築・ムーブ代入とも `= default` で、
+`ObjectPool` のムーブ代入に乗る。ムーブ先は移動元のボディ・重力・接触状態を
+引き継いでそのまま `step()` できる。
+
 ## アルゴリズム
 
 ### Semi-implicit Euler 積分
@@ -200,6 +207,7 @@ Body* b = world.get_body(h);
 | Friction | 摩擦係数 0.8 の面上で 3 秒後に横速度 < 1 m/s |
 | ContactBeginEvent | 衝突時に Begin イベントが user_data 付きで発火 |
 | StackStability | 5 個積み上げ後に爆発せず位置が有限範囲に収まる |
+| MoveAssignedWorldKeepsStepping | ムーブ代入した World が移動元のボディと重力を引き継いで step できる (`static_assert(std::is_move_assignable_v<World>)` も同ファイル) |
 
 ## 使用例 (スイカゲーム型)
 

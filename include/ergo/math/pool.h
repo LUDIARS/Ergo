@@ -115,12 +115,7 @@ public:
         alive_.assign(capacity, false);
     }
 
-    ~ObjectPool() {
-        // Destroy surviving objects
-        for (std::size_t i = 0; i < capacity_; ++i)
-            if (alive_[i]) std::launder(slab_ + i)->~T();
-        ::operator delete[](slab_, std::align_val_t{alignof(T)});
-    }
+    ~ObjectPool() { release(); }
 
     // Move-only
     ObjectPool(const ObjectPool&) = delete;
@@ -133,6 +128,25 @@ public:
           free_list_(std::move(o.free_list_)) {
         o.slab_     = nullptr;
         o.capacity_ = 0;
+    }
+
+    /// Destroys this pool's live objects and frees its slab, then takes over
+    /// the source's slab. The source is left empty (capacity 0), like after
+    /// the move constructor. Lets owners (e.g. physics2d::World) default
+    /// their own move assignment.
+    ObjectPool& operator=(ObjectPool&& o) noexcept {
+        if (this != &o) {
+            release();
+            capacity_  = o.capacity_;
+            slab_      = o.slab_;
+            alive_     = std::move(o.alive_);
+            free_list_ = std::move(o.free_list_);
+            o.slab_     = nullptr;
+            o.capacity_ = 0;
+            o.alive_.clear();
+            o.free_list_.clear();
+        }
+        return *this;
     }
 
     /// Construct a T. Returns invalid_handle if pool is full.
@@ -177,6 +191,16 @@ public:
     }
 
 private:
+    /// Destroy surviving objects and free the slab (a moved-from pool has
+    /// capacity 0 and a null slab, so this is a no-op for it).
+    void release() noexcept {
+        for (std::size_t i = 0; i < capacity_; ++i)
+            if (alive_[i]) std::launder(slab_ + i)->~T();
+        ::operator delete[](slab_, std::align_val_t{alignof(T)});
+        slab_ = nullptr;
+        capacity_ = 0;
+    }
+
     std::size_t      capacity_{0};
     T*               slab_{nullptr};
     std::vector<bool> alive_;

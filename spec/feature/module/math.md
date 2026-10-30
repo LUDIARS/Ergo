@@ -22,6 +22,10 @@ SIMD は SoA バッチ経路に限定し、scalar フォールバックを必ず
 
 - C++20 標準ライブラリのみ (`<concepts>`, `<cmath>`, `<memory>`, `<new>`, `<vector>` 等)
 - 他 Ergo モジュールへの依存なし
+- **C++20 は利用側へ伝播する**: `ergo_math` は `target_compile_features(PUBLIC cxx_std_20)`
+  を持つ (`cmake/ErgoTargets.cmake`)。公開ヘッダが concepts を使うため、リンクした
+  ターゲット (`ergo_physics2d`、ホストの実行ファイル) は CMake が自動で C++20 に
+  引き上げる。ホスト側で `cxx_std_20` を書き足す必要はない
 - `ergo::vector::Vec2 / Vec3` との相互変換は
   `ergo/math/vec_vector_convert.h` を明示インクルードで有効化 (opt-in)
 
@@ -82,6 +86,10 @@ SSE2 経路: `#if ERGO_MATH_SIMD` で有効化 (x64 デフォルト ON)。
 - **ObjectPool\<T\>**: 固定容量連続スラブ + free-list。
   `create(args...)` → Handle、`destroy(h)` で返却 (デストラクタ呼び出し)。
   per-要素 heap alloc ゼロ。Handle は `std::size_t` のインデックス。
+  move-only (コピー不可)。ムーブ代入 (`noexcept`) は代入先の生存オブジェクトを
+  破棄してスラブを解放し、移動元のスラブを引き取る。移動元は容量 0 の空になる
+  (ムーブ構築と同じ)。これで `physics2d::World` などの所有者が既定の
+  ムーブ代入 (`= default`) を持てる。
 
 ## テスト
 
@@ -89,7 +97,8 @@ SSE2 経路: `#if ERGO_MATH_SIMD` で有効化 (x64 デフォルト ON)。
 - `Mat`: 単位行列・乗算・転置・MatVec、Mat2/Mat3/Mat4 の逆行列 × 元 ≈ I
 - `batch`: SSE2 有無に関わらず scalar ループと一致
 - `pool`: Arena コンストラクタ呼び出しカウント・bump 順序・overflow 返却 null。
-  ObjectPool create/get/destroy/free-list 再利用・slab 連続性
+  ObjectPool create/get/destroy/free-list 再利用・slab 連続性・ムーブ代入
+  (代入先の生存オブジェクトの破棄回数、移動元が空になること、二重破棄しないこと)
 
 ## 使用例
 
