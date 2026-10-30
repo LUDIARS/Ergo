@@ -17,6 +17,8 @@ cmake_minimum_required(VERSION 3.20)
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir>
 #         [-DERGO_TEST_GENERATOR=<gen>] [-DERGO_TEST_PLATFORM=<platform>]
+#         [-DERGO_TEST_TOOLSET=<toolset>] [-DERGO_TEST_INSTANCE=<instance>]
+#         [-DERGO_TEST_MAKE_PROGRAM=<ninja/make>]
 #         [-DERGO_TEST_CXX_COMPILER=<cxx>] [-DERGO_TEST_CXX_LAUNCHER=<launcher>]
 #         -P tests/packages/test_host_consume.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/host_test_support.cmake")

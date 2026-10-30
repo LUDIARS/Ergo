@@ -5,11 +5,14 @@
 #
 # Each test is `cmake -P <script>` and configures / builds a small host project
 # that add_subdirectory()s this Ergo checkout. The nested build uses the outer
-# build's generator, platform (-A), C++ compiler and compiler launcher, so it
-# matches the toolchain under test and reuses a compiler cache. No network.
+# build's generator, platform (-A), toolset (-T), generator instance, make
+# program, C++ compiler and compiler launcher, so it matches the toolchain under
+# test and reuses a compiler cache. No network.
 #
 #   -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir>
 #   [-DERGO_TEST_GENERATOR=<gen>] [-DERGO_TEST_PLATFORM=<platform>]
+#   [-DERGO_TEST_TOOLSET=<toolset>] [-DERGO_TEST_INSTANCE=<instance>]
+#   [-DERGO_TEST_MAKE_PROGRAM=<ninja/make>]
 #   [-DERGO_TEST_CXX_COMPILER=<path>] [-DERGO_TEST_CXX_LAUNCHER=<launcher>]
 # ---------------------------------------------------------------------------
 if(NOT DEFINED ERGO_SOURCE_DIR)
@@ -22,6 +25,11 @@ endif()
 # Multi-config generators (Visual Studio / Xcode / Ninja Multi-Config) build
 # this configuration; single-config builds keep the generator's default.
 set(HOST_TEST_CONFIG Debug)
+# CMake >= 3.22 initialises CMAKE_BUILD_TYPE / CMAKE_CONFIGURATION_TYPES from
+# same-named environment variables (ctest passes the caller's through); the
+# nested configures must not pick a configuration other than the one above.
+unset(ENV{CMAKE_BUILD_TYPE})
+unset(ENV{CMAKE_CONFIGURATION_TYPES})
 
 function(host_fail what)
     message(FATAL_ERROR "FAIL: ${what}")
@@ -38,6 +46,17 @@ function(host_configure build source rc_var log_var)
         list(APPEND _args -G "${ERGO_TEST_GENERATOR}")
         if(ERGO_TEST_PLATFORM)
             list(APPEND _args -A "${ERGO_TEST_PLATFORM}")
+        endif()
+        if(ERGO_TEST_TOOLSET)
+            list(APPEND _args -T "${ERGO_TEST_TOOLSET}")
+        endif()
+        if(ERGO_TEST_INSTANCE)
+            list(APPEND _args "-DCMAKE_GENERATOR_INSTANCE=${ERGO_TEST_INSTANCE}")
+        endif()
+        # Ninja / Makefiles: the outer build's ninja / make, which need not be
+        # on PATH. IDE generators locate msbuild / xcodebuild themselves.
+        if(ERGO_TEST_MAKE_PROGRAM AND NOT ERGO_TEST_GENERATOR MATCHES "^(Visual Studio|Xcode)")
+            list(APPEND _args "-DCMAKE_MAKE_PROGRAM=${ERGO_TEST_MAKE_PROGRAM}")
         endif()
     endif()
     # IDE generators pick their own compiler.
