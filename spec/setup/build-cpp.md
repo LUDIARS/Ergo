@@ -28,6 +28,7 @@
 | キー | 既定 | 役割 |
 |---|---|---|
 | `ERGO_BUILD_TESTS`               | トップレベル: ON / サブプロジェクト: OFF | モジュールテストをビルドする (CTest 登録) |
+| `ERGO_BUILD_EXAMPLES`            | トップレベル: ON / サブプロジェクト: OFF | `examples/` のヘッドレスな使用例をビルドする ([integrate-modules.md](integrate-modules.md)) |
 | `ERGO_EXCLUDE_FROM_ALL`          | サブプロジェクトでテスト OFF のとき ON、それ以外 OFF | Ergo のターゲットを既定ビルド (`all`) から外す。ホストがリンクしたものだけがビルドされる |
 | `ERGO_POSITION_INDEPENDENT_CODE` | ON  | Ergo のライブラリを PIC でビルドする (ホストの共有ライブラリ / プラグインにリンクできる) |
 | `ERGO_BUILD_DUMMY`               | OFF | dummy プラグライブラリ (no-op 実装) をビルドする |
