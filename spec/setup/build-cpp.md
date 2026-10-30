@@ -169,10 +169,13 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
   無視する (`ergo: module libraries are always STATIC; BUILD_SHARED_LIBS ignored`)。
   ホスト自身の `BUILD_SHARED_LIBS` は変えない。既定で PIC なので、ホストの
   共有ライブラリ / プラグイン (`add_library(... SHARED)`) にもリンクできる。
+- **キャッシュ**: 管理対象の libcurl を ON にしても、ホストの `BUILD_SHARED_LIBS` /
+  `BUILD_TESTING` は書き換えない ([`third-party-deps.md`](third-party-deps.md))。
 
 回帰テスト: `test_host_consume` (C++14 + `BUILD_SHARED_LIBS=ON` のホストが
 `Ergo::input` / `Ergo::log` / `Ergo::bind` / `Ergo::physics2d` と SHARED プラグインを
-ビルドする)。実際にホストプロジェクトを構成・ビルドする (ctest ラベル `host`)。
+ビルドする)、`test_host_cache_isolation` (curl ON でホストのキャッシュが残る)。
+いずれも実際にホストプロジェクトを構成・ビルドする (ctest ラベル `host`)。
 
 ## 注意点
 

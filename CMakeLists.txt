@@ -1685,9 +1685,10 @@ endif()
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoTargets.cmake")
 ergo_finalize_targets()
 
-# Host consumption test: a real compiled host project add_subdirectory()s this
+# Host consumption tests: a real compiled host project add_subdirectory()s this
 # checkout (C++14 host, BUILD_SHARED_LIBS=ON, Ergo:: names, a SHARED plugin,
-# configure-time module requirements).
+# configure-time module requirements) and keeps its cache values with managed
+# curl ON (fake curl source, no network).
 if(ERGO_BUILD_TESTS)
     set(_ergo_host_test_args
         -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -1700,5 +1701,10 @@ if(ERGO_BUILD_TESTS)
             -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/host_consume
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_host_consume.cmake)
     set_tests_properties(test_host_consume PROPERTIES LABELS host TIMEOUT 900)
+    add_test(NAME test_host_cache_isolation
+        COMMAND ${CMAKE_COMMAND} ${_ergo_host_test_args}
+            -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/thirdparty/host_cache_isolation
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/thirdparty/test_host_cache_isolation.cmake)
+    set_tests_properties(test_host_cache_isolation PROPERTIES LABELS host TIMEOUT 600)
     unset(_ergo_host_test_args)
 endif()
