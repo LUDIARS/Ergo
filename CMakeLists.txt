@@ -359,6 +359,20 @@ if(ERGO_BUILD_SCENE)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
+
+    # ergo_scene_link — engine client for tools/ergo's `scene_editor` plugin
+    # (publish scenes, apply patches) over ergo_common_ws.
+    option(ERGO_BUILD_SCENE_LINK "Build ergo_scene_link (WS client for the scene_editor plugin)" ON)
+    if(ERGO_BUILD_SCENE_LINK)
+        add_library(ergo_scene_link src/scene/editor_link.cpp)
+        target_include_directories(ergo_scene_link PUBLIC include)
+        target_link_libraries(ergo_scene_link PUBLIC ergo_scene PRIVATE ergo_common_ws)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_scene_editor_link tests/scene/test_scene_editor_link.cpp)
+            target_link_libraries(test_scene_editor_link PRIVATE ergo_scene_link ergo_gtest_main)
+            add_test(NAME test_scene_editor_link COMMAND test_scene_editor_link)
+        endif()
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
