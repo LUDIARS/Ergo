@@ -16,7 +16,7 @@ import { WebSocket } from "ws";
 import type { Plugin, PluginFactory, PluginHealth } from "../../src/core/plugin.js";
 import { PLUGIN_FACTORIES } from "../../src/core/registry.js";
 import {
-    PLUGIN_ID_PATTERN, attachWs, consoleContext, createApp, instantiatePlugins,
+    MAX_WS_PAYLOAD, PLUGIN_ID_PATTERN, attachWs, consoleContext, createApp, instantiatePlugins,
     type RejectedPlugin,
 } from "../../src/core/server.js";
 import makeParticlePlugin from "../../src/plugins/particle/index.js";
@@ -234,6 +234,8 @@ test("attachWs routes upgrades by plugin id", { timeout: 15_000 }, async () => {
     const server = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }) as Server;
     await once(server, "listening");
     const wss = attachWs(server, plugins, ctx);
+    // Not ws's 100 MiB default: one client must not make the server buffer that much.
+    assert.equal(wss.options.maxPayload, MAX_WS_PAYLOAD);
     const base = `ws://127.0.0.1:${(server.address() as AddressInfo).port}`;
     const clients: WebSocket[] = [];
     const open = (path: string) => {

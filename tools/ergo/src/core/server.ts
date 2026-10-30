@@ -52,6 +52,11 @@ export interface RejectedPlugin {
 /** Path-safe plugin id: it becomes a URL segment and a route prefix. */
 export const PLUGIN_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
+/** Largest WS message accepted (ws defaults to 100 MiB). Covers a full
+ *  ergo_log_live batch (512 lines x 8 KiB msg, even when every byte is
+ *  \u-escaped) and scene JSON; a larger message closes the socket with 1009. */
+export const MAX_WS_PAYLOAD = 32 * 1024 * 1024;
+
 /** Ids taken by the shared server's own routes (/api/*, /shell/*). */
 export const RESERVED_PLUGIN_IDS: ReadonlySet<string> = new Set(["api", "shell"]);
 
@@ -277,7 +282,7 @@ export function attachWs(
     const byId = new Map<string, Plugin>();
     for (const p of plugins) if (p.onUpgrade) byId.set(p.id, p);
 
-    const wss = new WebSocketServer({ noServer: true });
+    const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_WS_PAYLOAD });
 
     server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
         // `req.url` is the raw request target. llhttp accepts some targets the

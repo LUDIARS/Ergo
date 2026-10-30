@@ -19,6 +19,9 @@ import type { LineFilter } from "./ring.js";
 /** Rings kept at most. Beyond it, the least recently active app whose engine
  *  has disconnected is evicted (apps with a live engine are never evicted). */
 export const MAX_APPS = 16;
+/** Live engine connections accepted at once. A further engine is closed with
+ *  1013 (ergo_log_live reconnects later), so the rings never exceed MAX_APPS. */
+export const MAX_ENGINES = MAX_APPS;
 /** Default `limit` of GET /api/lines (the maximum is the ring capacity). */
 export const DEFAULT_LINES_LIMIT = 1000;
 
@@ -137,7 +140,20 @@ const factory: PluginFactory = () => {
         }
     }
 
+    function engineCount(): number {
+        let n = 0;
+        for (const c of conns) if (c.role === "engine") ++n;
+        return n;
+    }
+
     function becomeEngine(conn: ConnState, requested: string, ctx: PluginContext) {
+        if (engineCount() >= MAX_ENGINES) {
+            if (conn.ws.readyState === WS.OPEN) {
+                ctx.log("warn", `[log] engine refused: ${MAX_ENGINES} engines already connected`);
+                conn.ws.close(1013, "too many engines");
+            }
+            return;
+        }
         conn.role = "engine";
         conn.app  = claimApp(requested, conn);
         ctx.log("info", `[log] engine connected: ${conn.app.name}`);

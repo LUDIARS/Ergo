@@ -80,8 +80,24 @@ function finiteNumber(v: unknown): number | null {
     return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+/// Longest `msg` kept, in UTF-16 code units. Mirrors the engine's
+/// `LiveSink::kMaxMessageBytes` (8192), which other clients need not honour:
+/// without it one ring could hold 10k arbitrarily long lines.
+export const MAX_MSG_CHARS = 8192;
+
+/// Cut `msg` to MAX_MSG_CHARS (not inside a surrogate pair) with a trailing
+/// "…", the way `ergo::log::LiveSink` cuts on the engine side.
+export function clipMessage(msg: string): string {
+    if (msg.length <= MAX_MSG_CHARS) return msg;
+    let cut = MAX_MSG_CHARS;
+    const last = msg.charCodeAt(cut - 1);
+    if (last >= 0xd800 && last <= 0xdbff) --cut;
+    return msg.slice(0, cut) + "\u2026";
+}
+
 /// Validate one engine line. Returns null for anything that is not a
 /// well-formed record (unknown level, non-numeric frame, non-string msg...).
+/// A `msg` longer than MAX_MSG_CHARS is cut (clipMessage).
 export function sanitizeLine(raw: unknown): LogLine | null {
     if (!raw || typeof raw !== "object") return null;
     const r = raw as Record<string, unknown>;
@@ -90,7 +106,7 @@ export function sanitizeLine(raw: unknown): LogLine | null {
     const ts_us = finiteNumber(r.ts_us);
     const tid   = finiteNumber(r.tid);
     if (frame === null || ts_us === null || tid === null) return null;
-    return { lvl: r.lvl, frame, ts_us, tid, msg: r.msg };
+    return { lvl: r.lvl, frame, ts_us, tid, msg: clipMessage(r.msg) };
 }
 
 /// Validate a `lines` frame body. Malformed lines are skipped; returns null

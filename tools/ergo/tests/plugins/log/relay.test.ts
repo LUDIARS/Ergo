@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { IncomingMessage } from "node:http";
 import type { WebSocket } from "ws";
 
-import makeLogPlugin, { MAX_APPS } from "../../../src/plugins/log/index.js";
+import makeLogPlugin, { MAX_APPS, MAX_ENGINES } from "../../../src/plugins/log/index.js";
 import type { Plugin, PluginContext } from "../../../src/core/plugin.js";
 
 /// Just enough of a `ws` socket for the relay: an open readyState, `on`
@@ -20,6 +20,12 @@ class FakeSocket {
         return this;
     }
     send(text: string) { this.sent.push(JSON.parse(text)); }
+    closedWith: number | null = null;
+    close(code: number) {
+        this.closedWith = code;
+        this.readyState = 3;   // WebSocket.CLOSED
+        this.emit("close");
+    }
 
     emit(event: string, arg?: unknown) {
         for (const cb of this.handlers.get(event) ?? []) cb(arg);
@@ -168,6 +174,20 @@ test("disconnected apps beyond MAX_APPS are evicted, live ones never", () => {
     assert.equal(names.includes("app3"), false);
     assert.equal(names.includes("app5"), true);
     assert.equal(names.includes("late"), true);
+});
+
+test("engines past MAX_ENGINES are refused with 1013, so the rings stay bounded", () => {
+    const plugin = makeLogPlugin();
+    for (let i = 0; i < MAX_ENGINES; ++i) assert.equal(engine(plugin, `app${i}`).closedWith, null);
+    const extra = engine(plugin, "one-too-many");
+    assert.equal(extra.closedWith, 1013);
+    // A refused socket's lines (which could name another app) are ignored.
+    const late = connect(plugin);
+    late.deliver({ op: "lines", app: "sneaky", dropped: 0, lines: [line("x")] });
+    assert.equal(late.closedWith, 1013);
+    const h = plugin.health!();
+    assert.equal(h.engines, MAX_ENGINES);
+    assert.equal(h.apps, MAX_APPS);
 });
 
 test("GET /api/lines filters by level, since, text and frame", async () => {

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-    isLevelTag, parseConsoleLine, sanitizeLine, sanitizeLinesMsg,
+    MAX_MSG_CHARS, clipMessage, isLevelTag, parseConsoleLine, sanitizeLine, sanitizeLinesMsg,
 } from "../../../src/plugins/log/protocol.js";
 
 test("parseConsoleLine reads ergo_log's console format", () => {
@@ -71,4 +71,19 @@ test("a frame encoded by ergo_log_live passes the guards", () => {
         app: "game", dropped: 2,
         lines: [{ lvl: "ERR", frame: 12, ts_us: 3456, tid: 140737, msg: "q\"x\ny" }],
     });
+});
+
+test("sanitizeLine cuts a msg longer than the engine's limit, like LiveSink does", () => {
+    const long = sanitizeLine({ lvl: "INF", frame: 0, ts_us: 0, tid: 0, msg: "a".repeat(9000) });
+    assert.ok(long);
+    assert.equal(long.msg.length, MAX_MSG_CHARS + 1);
+    assert.ok(long.msg.endsWith("\u2026"));
+    const exact = "b".repeat(MAX_MSG_CHARS);
+    assert.equal(sanitizeLine({ lvl: "INF", frame: 0, ts_us: 0, tid: 0, msg: exact })!.msg, exact);
+    // A message LiveSink already cut (8192 bytes + "…") comes through unchanged.
+    const engineCut = "c".repeat(MAX_MSG_CHARS) + "\u2026";
+    assert.equal(clipMessage(engineCut), engineCut);
+    // Never split a surrogate pair.
+    const emoji = "x".repeat(MAX_MSG_CHARS - 1) + "\u{1F600}" + "tail";
+    assert.equal(clipMessage(emoji), "x".repeat(MAX_MSG_CHARS - 1) + "\u2026");
 });
