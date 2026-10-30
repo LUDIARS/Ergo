@@ -28,13 +28,16 @@ Win32 サーバ実装に依存しない。
 ## 依存
 - C++17 標準ライブラリ
 - Threads (std::thread)
-- OS ソケット (Winsock / BSD sockets) ※ アウトバウンドのみ
+- `ergo_common` — JSON コーデック (`ergo::common::jsonm`)
+- `ergo_common_ws` — 共有 WebSocket クライアント (`ergo::common::ws::Client`、
+  [`common.md`](common.md))。 OS ソケット (Winsock / BSD sockets) はこちらが持つ。
+  ※ アウトバウンドのみ
 - (テスト) GoogleTest 互換 mini-gtest
 
 ## 変数
 - 登録済み変数テーブル (name → 型消し getter/setter + meta + last_seen)
 - 書き込みコマンド MPSC キュー (ネットスレッド → メインスレッドで drain)
-- WS クライアント (再接続戦略付き)
+- WS クライアント (`ergo_common_ws` の `ergo::common::ws::Client`。 再接続戦略付き)
 - 接続フラグ
 - アプリ識別子 (デフォルト exe 名 or "anonymous")
 
@@ -51,7 +54,8 @@ Win32 サーバ実装に依存しない。
 - ホスト変数の更新 (登録時に渡された setter 経由)
 
 ### タスク
-- WS クライアント接続 (失敗時は指数バックオフではなく一定間隔で再試行)
+- WS クライアント接続 (トランスポートは `ergo_common_ws` に委譲。 失敗時は指数バックオフ
+  ではなく一定間隔 (約 1.5 秒) で再試行)
 - 接続成功時に `hello` を送り、登録済み全変数を `bind` で再送 (再接続シナリオ)
 - 登録/解除のスレッド安全管理
 - 値変化検出 (毎フレーム getter を呼んで last_seen と比較; 違えば `value` 送信)
