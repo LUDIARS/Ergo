@@ -9,6 +9,9 @@ import { eulerDegToQuat, quatToEulerDeg } from "./rotation.js";
 let ws = null;
 let reconnectTimer = null;
 
+/** Largest finite float32: the engine (ergo_scene) rejects vector components past it. */
+const FLOAT_MAX = 3.4028234663852886e38;
+
 // state
 const scenes = new Map();   // id -> SceneInfo
 let selectedSceneId = null;
@@ -196,7 +199,8 @@ ${actor.components && actor.components.length ? `<div class="field-group">
             const val = inputs.map(i => Number(i.value));
             let ok = true;
             inputs.forEach((input, k) => {
-                const bad = input.value.trim() === "" || !Number.isFinite(val[k]);
+                // The engine stores floats and rejects |x| > FLT_MAX.
+                const bad = input.value.trim() === "" || !(Math.abs(val[k]) <= FLOAT_MAX);
                 input.classList.toggle("invalid", bad);
                 if (bad) ok = false;
             });

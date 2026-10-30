@@ -104,7 +104,7 @@ UI の `patch` を、 `scene_id` のシーンを publish したエンジン接�
 | `name` / `type` | 文字列 | テキスト |
 | `parent` | アクター id、 `""` で親を外す | テキスト |
 | `visual.kind` / `visual.ref` / `visual.material` | 文字列 | テキスト |
-| `transform.pos` / `transform.scale` | `[x, y, z]` | 数値 3 つ |
+| `transform.pos` / `transform.scale` | `[x, y, z]` (各成分は float の範囲内: 絶対値 ≤ FLT_MAX) | 数値 3 つ |
 | `transform.rot` | クォータニオン `[x, y, z, w]` | オイラー角 (度) 3 つ。 送信時にクォータニオンへ変換 |
 | `vars/<name>/value` | 任意の JSON | JSON テキスト (文字列は引用符付き) |
 
@@ -112,7 +112,9 @@ UI の `patch` を、 `scene_id` のシーンを publish したエンジン接�
 - エンジンは回転を正規化して格納する。 parent は同じシーンに存在し、 自分
   自身でも子孫でもないこと
 - 旧形式の `transform.rot.xyz` (オイラー xyz) は受け付けない。 それ以外の
-  未知パス・型違いも拒否され、 エンジンが変更前のシーンを publish し直す
+  未知パス・型違い・float の範囲を超える数値 (`1e39` など) ・double で
+  表せない数値 (`1e400` など) も拒否され、 エンジンが変更前のシーンを
+  publish し直す
 
 ## ライフサイクル
 

@@ -182,7 +182,21 @@ TEST(ScenePatch, RejectsWrongJsonTypes) {
     EXPECT_FALSE(s->apply_patch("crate", "transform.rot", "[0, 0, 0]"));     // xyz only
     EXPECT_FALSE(s->apply_patch("crate", "transform.rot", "[0, 0, 0, 0]"));  // zero length
     EXPECT_FALSE(s->apply_patch("crate", "vars/health/value", "{oops"));     // malformed
+    // Finite doubles past FLT_MAX would narrow to inf (and normalize to NaN):
+    EXPECT_FALSE(s->apply_patch("crate", "transform.pos", "[1e39, 0, 0]"));
+    EXPECT_FALSE(s->apply_patch("crate", "transform.scale", "[0, -1e39, 0]"));
+    EXPECT_FALSE(s->apply_patch("crate", "transform.rot", "[1e39, 0, 0, 1]"));
+    EXPECT_FALSE(s->apply_patch("crate", "transform.pos", "[1e400, 0, 0]"));    // past DBL_MAX
+    EXPECT_FALSE(s->apply_patch("crate", "vars/health/value", "1e400"));        // would store "inf"
+    EXPECT_FALSE(s->apply_patch("crate", "vars/health/value", R"([1, {"k": -1e400}])"));
     EXPECT_EQ(s->to_json(), before);
+    EXPECT_TRUE(Scene::load_json(s->to_json()) != nullptr);  // still a valid document
+
+    // The float range itself is accepted.
+    EXPECT_TRUE(s->apply_patch("crate", "transform.pos", "[3.4028234663852886e38, -1e-40, 0]"));
+    EXPECT_TRUE(s->apply_patch("crate", "transform.rot", "[3e38, 3e38, 3e38, 3e38]"));
+    EXPECT_TRUE(s->apply_patch("crate", "vars/health/value", "1e39"));  // a double, not a float
+    EXPECT_TRUE(Scene::load_json(s->to_json()) != nullptr);
 }
 
 TEST(SceneGraphFind, FindSceneByIdBothOverloads) {

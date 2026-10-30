@@ -160,7 +160,8 @@ public:
     ///   parent                 — actor id in this scene, or "" / null to
     ///                            clear; not the actor itself or a descendant
     /// Returns false (and changes nothing) for an unknown actor or field, a
-    /// value of the wrong JSON type or arity, or malformed JSON. The legacy
+    /// value of the wrong JSON type or arity, a number that is not finite
+    /// (as a float for transforms: |x| <= FLT_MAX), or malformed JSON. The legacy
     /// "transform.rot.xyz" path is rejected: rotations travel as quaternions.
     bool apply_patch(const std::string& actor_id, std::string_view field, std::string_view value_json);
 

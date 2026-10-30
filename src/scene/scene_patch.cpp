@@ -9,6 +9,7 @@
 #include "ergo/common/json_min.h"
 
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace ergo::scene {
@@ -19,12 +20,13 @@ using ergo::common::jsonm::JsonValue;
 constexpr std::string_view kVarsPrefix = "vars/";
 constexpr std::string_view kVarsSuffix = "/value";
 
-/// Exactly `n` finite numbers.
+/// Exactly `n` numbers that are finite as a float: a finite double past
+/// FLT_MAX (e.g. 1e39) would narrow to inf. The negated <= also rejects NaN.
 bool read_numbers(const JsonValue& v, std::size_t n, float* out) {
     if (!v.is_array() || !v.a || v.a->size() != n) return false;
     for (std::size_t i = 0; i < n; ++i) {
         const JsonValue& e = (*v.a)[i];
-        if (!e.is_number() || !std::isfinite(e.n)) return false;
+        if (!e.is_number() || !(std::fabs(e.n) <= std::numeric_limits<float>::max())) return false;
         out[i] = static_cast<float>(e.n);
     }
     return true;
@@ -97,7 +99,12 @@ bool Scene::apply_patch(const std::string& actor_id, std::string_view field, std
             field.substr(kVarsPrefix.size(), field.size() - kVarsPrefix.size() - kVarsSuffix.size());
         for (VarSpec& var : actor->vars) {
             if (var.name != name) continue;
-            var.value = ergo::common::jsonm::serialize(v);
+            std::string text = ergo::common::jsonm::serialize(v);
+            // 1e400 parses as inf and serializes as "inf", which to_json()
+            // could not write back: store only a value that re-parses.
+            JsonValue check;
+            if (!ergo::common::jsonm::parse(text, check)) return false;
+            var.value = std::move(text);
             return true;
         }
         return false;
