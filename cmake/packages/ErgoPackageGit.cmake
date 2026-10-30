@@ -23,6 +23,7 @@
 #     <prefix>_PIN_DESCENDS    the pin descends from expect_tag
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 
 # Internal: run git in <dir>; <out_rc> is the exit code (-1 without git).
 function(_ergo_pkg_git out_rc out_text dir)

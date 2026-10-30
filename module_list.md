@@ -1,26 +1,32 @@
 # Ergo モジュール一覧
 
-Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処理向けの
-等価な一覧は `module_list.yaml` にある。新規モジュールを追加したら
-**両方** にエントリを足すこと (CLAUDE.md の「新規モジュール追加手順」
-参照)。
+Ergo リポジトリに含まれる C++ モジュールの一覧。C++17 を基準とし、
+`ergo_math` / `ergo_physics2d` だけは C++20 (`target_compile_features` で
+利用側へ伝わる)。機械処理向けの等価な一覧は [`module_list.yaml`](module_list.yaml)
+にあり、所属ドメイン・リンクする `ergo_*` ターゲット (`depends`)・付随
+ターゲット (`extra_targets`)・プラグイン id (`tool_plugins`) はそちらが正本。
+新規モジュールを追加したら **両方** にエントリを足すこと (CLAUDE.md の
+「新規モジュール追加手順」参照)。両者と CMake オプション・`include/ergo/`・
+`tools/ergo` のプラグイン・README の食い違いは ctest `test_module_catalog`
+(`tests/test_module_catalog.cmake`) が検出する。
 
 | 名前 | 概要 | カテゴリ | 公開ヘッダ | 実装 | 仕様書 | 付随ツール |
 |---|---|---|---|---|---|---|
 | `ergo_input`        | マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ (inject API でテスト可能) | システム | `include/ergo/input/`        | `src/input/`        | `spec/feature/module/input.md`        | — |
-| `ergo_particle`     | CPU パーティクル sim + Pictor Vulkan ビルボード renderer (optional)                   | システム | `include/ergo/particle/`     | `src/particle/`     | `spec/feature/module/particle.md`     | `tools/ergo/` (`particle` / `vfx-suggest` / `vfx-breed` plugin) |
+| `ergo_particle`     | CPU パーティクル sim + Pictor Vulkan ビルボード renderer (optional)。`particle` プラグインから設定を受け取るフィーダーは任意ターゲット `ergo_particle_link` (`ERGO_BUILD_PARTICLE_LINK`) | システム | `include/ergo/particle/`     | `src/particle/`     | `spec/feature/module/particle.md`     | `tools/ergo/` (`particle` / `vfx-suggest` / `vfx-breed` plugin) |
 | `ergo_gpu_particle` | Shuriken 相当の GPU compute パーティクル。`IGpuBackend` 抽象で Vulkan/WebGPU 両対応   | システム | `include/ergo/gpu_particle/` | `src/gpu_particle/` | `spec/feature/module/gpu_particle.md` | — |
 | `ergo_bind`         | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`). アウトバウンド接続             | システム | `include/ergo/bind/`         | `src/bind/`         | `spec/feature/module/bind.md`         | `tools/ergo/` (`variable` plugin) |
 | `ergo_actor`        | シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (`ergo_bind` に委譲) | システム | `include/ergo/actor/`        | `src/actor/`        | `spec/feature/module/actor.md`        | `tools/ergo/` (`variable` plugin で表示) |
 | `ergo_cast`         | Actor を名前付き Scene に束ねる軽量グルーピング層 (一括/個別 activate + snapshot)。非所有・描画非依存。`ergo_scene` (look-dev ドキュメント) とは別物 | システム | `include/ergo/cast/`         | `src/cast/`         | `spec/feature/module/cast.md`         | — |
+| `ergo_scene`        | 保存できるルックデヴ用シーン文書 (`*.scene.json` の CRUD・パッチ適用・カメラ行列・`SceneGraph`)。`scene_editor` プラグインとのライブ編集は任意ターゲット `ergo_scene_link` (`ERGO_BUILD_SCENE_LINK`) | システム | `include/ergo/scene/`        | `src/scene/`        | `spec/feature/module/scene.md`        | `tools/ergo/` (`scene_editor` plugin) |
 | `ergo_sound`        | WAV デコード + ストリーミング + ミキサ + 波形処理 + Quantizer (外部 lib 無し)          | システム | `include/ergo/sound/`        | `src/sound/`        | `spec/feature/module/sound.md`        | — |
 | `ergo_audio`        | ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。`ergo_sound` とは独立・横並び | システム | `include/ergo/audio/`        | `src/audio/`        | `spec/feature/module/audio.md`        | — |
 | `ergo_frame`        | アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列                              | システム | `include/ergo/frame/`        | `src/frame/`        | `spec/feature/module/frame.md`        | — |
 | `ergo_profile`      | パフォーマンス確認用タイムライン。 AOP 的マーカー注入で速度/メモリ/スレッドを計測し Chrome Trace 形式で出力 | システム | `include/ergo/profile/`      | `src/profile/`      | `spec/feature/module/profile.md`      | `tools/ergo/` (`profile` plugin) |
-| `ergo_log`          | 4-level ロガー (Error/Warn/Info/Debug)。行頭にフレーム番号を埋め込む                   | システム | `include/ergo/log/`          | `src/log/`          | `spec/feature/module/log.md`          | — |
+| `ergo_log`          | 4-level ロガー (Error/Warn/Info/Debug)。行頭にフレーム番号を埋め込む。出力先はシンクで差し替え、時刻源は注入可能。`log` プラグインへ行を流す `LiveSink` は任意ターゲット `ergo_log_live` (`ERGO_BUILD_LOG_LIVE`) | システム | `include/ergo/log/`          | `src/log/`          | `spec/feature/module/log.md`          | `tools/ergo/` (`log` plugin) |
 | `ergo_io`           | 最小ファイル I/O ラッパー (`<filesystem>` の薄膜、UTF-8 `std::string` API)             | システム | `include/ergo/io/`           | `src/io/`           | `spec/feature/module/io.md`           | — |
 | `ergo_world_time`   | グローバル time-scale コンポーザ (HitStop / HitSlow)。Foundation/WorldTimeScale の C++ ポート | システム | `include/ergo/world_time/`   | `src/world_time/`   | `spec/feature/module/world_time.md`   | — |
-| `ergo_blackboard`   | グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle)。Foundation/Blackboard の C++ ポート | システム | `include/ergo/blackboard/`   | `src/blackboard/`   | `spec/feature/module/blackboard.md`   | — |
+| `ergo_blackboard`   | グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle、名前だけで `find<T>` / `subscribe<T>(name, cb)` / `visit`)。Foundation/Blackboard の C++ ポート | システム | `include/ergo/blackboard/`   | `src/blackboard/`   | `spec/feature/module/blackboard.md`   | — |
 | `ergo_ui`           | SVG ラスタ + 9-slice フレームコンポーザ (RGBA8, Pictor/Vulkan 依存なし)                | UI       | `include/ergo/ui/`           | `src/ui/`           | `spec/feature/module/ui.md`           | — |
 | `ergo_custos`       | Custos 遠隔テストランナーと話す in-process HTTP ブリッジ (`/health` `/screenshot` `/key`) | システム | `include/ergo/custos/`       | `src/custos/`       | `spec/feature/module/custos.md`       | (外部: `LUDIARS/Custos`) |
 | `ergo_health`       | HP コンテナ + ダメージ/回復/死亡コールバック (game-lexicon: `health-system`) | ロジック | `include/ergo/health/`       | `src/health/`       | `spec/feature/module/health.md`       | — |
@@ -28,8 +34,8 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 | `ergo_combo_counter`| 連続成功カウンタ + フルコンボ通知 (game-lexicon: `combo-counter`)            | ロジック | `include/ergo/combo_counter/`| `src/combo_counter/`| `spec/feature/module/combo_counter.md`| — |
 | `ergo_timing_judge` | 音ゲー用 ms タイミング判定 PERFECT/GREAT/GOOD/MISS (game-lexicon: `timing-judge`) | ロジック | `include/ergo/timing_judge/` | `src/timing_judge/` | `spec/feature/module/timing_judge.md` | — |
 | `ergo_character`    | TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替)。エンジン非依存 | ゲームオブジェクト | `include/ergo/character/` | `src/character/` | `spec/feature/module/character.md` | — |
-| `ergo_math`         | C++20 concepts ベースの汎用数学ライブラリ。Vec/Mat (テンプレート汎用)、SoA バッチ演算 (SSE2 optional)、Arena バンプアロケータ、ObjectPool (連続スラブ + free-list) | システム | `include/ergo/math/` | `src/math/` | `spec/feature/module/math.md` | — |
-| `ergo_physics2d`    | 2D 剛体物理エンジン (Box2D ライク)。Shape(Circle/Polygon)/Body/World/ContactEvent。sequential impulse ソルバ + SAT narrowphase + N² AABB broadphase。ergo_math の ObjectPool で DoD 配置 | システム | `include/ergo/physics2d/` | `src/physics2d/` | `spec/feature/module/physics2d.md` | — |
+| `ergo_math`         | C++20 concepts ベースの汎用数学ライブラリ (利用側にも C++20 が伝わる)。Vec/Mat (テンプレート汎用)、SoA バッチ演算 (SSE2 optional)、Arena バンプアロケータ、ObjectPool (連続スラブ + free-list) | システム | `include/ergo/math/` | `src/math/` | `spec/feature/module/math.md` | — |
+| `ergo_physics2d`    | 2D 剛体物理エンジン (Box2D ライク)。Shape(Circle/Polygon)/Body/World/ContactEvent。sequential impulse ソルバ + SAT narrowphase + N² AABB broadphase。ergo_math の ObjectPool で DoD 配置。C++20 (`ergo_math` から伝わる) | システム | `include/ergo/physics2d/` | `src/physics2d/` | `spec/feature/module/physics2d.md` | — |
 | `ergo_resource`     | タグ駆動リソース自動選択 + 読み込み。JSON マニフェスト catalog + Clio 同重みスコアラ + バイト列 loader (MUSA Clio の C++ 移植、ネットワーク非依存) | システム | `include/ergo/resource/` | `src/resource/` | `spec/module/resource.md` | — |
 | `ergo_http`         | libcurl バックエンドの同期 HTTP クライアント。`IHttpClient` / `get` / `post`。公開 API は `std::` のみで curl を隠蔽。既定 OFF (`ERGO_WITH_CURL` を強制) | システム | `include/ergo/http/`         | `src/http/`         | `spec/feature/module/http.md`         | (依存: `curl`) |
 | `ergo_render`       | Pictor 横断オーケストレーション層。`RenderContext` / `IRenderLayer` / `FrameComposer` / `ScreenshotBridge` / カメラ math / `StageRenderer` | システム | `include/ergo/render/`       | `src/render/`       | `spec/feature/module/render.md`       | — |
@@ -49,7 +55,7 @@ Ergo リポジトリに含まれる C++17 モジュールの一覧。機械処�
 
 | 名前 | 概要 |
 |---|---|
-| `ergo_common` | モジュール横断の小物ユーティリティ。現状は `ergo::common::jsonm` (minimal JSON codec) のみ。`ergo_bind` から PUBLIC link されて transitive に取り込まれる |
+| `ergo_common` | モジュール横断の小物ユーティリティ (仕様は `spec/feature/module/common.md`)。`ergo_common` は `ergo::common::jsonm` (minimal JSON codec) で、ソケットに依存しない。別ターゲット `ergo_common_ws` は共有 WebSocket クライアント (`ergo::common::ws::Client`) で、`ergo_bind` / `ergo_particle_link` / `ergo_scene_link` / `ergo_log_live` が使う。どちらも `ERGO_BUILD_*` を持たず常にビルドされる。`ergo_bind` からは両方が PUBLIC link されて transitive に取り込まれる |
 
 LUDIARS パッケージ (モジュールではなく、モジュールが使う外部の LUDIARS 製パッケージ):
 
@@ -64,6 +70,7 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
   を Ergo のパーティクル設定に変換する一回きりの移行用ライブラリと CLI で、
   使っているタイトルのツール側へ移してから Ergo から削除する予定
   (`spec/architecture/domains-and-ux.md` §5 の L1)。それまでは `legacy` ドメインに置く。
+  `module_list.yaml` では `excluded` に理由付きで載せている。
 - **仕様書の置き場所**: 初期からあるモジュールは `spec/feature/module/<名>.md`、
   2026-10 以降に足したモジュールは `spec/module/<名>.md` にある。一覧の仕様書の列は実物を指す。
 - **`ergo_inspector` は廃止済み (2026-04-21)**: 機能調査の結果 `ergo_bind` の
@@ -71,7 +78,11 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
   された (詳細は `spec/feature/module/bind.md` の「歴史的経緯」節 / `spec/feature/tool/ergo.md`
   の「廃止プラン」節)。live tuning の唯一の窓口は `ergo_bind`。
 - **`ergo_actor`**: `ergo_bind` に実装を委譲するシーングラフ基底。
-  `ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND` の両方が ON のときだけビルドされる。
+  `ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND` の両方が ON のときだけビルドされる
+  (`ERGO_BUILD_BIND=OFF` なら STATUS 行を出して作らない。`ergo_cast` も同様)。
+  逆に `ergo_physics2d` (→ `ergo_math`)・`ergo_ui_kit` / `ergo_ui_layout` /
+  `ergo_resource` (→ `ergo_io`) は依存先が OFF だと構成エラーになる
+  (一覧は [spec/setup/config-reference.md](spec/setup/config-reference.md) の「前提」列)。
 - **`ergo_particle::Renderer`**: Pictor + Vulkan が利用側に揃っている
   ときのみビルド (`ERGO_PARTICLE_HAS_RENDERER=ON`)。sim (`ParticleSystem`)
   だけならいつでも使える。
@@ -95,9 +106,7 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
 ## Web ツール
 
 全ての Web 系開発者ツールは **`tools/ergo/`** に統合済み。新規ツールは
-単独パッケージではなく `tools/ergo/src/plugins/<id>/` に追加する
-(`spec/feature/tool/ergo.md` 参照)。現行プラグイン:
-
-- `particle` — 旧 `tools/particle-editor/` の移植
-- `variable` — 旧 `tools/variable-editor/` の移植
-- `vfx-breed` — 変異体を並べて人間が選び、選んだ個体を親に次世代を作る対話的進化で `ParticleEffectConfig` を育てる (適応度は人間の目、`spec/feature/tool/ergo.md` の「`vfx-breed`」)
+単独パッケージではなく `tools/ergo/src/plugins/<id>/` に追加する。
+組み込みプラグインの一覧 (id・対応する C++ モジュール・エンジン側の供給元・
+仕様書) は [spec/feature/tool/ergo.md](spec/feature/tool/ergo.md) の
+「プラグイン一覧」が正本で、登録の実体は `tools/ergo/src/core/registry.ts`。

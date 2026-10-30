@@ -9,7 +9,7 @@
 /// Unity の GetComponents 相当の自動収集はしない — ホストが add_* で明示
 /// 登録する (登録解除しないままコンポーネントを破棄しないこと)。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/detail/effect_manager.h"
 #include "ergo/character/detail/move_manager.h"

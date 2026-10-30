@@ -8,7 +8,7 @@
 /// Type aliases: Vec2f/Vec3f/Vec4f (float), Vec2d/Vec3d/Vec4d (double).
 /// Conversion helpers to/from ergo::vector::Vec2 and Vec3.
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include "ergo/math/concepts.h"
 

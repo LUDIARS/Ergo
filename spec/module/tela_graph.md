@@ -44,7 +44,7 @@ Tela をプロセス内で使うホスト向けに、 `tela::Graph` への変換
 
 - `validate_tela_graph(graph, &error)` — Tela が受け付ける条件の検査。
 - `to_tela_graph_text(graph, &error)` — `TELA_GRAPH 1` のテキスト。
-- `save_tela_graph(path, graph, &error)` — ファイルへ書く。
+- `save_tela_graph(path, graph, &error)` — ファイルへ書く。 無い親フォルダは作る (作れなければ `cannot create <dir>: <理由>` で false)。
 - `to_tela_graph(graph)` — `tela::Graph` へ変換 (Tela がある構成のみ)。
 
 ### 出力

@@ -4,7 +4,7 @@
 
 Phase 3 (`feat/render-pipeline-graph-ui`) で旧 Scanner / Timeline / Profile Editor の 3 モードを廃止して **単一のグラフエディタ画面に統合**。 Pictor 系統B 解体 (LUDIARS/Pictor PR #60 系列) で「ハードコードされた描画パス」 が消えるため、 静的 scan は不要になり、 Profile が single source of truth になった。
 
-> 設計詳細: `spec/tool/render_pipeline_system_b.md`。 Pictor 側の正本スキーマ: `Pictor/spec/pipeline-profile-config.md` と `Pictor/spec/pipeline-system-b-config.md` (Phase 3 = schema v2)。
+> 設計詳細: `spec/feature/tool/render_pipeline_system_b.md`。 Pictor 側の正本スキーマ: `Pictor/spec/pipeline-profile-config.md` と `Pictor/spec/pipeline-system-b-config.md` (Phase 3 = schema v2)。
 
 ---
 
@@ -73,7 +73,7 @@ tools/ergo/src/plugins/render_pipeline/
 
 ## schema v2 (Phase 3)
 
-`PipelineProfileDef` に `attachments: AttachmentDef[]` を追加、 `RenderPassDef` に `attachment_ops: AttachmentOpsDef[]` を追加。 v1 profile (attachments 未宣言) は読み込み時に組み込み既定の 3 件 (`scene_hdr_color` / `scene_depth` / `swapchain`) を補完して開く (Pictor 側 `default_attachments()` と同一テーブル)。 詳細フィールドは `spec/tool/render_pipeline_system_b.md` §3 を参照。
+`PipelineProfileDef` に `attachments: AttachmentDef[]` を追加、 `RenderPassDef` に `attachment_ops: AttachmentOpsDef[]` を追加。 v1 profile (attachments 未宣言) は読み込み時に組み込み既定の 3 件 (`scene_hdr_color` / `scene_depth` / `swapchain`) を補完して開く (Pictor 側 `default_attachments()` と同一テーブル)。 詳細フィールドは `spec/feature/tool/render_pipeline_system_b.md` §3 を参照。
 
 ## 既知の制限 (Phase 3 時点)
 

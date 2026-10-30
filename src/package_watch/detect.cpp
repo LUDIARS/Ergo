@@ -6,11 +6,6 @@ namespace ergo::package_watch {
 
 namespace {
 
-/// UPM ホストの pin は Unity の窓が manifest.json の `#<sha>` を書き換える (ergo_pkg update は触らない)。
-std::string next_for_upm(const WatchDependency& dep, const std::string& to_rev) {
-    return "Unity: Window > LUDIARS > Ergo Packages, set " + dep.name + " to #" + to_rev;
-}
-
 /// 追跡ブランチの先頭へ上げる操作。 update が名前で受けるのは main だけなので、 他のブランチは SHA で渡す。
 std::string next_for_branch(const WatchDependency& dep, const std::string& head) {
     if (dep.owner == kUpmOwner) return next_for_upm(dep, head);

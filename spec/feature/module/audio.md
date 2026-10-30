@@ -9,7 +9,7 @@
 - `ergo_sound` = Ergo のコア柱 (レンダリングと同格の主要実装)。自前実装。
 - `ergo_audio` = FMOD 等プロ向け SDK への抽象。ゲーム FX 用の便利ライン。
 
-詳しくは `spec/module/sound.md` の「位置付け (Core Pillar)」節を参照。
+詳しくは [`sound.md`](sound.md) の「位置付け (Core Pillar)」節を参照。
 本モジュールは **ミドルウェア / SDK 差替えに焦点を当てた** 薄いラッパで
 あり、音響表現の新規機能は原則 `ergo_sound` 側に実装する。
 
@@ -88,7 +88,8 @@
 
 FMOD は **プロプライエタリ**。無償利用枠:
 - 個人 / インディー: 年間売上 $200k 未満
-- 配布物にクレジット表記 (`docs/third_party/FMOD.md` に記載)
+- 配布物にクレジット表記。表記はホスト (ゲーム) の配布物側で行う。Ergo は
+  FMOD SDK を同梱しないので `THIRD_PARTY_NOTICES.md` には載せない
 
 本リポジトリは FMOD SDK を **同梱しない**。ユーザが別途 firelight.com
 からダウンロードし、パスを通す運用:
@@ -98,8 +99,9 @@ FMOD は **プロプライエタリ**。無償利用枠:
 setx FMOD_SDK_DIR "C:/Program Files (x86)/FMOD SoundSystem/FMOD Studio API Windows"
 ```
 
-CMake 再構成後は FMOD バックエンドが自動選択される (`ergo_audio: using
-FMOD 2.x at ...` がログに出る)。
+CMake 再構成後は FMOD バックエンドが自動選択される (`ergo_audio: backend =
+FMOD (<FMOD_LIBRARY のパス>)` がログに出る。Dummy のときは `ergo_audio: backend =
+Dummy (set FMOD_SDK_DIR + reconfigure for FMOD)`)。
 
 ### ランタイム DLL の配置
 
@@ -109,9 +111,25 @@ staging できる:
 
 ```cmake
 add_executable(mygame ...)
-target_link_libraries(mygame PRIVATE ergo_audio)
+target_link_libraries(mygame PRIVATE Ergo::audio)
 ergo_audio_stage_runtime(mygame)  # POST_BUILD で FMOD DLL をコピー
 ```
 
-Dummy バックエンド時は no-op。FindFMOD が DLL を解決できなかった場合
-(稀) も no-op。
+ヘルパはホストの `CMakeLists.txt` (ホストのスコープ) から呼ばれる前提で、
+Ergo のディレクトリ変数は読まず、`ergo_audio` ターゲットのプロパティだけを読む。
+構成時に FMOD を選んだ `ergo_audio` は `ERGO_AUDIO_BACKEND` (`fmod` / `dummy`) と
+`ERGO_RUNTIME_FILES` (FindFMOD が import ライブラリの隣で見つけた DLL / .so /
+.dylib) を持つ。
+
+| 状況 | 挙動 |
+|---|---|
+| Dummy バックエンド | 何もしない (黙って戻る) |
+| FMOD + ランタイム解決済み | `POST_BUILD` で `$<TARGET_FILE_DIR:mygame>` へ `copy_if_different` |
+| FMOD + ランタイム未解決 | `WARNING` (構成時の `ergo_audio` 側でも `WARNING`)。黙って no-op にしない |
+| `ERGO_BUILD_AUDIO=OFF` / ターゲット未定義 | 構成エラー (理由を表示)。関数自体は常に定義される |
+
+Linux / macOS のビルドツリーでは FMOD ライブラリへのフルパスリンクが RPATH に
+入るため staging しなくても起動できるが、配布物には staging (またはホスト側の
+インストール手順) が要る。回帰テストは `test_audio_stage_runtime`
+(`tests/audio/test_audio_stage_runtime.cmake`、偽の FMOD SDK を作ってホストから
+呼ぶ)。

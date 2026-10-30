@@ -147,6 +147,15 @@ bool save_tela_graph(const std::string& path, const Graph& graph, std::string* e
     const std::filesystem::path target = std::filesystem::u8path(path);
     std::filesystem::path temp = target;
     temp += ".tmp";
+    if (target.has_parent_path()) {
+        // 出力先のフォルダが無ければ作る (`--out graphs/x.tela` を新しいビルドディレクトリへ書けるように)。
+        std::error_code dir_ec;
+        std::filesystem::create_directories(target.parent_path(), dir_ec);
+        if (dir_ec) {
+            const auto dir = target.parent_path().u8string();  // C++20 では u8string なので std::string へ写す
+            return fail(error, "cannot create " + std::string(dir.begin(), dir.end()) + ": " + dir_ec.message());
+        }
+    }
     {
         std::ofstream file(temp, std::ios::binary | std::ios::trunc);
         if (!file) return fail(error, "cannot open " + path + ".tmp");

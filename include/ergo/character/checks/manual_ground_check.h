@@ -7,7 +7,7 @@
 /// マップ…) なので、本モジュールは「外から set する」実装のみ持つ。
 /// ホスト側で IGroundContact を直接実装してもよい。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/ground_contact.h"
 

@@ -7,7 +7,7 @@
 
 音ゲー (ノート連続正解 / ミスでリセット) と、 アクションの連撃カウントの両方で使える。
 
-Ars 側ゲーム辞書 [`spec/game-lexicon/features/rhythm/combo-counter.toml`](../../../ars/spec/game-lexicon/features/rhythm/combo-counter.toml)
+Ars 側ゲーム辞書 (Ars リポジトリの `spec/game-lexicon/features/rhythm/combo-counter.toml`)
 のリファレンス実装。
 
 ## カテゴリ

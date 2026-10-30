@@ -8,6 +8,7 @@
     "spec/module/tela_graph.md",
     "spec/module/render_viz.md",
     "spec/module/package_model.md",
+    "spec/module/package_scan.md",
     "spec/module/package_viz.md",
     "spec/architecture/domains-and-ux.md"
   ],

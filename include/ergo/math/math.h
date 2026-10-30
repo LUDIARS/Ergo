@@ -12,7 +12,7 @@
 /// For ergo::vector interop also include ergo/math/vec_vector_convert.h
 /// after ergo/vector/vector.h.
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include "ergo/math/concepts.h"
 #include "ergo/math/vec.h"

@@ -1,7 +1,16 @@
 // scene_editor browser UI — scene tree + actor inspector + WS patch relay.
+//
+// Every edit is sent as a field-level `patch`; the UI never mutates its own
+// copy. The engine (ergo_scene_link) applies it and re-publishes the scene,
+// so what is shown is always the engine's state (a rejected edit snaps back).
+
+import { eulerDegToQuat, quatToEulerDeg } from "./rotation.js";
 
 let ws = null;
 let reconnectTimer = null;
+
+/** Largest finite float32: the engine (ergo_scene) rejects vector components past it. */
+const FLOAT_MAX = 3.4028234663852886e38;
 
 // state
 const scenes = new Map();   // id -> SceneInfo
@@ -140,7 +149,7 @@ function renderInspector() {
 <div class="field-group">
   <div class="field-group-label">Transform</div>
   ${vec3Field("position", "transform.pos", t.pos)}
-  ${vec3Field("rotation", "transform.rot.xyz", [t.rot[0], t.rot[1], t.rot[2]])}
+  ${vec3Field("rotation °", "transform.rot", quatToEulerDeg(t.rot))}
   ${vec3Field("scale", "transform.scale", t.scale)}
 </div>
 
@@ -154,7 +163,7 @@ function renderInspector() {
 ${actor.instanceOf ? `<div class="field-group">
   <div class="field-group-label">Prefab</div>
   ${fieldReadonly("instanceOf", actor.instanceOf)}
-  ${actor.overrides?.length ? `<div style="margin-top:4px;font-size:11px;color:#7f849c">${actor.overrides.length} override(s)</div>` : ""}
+  ${(actor.overrides ?? []).map(o => overrideRow(o)).join("")}
 </div>` : ""}
 
 ${actor.vars && actor.vars.length ? `<div class="field-group">
@@ -179,15 +188,43 @@ ${actor.components && actor.components.length ? `<div class="field-group">
         });
     });
 
-    // vec3 patch buttons
+    // vec3 patch buttons. Rotation is edited as Euler degrees but always
+    // travels as a full quaternion (`transform.rot` = [x, y, z, w]).
     inspScroll.querySelectorAll("[data-vec-field]").forEach(el => {
         const btn = el.querySelector(".patch-btn");
         if (!btn) return;
         btn.addEventListener("click", () => {
-            const inputs = el.querySelectorAll(".field-input.vec");
+            const inputs = [...el.querySelectorAll(".field-input.vec")];
             if (inputs.length < 3) return;
-            const val = [parseFloat(inputs[0].value), parseFloat(inputs[1].value), parseFloat(inputs[2].value)];
-            sendPatch(el.dataset.vecField, val);
+            const val = inputs.map(i => Number(i.value));
+            let ok = true;
+            inputs.forEach((input, k) => {
+                // The engine stores floats and rejects |x| > FLT_MAX.
+                const bad = input.value.trim() === "" || !(Math.abs(val[k]) <= FLOAT_MAX);
+                input.classList.toggle("invalid", bad);
+                if (bad) ok = false;
+            });
+            if (!ok) return;
+            const field = el.dataset.vecField;
+            sendPatch(field, field === "transform.rot" ? eulerDegToQuat(val) : val);
+        });
+    });
+
+    // var patch buttons: the input holds JSON text, sent as parsed JSON.
+    inspScroll.querySelectorAll("[data-var]").forEach(el => {
+        const btn = el.querySelector(".patch-btn");
+        const input = el.querySelector(".field-input");
+        if (!btn || !input) return;
+        btn.addEventListener("click", () => {
+            let value;
+            try { value = JSON.parse(input.value); } catch {
+                input.classList.add("invalid");
+                input.title = "Not valid JSON (strings need quotes)";
+                return;
+            }
+            input.classList.remove("invalid");
+            input.title = "";
+            sendPatch(`vars/${el.dataset.var}/value`, value);
         });
     });
 }
@@ -237,9 +274,19 @@ function vec3Field(label, vecField, vec) {
 }
 
 function varRow(v) {
-    return `<div class="var-row">
+    return `<div class="var-row" data-var="${esc(v.name)}">
   <span class="var-name">${esc(v.name)}</span><span class="var-type">${esc(v.type)}</span>
-  <div class="var-value">${esc(v.value)}</div>
+  <div class="var-edit">
+    <input class="field-input" value="${esc(v.value)}" placeholder="JSON value" spellcheck="false">
+    <button class="patch-btn">Apply</button>
+  </div>
+</div>`;
+}
+
+function overrideRow(o) {
+    return `<div class="var-row">
+  <span class="var-name">${esc(o.path)}</span>
+  <div class="var-value">${esc(o.value)}</div>
 </div>`;
 }
 

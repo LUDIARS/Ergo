@@ -20,7 +20,7 @@
 ///   auto* b = world.get_body(h);
 /// @endcode
 ///
-/// Spec: spec/module/physics2d.md
+/// Spec: spec/feature/module/physics2d.md
 
 #include "ergo/physics2d/shape.h"
 #include "ergo/physics2d/body.h"

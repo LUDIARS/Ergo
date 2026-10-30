@@ -45,7 +45,51 @@
         "ERGO_PACKAGES": "pictor;tela",
         "ERGO_PACKAGES_FETCH": true,
         "ERGO_PACKAGES_STRICT": true,
-        "ERGO_BUILD_TESTS": true
+        "ERGO_BUILD_TESTS": true,
+        "ERGO_AUDIO_BACKEND": "dummy"
+      }
+    },
+    {
+      "name": "ci-base",
+      "hidden": true,
+      "description": "Shared base of the Linux CI legs (.github/workflows/ci.yml). See spec/setup/ci.md.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": {
+        "ERGO_BUILD_TESTS": true,
+        "ERGO_AUDIO_BACKEND": "dummy"
+      }
+    },
+    {
+      "name": "ci-linux-gcc",
+      "displayName": "CI: Linux GCC (Release)",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "ci-linux-clang",
+      "displayName": "CI: Linux clang (Release, -Wall -Wextra)",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS": "-Wall -Wextra"
+      }
+    },
+    {
+      "name": "ci-asan",
+      "displayName": "CI: Linux ASan + UBSan (Debug)",
+      "inherits": "ci-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined"
       }
     },
     {
@@ -71,10 +115,44 @@
     { "name": "vs2022-release", "configurePreset": "vs2022", "configuration": "Release" },
     { "name": "vs2022-deps-debug", "configurePreset": "vs2022-deps", "configuration": "Debug" },
     { "name": "vs2022-deps-release", "configurePreset": "vs2022-deps", "configuration": "Release" },
-    { "name": "ci-packages", "configurePreset": "ci-packages" },
+    { "name": "ci-packages", "configurePreset": "ci-packages", "configuration": "Release" },
+    { "name": "ci-linux-gcc", "configurePreset": "ci-linux-gcc" },
+    { "name": "ci-linux-clang", "configurePreset": "ci-linux-clang" },
+    { "name": "ci-asan", "configurePreset": "ci-asan" },
     { "name": "xcode-debug", "configurePreset": "xcode", "configuration": "Debug" },
     { "name": "xcode-release", "configurePreset": "xcode", "configuration": "Release" },
     { "name": "xcode-deps-debug", "configurePreset": "xcode-deps", "configuration": "Debug" },
     { "name": "xcode-deps-release", "configurePreset": "xcode-deps", "configuration": "Release" }
+  ],
+  "testPresets": [
+    {
+      "name": "ci-packages",
+      "configurePreset": "ci-packages",
+      "configuration": "Release",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 }
+    },
+    {
+      "name": "ci-linux-gcc",
+      "configurePreset": "ci-linux-gcc",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 }
+    },
+    {
+      "name": "ci-linux-clang",
+      "configurePreset": "ci-linux-clang",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 }
+    },
+    {
+      "name": "ci-asan",
+      "configurePreset": "ci-asan",
+      "output": { "outputOnFailure": true },
+      "execution": { "jobs": 4 },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    }
   ]
 }

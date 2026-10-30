@@ -3,8 +3,9 @@
 /// ParticleEffectConfig — mirror of the `particle` plugin's wire schema
 /// (v1). Field names and units match the JSON shape produced by the
 /// unified ergo tool (see tools/ergo/src/plugins/particle/schema.ts).
-/// Hosts typically receive raw JSON over WebSocket, decode into this
-/// struct, and pass it to ParticleSystem via `set_config`.
+/// Hosts typically receive it over WebSocket through `EditorLink`
+/// (ergo_particle_link, ergo/particle/editor_link.h), which decodes the
+/// plugin's `state` frames into this struct for ParticleSystem::set_config.
 
 #include <array>
 #include <cstdint>

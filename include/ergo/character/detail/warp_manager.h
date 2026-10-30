@@ -5,7 +5,7 @@
 /// TCC の `WarpManager` に対応する。warp は Control / Effect より優先され、
 /// フレーム末尾 (Brain 反映後) にクリアされる。BrainBase の内部実装。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/types.h"
 

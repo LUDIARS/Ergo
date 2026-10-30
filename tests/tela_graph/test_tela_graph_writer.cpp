@@ -145,3 +145,24 @@ TEST(TelaGraphWriter, SaveWritesFileAndFailureLeavesExistingFileUntouched) {
 
     std::filesystem::remove_all(dir);
 }
+
+TEST(TelaGraphWriter, SaveCreatesMissingParentDirectories) {
+    const auto dir  = std::filesystem::temp_directory_path() / "ergo_tela_graph_writer_mkdir_test";
+    std::filesystem::remove_all(dir);
+    const auto path = dir / "nested" / "deeper" / "graph.tela";
+
+    std::string error;
+    ASSERT_TRUE(save_tela_graph(path.string(), minimal(), &error));
+    EXPECT_EQ(read_file(path), to_tela_graph_text(minimal()));
+    EXPECT_FALSE(std::filesystem::exists(dir / "nested" / "deeper" / "graph.tela.tmp"));
+
+    // A bare relative file name has no parent folder to create and still works.
+    const auto cwd = std::filesystem::current_path();
+    std::filesystem::current_path(dir);
+    const bool bare = save_tela_graph("bare.tela", minimal(), &error);
+    std::filesystem::current_path(cwd);
+    EXPECT_TRUE(bare);
+    EXPECT_EQ(read_file(dir / "bare.tela"), to_tela_graph_text(minimal()));
+
+    std::filesystem::remove_all(dir);
+}

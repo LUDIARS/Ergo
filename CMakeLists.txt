@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 project(Ergo LANGUAGES CXX)
 
+# Ergo itself, or a host's add_subdirectory / FetchContent / ergo_pkg bootstrap?
+# (PROJECT_IS_TOP_LEVEL needs CMake 3.21.) Picks the subproject defaults below.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_ergo_top ON)
+else()
+    set(_ergo_top OFF)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -8,7 +16,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ---------------------------------------------------------------------------
 # Top-level options. Hosts can flip per-module knobs as needed.
 # ---------------------------------------------------------------------------
-option(ERGO_BUILD_TESTS       "Build module tests"             ON)
+option(ERGO_BUILD_TESTS       "Build module tests (default: only when Ergo is the top-level project)" ${_ergo_top})
 option(ERGO_BUILD_DUMMY       "Build dummy plug libraries"     OFF)
 option(ERGO_BUILD_BENCHMARKS  "Build micro-benchmark executables (opt-in)" OFF)
 
@@ -47,7 +55,7 @@ option(ERGO_BUILD_PACKAGE_MODEL "Build ergo_package_model (resolved.json / CMake
 option(ERGO_BUILD_PACKAGE_SCAN  "Build ergo_package_scan (観測対象のチェックアウト → 根拠付きの使用関係)" ON)
 option(ERGO_BUILD_PACKAGE_VIZ   "Build ergo_package_viz (パッケージ版一覧 / ターゲットのリンク図 / 使用関係図 + CLI)" ON)
 option(ERGO_BUILD_PACKAGE_MANAGER "Build ergo_package_manager (ホスト宣言の読み取り・検査・漏れ検査)" ON)
-option(ERGO_BUILD_PACKAGE_CLI   "Build the ergo_pkg CLI (init / list / doctor / fetch、 ergo_package_manager が要る)" ON)
+option(ERGO_BUILD_PACKAGE_CLI   "Build the ergo_pkg CLI (init / list / doctor / fetch / add / remove / update / status、 outdated / watch は ERGO_BUILD_PACKAGE_WATCH。 ergo_package_manager が要る)" ON)
 option(ERGO_BUILD_PACKAGE_WATCH "Build ergo_package_watch (更新の検知 + ergo_pkg outdated / watch)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
@@ -71,16 +79,44 @@ option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute s
 set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / dummy")
 set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy)
 
+# As a subproject Ergo keeps its targets out of the host's `all`: only what the
+# host links is built. Never while ERGO_BUILD_TESTS is ON, so registered tests
+# are also built. The test gate is evaluated on every configure (not frozen
+# into the option's cached default), so toggling ERGO_BUILD_TESTS in an
+# existing build directory takes effect. Libraries are PIC so they also link
+# into host shared modules / plugins.
+if(_ergo_top)
+    set(_ergo_exclude_default OFF)
+else()
+    set(_ergo_exclude_default ON)
+endif()
+option(ERGO_EXCLUDE_FROM_ALL
+    "Keep Ergo's targets out of the default build (ignored while ERGO_BUILD_TESTS is ON; default: ON as a subproject)"
+    ${_ergo_exclude_default})
+if(ERGO_EXCLUDE_FROM_ALL AND ERGO_BUILD_TESTS)
+    message(STATUS "ergo: ERGO_BUILD_TESTS=ON, so ERGO_EXCLUDE_FROM_ALL is ignored (tests are built by `all`)")
+elseif(ERGO_EXCLUDE_FROM_ALL)
+    set_property(DIRECTORY PROPERTY EXCLUDE_FROM_ALL ON)
+endif()
+option(ERGO_POSITION_INDEPENDENT_CODE "Build Ergo's libraries as position-independent code" ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ${ERGO_POSITION_INDEPENDENT_CODE})
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
-# ergo_common — small utility lib shared across modules. Currently just the
-# minimal JSON codec (used by ergo_bind).
+# ergo_common — small utility lib shared across modules. JSON codec; WS
+# client in ergo_common_ws (kept apart so ergo_common stays socket-free).
 # ---------------------------------------------------------------------------
 add_library(ergo_common STATIC src/common/json_min.cpp)
 target_include_directories(ergo_common PUBLIC include)
+add_library(ergo_common_ws STATIC src/common/ws_client.cpp)
+target_include_directories(ergo_common_ws PUBLIC include)
+target_link_libraries(ergo_common_ws PUBLIC Threads::Threads)
+if(WIN32)
+    target_link_libraries(ergo_common_ws PUBLIC ws2_32)
+endif()
 
 # ---------------------------------------------------------------------------
 # Shared mini-gtest (header-only), bound into one static lib used by all tests
@@ -89,6 +125,13 @@ if(ERGO_BUILD_TESTS)
     enable_testing()
     add_library(ergo_gtest_main STATIC tests/gtest_main.cpp)
     target_include_directories(ergo_gtest_main PUBLIC third_party)
+
+    add_executable(test_json_min tests/common/test_json_min.cpp)
+    target_link_libraries(test_json_min PRIVATE ergo_common ergo_gtest_main)
+    add_test(NAME test_json_min COMMAND test_json_min)
+    add_executable(test_ws_client tests/common/test_ws_client.cpp)
+    target_link_libraries(test_ws_client PRIVATE ergo_common_ws ergo_gtest_main)
+    add_test(NAME test_ws_client COMMAND test_ws_client)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -106,6 +149,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
 # M0: nothing is acquired, existing targets are only recorded into
 # <build>/ergo-packages.resolved.json. See spec/setup/packages.md.
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/packages/ErgoPackages.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoModuleRequirements.cmake")
 
 # ---------------------------------------------------------------------------
 # ergo_http — libcurl-backed synchronous HTTP client. The public header hides
@@ -147,10 +191,6 @@ if(ERGO_BUILD_INPUT)
     )
     target_include_directories(ergo_input PUBLIC include)
     target_link_libraries(ergo_input PUBLIC Threads::Threads)
-    if(ERGO_BUILD_LOG)
-        # keyboard_device.cpp で ERGO_LOG_INFO を使うため依存を立てる。
-        target_link_libraries(ergo_input PUBLIC ergo_log)
-    endif()
 
     if(ERGO_BUILD_DUMMY)
         add_library(ergo_input_dummy
@@ -237,6 +277,20 @@ if(ERGO_BUILD_PARTICLE)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
+
+    # ergo_particle_link — receive-only feeder for tools/ergo's `particle`
+    # plugin over ergo_common_ws. Separate so ergo_particle stays socket-free.
+    option(ERGO_BUILD_PARTICLE_LINK "Build ergo_particle_link (WS feeder for the particle plugin)" ON)
+    if(ERGO_BUILD_PARTICLE_LINK)
+        add_library(ergo_particle_link src/particle/editor_link.cpp)
+        target_include_directories(ergo_particle_link PUBLIC include)
+        target_link_libraries(ergo_particle_link PUBLIC ergo_particle PRIVATE ergo_common_ws ergo_common)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_editor_link tests/particle/test_editor_link.cpp)
+            target_link_libraries(test_editor_link PRIVATE ergo_particle_link ergo_gtest_main)
+            add_test(NAME test_editor_link COMMAND test_editor_link)
+        endif()
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -247,14 +301,10 @@ if(ERGO_BUILD_BIND)
     add_library(ergo_bind
         src/bind/types.cpp
         src/bind/bind_engine.cpp
-        src/bind/ws_client.cpp
     )
     target_include_directories(ergo_bind PUBLIC include)
     target_compile_definitions(ergo_bind PUBLIC ERGO_BIND_ENABLED=1)
-    target_link_libraries(ergo_bind PUBLIC ergo_common Threads::Threads)
-    if(WIN32)
-        target_link_libraries(ergo_bind PUBLIC ws2_32)
-    endif()
+    target_link_libraries(ergo_bind PUBLIC ergo_common ergo_common_ws Threads::Threads)
     # VarKind is a closed wire-protocol enum (no runtime converter registry by
     # design). Guard against it drifting: any switch over an enum that omits a
     # case with no default label is a hard error, so adding a new VarKind fails
@@ -273,7 +323,7 @@ if(ERGO_BUILD_BIND)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME test_types test_json_min test_bind_engine)
+        foreach(NAME test_types test_bind_engine)
             add_executable(${NAME} tests/bind/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_bind ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
@@ -322,21 +372,39 @@ if(ERGO_BUILD_CAST AND ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND)
 endif()
 
 # ---------------------------------------------------------------------------
-# ergo_sound — WAV/OGG decode, streaming, mixing engine, waveform, quantizer
+# ergo_scene - serializable look-dev scene document (+ field-level patches).
 # ---------------------------------------------------------------------------
-# ergo_scene - serializable look-dev scene document.
 if(ERGO_BUILD_SCENE)
-    add_library(ergo_scene src/scene/scene.cpp)
+    add_library(ergo_scene src/scene/scene.cpp src/scene/scene_patch.cpp)
     target_include_directories(ergo_scene PUBLIC include)
     target_link_libraries(ergo_scene PUBLIC ergo_common)
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_scene tests/scene/test_scene.cpp)
-        target_link_libraries(test_scene PRIVATE ergo_scene ergo_gtest_main)
-        add_test(NAME test_scene COMMAND test_scene)
+        foreach(NAME test_scene test_scene_patch)
+            add_executable(${NAME} tests/scene/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_scene ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
+    endif()
+
+    # ergo_scene_link — engine client for tools/ergo's `scene_editor` plugin
+    # (publish scenes, apply patches) over ergo_common_ws.
+    option(ERGO_BUILD_SCENE_LINK "Build ergo_scene_link (WS client for the scene_editor plugin)" ON)
+    if(ERGO_BUILD_SCENE_LINK)
+        add_library(ergo_scene_link src/scene/editor_link.cpp)
+        target_include_directories(ergo_scene_link PUBLIC include)
+        target_link_libraries(ergo_scene_link PUBLIC ergo_scene PRIVATE ergo_common_ws)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_scene_editor_link tests/scene/test_scene_editor_link.cpp)
+            target_link_libraries(test_scene_editor_link PRIVATE ergo_scene_link ergo_gtest_main)
+            add_test(NAME test_scene_editor_link COMMAND test_scene_editor_link)
+        endif()
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# ergo_sound — WAV decode, streaming, mixing engine, waveform, quantizer
+# ---------------------------------------------------------------------------
 if(ERGO_BUILD_SOUND)
     add_library(ergo_sound
         src/sound/audio_decoder.cpp
@@ -495,6 +563,23 @@ if(ERGO_BUILD_LOG)
         target_link_libraries(test_log PRIVATE ergo_log ergo_gtest_main)
         target_link_libraries(test_log PRIVATE Threads::Threads)
         add_test(NAME test_log COMMAND test_log)
+        add_executable(test_log_sink tests/log/test_log_sink.cpp)
+        target_link_libraries(test_log_sink PRIVATE ergo_log ergo_gtest_main Threads::Threads)
+        add_test(NAME test_log_sink COMMAND test_log_sink)
+    endif()
+
+    # ergo_log_live — LiveSink streaming records to tools/ergo's `log` plugin
+    # over ergo_common_ws. Separate so ergo_log stays socket-free.
+    option(ERGO_BUILD_LOG_LIVE "Build ergo_log_live (LiveSink for the log plugin)" ON)
+    if(ERGO_BUILD_LOG_LIVE AND TARGET ergo_common_ws)
+        add_library(ergo_log_live src/log/live_sink.cpp)
+        target_include_directories(ergo_log_live PUBLIC include)
+        target_link_libraries(ergo_log_live PUBLIC ergo_log PRIVATE ergo_common_ws ergo_common)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_live_sink tests/log/test_live_sink.cpp)
+            target_link_libraries(test_live_sink PRIVATE ergo_log_live ergo_common ergo_gtest_main)
+            add_test(NAME test_live_sink COMMAND test_live_sink)
+        endif()
     endif()
 endif()
 
@@ -543,10 +628,21 @@ if(ERGO_BUILD_AUDIO)
         add_library(ergo_audio src/audio/audio_engine_fmod.cpp)
         target_link_libraries(ergo_audio PUBLIC FMOD::FMOD Threads::Threads)
         target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_FMOD=1)
+        # ergo_audio_stage_runtime() reads these from the host's scope, which
+        # cannot see FindFMOD's directory variables.
+        set_property(TARGET ergo_audio PROPERTY ERGO_AUDIO_BACKEND fmod)
+        if(FMOD_RUNTIME AND EXISTS "${FMOD_RUNTIME}")
+            set_property(TARGET ergo_audio PROPERTY ERGO_RUNTIME_FILES "${FMOD_RUNTIME}")
+        else()
+            message(WARNING "ergo_audio: FMOD backend but the runtime (fmod.dll / libfmod.so / "
+                "libfmod.dylib) was not found next to ${FMOD_LIBRARY}; "
+                "ergo_audio_stage_runtime() cannot stage it")
+        endif()
         message(STATUS "ergo_audio: backend = FMOD (${FMOD_LIBRARY})")
     else()
         add_library(ergo_audio src/audio/audio_engine_dummy.cpp)
         target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_DUMMY=1)
+        set_property(TARGET ergo_audio PROPERTY ERGO_AUDIO_BACKEND dummy)
         if(ERGO_AUDIO_BACKEND STREQUAL "fmod")
             message(FATAL_ERROR "ergo_audio: ERGO_AUDIO_BACKEND=fmod but FMOD SDK not found. Set FMOD_SDK_DIR.")
         endif()
@@ -559,27 +655,61 @@ if(ERGO_BUILD_AUDIO)
         add_executable(test_ergo_audio tests/audio/test_ergo_audio.cpp)
         target_link_libraries(test_ergo_audio PRIVATE ergo_audio ergo_gtest_main)
         add_test(NAME test_ergo_audio COMMAND test_ergo_audio)
+        # ergo_audio_stage_runtime() called from a host's scope against a fake
+        # FMOD SDK (configures + builds a small host project).
+        add_test(NAME test_audio_stage_runtime
+            COMMAND ${CMAKE_COMMAND}
+                -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/audio/stage_runtime
+                -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
+                -DERGO_TEST_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+                -DERGO_TEST_TOOLSET=${CMAKE_GENERATOR_TOOLSET}
+                -DERGO_TEST_INSTANCE=${CMAKE_GENERATOR_INSTANCE}
+                -DERGO_TEST_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+                -DERGO_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                -DERGO_TEST_CXX_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/audio/test_audio_stage_runtime.cmake)
+        set_tests_properties(test_audio_stage_runtime PROPERTIES LABELS host TIMEOUT 600)
     endif()
-
-    # Host helper: stage the FMOD runtime DLL next to an executable so it
-    # can load at launch time without PATH tweaks. No-op on the Dummy
-    # backend (DLL path is unset) or when FindFMOD did not resolve the
-    # runtime binary.
-    #
-    # Usage (from host CMakeLists):
-    #     add_executable(mygame ...)
-    #     target_link_libraries(mygame PRIVATE ergo_audio)
-    #     ergo_audio_stage_runtime(mygame)
-    function(ergo_audio_stage_runtime TARGET)
-        if(_ERGO_AUDIO_USE_FMOD AND FMOD_RUNTIME AND EXISTS "${FMOD_RUNTIME}")
-            add_custom_command(TARGET ${TARGET} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${FMOD_RUNTIME}"
-                    "$<TARGET_FILE_DIR:${TARGET}>/"
-                COMMENT "Staging FMOD runtime next to ${TARGET}: ${FMOD_RUNTIME}")
-        endif()
-    endfunction()
 endif()
+
+# Host helper: stage the FMOD runtime (fmod.dll / libfmod.so / libfmod.dylib)
+# next to an executable so it loads at launch without PATH tweaks. Defined
+# even with ERGO_BUILD_AUDIO=OFF (then it says so), and it reads only
+# ergo_audio's target properties: a function sees its caller's variables, and
+# the caller is the host, not Ergo's directory.
+#   Dummy backend          -> nothing to stage, returns quietly
+#   FMOD + runtime found   -> POST_BUILD copy next to TARGET
+#   FMOD + runtime missing -> WARNING (never silent on the FMOD backend)
+#
+# Usage (from host CMakeLists):
+#     add_executable(mygame ...)
+#     target_link_libraries(mygame PRIVATE ergo_audio)
+#     ergo_audio_stage_runtime(mygame)
+function(ergo_audio_stage_runtime TARGET)
+    if(NOT TARGET ${TARGET})
+        message(FATAL_ERROR "ergo_audio_stage_runtime: target '${TARGET}' does not exist. "
+            "Call it after add_executable(${TARGET} ...).")
+    endif()
+    if(NOT TARGET ergo_audio)
+        message(FATAL_ERROR "ergo_audio_stage_runtime(${TARGET}): ergo_audio does not exist "
+            "(ERGO_BUILD_AUDIO=OFF). Set ERGO_BUILD_AUDIO=ON or drop the call.")
+    endif()
+    get_target_property(_backend ergo_audio ERGO_AUDIO_BACKEND)
+    if(_backend STREQUAL "dummy")
+        return()
+    endif()
+    get_target_property(_runtime ergo_audio ERGO_RUNTIME_FILES)
+    if(_runtime)
+        add_custom_command(TARGET ${TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_runtime} "$<TARGET_FILE_DIR:${TARGET}>/"
+            COMMENT "Staging FMOD runtime next to ${TARGET}: ${_runtime}"
+            VERBATIM)
+    else()
+        message(WARNING "ergo_audio_stage_runtime(${TARGET}): ergo_audio uses FMOD but no "
+            "runtime file was resolved, so nothing is staged. Check FMOD_SDK_DIR.")
+    endif()
+endfunction()
 
 # ---------------------------------------------------------------------------
 # ergo_world_time — global time-scale composer for hit-stop / hit-slow
@@ -1243,6 +1373,8 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
     # ERGO_PACKAGES_SIBLING_ROOT の兄弟チェックアウト。 未設定なら観測対象は未観測として描く。
     # P4 はトップのソース (ホスト) の .ergo/watch-report.json と <build>/ergo-packages.status.json
     # (ergo_pkg watch / ergo_pkg status が書く。 無ければ札は "—")。
+    # P2 は File API の返答が要る (CMake 3.27+ は 1 回の構成で、 それ未満は 2 回目の構成で返る) ので最後に
+    # 書く: 返答が無くて止まっても P1 / P3 / P4 は書けている。
     set(_ergo_graphs_dir "${CMAKE_BINARY_DIR}/graphs")
     set(_ergo_usage_root "")
     if(ERGO_PACKAGES_SIBLING_ROOT)
@@ -1252,13 +1384,13 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_ergo_graphs_dir}"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view packages
                 --out "${_ergo_graphs_dir}/packages.tela"
-        COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view targets
-                --out "${_ergo_graphs_dir}/targets.tela"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view usage ${_ergo_usage_root}
                 --manifest "${CMAKE_CURRENT_SOURCE_DIR}/ergo-packages.json"
                 --out "${_ergo_graphs_dir}/usage.tela"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view host --host "${CMAKE_SOURCE_DIR}"
                 --out "${_ergo_graphs_dir}/host.tela"
+        COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view targets
+                --out "${_ergo_graphs_dir}/targets.tela"
         DEPENDS ergo_package_viz_cli
         COMMENT "ergo_package_viz: writing package graphs to ${_ergo_graphs_dir}"
         VERBATIM)
@@ -1577,6 +1709,23 @@ if(ERGO_BUILD_VECTOR)
 endif()
 
 # ---------------------------------------------------------------------------
+# examples/ — headless composition examples (consumers of the public targets,
+# not modules; spec/setup/integrate-modules.md). ON by default only when Ergo
+# is the top-level project, so a host's add_subdirectory(<ergo>) does not
+# build them. Kept after every module target: examples/ tests if(TARGET ...).
+# (PROJECT_IS_TOP_LEVEL needs CMake 3.21; the minimum here is 3.20.)
+# ---------------------------------------------------------------------------
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_ergo_examples_default ON)
+else()
+    set(_ergo_examples_default OFF)
+endif()
+option(ERGO_BUILD_EXAMPLES "Build headless composition examples" ${_ergo_examples_default})
+if(ERGO_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ---------------------------------------------------------------------------
 # benchmarks/ — micro-benchmarks, opt-in via ERGO_BUILD_BENCHMARKS.
 #
 # Each benchmark is a standalone executable that uses the tiny harness in
@@ -1606,6 +1755,15 @@ if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)
     add_executable(test_thirdparty_deps tests/thirdparty/deps_smoke.cpp)
     target_link_libraries(test_thirdparty_deps PRIVATE ergo_thirdparty ergo_gtest_main)
     add_test(NAME test_thirdparty_deps COMMAND test_thirdparty_deps)
+endif()
+
+# tests/test_module_catalog.cmake — module_list.{md,yaml} / README / config-reference
+# / tools/ergo plugin docs / spec/domains / spec links against the code (cmake -P,
+# no compiler). Ergo's own checkout only: it says nothing about a host's build.
+if(ERGO_BUILD_TESTS AND _ergo_top)
+    add_test(NAME test_module_catalog
+        COMMAND ${CMAKE_COMMAND} -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_module_catalog.cmake)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -1652,4 +1810,39 @@ if(ERGO_BUILD_TESTS)
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_${NAME}.cmake)
         endforeach()
     endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Host-facing target finish (keep last: walks every ergo_* library defined
+# above). Ergo::<name> aliases, the C++ standard (cxx_std_17, ergo_math 20)
+# and MSVC /utf-8 as usage requirements. See cmake/ErgoTargets.cmake.
+# ---------------------------------------------------------------------------
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoTargets.cmake")
+ergo_finalize_targets()
+
+# Host consumption tests: a real compiled host project add_subdirectory()s this
+# checkout (C++14 host, BUILD_SHARED_LIBS=ON, Ergo:: names, a SHARED plugin,
+# configure-time module requirements) and keeps its cache values with managed
+# curl ON (fake curl source, no network).
+if(ERGO_BUILD_TESTS)
+    set(_ergo_host_test_args
+        -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DERGO_TEST_GENERATOR=${CMAKE_GENERATOR}
+        -DERGO_TEST_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+        -DERGO_TEST_TOOLSET=${CMAKE_GENERATOR_TOOLSET}
+        -DERGO_TEST_INSTANCE=${CMAKE_GENERATOR_INSTANCE}
+        -DERGO_TEST_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+        -DERGO_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        -DERGO_TEST_CXX_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER})
+    add_test(NAME test_host_consume
+        COMMAND ${CMAKE_COMMAND} ${_ergo_host_test_args}
+            -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/packages/host_consume
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/packages/test_host_consume.cmake)
+    set_tests_properties(test_host_consume PROPERTIES LABELS host TIMEOUT 900)
+    add_test(NAME test_host_cache_isolation
+        COMMAND ${CMAKE_COMMAND} ${_ergo_host_test_args}
+            -DERGO_TEST_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests/thirdparty/host_cache_isolation
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/thirdparty/test_host_cache_isolation.cmake)
+    set_tests_properties(test_host_cache_isolation PROPERTIES LABELS host TIMEOUT 600)
+    unset(_ergo_host_test_args)
 endif()

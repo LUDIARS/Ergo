@@ -36,7 +36,7 @@ The tab shows the unread count; a new update is notified once (`ShowNotification
 |---|---|---|
 | `Ergo.Packages.Core` | `Editor/Core` | Plain C# (`noEngineReferences`): JSON reader, manifest / lock / report readers, `PinPlanner`, `ManifestJsonEditor`, read state |
 | `Ergo.Packages.Editor` | `Editor` | Window, notifier, applier |
-| `Ergo.Packages.Tests.Editor` | `Tests/Editor` | NUnit tests of Core. `Fixtures/` are byte-identical copies of Ergo's `tests/package_watch/fixtures` |
+| `Ergo.Packages.Tests.Editor` | `Tests/Editor` | NUnit tests of Core. `Fixtures/` are byte-identical copies of the `*.json` directly in Ergo's `tests/package_watch/fixtures` (its `provenance/` holds Revisor / Concordia API samples only the native tests read) |
 
 To run the tests in Unity, add `"testables": ["com.ludiars.ergo.packages"]` to `manifest.json` and use the Test
 Runner (EditMode). Without Unity: `dotnet test tests/unity_packages` in the Ergo checkout.

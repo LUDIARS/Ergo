@@ -4,7 +4,7 @@
 /// signal. Used by rhythm games (note hits) and action games (chained
 /// combo).
 ///
-/// Spec: spec/module/combo_counter.md
+/// Spec: spec/feature/module/combo_counter.md
 /// Lexicon: spec/game-lexicon/features/rhythm/combo-counter.toml,
 ///          spec/game-lexicon/features/action/combo-system.toml (Ars)
 

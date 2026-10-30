@@ -2,7 +2,7 @@
 
 /// ergo::physics2d::ContactEvent — contact event types.
 ///
-/// Spec: spec/module/physics2d.md
+/// Spec: spec/feature/module/physics2d.md
 
 #include "ergo/physics2d/body.h"
 #include <cstdint>

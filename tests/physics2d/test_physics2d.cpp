@@ -2,8 +2,17 @@
 #include "gtest/gtest.h"
 
 #include <cmath>
+#include <type_traits>
+#include <utility>
 
 using namespace ergo::physics2d;
+
+// World is move-only. Its `= default` move assignment needs ObjectPool to be
+// move-assignable; otherwise clang warns -Wdefaulted-function-deleted in
+// every host translation unit that includes world.h.
+static_assert(std::is_move_constructible_v<World>);
+static_assert(std::is_move_assignable_v<World>);
+static_assert(!std::is_copy_assignable_v<World>);
 
 // Test 1: Free fall - body falls under gravity
 TEST(Physics2D, FreeFall) {
@@ -151,4 +160,30 @@ TEST(Physics2D, StackStability) {
             EXPECT_LT(std::abs(b.position.data[0]), 50.0f);
         }
     });
+}
+
+// Test 8: a moved-into World keeps the bodies of the source and keeps stepping
+TEST(Physics2D, MoveAssignedWorldKeepsStepping) {
+    World src(ergo::math::Vec<2,float>{{0.0f, -10.0f}});
+    BodyDef def;
+    def.type = BodyType::Dynamic;
+    def.position = {{0.0f, 10.0f}};
+    auto h = src.create_body(def, make_circle_shape(0.5f));
+
+    World dst(ergo::math::Vec<2,float>{{0.0f, 0.0f}});
+    BodyDef other;
+    other.position = {{5.0f, 5.0f}};
+    dst.create_body(other, make_circle_shape(0.5f));
+
+    dst = std::move(src);
+    ASSERT_TRUE(dst.get_body(h) != nullptr);
+    int alive = 0;
+    dst.for_each_body([&alive](BodyHandle, Body&) { ++alive; });
+    EXPECT_EQ(alive, 1);
+
+    float dt = 1.0f / 60.0f;
+    for (int i = 0; i < 60; i++) dst.step(dt);
+    float t = 60 * dt;
+    float expected_y = 10.0f - 0.5f * 10.0f * t * t;  // the source's gravity came along
+    EXPECT_NEAR(dst.get_body(h)->position.data[1], expected_y, 0.5f);
 }

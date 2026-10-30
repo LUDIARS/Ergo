@@ -40,7 +40,7 @@ scanner snapshot を見ていた API (`GET /render_pipeline/api/snapshot`、 `PO
 - plugin 側 `index.ts` の scanner サブプロセス起動コード + `/api/snapshot` / `/api/rescan` ルート
 - plugin 側 UI の Scanner モード (`app.js` 内 mode=`scanner` 分岐 + 関連 DOM)
 - plugin 側 UI の Timeline モード (新グラフへ統合、後述)
-- 既存 `spec/tool/render_pipeline.md` の「モード A: Scanner」「モード T: Timeline」 セクションは Phase 3 PR で大幅短縮 (Profile Editor v1 表記も同様に更新)
+- 既存 `spec/feature/tool/render_pipeline.md` の「モード A: Scanner」「モード T: Timeline」 セクションは Phase 3 PR で大幅短縮 (Profile Editor v1 表記も同様に更新)
 
 ## 5. データモデル (Phase 3 グラフ図形)
 
@@ -205,7 +205,7 @@ Phase 3 で追加するもの:
 - `tools/ergo/src/plugins/render_pipeline/index.ts` — scanner 起動撤去 + `/graph` endpoint 配線
 - `tools/ergo/src/plugins/render_pipeline/ui/index.html` — モード切替を廃止し単一 GraphView へ
 - `tools/ergo/src/plugins/render_pipeline/ui/app.js` — GraphView entry point + WS timing overlay
-- `spec/tool/render_pipeline.md` — Phase 3 反映 (Scanner / Timeline モード記述削除、 単一 GraphView の説明に書き換え)
+- `spec/feature/tool/render_pipeline.md` — Phase 3 反映 (Scanner / Timeline モード記述削除、 単一 GraphView の説明に書き換え)
 
 ## 12. テスト
 
@@ -227,6 +227,6 @@ Phase 3 で追加するもの:
 2. profile_schema.ts を v2 化、 default テーブル新設 (commit 2)
 3. profile_store.ts に v2 対応 + `/graph` endpoint (commit 3)
 4. UI を単一 GraphView へ刷新 (vis-network 初期化、 drag-to-connect、 inspector / attachment panel、 timing overlay) (commit 4)
-5. `spec/tool/render_pipeline.md` を Phase 3 化 (commit 5)
+5. `spec/feature/tool/render_pipeline.md` を Phase 3 化 (commit 5)
 6. テスト + tsc / npm run build EXIT 0 確認
 7. PR

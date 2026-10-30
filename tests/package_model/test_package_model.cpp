@@ -106,6 +106,23 @@ TEST(PackageModel, CodemodelReadsLatestIndexAndSkipsGeneratorTargets) {
     EXPECT_EQ(render->dependencies.size(), 2u);
 }
 
+// CMake 3.27+ answers the hub's cmake_file_api(QUERY) in the same run as a shared query: the index has
+// no client-ergo reply (the client query is answered only by the next run), so the reader takes `objects`.
+TEST(PackageModel, CodemodelReadsSharedReplyWithoutClientErgo) {
+    PackageModel m;
+    std::string error;
+    ASSERT_TRUE(read_codemodel(kFixtures + "/fileapi_shared", m, &error));
+    EXPECT_TRUE(m.has_codemodel);
+    EXPECT_EQ(m.configuration, std::string(""));  // single-config generator
+    EXPECT_EQ(m.source_root, std::string("/work/demo"));
+    EXPECT_EQ(m.ergo_root, std::string("/work/demo/external/ergo"));
+    EXPECT_EQ(m.targets.size(), 2u);
+    const auto* app = target(m, "demo_app");
+    ASSERT_TRUE(app != nullptr);
+    ASSERT_EQ(app->dependencies.size(), 1u);
+    EXPECT_EQ(app->dependencies[0], std::string("ergo_common::@00000000000000000001"));
+}
+
 TEST(PackageModel, CodemodelRejectsUnsupportedVersion) {
     PackageModel m;
     std::string error;

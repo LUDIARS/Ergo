@@ -1,0 +1,64 @@
+name: packages-integration
+
+# The integrated Ergo + Pictor + Tela build: CMakePresets.json `ci-packages`
+# (ERGO_PACKAGES=pictor;tela fetched by the package hub at the manifest pins,
+# ERGO_PACKAGES_STRICT=ON). Windows only, where Pictor's GLFW needs no extra
+# system packages. See spec/setup/ci.md.
+#
+# Not a PR gate: it runs nightly and by hand until it has been green.
+
+on:
+  schedule:
+    - cron: '23 18 * * *'   # 03:23 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci-packages:
+    runs-on: windows-latest
+    # Remove once the first run is green (spec/setup/ci.md).
+    continue-on-error: true
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # STRICT turns PKG-16 (lib/lapilli not initialised) into an error.
+          submodules: recursive
+
+      # FetchContent base dir (ERGO_DEPENDENCY_CACHE_DIR): the fetched
+      # Pictor / Tela / third-party sources, keyed on their pins.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/deps-cache
+          key: ergo-deps-${{ runner.os }}-${{ hashFiles('ergo-packages.json', 'third_party/dependencies.cmake') }}
+
+      - name: Configure
+        run: cmake --preset ci-packages -DERGO_DEPENDENCY_CACHE_DIR=build/deps-cache
+
+      - name: Build
+        env:
+          CL: /MP
+        run: cmake --build --preset ci-packages --parallel
+
+      - name: Test
+        run: ctest --preset ci-packages --output-junit ctest-junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ctest-ci-packages
+          path: |
+            build/ci-packages/ctest-junit.xml
+            build/ci-packages/Testing/Temporary/LastTest.log
+            build/ci-packages/ergo-packages.resolved.json
+          if-no-files-found: warn

@@ -1,28 +1,198 @@
 name: CI
 
+# Legs, required checks and local repro commands: spec/setup/ci.md.
+
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # PR runs: a newer push cancels the running build. push / dispatch runs are
+  # never cancelled mid-build, but GitHub keeps only one pending run per group,
+  # so a newer push replaces a still-queued one (that SHA's run shows "cancelled").
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The C++ suite (ctest) on every supported toolchain. Each leg's commands
+  # are the ones spec/setup/ci.md gives for reproducing it locally.
   build-and-test:
-    runs-on: windows-latest
+    name: build-and-test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Primary dev platform. Visual Studio generator (multi-config), Release.
+          - name: windows-msvc
+            os: windows-latest
+            shell: pwsh
+            build-dir: build
+            configure: cmake -B build -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+            build: cmake --build build --config Release --parallel
+            test: ctest --test-dir build --build-config Release --parallel 4 --output-on-failure --output-junit ctest-junit.xml
+          # The declared minimum (CMakeLists.txt: cmake_minimum_required 3.20) with GCC.
+          # Presets need 3.21, so this leg uses plain command lines; ctest 3.20 has no --output-junit.
+          - name: linux-gcc-cmake320
+            os: ubuntu-24.04
+            shell: bash
+            build-dir: build
+            configure: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+            build: cmake --build build --parallel
+            test: ctest --test-dir build --parallel 4 --output-on-failure
+          # clang with -Wall -Wextra (warnings are shown, not yet errors).
+          - name: linux-clang
+            os: ubuntu-24.04
+            shell: bash
+            build-dir: build/ci-linux-clang
+            configure: cmake --preset ci-linux-clang -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            build: cmake --build --preset ci-linux-clang
+            test: ctest --preset ci-linux-clang --output-junit ctest-junit.xml
+          # GCC Debug with AddressSanitizer + LeakSanitizer + UBSan.
+          - name: linux-asan
+            os: ubuntu-24.04
+            shell: bash
+            build-dir: build/ci-asan
+            configure: cmake --preset ci-asan -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            build: cmake --build --preset ci-asan
+            test: ctest --preset ci-asan --output-junit ctest-junit.xml
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: ccache
+        if: runner.os == 'Linux'
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: ${{ matrix.name }}
+
+      - name: Install CMake 3.20.5
+        if: matrix.name == 'linux-gcc-cmake320'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cmake320"
+          "$RUNNER_TEMP/cmake320/bin/pip" install --quiet cmake==3.20.5 ninja
+          echo "$RUNNER_TEMP/cmake320/bin" >> "$GITHUB_PATH"
+
+      - name: Allow sanitizer shadow memory
+        # Newer runner kernels randomise more mmap bits than the sanitizer
+        # runtimes expect; 28 keeps ASan's shadow mapping valid.
+        if: matrix.name == 'linux-asan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Configure
         run: |
-          cmake -B build `
-            -DERGO_BUILD_TESTS=ON `
-            -DERGO_AUDIO_BACKEND=dummy
+          cmake --version
+          ${{ matrix.configure }}
 
       - name: Build
-        run: cmake --build build --config Release
+        env:
+          CL: ${{ runner.os == 'Windows' && '/MP' || '' }}
+        run: ${{ matrix.build }}
 
       - name: Test
-        run: ctest --test-dir build --build-config Release --output-on-failure
+        run: ${{ matrix.test }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ctest-${{ matrix.name }}
+          path: |
+            ${{ matrix.build-dir }}/ctest-junit.xml
+            ${{ matrix.build-dir }}/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+
+      # Dogfood the package manager's P4 host view on Ergo itself
+      # (spec/feature/package-manager.md). Informational, never fails the leg.
+      - name: Package status and graphs
+        if: always() && matrix.name == 'windows-msvc'
+        continue-on-error: true
+        run: |
+          cmake build
+          ./build/Release/ergo_pkg.exe status --build build --junit build/ctest-junit.xml --host . --ergo .
+          cmake --build build --config Release --target ergo_package_graphs
+
+      - name: Upload package graphs
+        if: always() && matrix.name == 'windows-msvc'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ergo-package-graphs
+          path: |
+            build/graphs/*.tela
+            build/ergo-packages.status.json
+            build/ergo-packages.resolved.json
+          if-no-files-found: ignore
+
+  # macOS (AppleClang) is not a required check yet: run by hand from the
+  # Actions tab (workflow_dispatch) until it has been green for a while.
+  build-and-test-macos:
+    name: build-and-test (macos-14)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: macos-14
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --parallel 4 --output-on-failure --output-junit ctest-junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ctest-macos-14
+          path: |
+            build/ctest-junit.xml
+            build/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+
+  # tools/ergo (Node): type-check src + tests, build dist/, run node:test.
+  tools-ergo:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/ergo
+    env:
+      # npm ci would otherwise download the Electron binary; tests never start it.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # lib/lapilli provides @ludiars/one-shot (a file: dependency).
+          submodules: true
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/ergo/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
 
   # W7: Core of the Unity package (unity/com.ludiars.ergo.packages) without Unity. The package structure and the
   # Fixtures byte match run in ctest above (test_unity_package_structure).
@@ -30,9 +200,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '8.0.x'
 

@@ -6,6 +6,18 @@
       "layer": "shared"
     },
     {
+      "glob": "contracts/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "examples/*",
+      "layer": "application"
+    },
+    {
+      "glob": "examples/compose_loop/*",
+      "layer": "application"
+    },
+    {
       "glob": "include/ergo/actor/*",
       "layer": "domain-logic"
     },
@@ -354,6 +366,10 @@
       "layer": "shared"
     },
     {
+      "glob": "tests/audio/fixtures/stage_host/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tests/bind/*",
       "layer": "shared"
     },
@@ -374,7 +390,15 @@
       "layer": "shared"
     },
     {
+      "glob": "tests/common/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tests/custos/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/custos/contracts/*",
       "layer": "shared"
     },
     {
@@ -434,6 +458,18 @@
       "layer": "shared"
     },
     {
+      "glob": "tests/packages/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/packages/contracts/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/packages/fixtures/host_consume/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tests/particle/*",
       "layer": "shared"
     },
@@ -479,6 +515,10 @@
     },
     {
       "glob": "tests/thirdparty/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/thirdparty/fixtures/*/*",
       "layer": "shared"
     },
     {
@@ -534,8 +574,20 @@
       "layer": "application"
     },
     {
+      "glob": "tools/ergo/src/plugins/log/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/log/ui/*",
+      "layer": "presentation"
+    },
+    {
       "glob": "tools/ergo/src/plugins/particle/*",
       "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/particle/ui/*",
+      "layer": "presentation"
     },
     {
       "glob": "tools/ergo/src/plugins/pictor_perf/*",
@@ -590,12 +642,64 @@
       "layer": "application"
     },
     {
+      "glob": "tools/ergo/src/plugins/vfx-breed/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/src/plugins/vfx-breed/ui/*",
+      "layer": "presentation"
+    },
+    {
       "glob": "tools/ergo/src/plugins/vfx-suggest/*",
       "layer": "application"
     },
     {
       "glob": "tools/ergo/src/plugins/visus/*",
       "layer": "application"
+    },
+    {
+      "glob": "tools/ergo/tests/core/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/helpers/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/log/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/particle/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/pictor_perf/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/scene_editor/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/ui_layout/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/variable/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/vfx-breed/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/vfx-suggest/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/ergo/tests/plugins/visus/*",
+      "layer": "shared"
     },
     {
       "glob": "tools/package_cli/*",

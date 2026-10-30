@@ -7,7 +7,7 @@
 /// persisted (file / DB / cloud). Pair with `ergo_io` if you want a quick
 /// local high-score file.
 ///
-/// Spec: spec/module/score.md
+/// Spec: spec/feature/module/score.md
 /// Lexicon: spec/game-lexicon/features/core/score-system.toml (Ars)
 
 #include <cstdint>

@@ -40,7 +40,7 @@
 | header_dir | `include/ergo/ui_layout/` |
 | source_dir | `src/ui_layout/` |
 | test_dir | `tests/ui_layout/` |
-| spec | `spec/module/ui_layout.md` (本書) |
+| spec | `spec/feature/module/ui_layout.md` (本書) |
 | cmake_option | `ERGO_BUILD_UI_LAYOUT` |
 | tool_plugin | `ui_layout` (tools/ergo プラグイン id) |
 | status | preview |

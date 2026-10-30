@@ -5,7 +5,7 @@
 /// TCC の `MoveManager` に対応する。BrainBase の内部実装で、ホストが
 /// 直接使うことは想定しない。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/move_source.h"
 

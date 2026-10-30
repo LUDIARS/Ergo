@@ -2,7 +2,7 @@
 
 /// ergo::physics2d::Body — rigid body data, BodyDef, BodyHandle.
 ///
-/// Spec: spec/module/physics2d.md
+/// Spec: spec/feature/module/physics2d.md
 
 #include "ergo/physics2d/shape.h"
 #include "ergo/math/vec.h"

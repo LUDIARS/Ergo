@@ -34,7 +34,7 @@ bool validate_tela_graph(const Graph& graph, std::string* error = nullptr);
 /// 空白に置き換える (1 レコード 1 行の形式を壊さないため)。
 std::string to_tela_graph_text(const Graph& graph, std::string* error = nullptr);
 
-/// ファイルへ書く。 検査や I/O に失敗したら false (既存ファイルには触れない)。
+/// ファイルへ書く。 無い親フォルダは作る。 検査や I/O に失敗したら false (既存ファイルには触れない)。
 bool save_tela_graph(const std::string& path, const Graph& graph,
                      std::string* error = nullptr);
 

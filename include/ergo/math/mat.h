@@ -11,7 +11,7 @@
 ///
 /// Row-major storage: element(r, c) = data[r * C + c].
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include "ergo/math/concepts.h"
 #include "ergo/math/vec.h"

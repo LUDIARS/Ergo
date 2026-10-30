@@ -17,6 +17,10 @@ namespace ergo::package_watch {
 /// UPM ホストの依存の持ち主 (manifest.json の `#<sha>` は Unity の窓が書き換える)。
 extern const char* const kUpmOwner;
 
+/// UPM ホストの依存の次の操作。 pin は Unity の窓が manifest.json の `#<sha>` を書き換える (ergo_pkg update は
+/// UPM の pin に触らない) ので、 tag / track / merged のどれでも Unity の窓を案内する。 to_rev が空なら SHA を書かない。
+std::string next_for_upm(const WatchDependency& dep, const std::string& to_rev);
+
 /// UPM の git URL から取得元を取り出す: 先頭の "git+" と "?path=..." を落とす
 /// ("git+https://host/LUDIARS/Tela.git?path=/unity/x" → "https://host/LUDIARS/Tela.git")。
 std::string upm_repository(const std::string& url);

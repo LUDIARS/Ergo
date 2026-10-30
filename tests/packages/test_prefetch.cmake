@@ -6,7 +6,9 @@
 #
 # The fake package (fixtures/alpha) becomes a git repository here, reached by
 # a file:// URL; "no network" is proven by moving that repository away before
-# the configure. project NONE, no compiler.
+# the configure. project NONE, no compiler. The pin is an untagged commit
+# behind the tip (C1 v1.0.0 <- C2 pin <- C3 tip), as real pins are: a shallow
+# clone reaches only branch and tag tips, so a GIT_SHALLOW fetch fails there.
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir>
 #         [-DGIT_EXECUTABLE=<git>] [-DERGO_TEST_GENERATOR=<gen>]
@@ -27,8 +29,15 @@ endif()
 # --- fake package and manifest ----------------------------------------------
 pkg_make_repo(C1 "${FIX}/alpha" "${W}/repos/Alpha")
 pkg_git("${W}/repos/Alpha" tag v1.0.0)
+foreach(_c C2 C3)
+    file(WRITE "${W}/repos/Alpha/${_c}.txt" "${_c}\n")
+    pkg_git("${W}/repos/Alpha" add -A)
+    pkg_git("${W}/repos/Alpha" commit -q -m "${_c}")
+    pkg_git("${W}/repos/Alpha" rev-parse HEAD)
+    set(${_c} "${GIT_OUT}")
+endforeach()
 pkg_file_url(ALPHA_URL "${W}/repos/Alpha")
-set(ALPHA_REV "${C1}")
+set(ALPHA_REV "${C2}")                                # untagged, not the tip
 set(ALPHA_EXPECT_TAG v1.0.0)
 set(BETA_URL "file:///nowhere/Beta.git")              # never fetched
 set(BETA_REV 0000000000000000000000000000000000000000)
@@ -61,7 +70,7 @@ endif()
 prefetch(pass alpha)
 set(SRC "${BASE}/ergo_pkg_alpha-src")
 pkg_git("${SRC}" rev-parse HEAD)
-pkg_assert_eq("prefetched HEAD is the pin" "${GIT_OUT}" "${C1}")
+pkg_assert_eq("prefetched HEAD is the untagged pin behind the tip" "${GIT_OUT}" "${C2}")
 if(EXISTS "${BASE}/_ergo_prefetch/ergo_pkg_alpha")
     pkg_fail("the scratch sub-build must be removed")
 endif()
@@ -87,5 +96,8 @@ file(READ "${W}/build/ergo-packages.resolved.json" _json)
 string(JSON _route GET "${_json}" packages alpha route)
 string(JSON _head GET "${_json}" packages alpha head)
 pkg_assert_eq("route 5" "${_route}" fetch)
-pkg_assert_eq("fetched head" "${_head}" "${C1}")
+pkg_assert_eq("fetched head" "${_head}" "${C2}")
+if(_out MATCHES "PKG-08")
+    pkg_fail("the pin descends from v1.0.0: no PKG-08 with full history\n${_out}")
+endif()
 pkg_pass("ERGO_PACKAGES_FETCH=ON configure hits route 5 without network after prefetch")

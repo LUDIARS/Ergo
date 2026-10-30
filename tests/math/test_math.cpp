@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 
 #include <cmath>
+#include <utility>
 #include <vector>
 
 // M_PI は MSVC では <cmath> に入らない場合があるため定義する
@@ -425,4 +426,53 @@ TEST(ObjectPool, ContiguousSlab) {
         EXPECT_LT(reinterpret_cast<uintptr_t>(&pool.get(handles[i])),
                   reinterpret_cast<uintptr_t>(base + 8));
     }
+}
+
+TEST(ObjectPool, MoveAssignDestroysOldObjectsAndTakesSource) {
+    TrackedObj::ctor_count = 0;
+    TrackedObj::dtor_count = 0;
+    ergo::math::ObjectPool<TrackedObj> dst(4);
+    (void)dst.create(1);
+    (void)dst.create(2);
+    ergo::math::ObjectPool<TrackedObj> src(3);
+    auto hs = src.create(30);
+    EXPECT_EQ(TrackedObj::ctor_count, 3);
+
+    dst = std::move(src);
+    // dst's two live objects are destroyed; src's object is taken over as is
+    // (no copy, no extra construction).
+    EXPECT_EQ(TrackedObj::dtor_count, 2);
+    EXPECT_EQ(TrackedObj::ctor_count, 3);
+    EXPECT_EQ(dst.capacity(), 3u);
+    EXPECT_EQ(dst.size(), 1u);
+    EXPECT_TRUE(dst.alive(hs));
+    EXPECT_EQ(dst.get(hs).value, 30);
+
+    // The source is left empty and destroys nothing.
+    EXPECT_EQ(src.capacity(), 0u);
+    EXPECT_EQ(src.size(), 0u);
+    EXPECT_FALSE(src.alive(hs));
+    EXPECT_EQ(src.slab(), nullptr);
+
+    // The taken-over slab keeps working: free slots are reusable.
+    auto h2 = dst.create(31);
+    EXPECT_NE(h2, ergo::math::ObjectPool<TrackedObj>::invalid_handle);
+    EXPECT_EQ(dst.size(), 2u);
+}
+
+TEST(ObjectPool, MoveAssignedPoolDestroysTakenObjectsOnce) {
+    TrackedObj::ctor_count = 0;
+    TrackedObj::dtor_count = 0;
+    {
+        ergo::math::ObjectPool<TrackedObj> dst(2);
+        {
+            ergo::math::ObjectPool<TrackedObj> src(2);
+            (void)src.create(7);
+            (void)src.create(8);
+            dst = std::move(src);
+        }  // src destroyed: nothing alive there any more
+        EXPECT_EQ(TrackedObj::dtor_count, 0);
+    }  // dst destroyed: the two taken-over objects
+    EXPECT_EQ(TrackedObj::ctor_count, 2);
+    EXPECT_EQ(TrackedObj::dtor_count, 2);
 }

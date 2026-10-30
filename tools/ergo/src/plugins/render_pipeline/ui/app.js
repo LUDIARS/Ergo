@@ -1,6 +1,6 @@
 // Render Pipeline — single NodeGraph editor (Phase 3).
 //
-// `spec/tool/render_pipeline_system_b.md`。 旧 3 モード (Scanner / Timeline /
+// `spec/feature/tool/render_pipeline_system_b.md`。 旧 3 モード (Scanner / Timeline /
 // Profile Editor) を廃止し、 *.profile.json を唯一の真理として単一の
 // vis-network グラフで表示・編集する。
 //

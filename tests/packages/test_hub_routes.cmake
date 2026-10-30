@@ -89,6 +89,20 @@ file(COPY "${FIX}/alpha/" DESTINATION "${W}/sib2/.worktrees/Alpha")   # never re
 make_repo(B1 beta "${W}/repos/Beta")
 make_repo(G1 gamma "${W}/repos/Gamma")
 
+# An untagged pin behind the tip (O1 v1.0.0 <- O2 pin <- O3 tip), like the
+# real Pictor / Tela pins: a shallow clone reaches only branch and tag tips,
+# so route 5 must fetch a SHA pin with full history. Own repository (and own
+# fetch dir in its case), so Alpha's cases keep C2 as the tip.
+set(ALPHA_OLD "${W}/repos/AlphaOld")
+make_repo(O1 alpha "${ALPHA_OLD}")
+git("${ALPHA_OLD}" tag v1.0.0)
+foreach(_c O2 O3)
+    file(WRITE "${ALPHA_OLD}/assets/version.txt" "${_c}\n")
+    git("${ALPHA_OLD}" commit -q -am "${_c}")
+    git("${ALPHA_OLD}" rev-parse HEAD)
+    set(${_c} "${GIT_OUT}")
+endforeach()
+
 file_url(ALPHA_URL "${ALPHA}")
 file_url(BETA_URL "${W}/repos/Beta")
 file_url(GAMMA_URL "${W}/repos/Gamma")
@@ -96,10 +110,13 @@ set(WIRING_DIR "${FIX}/hub/wiring")
 set(BETA_REV "${B1}")
 set(GAMMA_REV "${G1}")
 
-# make_manifest(<out file> <alpha rev> [EXPECT_TAG <tag>] [TOOL])
+# make_manifest(<out file> <alpha rev> [EXPECT_TAG <tag>] [ALPHA_URL <url>] [TOOL])
 function(make_manifest out alpha_rev)
-    cmake_parse_arguments(A "TOOL" "EXPECT_TAG" "" ${ARGN})
+    cmake_parse_arguments(A "TOOL" "EXPECT_TAG;ALPHA_URL" "" ${ARGN})
     set(ALPHA_REV "${alpha_rev}")
+    if(A_ALPHA_URL)
+        set(ALPHA_URL "${A_ALPHA_URL}")
+    endif()
     set(ALPHA_EXPECT_TAG v1.0.0)
     if(A_EXPECT_TAG)
         set(ALPHA_EXPECT_TAG "${A_EXPECT_TAG}")
@@ -114,6 +131,8 @@ make_manifest("${W}/m/pin-c2.json" "${C2}")
 make_manifest("${W}/m/pin-c1.json" "${C1}")
 make_manifest("${W}/m/pin-c1-tag9.json" "${C1}" EXPECT_TAG v9.0.0)
 make_manifest("${W}/m/pin-c2-tool.json" "${C2}" TOOL)
+file_url(_old_url "${ALPHA_OLD}")
+make_manifest("${W}/m/pin-untagged.json" "${O2}" ALPHA_URL "${_old_url}")
 configure_file("${FIX}/hub/extra-ok.json.in" "${W}/m/extra-ok.json" @ONLY)
 configure_file("${FIX}/hub/extra-clash.json.in" "${W}/m/extra-clash.json" @ONLY)
 
@@ -294,6 +313,14 @@ expect_json("fetch head" "${C2}" packages alpha head)
 run_case(fetch_mismatch fail "PKG-04\\|error\\|alpha" "${M2}" -DERGO_PACKAGES=alpha
     -DERGO_PACKAGES_FETCH=ON "-DFETCHCONTENT_SOURCE_DIR_ERGO_PKG_ALPHA=${W}/clones/behind")
 pkg_pass("fetch route (only when allowed, HEAD == pin verified)")
+
+run_case(fetch_untagged_pin pass "mode=M2" "${W}/m/pin-untagged.json" -DERGO_PACKAGES=alpha
+    -DERGO_PACKAGES_FETCH=ON -DERGO_PACKAGES_STRICT=ON "-DFETCHCONTENT_BASE_DIR=${W}/g")
+expect_json("untagged pin route" fetch packages alpha route)
+expect_json("untagged pin head" "${O2}" packages alpha head)
+git("${W}/g/ergo_pkg_alpha-src" rev-parse --is-shallow-repository)
+pkg_assert_eq("a SHA pin is fetched with full history (ancestry / PKG-08 can be judged)" "${GIT_OUT}" false)
+pkg_pass("fetch route: an untagged pin behind the tip under STRICT")
 
 # --- extra manifest -------------------------------------------------------------
 run_case(extra_ok pass "mode=M2" "${M2}" "-DERGO_PACKAGES=alpha^^gamma"

@@ -19,6 +19,7 @@
 # included at the end of this file so callers include one file.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 
 # Append one finding to the list variable named <list_var> (caller scope).
 macro(ergo_pkg_add_finding list_var id severity subject message)

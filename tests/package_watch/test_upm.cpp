@@ -193,4 +193,7 @@ TEST(PackageWatchUpm, ReportFixtureHasWriterKeys) {
     EXPECT_TRUE(keys_of(first(a, "events")) == keys_of(first(b, "events")));
     EXPECT_TRUE(keys_of(first(a, "pending")) == keys_of(first(b, "pending")));
     EXPECT_FALSE(keys_of(first(b, "events")).empty());
+    ASSERT_TRUE(a.find("sources") && b.find("sources"));
+    EXPECT_TRUE(keys_of(*a.find("sources")) == keys_of(*b.find("sources")));
+    EXPECT_FALSE(keys_of(*b.find("sources")).empty());
 }

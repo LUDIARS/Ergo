@@ -22,7 +22,7 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
 
 - `pathPattern` は正規表現。 先頭を `(^|/)` にして、 リポジトリ相対でも
   絶対パスでも同じように当たるようにする。 ただしリポジトリ直下だけを指すファイルやツール
-  (`CMakeLists.txt`・`ergo-packages.json`・`CMakePresets.json`・`.gitmodules`・`tools/ergo/`) は
+  (`CMakeLists.txt`・`ergo-packages.json`・`CMakePresets.json`・`.gitmodules`・`tools/ergo/`・`examples/`・`contracts/`・`.github/workflows/`) は
   `^` で始め、 テスト用フィクスチャの中にある同名ファイルを巻き込まない
 - C++ モジュールは `src/<名>/`・`include/ergo/<名>/`・`tests/<名>/` の 3 本を必ず組で書く
   (欠けるとヘッダ・実装・テストが別ドメインに割れる)。 `include/` は `include/ergo/<名>/` まで
@@ -35,7 +35,8 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
   `tools/` 配下の同名ディレクトリを巻き込みやすいので注意する
 - **新規ソースディレクトリを足す PR は、 同じ PR で membership を更新する**。
   どのドメインにも属さないコードは Anatomia の解析から漏れる
-- モジュールの割り当ては `spec/module/<名>.md` の「所属ドメイン」と矛盾させない。
+- モジュールの割り当ては仕様書 (`spec/feature/module/<名>.md` か `spec/module/<名>.md`。
+  どちらにあるかは `module_list.md` の仕様書の列) の「所属ドメイン」と矛盾させない。
   食い違う場合は、 どちらが正しいかを決めて両方を直す
 - ドメイン名は kebab-case。 リネームは Anatomia 側の履歴と突き合わせが切れるため、
   必要なとき以外はしない
@@ -48,8 +49,8 @@ Praeforma のコア / ビジネスドメインとの対応・古い処理の一�
 
 | ドメイン | 主な範囲 |
 | --- | --- |
-| `foundation` | `common` / `math`・`template/`・直下の `CMakeLists.txt`・`benchmarks/`・`tests/gtest_main.cpp`・`tests/thirdparty/` |
-| `build-packages` | `cmake/`・`ergo-packages.json`・`CMakePresets.json`・`tests/packages/`・`lib/`・`.gitmodules` |
+| `foundation` | `common` / `math`・`template/`・直下の `CMakeLists.txt`・`benchmarks/`・`tests/gtest_main.cpp` など `tests/` 直下・`tests/thirdparty/`・`examples/` (ヘッドレスの使用例) |
+| `build-packages` | `cmake/`・`ergo-packages.json`・`CMakePresets.json`・`tests/packages/`・`lib/`・`.gitmodules`・`package_manager` / `package_watch`・`tools/package_cli/`・`unity/com.ludiars.ergo.packages/`・`tests/unity_packages/`・`contracts/`・`.github/workflows/` |
 | `structure-visualization` | `graph_layout` / `tela_graph` / `render_viz` / `package_model` / `package_scan` / `package_viz`・`tools/render_viz/`・`tools/package_viz/` |
 | `observability` | `log` / `frame` / `profile` / `bind` / `custos` |
 | `dev-tools` | `tools/ergo/` |

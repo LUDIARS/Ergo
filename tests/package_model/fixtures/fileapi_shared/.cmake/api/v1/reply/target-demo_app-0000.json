@@ -1,0 +1,20 @@
+{
+  "name": "demo_app",
+  "id": "demo_app::@00000000000000000000",
+  "type": "EXECUTABLE",
+  "paths": {
+    "source": ".",
+    "build": "."
+  },
+  "sources": [
+    {
+      "path": "src/main.cpp",
+      "compileGroupIndex": 0
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "ergo_common::@00000000000000000001"
+    }
+  ]
+}

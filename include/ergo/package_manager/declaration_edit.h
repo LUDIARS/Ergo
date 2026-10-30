@@ -5,6 +5,7 @@
 //
 //   add     host.use (と --optional / --features) に足す。 Ergo のマニフェストに無い名前は非公開 packages に
 //           足し、 repository と rev が要る。 link の結線ファイルが無ければ誤り (結線は生成しない)
+//           tool は packages にだけ足し host.use は変えない (--optional / --features / --wiring と宣言済みの tool は誤り)
 //   remove  host.use / optional / features と非公開 packages から外す。 Ergo のモジュールが needs に
 //           持つ名前なら拒む (modules.*.needs を壊す)
 //   pin     持ち主のファイルの rev と expect_tag だけを書く (expect_tag が空なら外す)

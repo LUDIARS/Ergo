@@ -63,6 +63,23 @@ function(ergo_declare_dependency)
         "Use a local source tree for '${D_NAME}' instead of fetching (offline override)")
 endfunction()
 
+# ---------------------------------------------------------------------------
+# ergo_dependency_shallow_for(<out> <tag>)
+#
+# GIT_SHALLOW for a GIT_TAG. A --depth 1 clone only holds branch and tag tips,
+# so a 40-digit commit SHA behind every tip fails with "reference is not a
+# tree": SHA pins get the full history (FALSE), branch and tag names stay
+# shallow (TRUE, e.g. curl-8_19_0).
+# ---------------------------------------------------------------------------
+function(ergo_dependency_shallow_for out tag)
+    # CMake regex has no {n}: 40 dots pin the length (ergo-bootstrap.cmake.in does the same).
+    if(tag MATCHES "^[0-9a-f]+$" AND tag MATCHES "^........................................$")
+        set(${out} FALSE PARENT_SCOPE)
+    else()
+        set(${out} TRUE PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Internal: assert a dependency was declared; emit FetchContent_Declare for it,
 # honouring an offline source override. EXTRA_ARGS are passed through verbatim
 # (e.g. SOURCE_SUBDIR for source-only deps).
@@ -96,10 +113,11 @@ function(_ergo_fc_declare NAME)
     get_property(_repo GLOBAL PROPERTY _ergo_dep_${NAME}_repo)
     get_property(_tag  GLOBAL PROPERTY _ergo_dep_${NAME}_tag)
     message(STATUS "ergo dep '${NAME}': fetching ${_repo}@${_tag}")
+    ergo_dependency_shallow_for(_shallow "${_tag}")
     FetchContent_Declare(${NAME}
         GIT_REPOSITORY "${_repo}"
         GIT_TAG        "${_tag}"
-        GIT_SHALLOW    TRUE
+        GIT_SHALLOW    ${_shallow}
         ${ARGN})
 endfunction()
 

@@ -11,6 +11,7 @@
 # the drift classification none / ahead / behind / diverged / unknown.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 
 # ---------------------------------------------------------------------------
 # PKG-03: a selected package resolved through none of the routes. Always an

@@ -37,6 +37,7 @@
 - Threads (std::thread — `PollingThread` 使用時のみ)
 - (将来) OS ネイティブ入力 API (Windows Raw Input / evdev / HID API 等)
 - (テスト) GoogleTest 互換 mini-gtest
+- 他 Ergo モジュールへの依存なし (`ergo_log` にもリンクしない。下記「キー入力のログ」)
 
 ## 変数
 
@@ -72,6 +73,26 @@
 - `InputEvent` 通知 (Press / Release / Axis / Move / Scroll / Connect / Disconnect)
 - `Observer::notify` 経由の同期コールバック
 - `InputBuffer` に積まれる時系列イベント列 (FrameSync / Immediate)
+
+### キー入力のログ
+
+`ergo_input` 自身はキー入力をログに出さない。以前は `KeyboardDevice` が
+押下 / 解放のたびに `ERGO_LOG_INFO("[input] key down: ...")` を出していたが、
+既定レベル (Info) で毎キー 1 行が標準出力に出るうえ、`ergo_input` → `ergo_log`
+のモジュール間依存 (`ERGO_BUILD_LOG=OFF` でリンクが壊れる) になっていたため
+外した。ログが要るホストは `observer()` を購読して自分で出す:
+
+```cpp
+using ergo::input::EventType;
+keyboard.observer().subscribe([](const ergo::input::InputEvent& ev) {
+    if (ev.eventType != EventType::Press && ev.eventType != EventType::Release) return;
+    ERGO_LOG_INFO("[input] key %s: code=%u (dev=%u)", ev.eventType == EventType::Press ? "down" : "up",
+                  static_cast<unsigned>(ev.code), static_cast<unsigned>(ev.deviceIndex));
+});
+```
+
+`ergo_log` へのリンクはホストが自分で張る (`target_link_libraries(mygame PRIVATE
+Ergo::input Ergo::log)`)。
 
 ### タスク
 

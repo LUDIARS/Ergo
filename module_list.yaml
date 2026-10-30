@@ -1,447 +1,565 @@
 # Ergo モジュール一覧 (機械処理用)
 #
 # 人間向けの一覧は module_list.md を参照。新規モジュール追加時は両方に
-# エントリを足すこと。
+# エントリを足すこと。tests/test_module_catalog.cmake (ctest
+# test_module_catalog) がこのファイルと CMakeLists.txt / include/ergo/ /
+# spec/domains/ / tools/ergo/ / README.md / module_list.md の食い違いを検出する。
+#
+# 書式の約束 (test_module_catalog が YAML パーサを使わずに読むため):
+#   - modules[] の各エントリは "  - name: " で始め、キーは 1 行 1 つ
+#   - 文字列の値 (summary) は必ず二重引用符で囲む
+#   - リストはフロー形式 ([a, b]) で 1 行に書く
 #
 # schema (modules[].*):
-#   name:        CMake ターゲット名 (ergo_*)
-#   summary:     1 行概要 (日本語)
-#   category:    UI / ロジック / システム / ゲームオブジェクト
-#   header_dir:  公開ヘッダのルート
-#   source_dir:  実装ソースのルート
-#   test_dir:    テストソースのルート
-#   spec:        モジュール仕様書
-#   cmake_option: ON/OFF で切り替える CMake オプション
-#   tool_plugin: 付随する tools/ergo/ プラグイン id (無ければ null)
-#   status:      stable / preview / incomplete のいずれか
+#   name:          CMake ターゲット名 (ergo_*)。Ergo::<名前から ergo_ を除いたもの> の ALIAS もある
+#   summary:       1 行概要 (日本語、二重引用符で囲む)
+#   category:      UI / ロジック / システム / ゲームオブジェクト
+#   domain:        所属する Anatomia ドメイン (spec/domains/<domain>.domain.json)
+#   header_dir:    公開ヘッダのルート
+#   source_dir:    実装ソースのルート
+#   test_dir:      テストソースのルート
+#   spec:          モジュール仕様書 (spec/feature/module/ か spec/module/ の実物)
+#   cmake_option:  ON/OFF で切り替える CMake オプション (既定・前提は spec/setup/config-reference.md)
+#   cxx_standard:  利用側に伝わる C++ 標準 (省略時 17。target_compile_features で伝播)
+#   depends:       リンクする ergo_* ターゲット (PUBLIC / PRIVATE を問わず、CMakeLists.txt の
+#                  target_link_libraries のとおり。外部ライブラリと Threads は含めない)
+#   external:      必須の外部ターゲット (省略時なし。任意の外部 SDK は仕様書を参照)
+#   extra_targets: モジュールに付随する追加ターゲット。{name, cmake_option} の列で、
+#                  cmake_option が null のものは別スイッチを持たない
+#                  (モジュールと一緒に、または外部ターゲットの有無で決まる)。
+#                  ERGO_BUILD_DUMMY の ergo_<名>_dummy は載せない
+#   tool_plugins:  付随する tools/ergo プラグイン id の列 (無ければ [])
+#   status:        stable / preview / incomplete のいずれか
+#
+# schema (shared_libs[].*): name / summary / header_dir / source_dir / test_dir /
+#   spec / extra_targets。モジュールではなく、常にビルドされる下層ライブラリ
+#   (ERGO_BUILD_* を持たない)。
+#
+# schema (excluded[].*): include/ergo/ にディレクトリがあるが一覧に載せないもの。
+#   name / reason / ref。
 
-schema_version: 1
-
-# ergo_shuriken_migrator は載せない: Unity Shuriken からの一回きりの移行用で、
-# 使っているタイトルのツール側へ移してから削除する予定
-# (spec/architecture/domains-and-ux.md §5 の L1)。
+schema_version: 2
 
 # モジュールが使う LUDIARS 製パッケージ (Pictor / Tela / Lapilli ...) の版と
 # modules ごとの needs / optional の宣言。形式は spec/data/ergo-packages.md。
 package_manifest: ergo-packages.json
 
+excluded:
+  - name: ergo_shuriken_migrator
+    reason: "Unity Shuriken からの一回きりの移行用。使っているタイトルのツール側へ移してから削除する予定で、それまでは legacy ドメインに置く"
+    ref: spec/architecture/domains-and-ux.md §5 L1
+
 modules:
   - name: ergo_input
-    summary: マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ
+    summary: "マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ"
     category: システム
+    domain: input
     header_dir: include/ergo/input/
     source_dir: src/input/
     test_dir:   tests/input/
     spec:       spec/feature/module/input.md
     cmake_option: ERGO_BUILD_INPUT
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_particle
-    summary: CPU パーティクル sim + (任意) Pictor Vulkan ビルボード renderer
+    summary: "CPU パーティクル sim + (任意) Pictor Vulkan ビルボード renderer。particle プラグインから設定を受け取るフィーダーは別ターゲット ergo_particle_link"
     category: システム
+    domain: rendering
     header_dir: include/ergo/particle/
     source_dir: src/particle/
     test_dir:   tests/particle/
     spec:       spec/feature/module/particle.md
     cmake_option: ERGO_BUILD_PARTICLE
-    tool_plugin: particle
+    depends:    []
+    extra_targets: [{name: ergo_particle_link, cmake_option: ERGO_BUILD_PARTICLE_LINK}]
+    tool_plugins: [particle, vfx-suggest, vfx-breed]
     status: stable
 
   - name: ergo_gpu_particle
-    summary: Shuriken 相当の GPU compute パーティクル (IGpuBackend 抽象)
+    summary: "Shuriken 相当の GPU compute パーティクル (IGpuBackend 抽象)"
     category: システム
+    domain: rendering
     header_dir: include/ergo/gpu_particle/
     source_dir: src/gpu_particle/
     test_dir:   tests/gpu_particle/
     spec:       spec/feature/module/gpu_particle.md
     cmake_option: ERGO_BUILD_GPU_PARTICLE
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview   # Burst cycles / shape variants が TODO
 
   - name: ergo_bind
-    summary: 任意ホスト変数を WS アウトバウンドで外部エディタに公開
+    summary: "任意ホスト変数を WS アウトバウンドで外部エディタに公開"
     category: システム
+    domain: observability
     header_dir: include/ergo/bind/
     source_dir: src/bind/
     test_dir:   tests/bind/
     spec:       spec/feature/module/bind.md
     cmake_option: ERGO_BUILD_BIND
-    tool_plugin: variable
+    depends:    [ergo_common, ergo_common_ws]
+    tool_plugins: [variable]
     status: stable
 
   - name: ergo_actor
-    summary: シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (ergo_bind に委譲)
+    summary: "シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (ergo_bind に委譲)"
     category: システム
+    domain: actor-character
     header_dir: include/ergo/actor/
     source_dir: src/actor/
     test_dir:   tests/actor/
     spec:       spec/feature/module/actor.md
-    cmake_option: ERGO_BUILD_ACTOR   # ERGO_BUILD_BIND も ON が必須
-    tool_plugin: variable
+    cmake_option: ERGO_BUILD_ACTOR   # ERGO_BUILD_BIND=OFF なら STATUS を出して作らない
+    depends:    [ergo_bind]
+    tool_plugins: [variable]
     status: preview
 
   - name: ergo_cast
-    summary: Actor を名前付き Scene に束ねる軽量グルーピング層 (一括/個別 activate + snapshot)。非所有・描画非依存。ergo_scene (look-dev ドキュメント) とは別物
+    summary: "Actor を名前付き Scene に束ねる軽量グルーピング層 (一括/個別 activate + snapshot)。非所有・描画非依存。ergo_scene (look-dev ドキュメント) とは別物"
     category: システム
+    domain: scene-composition
     header_dir: include/ergo/cast/
     source_dir: src/cast/
     test_dir:   tests/cast/
     spec:       spec/feature/module/cast.md
-    cmake_option: ERGO_BUILD_CAST   # ERGO_BUILD_ACTOR / ERGO_BUILD_BIND も ON が必須
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_CAST   # ERGO_BUILD_ACTOR / ERGO_BUILD_BIND のどちらかが OFF なら STATUS を出して作らない
+    depends:    [ergo_actor]
+    tool_plugins: []
+    status: preview
+
+  - name: ergo_scene
+    summary: "保存できるルックデヴ用シーン文書 (*.scene.json の CRUD・パッチ適用・カメラ行列・SceneGraph)。scene_editor プラグインとのライブ編集は別ターゲット ergo_scene_link"
+    category: システム
+    domain: scene-composition
+    header_dir: include/ergo/scene/
+    source_dir: src/scene/
+    test_dir:   tests/scene/
+    spec:       spec/feature/module/scene.md
+    cmake_option: ERGO_BUILD_SCENE
+    depends:    [ergo_common]
+    extra_targets: [{name: ergo_scene_link, cmake_option: ERGO_BUILD_SCENE_LINK}]
+    tool_plugins: [scene_editor]
     status: preview
 
   - name: ergo_sound
-    summary: WAV デコード + ストリーム + ミキサ + 波形処理 + Quantizer (外部 lib 無し)
+    summary: "WAV デコード + ストリーム + ミキサ + 波形処理 + Quantizer (外部 lib 無し)"
     category: システム
+    domain: audio
     header_dir: include/ergo/sound/
     source_dir: src/sound/
     test_dir:   tests/sound/
     spec:       spec/feature/module/sound.md
     cmake_option: ERGO_BUILD_SOUND
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: stable   # WAV only; 圧縮フォーマットは別 commit で stb_vorbis を vendor
 
   - name: ergo_frame
-    summary: アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列
+    summary: "アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列"
     category: システム
+    domain: observability
     header_dir: include/ergo/frame/
     source_dir: src/frame/
     test_dir:   tests/frame/
     spec:       spec/feature/module/frame.md
     cmake_option: ERGO_BUILD_FRAME
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: stable
 
   - name: ergo_profile
-    summary: パフォーマンス確認用タイムライン (AOP 的マーカー注入 → Chrome Trace 出力)
+    summary: "パフォーマンス確認用タイムライン (AOP 的マーカー注入 → Chrome Trace 出力)"
     category: システム
+    domain: observability
     header_dir: include/ergo/profile/
     source_dir: src/profile/
     test_dir:   tests/profile/
     spec:       spec/feature/module/profile.md
     cmake_option: ERGO_BUILD_PROFILE
-    tool_plugin: profile
-    status: preview   # tools/ergo profile プラグインは別途追加
+    depends:    []
+    tool_plugins: [profile]
+    status: preview
 
   - name: ergo_log
-    summary: 4-level ロガー (Error/Warn/Info/Debug)、先頭にフレーム番号
+    summary: "4-level ロガー (Error/Warn/Info/Debug)、先頭にフレーム番号。出力先はシンクで差し替え、時刻源は注入可能。log プラグインへ流す LiveSink は別ターゲット ergo_log_live"
     category: システム
+    domain: observability
     header_dir: include/ergo/log/
     source_dir: src/log/
     test_dir:   tests/log/
     spec:       spec/feature/module/log.md
     cmake_option: ERGO_BUILD_LOG
-    tool_plugin: null
+    depends:    []
+    extra_targets: [{name: ergo_log_live, cmake_option: ERGO_BUILD_LOG_LIVE}]
+    tool_plugins: [log]
     status: stable
 
   - name: ergo_io
-    summary: 最小ファイル I/O ラッパー (<filesystem> の薄膜、UTF-8 std::string API)
+    summary: "最小ファイル I/O ラッパー (<filesystem> の薄膜、UTF-8 std::string API)"
     category: システム
+    domain: resource-io
     header_dir: include/ergo/io/
     source_dir: src/io/
     test_dir:   tests/io/
     spec:       spec/feature/module/io.md
     cmake_option: ERGO_BUILD_IO
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: stable
 
   - name: ergo_audio
-    summary: ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。ergo_sound とは独立・横並び
+    summary: "ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。ergo_sound とは独立・横並び"
     category: システム
+    domain: audio
     header_dir: include/ergo/audio/
     source_dir: src/audio/
     test_dir:   tests/audio/
     spec:       spec/feature/module/audio.md
     cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/dummy)
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_world_time
-    summary: グローバル time-scale コンポーザ (HitStop / HitSlow)。Foundation/WorldTimeScale の C++ ポート
+    summary: "グローバル time-scale コンポーザ (HitStop / HitSlow)。Foundation/WorldTimeScale の C++ ポート"
     category: システム
+    domain: gameplay-rules
     header_dir: include/ergo/world_time/
     source_dir: src/world_time/
     test_dir:   tests/world_time/
     spec:       spec/feature/module/world_time.md
     cmake_option: ERGO_BUILD_WORLD_TIME
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_blackboard
-    summary: グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle)。Foundation/Blackboard の C++ ポート
+    summary: "グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle、名前だけで find / subscribe / visit)。Foundation/Blackboard の C++ ポート"
     category: システム
+    domain: gameplay-rules
     header_dir: include/ergo/blackboard/
     source_dir: src/blackboard/
     test_dir:   tests/blackboard/
     spec:       spec/feature/module/blackboard.md
     cmake_option: ERGO_BUILD_BLACKBOARD
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_ui
-    summary: SVG ラスタ + 9-slice フレームコンポーザ (RGBA8, Pictor/Vulkan 依存なし)
+    summary: "SVG ラスタ + 9-slice フレームコンポーザ (RGBA8, Pictor/Vulkan 依存なし)"
     category: UI
+    domain: ui-layout
     header_dir: include/ergo/ui/
     source_dir: src/ui/
     test_dir:   tests/ui/
     spec:       spec/feature/module/ui.md
     cmake_option: ERGO_BUILD_UI
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_custos
-    summary: Custos 遠隔テストランナー (LUDIARS/Custos) と話す in-process HTTP ブリッジ
+    summary: "Custos 遠隔テストランナー (LUDIARS/Custos) と話す in-process HTTP ブリッジ"
     category: システム
+    domain: observability
     header_dir: include/ergo/custos/
     source_dir: src/custos/
     test_dir:   tests/custos/
     spec:       spec/feature/module/custos.md
     cmake_option: ERGO_BUILD_CUSTOS
-    tool_plugin: null   # サービス側は LUDIARS/Custos リポ
+    depends:    []
+    tool_plugins: []   # サービス側は LUDIARS/Custos リポ
     status: preview
 
   - name: ergo_health
-    summary: HP コンテナ + ダメージ / 回復 / 死亡コールバック (game-lexicon: health-system)
+    summary: "HP コンテナ + ダメージ / 回復 / 死亡コールバック (game-lexicon: health-system)"
     category: ロジック
+    domain: gameplay-rules
     header_dir: include/ergo/health/
     source_dir: src/health/
     test_dir:   tests/health/
     spec:       spec/feature/module/health.md
     cmake_option: ERGO_BUILD_HEALTH
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_score
-    summary: スコアカウンタ + コンボ倍率 + ハイスコア通知 (game-lexicon: score-system)
+    summary: "スコアカウンタ + コンボ倍率 + ハイスコア通知 (game-lexicon: score-system)"
     category: ロジック
+    domain: gameplay-rules
     header_dir: include/ergo/score/
     source_dir: src/score/
     test_dir:   tests/score/
     spec:       spec/feature/module/score.md
     cmake_option: ERGO_BUILD_SCORE
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_combo_counter
-    summary: 連続成功カウンタ + フルコンボ通知 (game-lexicon: combo-counter)
+    summary: "連続成功カウンタ + フルコンボ通知 (game-lexicon: combo-counter)"
     category: ロジック
+    domain: gameplay-rules
     header_dir: include/ergo/combo_counter/
     source_dir: src/combo_counter/
     test_dir:   tests/combo_counter/
     spec:       spec/feature/module/combo_counter.md
     cmake_option: ERGO_BUILD_COMBO_COUNTER
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_timing_judge
-    summary: 音ゲー用ミリ秒タイミング判定 (PERFECT/GREAT/GOOD/MISS) (game-lexicon: timing-judge)
+    summary: "音ゲー用ミリ秒タイミング判定 (PERFECT/GREAT/GOOD/MISS) (game-lexicon: timing-judge)"
     category: ロジック
+    domain: gameplay-rules
     header_dir: include/ergo/timing_judge/
     source_dir: src/timing_judge/
     test_dir:   tests/timing_judge/
     spec:       spec/feature/module/timing_judge.md
     cmake_option: ERGO_BUILD_TIMING_JUDGE
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_character
-    summary: TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替、エンジン非依存)
+    summary: "TCC 流 Character Controller (Brain/Check/Control/Effect 合成 + 優先度切替、エンジン非依存)"
     category: ゲームオブジェクト
+    domain: actor-character
     header_dir: include/ergo/character/
     source_dir: src/character/
     test_dir:   tests/character/
     spec:       spec/feature/module/character.md
     cmake_option: ERGO_BUILD_CHARACTER
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_math
-    summary: C++20 concepts ベースの汎用数学ライブラリ (Vec/Mat/SoA batch/Arena/ObjectPool)。ergo_physics2d 等の下層
+    summary: "C++20 concepts ベースの汎用数学ライブラリ (Vec/Mat/SoA batch/Arena/ObjectPool)。ergo_physics2d 等の下層"
     category: システム
+    domain: foundation
     header_dir: include/ergo/math/
     source_dir: src/math/
     test_dir:   tests/math/
     spec:       spec/feature/module/math.md
     cmake_option: ERGO_BUILD_MATH
-    tool_plugin: null
+    cxx_standard: 20
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_physics2d
-    summary: 2D 剛体物理エンジン (Box2D ライク)。Shape(Circle/Polygon)/Body/World/ContactEvent。sequential impulse + SAT narrowphase + N² broadphase
+    summary: "2D 剛体物理エンジン (Box2D ライク)。Shape(Circle/Polygon)/Body/World/ContactEvent。sequential impulse + SAT narrowphase + N² broadphase"
     category: システム
+    domain: physics
     header_dir: include/ergo/physics2d/
     source_dir: src/physics2d/
     test_dir:   tests/physics2d/
     spec:       spec/feature/module/physics2d.md
-    cmake_option: ERGO_BUILD_PHYSICS2D
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_PHYSICS2D   # ERGO_BUILD_MATH=OFF なら構成エラー
+    cxx_standard: 20
     depends:    [ergo_math]
+    tool_plugins: []
     status: preview
 
   - name: ergo_resource
-    summary: タグ駆動リソース自動選択 + 読み込み。JSON マニフェスト catalog + Clio 同重みスコアラ + バイト列 loader (MUSA Clio の C++ 移植)
+    summary: "タグ駆動リソース自動選択 + 読み込み。JSON マニフェスト catalog + Clio 同重みスコアラ + バイト列 loader (MUSA Clio の C++ 移植)"
     category: システム
+    domain: resource-io
     header_dir: include/ergo/resource/
     source_dir: src/resource/
     test_dir:   tests/resource/
     spec:       spec/module/resource.md
-    cmake_option: ERGO_BUILD_RESOURCE
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_RESOURCE   # ERGO_BUILD_IO=OFF なら構成エラー
     depends:    [ergo_common, ergo_io]
+    tool_plugins: []
     status: preview
 
   - name: ergo_http
-    summary: libcurl バックエンドの同期 HTTP クライアント (IHttpClient/get/post)。公開 API は std:: のみで curl を隠蔽。既定 OFF (ERGO_WITH_CURL を強制)
+    summary: "libcurl バックエンドの同期 HTTP クライアント (IHttpClient/get/post)。公開 API は std:: のみで curl を隠蔽。既定 OFF (ERGO_WITH_CURL を強制)"
     category: システム
+    domain: resource-io
     header_dir: include/ergo/http/
     source_dir: src/http/
     test_dir:   tests/http/
     spec:       spec/feature/module/http.md
     cmake_option: ERGO_BUILD_HTTP
-    tool_plugin: null
-    depends:    [curl]
+    depends:    []
+    external:   [CURL::libcurl]
+    tool_plugins: []
     status: preview
 
   - name: ergo_render
-    summary: Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)
+    summary: "Pictor 横断オーケストレーション層 (RenderContext / IRenderLayer / FrameComposer / ScreenshotBridge / カメラ math / StageRenderer)"
     category: システム
+    domain: rendering
     header_dir: include/ergo/render/
     source_dir: src/render/
     test_dir:   tests/render/
     spec:       spec/feature/module/render.md
     cmake_option: ERGO_BUILD_RENDER   # Vulkan 実描画経路は pictor + Vulkan SDK 検出時のみ
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview   # Vulkan 非依存部分のみテスト済。 PrivateGame/AC への載せ替えは P2
 
   - name: ergo_vector
-    summary: SVG path polygon tessellation + extrude 3D mesh + vertex animation scene
+    summary: "SVG path polygon tessellation + extrude 3D mesh + vertex animation scene"
     category: UI
+    domain: ui-layout
     header_dir: include/ergo/vector/
     source_dir: src/vector/
     test_dir:   tests/vector/
     spec:       spec/feature/module/vector.md
     cmake_option: ERGO_BUILD_VECTOR
-    tool_plugin: null
+    depends:    []
+    tool_plugins: []
     status: preview
 
   - name: ergo_tela_graph
-    summary: Ergo 可視化の共通出口。 配置済み関係図の値型 + Tela TELA_GRAPH 1 の検査・書き出し + tela::Graph 変換 (Tela があるとき)
+    summary: "Ergo 可視化の共通出口。 配置済み関係図の値型 + Tela TELA_GRAPH 1 の検査・書き出し + tela::Graph 変換 (Tela があるとき)"
     category: システム
+    domain: structure-visualization
     header_dir: include/ergo/tela_graph/
     source_dir: src/tela_graph/
     test_dir:   tests/tela_graph/
     spec:       spec/module/tela_graph.md
-    cmake_option: ERGO_BUILD_TELA_GRAPH   # tela::Graph 変換は Tela::Graph ターゲット検出時のみ
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_TELA_GRAPH
+    depends:    []
+    extra_targets: [{name: ergo_tela_graph_tela, cmake_option: null}]   # Tela::Graph ターゲット検出時のみ (C++20)
+    tool_plugins: []
     status: preview   # ファイルの Tela 受理はテスト済。 Tela 画面での見え方は未確認
 
   - name: ergo_render_viz
-    summary: Pictor 描画パイプライン (パス / アタッチメント / ポストプロセス / CPU 段 / GPU 時間) を Tela の関係図にする可視化層 + CLI
+    summary: "Pictor 描画パイプライン (パス / アタッチメント / ポストプロセス / CPU 段 / GPU 時間) を Tela の関係図にする可視化層 + CLI"
     category: システム
+    domain: structure-visualization
     header_dir: include/ergo/render_viz/
     source_dir: src/render_viz/
     test_dir:   tests/render_viz/
     spec:       spec/module/render_viz.md
-    cmake_option: ERGO_BUILD_RENDER_VIZ   # Pictor アダプタと CLI は pictor ターゲット検出時のみ
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_RENDER_VIZ   # ERGO_BUILD_TELA_GRAPH=OFF なら STATUS を出して作らない
+    depends:    [ergo_tela_graph]
+    extra_targets: [{name: ergo_render_viz_pictor, cmake_option: null}, {name: ergo_render_viz_cli, cmake_option: null}]   # pictor ターゲット検出時のみ
+    tool_plugins: []
     status: preview
 
   - name: ergo_graph_layout
-    summary: 抽象グラフを層別に配置して tela_graph::Graph にする汎用配置 (左 = 使う側、 最長経路の列、 重心法 2 往復、 縦横の折れ線、 決定的)
+    summary: "抽象グラフを層別に配置して tela_graph::Graph にする汎用配置 (左 = 使う側、 最長経路の列、 重心法 2 往復、 縦横の折れ線、 決定的)"
     category: システム
+    domain: structure-visualization
     header_dir: include/ergo/graph_layout/
     source_dir: src/graph_layout/
     test_dir:   tests/graph_layout/
     spec:       spec/module/graph_layout.md
-    cmake_option: ERGO_BUILD_GRAPH_LAYOUT   # ergo_tela_graph が要る
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_GRAPH_LAYOUT   # ERGO_BUILD_TELA_GRAPH=OFF なら STATUS を出して作らない
+    depends:    [ergo_tela_graph]
+    tool_plugins: []
     status: preview
 
   - name: ergo_package_model
-    summary: ergo-packages.resolved.json と CMake File API codemodel v2 を読むパッケージ構成の値型 (帰属・既定の除外・層・PKG-17 宣言漏れ)、 P4 の入力 (watch の報告・status.json) の読み手
+    summary: "ergo-packages.resolved.json と CMake File API codemodel v2 を読むパッケージ構成の値型 (帰属・既定の除外・層・PKG-17 宣言漏れ)、 P4 の入力 (watch の報告・status.json) の読み手"
     category: システム
+    domain: structure-visualization
     header_dir: include/ergo/package_model/
     source_dir: src/package_model/
     test_dir:   tests/package_model/
     spec:       spec/module/package_model.md
     cmake_option: ERGO_BUILD_PACKAGE_MODEL
-    tool_plugin: null
+    depends:    [ergo_common]
+    tool_plugins: []
     status: preview
 
   - name: ergo_package_scan
-    summary: 観測対象の兄弟チェックアウト (package.json / .gitmodules / gitlink) とマニフェストの ported_from / relations から根拠付きの使用関係を作る (読むだけ)
+    summary: "観測対象の兄弟チェックアウト (package.json / .gitmodules / gitlink) とマニフェストの ported_from / relations から根拠付きの使用関係を作る (読むだけ)"
     category: システム
+    domain: structure-visualization
     header_dir: include/ergo/package_scan/
     source_dir: src/package_scan/
     test_dir:   tests/package_scan/
     spec:       spec/module/package_scan.md
     cmake_option: ERGO_BUILD_PACKAGE_SCAN
-    tool_plugin: null
+    depends:    [ergo_common]
+    tool_plugins: []
     status: preview
 
   - name: ergo_package_viz
-    summary: パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) / 使用関係図 (P3) / ホスト状態図 (P4) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs
+    summary: "パッケージ版一覧 (P1) / ターゲットのリンク図 (P2) / 使用関係図 (P3) / ホスト状態図 (P4) を Tela の上限内に収めて図にする可視化層 + CLI ergo_package_viz / ergo_package_graphs"
     category: システム
+    domain: structure-visualization
     header_dir: include/ergo/package_viz/
     source_dir: src/package_viz/
     test_dir:   tests/package_viz/
     spec:       spec/module/package_viz.md
-    cmake_option: ERGO_BUILD_PACKAGE_VIZ   # ergo_package_model / ergo_package_scan / ergo_graph_layout が要る
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_PACKAGE_VIZ   # ergo_package_model / ergo_package_scan / ergo_graph_layout が無ければ STATUS を出して作らない
+    depends:    [ergo_package_model, ergo_package_scan, ergo_graph_layout]
+    extra_targets: [{name: ergo_package_viz_cli, cmake_option: null}, {name: ergo_package_graphs, cmake_option: null}]
+    tool_plugins: []
     status: preview
 
   - name: ergo_package_manager
-    summary: ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧・書式を保つ書き換えと持ち主の判定・テスト結果の集計と status.json の書き手 + CLI ergo_pkg (init / list / doctor / fetch / add / remove / update / status)
+    summary: "ホストの宣言 (ergo-packages.json の host 節) の読み取りと検査・漏れ検査・ブートストラップの生成と古さ・init の計画・一覧・書式を保つ書き換えと持ち主の判定・テスト結果の集計と status.json の書き手 + CLI ergo_pkg (init / list / doctor / fetch / add / remove / update / status)"
     category: システム
+    domain: build-packages
     header_dir: include/ergo/package_manager/
     source_dir: src/package_manager/
     test_dir:   tests/package_manager/
     spec:       spec/module/package_manager.md
-    cmake_option: ERGO_BUILD_PACKAGE_MANAGER   # CLI は ERGO_BUILD_PACKAGE_CLI
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_PACKAGE_MANAGER
+    depends:    [ergo_common]
+    extra_targets: [{name: ergo_pkg_cli, cmake_option: ERGO_BUILD_PACKAGE_CLI}]
+    tool_plugins: []
     status: preview
 
   - name: ergo_package_watch
-    summary: パッケージの更新の検知 (tag / track / off-main の判定、 W4 の run / review / merged と由来 pf / ai / human / unknown、 前回状態と重複の抑止・報告と出来事の書き手、 取得元は IRefSource / IHistorySource / IReviewSource / IRunSource、 UPM ホストの読み手) + CLI ergo_pkg (outdated / watch)。 Unity パッケージ unity/com.ludiars.ergo.packages が報告を読む
+    summary: "パッケージの更新の検知 (tag / track / off-main の判定、 W4 の run / review / merged と由来 pf / ai / human / unknown、 前回状態と重複の抑止・報告と出来事の書き手、 取得元は IRefSource / IHistorySource / IReviewSource / IRunSource、 UPM ホストの読み手) + CLI ergo_pkg (outdated / watch)。 Unity パッケージ unity/com.ludiars.ergo.packages が報告を読む"
     category: システム
+    domain: build-packages
     header_dir: include/ergo/package_watch/
     source_dir: src/package_watch/
     test_dir:   tests/package_watch/
     spec:       spec/module/package_watch.md
-    cmake_option: ERGO_BUILD_PACKAGE_WATCH   # ergo_package_manager が要る。 git の起動は CLI のアダプタだけ
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_PACKAGE_WATCH   # ergo_package_manager が無ければ STATUS を出して作らない。 git の起動は CLI のアダプタだけ
+    depends:    [ergo_package_manager]
+    tool_plugins: []
     status: preview
 
   - name: ergo_ui_layout
-    summary: Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit.
+    summary: "Data-driven UI layout runtime with JSON model, binding, layout solve, and render adapter emit."
     category: UI
+    domain: ui-layout
     header_dir: include/ergo/ui_layout/
     source_dir: src/ui_layout/
     test_dir:   tests/ui_layout/
     spec:       spec/feature/module/ui_layout.md
-    cmake_option: ERGO_BUILD_UI_LAYOUT
-    tool_plugin: ui_layout
+    cmake_option: ERGO_BUILD_UI_LAYOUT   # ERGO_BUILD_IO=OFF なら構成エラー
+    depends:    [ergo_common, ergo_io]
+    tool_plugins: [ui_layout]
     status: preview
 
   - name: ergo_ui_kit
-    summary: リテインドモードの UI コンポーネントフレームワーク (uidoc.json のツリー → レイアウト解決 → GPU 非依存の描画リスト、入力バブリング、プロパティアニメ)
+    summary: "リテインドモードの UI コンポーネントフレームワーク (uidoc.json のツリー → レイアウト解決 → GPU 非依存の描画リスト、入力バブリング、プロパティアニメ)"
     category: UI
+    domain: ui-layout
     header_dir: include/ergo/ui_kit/
     source_dir: src/ui_kit/
     test_dir:   tests/ui_kit/
     spec:       spec/module/ui_kit.md
-    cmake_option: ERGO_BUILD_UI_KIT
-    tool_plugin: null
+    cmake_option: ERGO_BUILD_UI_KIT   # ERGO_BUILD_IO=OFF なら構成エラー
+    depends:    [ergo_common, ergo_io]
+    tool_plugins: []
     status: preview
 
 
 shared_libs:
   - name: ergo_common
-    summary: モジュール横断の小物ユーティリティ (現状は minimal JSON codec のみ)
+    summary: "モジュール横断の小物ユーティリティ。ergo_common は最小 JSON コーデック (ergo::common::jsonm)、別ターゲット ergo_common_ws は共有 WebSocket クライアント (ergo::common::ws)"
     header_dir: include/ergo/common/
     source_dir: src/common/
-    spec: null
-
-
+    test_dir:   tests/common/
+    spec:       spec/feature/module/common.md
+    extra_targets: [{name: ergo_common_ws, cmake_option: null}]

@@ -7,7 +7,7 @@
 /// configured windows. Pure stateless math + a thin helper that pairs with
 /// `ergo::combo_counter`.
 ///
-/// Spec: spec/module/timing_judge.md
+/// Spec: spec/feature/module/timing_judge.md
 /// Lexicon: spec/game-lexicon/features/rhythm/timing-judge.toml (Ars)
 
 #include <cstdint>

@@ -42,8 +42,9 @@ elseif(ERGO_BOOTSTRAP_FETCH)
         message(FATAL_ERROR "PKG-02 ergo: host.ergo.rev '${_ergo_bs_rev}' is not a 40-digit commit SHA")
     endif()
     include(FetchContent)
+    # Full history: the pin is a SHA, and a shallow clone only reaches branch / tag tips.
     FetchContent_Declare(ergo GIT_REPOSITORY "${_ergo_bs_repo}" GIT_TAG "${_ergo_bs_rev}"
-        GIT_SHALLOW TRUE SOURCE_SUBDIR _ergo_no_build)
+        GIT_SHALLOW FALSE SOURCE_SUBDIR _ergo_no_build)
     FetchContent_MakeAvailable(ergo)
     set(ERGO_BOOTSTRAP_DIR "${ergo_SOURCE_DIR}")
     set(ERGO_BOOTSTRAP_ROUTE fetch)

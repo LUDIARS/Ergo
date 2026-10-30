@@ -5,7 +5,7 @@
 /// Include this header explicitly when you need interop between the two
 /// modules. Both ergo/vector/vector.h and ergo/math/vec.h must be visible.
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include "ergo/math/vec.h"
 #include "ergo/vector/vector.h"

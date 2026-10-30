@@ -11,7 +11,7 @@
 /// Marker names must outlive the session (string literals / __func__) - the
 /// collector stores the pointer, not a copy, to keep the hot path alloc-free.
 ///
-/// Full spec: spec/module/profile.md
+/// Full spec: spec/feature/module/profile.md
 
 #include <cstddef>
 #include <cstdint>

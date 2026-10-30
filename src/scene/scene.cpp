@@ -487,10 +487,21 @@ bool SceneGraph::unmount(const std::string& scene_id) {
 }
 
 bool SceneGraph::is_mounted(const std::string& scene_id) const {
+    return find_scene(scene_id) != nullptr;
+}
+
+Scene* SceneGraph::find_scene(const std::string& scene_id) {
     for (const auto& s : scenes_) {
-        if (s->id() == scene_id) return true;
+        if (s->id() == scene_id) return s.get();
     }
-    return false;
+    return nullptr;
+}
+
+const Scene* SceneGraph::find_scene(const std::string& scene_id) const {
+    for (const auto& s : scenes_) {
+        if (s->id() == scene_id) return s.get();
+    }
+    return nullptr;
 }
 
 const ActorSpec* SceneGraph::find_actor(const std::string& actor_id) const {

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log — ergo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>📜 Log</h1>
+  <label class="field">app
+    <select id="app-select" title="Engine (ergo_log_live) whose lines are shown"></select>
+  </label>
+  <span id="app-state" class="badge"></span>
+  <span id="status" class="disconnected">○ disconnected</span>
+</div>
+
+<div id="filters">
+  <div id="levels">
+    <label class="lvl lvl-ERR"><input type="checkbox" value="ERR" checked> ERR <span class="count" data-lvl="ERR">0</span></label>
+    <label class="lvl lvl-WRN"><input type="checkbox" value="WRN" checked> WRN <span class="count" data-lvl="WRN">0</span></label>
+    <label class="lvl lvl-INF"><input type="checkbox" value="INF" checked> INF <span class="count" data-lvl="INF">0</span></label>
+    <label class="lvl lvl-DBG"><input type="checkbox" value="DBG" checked> DBG <span class="count" data-lvl="DBG">0</span></label>
+  </div>
+  <input id="text-filter" type="search" placeholder="filter text…" spellcheck="false">
+  <label class="field">frame
+    <input id="frame-min" class="frame" type="number" min="0" placeholder="min">
+    –
+    <input id="frame-max" class="frame" type="number" min="0" placeholder="max">
+  </label>
+  <label class="field"><input id="auto-scroll" type="checkbox" checked> auto-scroll</label>
+  <button id="pause-btn" type="button">Pause</button>
+  <span id="summary"></span>
+</div>
+
+<div id="log-scroll">
+  <table id="log-table">
+    <thead>
+      <tr><th class="c-frame">frame</th><th class="c-time">time (s)</th><th class="c-lvl">lvl</th><th class="c-tid">thread</th><th class="c-msg">message</th></tr>
+    </thead>
+    <tbody id="log-body"></tbody>
+  </table>
+  <div id="empty">No log lines yet.<br>Install <code>ergo::log::LiveSink</code> (target <code>ergo_log_live</code>)<br>in the host and call <code>start()</code>.</div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

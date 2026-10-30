@@ -1,6 +1,7 @@
 #pragma once
 
-// ergo_pkg CLI の引数。 解析だけを持つ (実行は cmd_*.cpp)。
+// ergo_pkg CLI の引数。 解析と使い方の表示だけを持つ (実行は cmd_*.cpp)。 受け付ける選択肢と使い方は
+// cli_args.cpp のコマンドの表が正本 (下は一覧の写し)。
 //
 //   ergo_pkg init   [--code <c>] [--upm]                 [--host <dir>] [--ergo <dir>]
 //   ergo_pkg list   [--json] [--build <dir>]              [--host <dir>] [--ergo <dir>]
@@ -11,7 +12,7 @@
 //                   [--kind link|tool] [--code <c>] [--repository <url> --rev <sha|tag>] [--wiring <path>]
 //                   [--allow-off-main] [--cache <dir>]   [--host <dir>] [--ergo <dir>]
 //   ergo_pkg remove <name>                                [--host <dir>] [--ergo <dir>]
-//   ergo_pkg update <name> --to <tag|main|sha> [--allow-off-main] [--cache <dir>]
+//   ergo_pkg update <name> --to <tag|main|sha|branch> [--allow-off-main] [--cache <dir>]
 //                                                         [--host <dir>] [--ergo <dir>]
 //   ergo_pkg outdated [--json] [--fail-on <kind>] [--cache <dir>] [--root <dir>]
 //                                                         [--host <dir>] [--ergo <dir>]
@@ -59,6 +60,10 @@ struct Args {
 /// 失敗したら false と理由 (使い方の誤り)。
 bool parse_args(const std::vector<std::string>& argv, Args& out, std::string* error);
 
-const char* usage();
+/// 全コマンドの使い方 (`ergo_pkg --help`)。 コマンドの表 (cli_args.cpp) から作る。
+std::string usage();
+
+/// 1 コマンドの使い方 (`ergo_pkg <command> --help`)。 知らないコマンドなら usage()。
+std::string usage_for(const std::string& command);
 
 } // namespace ergo::package_cli

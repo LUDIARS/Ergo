@@ -6,7 +6,7 @@
 /// スクリプト移動など「入力ではなく外部ロジックが希望値を握る」場面で使う。
 /// priority を 0 にすれば不在扱いに戻る。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/move_source.h"
 #include "ergo/character/turn_source.h"

@@ -5,7 +5,7 @@
 /// Shapes are plain data (no vtable). Shape variant uses an enum tag
 /// so the compiler can enforce exhaustive coverage.
 ///
-/// Spec: spec/module/physics2d.md
+/// Spec: spec/feature/module/physics2d.md
 
 #include "ergo/math/vec.h"
 #include <cstdint>

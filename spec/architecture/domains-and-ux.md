@@ -108,8 +108,8 @@
 
 | ドメイン | 範囲 |
 | --- | --- |
-| `foundation` | `common` / `math`、`template/`、リポジトリ直下の `CMakeLists.txt`、`benchmarks/`、`tests/gtest_main.cpp`、`tests/thirdparty/` |
-| `build-packages` | `cmake/` (`packages/` と `deps/` を含む)、`ergo-packages.json`、`CMakePresets.json`、`tests/packages/`、`lib/`、`.gitmodules` |
+| `foundation` | `common` / `math`、`template/`、リポジトリ直下の `CMakeLists.txt`、`benchmarks/`、`tests/gtest_main.cpp` など `tests/` 直下、`tests/thirdparty/`、`examples/` (モジュールを組み合わせるヘッドレスの使用例) |
+| `build-packages` | `cmake/` (`packages/` と `deps/` を含む)、`ergo-packages.json`、`CMakePresets.json`、`tests/packages/`、`lib/`、`.gitmodules`、`package_manager` / `package_watch`、`tools/package_cli/`、`unity/com.ludiars.ergo.packages/`、`tests/unity_packages/`、`contracts/` (テストの契約ランタイム)、`.github/workflows/` |
 | `structure-visualization` | `graph_layout` / `tela_graph` / `render_viz` / `package_model` / `package_scan` / `package_viz`、`tools/render_viz/`、`tools/package_viz/` |
 | `observability` | `log` / `frame` / `profile` / `bind` / `custos` |
 | `dev-tools` | `tools/ergo/` |
@@ -161,7 +161,7 @@
 | L4 | `.anatomia/domains/render-orchestration.json` | spec/domains へ移す前の旧ドメイン定義 | Anatomia は `spec/domains` があるとそちらを優先し、この置き場を読まない。`.gitignore` は `.anatomia/*` を除外しているのに追跡が残っている。範囲は `rendering` と重なる | **削除** | **済み**: 削除して追跡から外した。`legacy` の membership からも外した |
 | L5 | `review/` (2026-05-13 〜 2026-05-30、`latest.json`) | 日付別のコード規約レビュー記録 | 最終更新は 2026-05-30。現在のレビューはリポの外で別に管理する運用で、ここは更新されていない | **削除** (残したい記録はレビューの管理先へ移す) | **済み**: 削除。4 日分の記録 (2026-05-13 / 15 / 17 / 30) はリポ外のレビュー管理先に同じ日付で残っているため移す物は無かった。`legacy` の membership からも外した |
 | L6 | `cmake/deps/kazmath.cmake` と CMake プリセットの kazmath | 外部の数学ライブラリの取り込み | `src/` / `include/` のどこからも参照されず、使うのは疎通テスト `tests/thirdparty/deps_smoke.cpp` だけ。数学は `ergo_math` が持つ | **要確認 → 削除**: 利用側が Ergo 経由で取っていなければ外す | **済み**: 利用側 (Ergo を取り込むゲーム・SDK のリポ) の CMake に `kazmath` / `ERGO_WITH_KAZMATH` の参照が無いことを確かめ、`cmake/deps/kazmath.cmake`・登録・プリセット・疎通テストの kazmath 分・通知を外した。curl は残す |
-| L7 | `*_dummy` プラグライブラリ (`ergo_<名>_dummy`、`ERGO_BUILD_DUMMY` 既定 ON) | API を何もしない実装で差し替えるためのライブラリ | リポ内にリンクする側もテストも無い。`spec/setup/ide-projects.md` は OFF を勧めている。なお `src/audio/audio_engine_dummy.cpp` は FMOD が無いときの実行時フォールバックで別物 | **残す (要確認)**: 利用側が使っていなければ既定を OFF にする | **済み**: 利用側でリンクしている所は無く、Ergo を取り込むリポはどれも `ERGO_BUILD_DUMMY` を OFF に固定していた。既定を OFF にした (ライブラリは残す。`audio_engine_dummy.cpp` は変えていない) |
+| L7 | `*_dummy` プラグライブラリ (`ergo_<名>_dummy`、`ERGO_BUILD_DUMMY` は当時既定 ON。現在は既定 OFF) | API を何もしない実装で差し替えるためのライブラリ | リポ内にリンクする側もテストも無い。`spec/setup/ide-projects.md` は OFF を勧めている。なお `src/audio/audio_engine_dummy.cpp` は FMOD が無いときの実行時フォールバックで別物 | **残す (要確認)**: 利用側が使っていなければ既定を OFF にする | **済み**: 利用側でリンクしている所は無く、Ergo を取り込むリポはどれも `ERGO_BUILD_DUMMY` を OFF に固定していた。既定を OFF にした (ライブラリは残す。`audio_engine_dummy.cpp` は変えていない) |
 | L8 | `spec/feature/tool/acstage.md` / `placer.md` | AdventureCube 固有のツールの仕様 | 実装は AdventureCube 側にあり、`spec/feature/tool/ergo.md` も Ergo から外したと書いている | **移行**: AdventureCube のリポへ | 未着手: 移行先のリポでの作業が先 (別の委託) |
 | L9 | 一覧のずれ: `module_list.md` / `.yaml` | モジュール一覧 | `ergo_ui_kit` と `ergo_shuriken_migrator` が載っていない。`ergo_ui_kit` には仕様書も無い。仕様書の列は `spec/module/<名>.md` を指すが、多くの実物は `spec/feature/module/` にある | **直す** (別 PR で一覧と仕様書の置き場をそろえる) | **済み**: `ergo_ui_kit` を一覧に足し、仕様書 `spec/module/ui_kit.md` のひな形を作った。仕様書の列を実物 (`spec/feature/module/` か `spec/module/`) にそろえた。`ergo_shuriken_migrator` は移行予定なので載せず、両方の一覧に理由を注記 |
 

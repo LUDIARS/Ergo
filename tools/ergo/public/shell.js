@@ -4,7 +4,7 @@
 //
 // State changes (plugins loaded, plugin activated, health updated) are
 // announced through `window.ergo.shell` so extensions can react. See
-// `extensions.js` for the public API; `spec/tool/ergo.md` for usage.
+// `extensions.js` for the public API; `spec/feature/tool/ergo.md` for usage.
 
 const nav    = document.getElementById("plugin-nav");
 const viewer = document.getElementById("viewer");

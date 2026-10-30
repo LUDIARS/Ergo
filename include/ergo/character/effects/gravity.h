@@ -6,7 +6,7 @@
 /// 接地判定は `IGroundContact` を DI で参照する (未設定なら常に空中)。
 /// Check 層 (`IUpdateComponent`) として Brain 反映前に毎フレーム積分する。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/effect_source.h"
 #include "ergo/character/ground_contact.h"

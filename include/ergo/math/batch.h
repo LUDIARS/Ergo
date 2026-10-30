@@ -14,7 +14,7 @@
 /// All SSE2 results must be bit-for-bit identical to the scalar path for
 /// identical inputs (tested in tests/math/test_math.cpp).
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include "ergo/math/concepts.h"
 
