@@ -290,7 +290,8 @@ int main(int argc, char** argv) {
     }
 
     // ---- Setup (once) -----------------------------------------------------
-    // ergo_input logs every key at Info; stay quiet unless asked.
+    // Keep module Info chatter (e.g. per-key input lines) out of the run;
+    // the example's own status lines use report().
     ergo::log::set_level(opt.verbose ? ergo::log::Level::Debug : ergo::log::Level::Warn);
     ergo::log::set_frame_provider(&ergo::frame::count);
     ergo::profile::set_enabled(!opt.trace.empty());
