@@ -18,7 +18,7 @@
 | 5 | 報告と `events.json` に `sources.{revisor,concordia}` (`ok` / `unavailable` / `off`) | `watch_report.h` / `.cpp` |
 | 6 | loopback の URL の検査 | `loopback_url.h` / `.cpp` |
 | 7 | CLI: `watch --revisor-url / --concordia-url` (`ERGO_WATCH_REVISOR_URL` / `ERGO_WATCH_CONCORDIA_URL`)、loopback 以外は終了 2。HTTP は `ergo_http` のアダプタ (`ERGO_BUILD_HTTP=ON` のときだけ組み込む) | `tools/package_cli/provenance_endpoints.*` / `provenance_sources.*` / `http_json_get.*` / `revisor_review_source.*` / `concordia_run_source.*`、`cmd_watch.cpp`、`cli_args.*`、`CMakeLists.txt` |
-| 8 | テスト (JSON 見本・偽リポ、ネットワーク無し) | `tests/package_watch/test_provenance.cpp`、`tests/package_watch/fixtures/{revisor-open,revisor-merged,concordia-runs}.json`、`tests/packages/test_package_watch_cli.cmake` |
+| 8 | テスト (JSON 見本・偽リポ、ネットワーク無し) | `tests/package_watch/test_provenance.cpp`、`tests/package_watch/fixtures/provenance/{revisor-open,revisor-merged,concordia-runs}.json` (Unity の `Tests/Editor/Fixtures` と共有しない API 応答の見本なので、平らな `fixtures/*.json` の外に置く)、`tests/packages/test_package_watch_cli.cmake` |
 | 9 | 文書: モジュール・形式・統合設計の実装状況・一覧 | `spec/module/package_watch.md`、`spec/data/ergo-watch-report.md`、`spec/feature/package-manager.md`、`module_list.md` / `.yaml`、`README.md` |
 
 新しいモジュールと新しいトップレベルは無い (全て `ergo_package_watch` と `tools/package_cli/` の中)。`spec/domains/build-packages.domain.json`

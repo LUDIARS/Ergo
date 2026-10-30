@@ -1,6 +1,7 @@
 #include "ergo/package_watch/provenance.h"
 
 #include "ergo/package_manager/declaration_check.h"
+#include "ergo/package_watch/upm_dependency.h"
 
 #include <algorithm>
 #include <cctype>
@@ -114,7 +115,10 @@ void add_merged(const WatchDependency& dep, const std::string& key, const Review
         c.to_rev     = ergo::package_manager::is_full_sha(it->merge_sha) ? it->merge_sha : std::string();
         c.origin     = prev.origin;
         c.trigger    = prev.trigger;
-        c.next       = "ergo_pkg update " + dep.name + " --to " + (dep.track_branch == "main" ? std::string("main") : c.to_rev);
+        c.next       = dep.owner == kUpmOwner  // UPM の pin は Unity の窓が書く (ergo_pkg update は触らない)
+                           ? next_for_upm(dep, c.to_rev)
+                           : "ergo_pkg update " + dep.name + " --to " +
+                                 (dep.track_branch == "main" ? std::string("main") : c.to_rev);
         out.push_back(std::move(c));
     }
 }

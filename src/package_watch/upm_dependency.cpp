@@ -9,6 +9,12 @@ namespace ergo::package_watch {
 
 const char* const kUpmOwner = "upm";
 
+std::string next_for_upm(const WatchDependency& dep, const std::string& to_rev) {
+    const std::string window = "Unity: Window > LUDIARS > Ergo Packages, ";
+    if (to_rev.empty()) return window + "update " + dep.name;
+    return window + "set " + dep.name + " to #" + to_rev;
+}
+
 namespace {
 
 std::string lower(std::string s) {

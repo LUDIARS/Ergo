@@ -113,5 +113,6 @@
       "warning": false
     }
   ],
-  "schema": 1
+  "schema": 1,
+  "sources": { "concordia": "off", "revisor": "off" }
 }
