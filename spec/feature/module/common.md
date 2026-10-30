@@ -96,6 +96,7 @@ client.stop();
 | bind | `ergo_bind` | `variable` (`/variable/ws`) |
 | particle | `ergo_particle_link` | `particle` (`/particle/ws`)、 受信のみ |
 | scene | `ergo_scene_link` | `scene_editor` (`/scene_editor/ws`) |
+| log | `ergo_log_live` | `log` (`/log/ws`)、 送信のみ |
 
 ## 作業
 

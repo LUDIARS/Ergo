@@ -16,13 +16,14 @@ inspector など) を **単一の Node サーバ + プラグインアーキテ�
 ## 運用方針
 
 - **1 Node プロセス / 1 ポート / 複数プラグイン**
-- `tools/ergo` は **共有プラグインホスト**。core/shell + 汎用プラグイン
-  (`particle` / `variable` / `rive` / `profile` / `render_pipeline`) だけを持ち、ゲーム固有のエディタは持たない
+- `tools/ergo` は **共有プラグインホスト**。core/shell + 汎用プラグインだけを持ち、
+  ゲーム固有のエディタは持たない
 - 各プラグインは自身の HTTP ルートと WS ハンドラを提供する
 - プラグインの 2 系統:
   - **組み込み (汎用)** — `src/plugins/<id>/` に配置し `src/core/registry.ts`
-    に登録。どのホストプロジェクトでも使う `particle` / `variable` / `rive` /
-    `profile` / `render_pipeline` のみ
+    の `PLUGIN_FACTORIES` に登録した、どのホストプロジェクトでも使うもの。
+    実在する組み込みプラグインの正本は `registry.ts` で、一覧は下の
+    「プラグイン一覧」 (ctest `test_module_catalog` が両者の一致を検査する)
   - **外部 (ゲーム固有)** — ホストリポ側に置き、`ERGO_PLUGIN_DIR` 環境変数で
     指定したディレクトリから起動時に動的ロードする (`src/core/external.ts`)。
     Ergo の core/shell を fork せずに各ゲームが自分のエディタを足せる
@@ -36,8 +37,8 @@ inspector など) を **単一の Node サーバ + プラグインアーキテ�
 - **既定: Electron スタンドアロンアプリ** (`npm start` / `editor.bat`)
   - 同プロセスで Node サーバを boot し、`BrowserWindow` がシェル UI を表示
   - ネイティブウィンドウとして扱えて、ブラウザを別に開く必要がない
-  - エンジンクライアント (AdventureCube の `ergo_particle` / `ergo_bind`)
-    は従来通り `ws://127.0.0.1:5170/...` に接続する (同じポート)
+  - エンジンクライアント (`ergo_bind` / `ergo_particle_link` / `ergo_scene_link` /
+    `ergo_log_live`) は従来通り `ws://127.0.0.1:5170/<id>/ws` に接続する (同じポート)
 - **ヘッドレス: `npm run serve` / `npm run dev`**
   - ウィンドウを開かず Node サーバのみ。ブラウザから接続する従来モード
   - CI、Docker、リモート接続、ブラウザ側 devtools を主に使うケースなど
@@ -68,7 +69,8 @@ tools/ergo/
 ├── electron/
 │   ├── main.cjs          # Electron main process (boot server + open window)
 │   └── preload.cjs       # contextBridge: window.ergo.electron (IPC)
-├── tsconfig.json
+├── tsconfig.json         # ビルド (src → dist/)
+├── tsconfig.test.json    # 型検査だけ (src + tests、npm run typecheck)
 ├── README.md
 ├── public/               # シェル UI
 │   ├── index.html
@@ -82,16 +84,17 @@ tools/ergo/
     │   ├── shell-api.ts  # window.ergo.shell の TypeScript 型定義 (型のみ)
     │   ├── registry.ts   # 組み込み (汎用) プラグインの列挙
     │   ├── external.ts   # ERGO_PLUGIN_DIR からの外部プラグイン動的ロード
-    │   └── server.ts     # Hono + http.Server + WS の共通土台
-    └── plugins/          # 組み込み (汎用) プラグインのみ
-        ├── particle/     # 旧 particle-editor
-        │   ├── index.ts
-        │   ├── schema.ts
-        │   └── ui/
-        └── variable/     # 旧 variable-editor
-            ├── index.ts
-            ├── protocol.ts
-            └── ui/
+    │   ├── safe_path.ts  # resolveWithin: ルート外へ出るパスを拒む共通ガード (visus / ui_layout)
+    │   └── server.ts     # Hono + http.Server + WS の共通土台 (id と形の検査を含む)
+    └── plugins/          # 組み込み (汎用) プラグインのみ。1 プラグイン = 1 ディレクトリ
+        ├── particle/     # 旧 particle-editor (index.ts / schema.ts / ranges.ts / ui/)
+        ├── variable/     # 旧 variable-editor (index.ts / protocol.ts / ui/)
+        └── <id>/         # rive / profile / pictor_perf / render_pipeline / visus /
+                          # ui_layout / vfx-suggest / vfx-breed / scene_editor / log
+tests/                    # npm test (node:test + tsx)。src/ と同じ分け方
+├── core/                 # server / external / safe_path
+├── helpers/              # fake_ws.ts などテスト用の部品
+└── plugins/<id>/         # プラグインごとのテスト
 ```
 
 ゲーム固有プラグイン (`placer` / `terrain` / `acstage` / `spawn` / `skill`
@@ -136,7 +139,8 @@ export default (): Plugin => {
   指定ディレクトリ直下の各サブディレクトリの `index.{js,ts}` を動的 import
   して `default` export (`PluginFactory`) を組み込み factory に併合する
   (`src/core/external.ts`)。
-- 壊れた pack エントリはログを出してスキップ — 起動は止めない。
+- 壊れた pack エントリはログを出してスキップ — 起動は止めない (下の「プラグイン id と
+  読み込みの規則」)。
 - TypeScript 製プラグインは `npm run serve` / `dev` (tsx) でそのままロード。
   Electron (`npm start`) 経路でも `electron/main.cjs` が tsx の ESM ローダを
   register するので `.ts` のままロードできる。
@@ -156,17 +160,126 @@ export default (): Plugin => {
   - PrivateGame: `tools/game-web/plugins/{spawn,skill}`
   - AdventureCube: `tools/ac-web/plugins/{placer,terrain,acstage}`
 
+### プラグイン id と読み込みの規則
+
+組み込み・外部の両方に同じ規則を当てる (`src/core/server.ts` の
+`instantiatePlugins()` / `createApp()`、`src/core/external.ts`)。
+
+- **id**: `/^[a-z0-9][a-z0-9_-]*$/` に合うこと (URL の 1 セグメントとルートの接頭辞に
+  なる)。`api` と `shell` はサーバ自身のルートなので使えない
+- **形**: `title` は文字列。`description` / `icon` / `staticRoot` は、あれば文字列。
+  `routes` / `onUpgrade` / `health` は、あれば関数
+- **壊れたプラグインの扱い**: 組み込みが壊れていたら起動を止める (このリポのバグ)。
+  外部は、ファクトリや `routes()` が例外を投げた・形が違う・id が重複した、の
+  どれでもログを出してスキップする。pack エントリの import に失敗したもの、
+  `default` (または `factory`) の関数 export が無いものもログを出してスキップする
+- **id の重複**: 先に名乗ったものが勝つ。組み込みが外部より先で、外部は
+  `ERGO_PLUGIN_DIR` に並べた順、pack の中ではエントリ名の順
+- **`/api/health`**: ファクトリ・形・重複・`routes()` で外したものを
+  `rejected: [{id, source, ok:false, err}]` に並べ、そのときは全体の `ok` も false。
+  `health()` が例外を投げた・真偽値の `ok` を返さないプラグインは、`plugins` の中で
+  `ok:false` と `err` 付きで表示する (`id` / `title` は `health()` で上書きできない)
+- **`index.js` と `index.ts`**: 両方あれば、どの起動経路 (tsx の `serve` / `dev`、
+  Electron の `dist/`) でも `index.js` を読む
+
+組み込みプラグインを足すときは、`tests/core/server.test.ts` が `PLUGIN_FACTORIES` の
+全部について id の形・`/<id>/` の `index.html` が 200・`GET /<id>/api/health` が
+200 で真偽値の `ok` を返すことを検査する。
+
+## プラグイン一覧
+
+`src/core/registry.ts` の `PLUGIN_FACTORIES` に登録された組み込みプラグインの全部
+(12 個)。「供給元」はプラグインにデータを送る側で、次の 4 種類:
+
+- **リポ内クライアント**: Ergo のターゲットがエンジン側から WS で接続する
+- **ホスト提供**: ホスト (ゲーム・Pictor を回すプログラム) が自分で送る / 自分で HTTP を出す。Ergo にクライアントは無い
+- **ファイル**: ブラウザでのファイル読み込みか、環境変数で指したディレクトリ
+- **ブラウザのみ**: サーバは状態を持たない (必要なら LLM を呼ぶだけ)
+
+どのプラグインも `GET /<id>/api/health` を持ち、UI は `/<id>/` で開く。
+
+<!-- plugin-matrix:begin -->
+| id | C++ モジュール | 供給元 | ワイヤ契約と主なエンドポイント | 仕様 |
+|---|---|---|---|---|
+| `particle` | `ergo_particle` | リポ内クライアント: `ergo_particle_link` (受信のみ、`include/ergo/particle/editor_link.h`) | WS `/particle/ws`: UI が `set` / `replace` を送り、全接続へ `state` を配信。REST `GET` / `POST /particle/api/effect` | 本書「`particle`」、[particle.md](../module/particle.md) |
+| `variable` | `ergo_bind` (`ergo_actor` の変数も) | リポ内クライアント: `ergo::bind::Engine::connect` (既定 `127.0.0.1:5170`、`/variable/ws`) | WS `/variable/ws`: `hello` でロール (`engine` / `ui`) を名乗り、登録と値を中継。REST `GET /variable/api/vars`・`/api/actors` | 本書「`variable`」、[bind.md](../module/bind.md) |
+| `rive` | — | ブラウザのみ (`.riv` はブラウザで読む) | WS `/rive/ws`: `publish` (メタ情報) を全接続へ `meta` で配信。REST `GET /rive/api/meta` | [rive.md](rive.md) |
+| `profile` | `ergo_profile` | ファイル (`ergo_profile` の Chrome Trace JSON をブラウザに渡す)、またはホスト提供の WS `{op:"publish", trace}` | WS `/profile/ws`: `publish` を全接続へ `trace` で配信 | 本書「`profile`」、[profile.md](../module/profile.md) |
+| `pictor_perf` | — (Pictor の `PerfQueryAPI`) | ホスト提供: WS `{op:"publish", snapshot}` か `POST /pictor_perf/api/publish` | WS `/pictor_perf/ws` へ `snapshot` を配信。REST `GET /pictor_perf/api/snapshot` | [pictor_perf.md](pictor_perf.md) |
+| `render_pipeline` | — (Pictor のプロファイル) | ファイル: `ERGO_PICTOR_PROFILE_DIR` の `*.profile.json`。GPU 時間はホスト提供の WS `{op:"timing"}` | REST `GET /render_pipeline/api/profiles`・`/api/profile/:file`、`POST /api/profile`。WS: 保存で `profiles-changed`、`timing` を中継 | [render_pipeline.md](render_pipeline.md) / [render_pipeline_system_b.md](render_pipeline_system_b.md) |
+| `visus` | — (Pictor の描画定義) | ファイル: `VISUS_PROJECT_ROOTS` 配下の `*.visus.json` | REST `GET /visus/api/roots`・`/api/scan`・`/api/load`、`POST /api/save` (ルートの外は拒否)。WS: 保存を通知 | 本書「`visus`」 |
+| `ui_layout` | `ergo_ui_layout` | ホスト提供: ホストが `POST /ui_layout/patch` と `GET /ui_layout/state` を自分で出す (既定 `http://127.0.0.1:8080`、`POST /ui_layout/api/bridge/config` で変更)。`ergo_custos` はこの 2 つを提供しない | REST `/ui_layout/api/bridge/{config,patch,pull}`・`/api/file/{open,save,svg}`。WS `/ui_layout/ws` へ `patch` / `document` を配信 | 本書「`ui_layout`」、[ui_layout.md](../module/ui_layout.md) |
+| `vfx-suggest` | `ergo_particle` (設定の形) | ブラウザのみ + 任意で LLM (`ERGO_VFX_BACKEND`) | REST `GET /vfx-suggest/api/games`・`/api/catalog`、`POST /api/generate`・`/api/ks-emitter` (`ks-emitter` は legacy の L2)。WS なし | 本書「`vfx-suggest`」 |
+| `vfx-breed` | `ergo_particle` (設定の形) | ブラウザのみ + 任意で LLM (方向指示) | REST `POST /vfx-breed/api/generation`、`GET /api/seeds`・`/api/genes`。WS なし | 本書「`vfx-breed`」 |
+| `scene_editor` | `ergo_scene` | リポ内クライアント: `ergo_scene_link` (`include/ergo/scene/editor_link.h`) | WS `/scene_editor/ws`: エンジンが `{op:"scene", id, json}` を送り、UI の `{op:"patch", scene_id, actor_id, field, value}` をそのシーンの持ち主へ転送。REST `GET /scene_editor/api/scenes` | [scene_editor.md](scene_editor.md) |
+| `log` | `ergo_log` | リポ内クライアント: `ergo_log_live` (`include/ergo/log/live_sink.h`) | WS `/log/ws`: エンジンが `hello` と `lines` を送り、UI は接続時に `backlog`、以後 `lines`。REST `GET /log/api/apps`・`/api/lines` | [log.md](log.md) |
+<!-- plugin-matrix:end -->
+
+ポートを変えた場合 (`PORT`) は、エンジン側クライアントの `connect` にも同じポートを渡す。
+
 ## 現行プラグイン (組み込み・汎用)
 
 ### `particle`
 - 旧 `tools/particle-editor/` の移植
 - 単一 `ParticleEffectConfig` を保持し、すべての WS 接続に `state` を配信
-- ブラウザ UI ↔ engine client (AdventureCube via `ergo_particle`)
+- ブラウザ UI ↔ engine client (`ergo_particle_link`。`ergo_particle` 本体はソケットを持たない)
+- プレビュー描画の emit / step / draw は `ui/particle-simulation.js` (粒子の計算) と
+  `ui/particle-draw.js` (canvas 描画) に分け、`ui/preview.js` (`/particle/preview.js`) が
+  ES module として公開する。エディタと `vfx-breed` / `vfx-suggest` の埋め込み
+  プレビューが共有し、粒子の配列・発生の時計・フレームループは呼ぶ側がそれぞれ持つ
+  (テスト `tests/plugins/particle/preview.test.ts`)
 
 ### `variable`
 - 旧 `tools/variable-editor/` の移植
 - `BIND_VAR()` 登録を受ける engine ↔ UI ハブ
 - `hello` メッセージでロール (`engine` / `ui`) を識別
+
+### `rive`
+- `.riv` をブラウザの canvas で再生し、アートボード / state machine / アニメーションを見る。
+  ファイルはブラウザで読み、サーバは開いているファイルのメタ情報を中継するだけ。
+  仕様は [rive.md](rive.md)
+
+### `profile`
+- `ergo_profile` が書いた Chrome Trace Event JSON をタイムライン表示する
+  (フレームグラフ + カウンタトラック)。トレースはブラウザで読み、WS の `publish`
+  は直近のトレースを他の接続へ配るだけ。仕様は [profile.md](../module/profile.md)
+  の「タイムライン UI」
+
+### `pictor_perf`
+- Pictor の `PerfQueryAPI::export_json()` の性能スナップショット (SoA のアライメント・
+  帯域・バッチ適格性・GPU 時間) を表示する。ホストが WS か HTTP で publish する。
+  仕様は [pictor_perf.md](pictor_perf.md)
+
+### `render_pipeline`
+- Pictor の `*.profile.json` (`ERGO_PICTOR_PROFILE_DIR`) を単一のノードグラフで表示・編集し、
+  保存する。仕様は [render_pipeline.md](render_pipeline.md) と
+  [render_pipeline_system_b.md](render_pipeline_system_b.md)、ディレクトリの指定は
+  [plugin-data-roots.md](../../setup/plugin-data-roots.md)
+
+### `visus`
+- 各プロジェクトの `assets/visus/*.visus.json` (Pictor の描画定義) を一覧・編集する。
+  ルートは `VISUS_PROJECT_ROOTS` (`;` 区切り、未設定なら cwd)。全 API は
+  `core/safe_path.ts` の `resolveWithin` でルートの外へ出るパスを拒む。`geometry.kind ==
+  "custom"` はフォームで、それ以外は生 JSON で編集する
+
+### `ui_layout`
+- `ergo_ui_layout` の `*.uilayout.json` を Figma 風に編集する (キャンバス・階層・
+  プロパティ・ファイル入出力。ファイルはツールの cwd の外へ出られない)
+- 実行中のゲームとの往復は **ホストが出す HTTP** を経由する: 編集は
+  `POST /ui_layout/api/bridge/patch` → ホストの `/ui_layout/patch`、取り込みは
+  `POST /ui_layout/api/bridge/pull` → ホストの `/ui_layout/state`。既定の転送先は
+  `http://127.0.0.1:8080` で、`POST /ui_layout/api/bridge/config` で変える。
+  `ergo_custos` のブリッジは `/health` / `/screenshot` / `/key` だけで、この 2 つは
+  提供しない。仕様は [ui_layout.md](../module/ui_layout.md)
+
+### `vfx-suggest`
+- ゲームとシーンの文脈から LLM で `ParticleEffectConfig` のプリセットを作る
+  (`POST /vfx-suggest/api/generate`)。結果は `particle/ranges.ts` の値域で丸め (sanitize)、
+  プレビューは `particle` プラグインの WS へ送る。LLM のバックエンドは
+  `ERGO_VFX_BACKEND` (`cli` / `sdk`) と `ERGO_VFX_MODEL`
+  ([config-reference.md](../../setup/config-reference.md))
+- `ks_export.ts` (`POST /vfx-suggest/api/ks-emitter`) は特定タイトル向けの書き出しで、
+  ホストの plugin pack へ移す予定の legacy (`spec/architecture/domains-and-ux.md` §5 の L2)
 
 ### `vfx-breed`
 - エフェクトを「選んで育てる」対話的進化。 変異体を並べ、 人間が選んだ個体を親に
@@ -209,7 +322,19 @@ export default (): Plugin => {
 - プレビュー描画は particle エディタの emit / step / draw を ES module にした
   `particle/ui/preview.js` (`/particle/preview.js`) を使う。 出現位置は disc のみで、
   svgStroke / svgFill は disc で代用する (ergo_particle と同じ)
-- テスト: `tools/ergo/tests/vfx-breed/` (`npm test`、 node:test + tsx)
+- テスト: `tools/ergo/tests/plugins/vfx-breed/` (`npm test`、 node:test + tsx)
+
+### `scene_editor`
+- `ergo_scene` のシーンをツリー表示し、アクターのフィールドを編集する。エンジン
+  (`ergo_scene_link`) が publish したシーンだけを見せ、UI のパッチはそのシーンを
+  publish したエンジンへ転送する。エンジンが `Scene::apply_patch` で適用して
+  publish し直すので、UI は常にエンジンの状態を表示する。仕様は
+  [scene_editor.md](scene_editor.md)
+
+### `log`
+- 動作中の `ergo_log` の行を表示する。エンジン (`ergo_log_live` の `LiveSink`) ごとに
+  直近 10k 行のリングを持ち、切断後も残す。レベル・文字列・フレーム範囲で絞り込む。
+  仕様は [log.md](log.md)
 
 > `placer` / `terrain` / `acstage` は AdventureCube 固有のため Ergo から
 > 分離し、`AdventureCube/tools/ac-web/plugins/` の plugin pack へ移設した。
@@ -320,30 +445,28 @@ Electron アプリとして起動した場合のみ、preload 経由で
 
 ## テスト
 
-単体テストは `npm test` (node:test + tsx、 `tools/ergo/tests/**/*.test.ts`)。
-現状の対象は `vfx-breed` と vfx-suggest の sanitize。
+`npm test` (node:test + tsx、`tests/**/*.test.ts`) と `npm run typecheck`
+(`tsconfig.test.json` で `src/` と `tests/` を型検査、出力なし)。どちらも
+`lib/lapilli` の submodule が要る。テストは hermetic で、一時ディレクトリと
+ポート 0 を使い、外部のサービスやネットワークに出ない。
 
-第1弾ではスモークテストのみ:
-- `npm install && npm run start` でサーバが起動すること
-- `/api/plugins` が JSON で 2 件返すこと
-- `/particle/` / `/variable/` の UI が 200 で返ること
-- ws 接続で `state` / `registry` メッセージが受信できること
+| 場所 | 対象 |
+|---|---|
+| `tests/core/server.test.ts` | 組み込み全部の id・UI・`/api/health`、`/api/plugins`、id と形の検査、壊れた外部プラグインのスキップと `rejected` |
+| `tests/core/external.test.ts` | `ERGO_PLUGIN_DIR` の pack 読み込み (複数ディレクトリ、`index.js` 優先、壊れたエントリと id の衝突) |
+| `tests/core/safe_path.test.ts` | `resolveWithin` (ルートの外へ出るパスの拒否、Windows のドライブ違いと UNC を含む) |
+| `tests/helpers/` | `fake_ws.ts` などテスト用の部品 (テストそのものではない) |
+| `tests/plugins/particle/` | 共有プレビュー (`preview.js`) の上限・発生位置・減衰と重力・寿命・描画 |
+| `tests/plugins/variable/` | engine ↔ UI の中継 |
+| `tests/plugins/pictor_perf/` | publish (WS / HTTP) とスナップショットの検証 |
+| `tests/plugins/visus/` | save の検証 (パス・拡張子・JSON) と scan / load |
+| `tests/plugins/ui_layout/` | ファイルの保存・open・svg とルートの外へ出るパスの拒否 |
+| `tests/plugins/vfx-suggest/` | sanitize (値域への丸め) |
+| `tests/plugins/vfx-breed/` | 遺伝子・世代・交叉と変異 (`helpers.ts` は共通部品) |
+| `tests/plugins/scene_editor/` | シーンの解析・中継・回転の変換 |
+| `tests/plugins/log/` | リング・プロトコル・中継 |
 
-## Particle preview shared implementation
-
-Actio: cefe617a-e0ee-445f-93c1-ac6db8c67108. The editor imports the shared
-emission, integration and drawing entry points from /particle/preview.js.
-particle-simulation.js owns particle math; particle-draw.js owns particle canvas
-rendering. Each caller retains its particle array, emission clock and frame loop.
-The editor retains SVG sampling/guides, burst, pause, reset and device-pixel scale.
-Embedded previews retain disc fallback, config-reset semantics and shared frame
-scheduling/disposal. Neither module changes configuration or WebSocket contracts.
-Regression coverage: tools/ergo/tests/particle/preview.test.ts (cap and supplied
-spawn point, damping/gravity/lifetime, scaling/blending/shape, reset/dispose).
-
-Validation for this refactor: node --check passed for the shared JavaScript,
-preview adapter, editor inline module and test source; git diff --check passed.
-Unit tests and browser/service startup were not run by this session. Review must
-verify those separately. Rollback is a revert of this task commit; no data or
-configuration migration is involved. Domain membership: dev-tools (supporting
-developer-tool boundary), existing tools/ergo source/test membership unchanged.
+CI ではジョブ `tools-ergo` (`.github/workflows/ci.yml`) が Node 22 で
+`npm ci` → `npm run typecheck` → `npm run build` → `npm test` を実行する
+(submodule 込み、`ELECTRON_SKIP_BINARY_DOWNLOAD=1`)。手元での再現は
+[ci.md](../../setup/ci.md)。

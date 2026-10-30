@@ -14,7 +14,9 @@ import type { IncomingMessage } from "node:http";
 import type { WebSocket } from "ws";
 
 export interface PluginContext {
-    /** Tagged console logging — the shell UI can display recent log lines. */
+    /** Tagged console logging (stdout / stderr of the tool process). It is not
+     *  forwarded to the shell UI or to the `log` plugin, which shows engine-side
+     *  ergo_log lines only. */
     log: (level: "info" | "warn" | "error", msg: string) => void;
 }
 

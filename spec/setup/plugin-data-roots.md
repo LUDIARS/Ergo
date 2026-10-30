@@ -12,13 +12,13 @@
 | 環境変数 | 対象プラグイン | 役割 / 既定の解決 |
 |---|---|---|
 | `ERGO_PICTOR_PROFILE_DIR` | `render_pipeline` | Pictor の `*.profile.json` を置くディレクトリ。未設定時は cwd から `../../../Pictor/profiles` を試し、無ければ cwd の `profiles/` (`tools/ergo/src/plugins/render_pipeline/profile_store.ts:30-39`) |
-| `VISUS_PROJECT_ROOTS` | `visus` | 描画定義 (`*.visus.json` 等) を走査するプロジェクトルート。`;` 区切りで複数指定可。未設定時は `process.cwd()` 1 件 (`tools/ergo/src/plugins/visus/index.ts:46-51`) |
+| `VISUS_PROJECT_ROOTS` | `visus` | 描画定義 (`*.visus.json` 等) を走査するプロジェクトルート。`;` 区切りで複数指定可。未設定時は `process.cwd()` 1 件 (`tools/ergo/src/plugins/visus/index.ts:47-52`) |
 
 - どちらも相対指定は cwd 基準で絶対パス化される。
 - `render_pipeline` の保存 (`POST /render_pipeline/api/profile`) は
   `ERGO_PICTOR_PROFILE_DIR` が解決したディレクトリへ書き込む。
-- `visus` は指定ルート配下に閉じ込めるパス検証を行い、`..` でのエスケープを
-  弾く (`index.ts` `resolveSafe`)。
+- `visus` は指定ルート配下に閉じ込めるパス検証を行い、`..` やルート外の絶対パスでの
+  エスケープを弾く (共通ガード `tools/ergo/src/core/safe_path.ts` の `resolveWithin`)。
 
 ## 手順
 
@@ -36,7 +36,7 @@ npm run dev
 
 - `render_pipeline`: `http://localhost:5170/render_pipeline/` で
   `*.profile.json` のグラフ編集 (エンドポイント詳細は
-  [`../tool/render_pipeline.md`](../tool/render_pipeline.md))
+  [`../feature/tool/render_pipeline.md`](../feature/tool/render_pipeline.md))
 - `visus`: `http://localhost:5170/visus/` で描画定義の一覧・編集
 
 ## 注意点

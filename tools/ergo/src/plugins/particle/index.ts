@@ -1,7 +1,7 @@
 /// Particle plugin — hosts a WS hub that mirrors a single
 /// `ParticleEffectConfig` to all connected clients. Browser UIs send
-/// `set` / `replace`; engine clients (e.g. AdventureCube via
-/// `ergo_particle`) just receive `state` frames.
+/// `set` / `replace`; engine clients (in-repo: `ergo_particle_link`,
+/// include/ergo/particle/editor_link.h) just receive `state` frames.
 ///
 /// Migrated from the stand-alone `tools/particle-editor/` package.
 
