@@ -3,8 +3,9 @@
 /// ergo_scene - serializable look-dev scene document.
 ///
 /// This first implementation intentionally owns the data model, CRUD, JSON
-/// load/save, and camera matrices only. Render submission and editor UI can
-/// build on this stable document layer later.
+/// load/save, field-level patches, and camera matrices only. Render
+/// submission is host-side. The live editor is the tools/ergo `scene_editor`
+/// plugin, fed by the separate `ergo_scene_link` target (scene/editor_link.h).
 
 #include <cstddef>
 #include <functional>
@@ -150,6 +151,19 @@ public:
     bool remove_actor(const std::string& id);
     void clear_actors();
 
+    /// Apply one field-level edit (the scene_editor wire format) to an actor.
+    /// `value_json` is the JSON text of the new value. Supported fields:
+    ///   name, type, visual.kind, visual.ref, visual.material  — JSON string
+    ///   transform.pos, transform.scale                        — [x, y, z]
+    ///   transform.rot          — [x, y, z, w], stored normalized
+    ///   vars/<name>/value      — any JSON, stored serialized (var must exist)
+    ///   parent                 — actor id in this scene, or "" / null to
+    ///                            clear; not the actor itself or a descendant
+    /// Returns false (and changes nothing) for an unknown actor or field, a
+    /// value of the wrong JSON type or arity, or malformed JSON. The legacy
+    /// "transform.rot.xyz" path is rejected: rotations travel as quaternions.
+    bool apply_patch(const std::string& actor_id, std::string_view field, std::string_view value_json);
+
 private:
     std::string id_;
     std::string domain_ = "level";
@@ -178,6 +192,10 @@ public:
 
     /// True if a scene with this id is currently mounted.
     bool is_mounted(const std::string& scene_id) const;
+
+    /// The mounted scene with this id, or nullptr.
+    Scene* find_scene(const std::string& scene_id);
+    const Scene* find_scene(const std::string& scene_id) const;
 
     std::size_t scene_count() const { return scenes_.size(); }
 

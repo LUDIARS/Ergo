@@ -345,21 +345,25 @@ if(ERGO_BUILD_CAST AND ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND)
 endif()
 
 # ---------------------------------------------------------------------------
-# ergo_sound — WAV/OGG decode, streaming, mixing engine, waveform, quantizer
+# ergo_scene - serializable look-dev scene document (+ field-level patches).
 # ---------------------------------------------------------------------------
-# ergo_scene - serializable look-dev scene document.
 if(ERGO_BUILD_SCENE)
-    add_library(ergo_scene src/scene/scene.cpp)
+    add_library(ergo_scene src/scene/scene.cpp src/scene/scene_patch.cpp)
     target_include_directories(ergo_scene PUBLIC include)
     target_link_libraries(ergo_scene PUBLIC ergo_common)
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_scene tests/scene/test_scene.cpp)
-        target_link_libraries(test_scene PRIVATE ergo_scene ergo_gtest_main)
-        add_test(NAME test_scene COMMAND test_scene)
+        foreach(NAME test_scene test_scene_patch)
+            add_executable(${NAME} tests/scene/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_scene ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# ergo_sound — WAV decode, streaming, mixing engine, waveform, quantizer
+# ---------------------------------------------------------------------------
 if(ERGO_BUILD_SOUND)
     add_library(ergo_sound
         src/sound/audio_decoder.cpp
