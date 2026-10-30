@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
-import type { ParticleEffectConfig } from "../../src/plugins/particle/schema.js";
-import { PARTICLE_RANGES } from "../../src/plugins/particle/ranges.js";
+import type { ParticleEffectConfig } from "../../../src/plugins/particle/schema.js";
+import { PARTICLE_RANGES } from "../../../src/plugins/particle/ranges.js";
 
 export function numericValues(cfg: ParticleEffectConfig): Record<string, number> {
     return {

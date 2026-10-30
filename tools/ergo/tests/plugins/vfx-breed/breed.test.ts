@@ -1,14 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_EFFECT } from "../../src/plugins/particle/schema.js";
-import { CATALOG } from "../../src/plugins/vfx-suggest/catalog.js";
-import { GENES, geneIndex } from "../../src/plugins/vfx-breed/genes.js";
-import { encode } from "../../src/plugins/vfx-breed/genome.js";
-import { mutate, flipProbability, MAX_FLIP } from "../../src/plugins/vfx-breed/mutate.js";
-import { crossover } from "../../src/plugins/vfx-breed/crossover.js";
-import { breed } from "../../src/plugins/vfx-breed/breed.js";
-import { makeRng } from "../../src/plugins/vfx-breed/rng.js";
+import { DEFAULT_EFFECT } from "../../../src/plugins/particle/schema.js";
+import { CATALOG } from "../../../src/plugins/vfx-suggest/catalog.js";
+import { GENES, geneIndex } from "../../../src/plugins/vfx-breed/genes.js";
+import { encode } from "../../../src/plugins/vfx-breed/genome.js";
+import { mutate, flipProbability, MAX_FLIP } from "../../../src/plugins/vfx-breed/mutate.js";
+import { crossover } from "../../../src/plugins/vfx-breed/crossover.js";
+import { breed } from "../../../src/plugins/vfx-breed/breed.js";
+import { makeRng } from "../../../src/plugins/vfx-breed/rng.js";
 import { assertWithinRanges } from "./helpers.js";
 
 const zeroBias = GENES.map(() => 0);
