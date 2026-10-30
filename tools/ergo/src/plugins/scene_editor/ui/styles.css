@@ -180,6 +180,7 @@ body {
 .field-input:focus { border-color: #cba6f7; }
 .field-input[readonly] { background: #1e1e2e; color: #7f849c; cursor: default; }
 .field-input.vec { width: 60px; flex: none; }
+.field-input.invalid { border-color: #f38ba8; }
 .vec-group { display: flex; gap: 4px; align-items: center; }
 .vec-axis { font-size: 10px; color: #7f849c; }
 
@@ -204,6 +205,7 @@ body {
 .var-name  { font-weight: 600; color: #a6e3a1; font-size: 12px; }
 .var-type  { font-size: 10px; color: #7f849c; margin-left: 4px; }
 .var-value { margin-top: 3px; font-size: 12px; color: #cdd6f4; }
+.var-edit  { display: flex; align-items: center; margin-top: 3px; }
 
 .patch-btn {
     padding: 2px 10px;

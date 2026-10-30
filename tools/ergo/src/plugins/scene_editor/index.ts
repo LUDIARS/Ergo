@@ -1,16 +1,20 @@
 /// scene_editor plugin — scene tree, actor inspector, WS patch relay.
 ///
-/// Engine clients push full scene JSON via { op: "scene", id, json }.
+/// Engine clients (in-repo: `ergo_scene_link`, include/ergo/scene/editor_link.h)
+/// push full scene JSON via { op: "scene", id, json }.
 /// UI clients receive structured SceneInfo snapshots and can apply
 /// field-level patches via { op: "patch", scene_id, actor_id, field, value }.
-/// Patches are forwarded to the engine that owns the scene.
+/// Patches are forwarded to the engine that owns the scene; the engine applies
+/// them with `Scene::apply_patch` and re-publishes the scene, so the UI only
+/// ever shows engine state. Protocol: spec/feature/tool/scene_editor.md.
 
 import { Hono } from "hono";
 import { WebSocket as WS } from "ws";
 
 import type { Plugin, PluginContext, PluginFactory } from "../../core/plugin.js";
+import { parseScene } from "./parse_scene.js";
 import type {
-    ActorSummary, EngineMsg, SceneInfo, ServerToEngine, ServerToUi, UiMsg,
+    EngineMsg, SceneInfo, ServerToEngine, ServerToUi, UiMsg,
 } from "./protocol.js";
 
 interface ConnState {
@@ -21,85 +25,6 @@ interface ConnState {
 
 interface StoredScene extends SceneInfo {
     ownerWs: WS;
-}
-
-function parseScene(id: string, json: string, app: string): SceneInfo | null {
-    let root: Record<string, unknown>;
-    try { root = JSON.parse(json); } catch { return null; }
-
-    const rawActors = Array.isArray(root.actors) ? root.actors as unknown[] : [];
-    const actors: ActorSummary[] = rawActors
-        .filter((a): a is Record<string, unknown> => typeof a === "object" && a !== null)
-        .map((a) => {
-            const tr = (a.transform as Record<string, unknown>) ?? {};
-            const vi = (a.visual as Record<string, unknown>) ?? {};
-            const pos   = asVec3(tr.pos)   ?? [0, 0, 0] as [number, number, number];
-            const rot   = asVec4(tr.rot)   ?? [0, 0, 0, 1] as [number, number, number, number];
-            const scale = asVec3(tr.scale) ?? [1, 1, 1] as [number, number, number];
-            return {
-                id:        String(a.id ?? ""),
-                name:      String(a.name ?? ""),
-                type:      String(a.type ?? "Actor"),
-                parent:    typeof a.parent === "string" ? a.parent : "",
-                transform: { pos, rot, scale },
-                visual: {
-                    kind:     String(vi.kind ?? ""),
-                    ref:      String(vi.ref ?? ""),
-                    material: String(vi.material ?? ""),
-                },
-                instanceOf: String(a.instanceOf ?? ""),
-                vars: parseVars(a.vars),
-                components: parseComponents(a.components),
-            };
-        });
-
-    const cam = (root.camera as Record<string, unknown>) ?? {};
-    return {
-        id:     String(root.id ?? id),
-        domain: String(root.domain ?? "level"),
-        mount:  String(root.mount ?? "/level"),
-        actors,
-        camera: {
-            mode:     String(cam.mode ?? "orbit"),
-            target:   asVec3(cam.target) ?? [0, 0, 0],
-            distance: typeof cam.distance === "number" ? cam.distance : 8,
-            fov_deg:  typeof cam.fov_deg  === "number" ? cam.fov_deg  : 50,
-        },
-        app,
-    };
-}
-
-function parseVars(raw: unknown): ActorSummary["vars"] {
-    if (!Array.isArray(raw)) return [];
-    return raw
-        .filter((v): v is Record<string, unknown> => typeof v === "object" && v !== null)
-        .map((v) => ({
-            name:  String(v.name ?? ""),
-            type:  String(v.type ?? ""),
-            value: String(v.value ?? ""),
-        }));
-}
-
-function parseComponents(raw: unknown): ActorSummary["components"] {
-    if (!Array.isArray(raw)) return [];
-    return raw
-        .filter((c): c is Record<string, unknown> => typeof c === "object" && c !== null)
-        .map((c) => ({
-            type:  String(c.type ?? ""),
-            props: Object.entries(c)
-                .filter(([k]) => k !== "type")
-                .map(([k, v]) => [k, String(v)] as [string, string]),
-        }));
-}
-
-function asVec3(v: unknown): [number, number, number] | null {
-    if (!Array.isArray(v) || v.length < 3) return null;
-    return [Number(v[0]), Number(v[1]), Number(v[2])];
-}
-
-function asVec4(v: unknown): [number, number, number, number] | null {
-    if (!Array.isArray(v) || v.length < 4) return null;
-    return [Number(v[0]), Number(v[1]), Number(v[2]), Number(v[3])];
 }
 
 const factory: PluginFactory = () => {
@@ -163,6 +88,7 @@ const factory: PluginFactory = () => {
                 if (state.role === "engine") {
                     const em = msg as EngineMsg;
                     if (em.op === "scene") {
+                        if (typeof em.id !== "string" || typeof em.json !== "string") return;
                         const parsed = parseScene(em.id, em.json, state.app);
                         if (parsed) {
                             scenes.set(em.id, { ...parsed, ownerWs: ws });
