@@ -91,3 +91,31 @@ test("malformed or non-object documents are rejected", () => {
     const s = parseScene("x", JSON.stringify({ actors: [1, null, "a", { id: "ok" }] }), "app");
     assert.deepEqual(s?.actors.map((a) => a.id), ["ok"]);
 });
+
+test("hostile scalar values never throw (String({toString:1}) does)", () => {
+    const poison = { toString: 1 };
+    const doc = JSON.stringify({
+        domain: poison, mount: poison, camera: { mode: poison, target: [poison, 0, 0] },
+        actors: [{
+            id: poison, name: poison, type: poison, instanceOf: poison,
+            visual: { kind: poison, ref: poison, material: poison },
+            transform: { pos: [poison, 0, 0], rot: [0, 0, 0, poison], scale: ["1", 1, 1] },
+            vars: [{ name: poison, type: poison, value: poison }],
+            overrides: [{ path: poison, value: poison }],
+            components: [{ type: poison, p: poison }],
+        }],
+    });
+    const s = parseScene("x", doc, "app");
+    assert.ok(s);
+    assert.equal(s.domain, '{"toString":1}');
+    assert.equal(s.camera.mode, '{"toString":1}');
+    assert.deepEqual(s.camera.target, [0, 0, 0]);
+    const a = s.actors[0];
+    assert.equal(a.id, '{"toString":1}');
+    assert.equal(a.visual.kind, '{"toString":1}');
+    assert.deepEqual(a.transform, { pos: [0, 0, 0], rot: [0, 0, 0, 1], scale: [1, 1, 1] });
+    assert.equal(a.vars[0].name, '{"toString":1}');
+    assert.equal(a.vars[0].value, '{"toString":1}');
+    assert.equal(a.overrides[0].path, '{"toString":1}');
+    assert.equal(a.components[0].type, '{"toString":1}');
+});
