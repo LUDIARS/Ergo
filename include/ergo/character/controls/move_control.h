@@ -6,7 +6,7 @@
 /// 変換し (`IMoveSource`)、入力方向へキャラを向ける (`ITurnSource`)。
 /// 入力が無い間は速度 0 のまま最後の向きを保持する (TCC と同じ挙動)。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/move_source.h"
 #include "ergo/character/turn_source.h"

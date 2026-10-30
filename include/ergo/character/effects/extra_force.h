@@ -6,7 +6,7 @@
 /// 爆風など「一度加わって時間減衰する」速度を表す。Check 層
 /// (`IUpdateComponent`) として毎フレーム減衰する。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/effect_source.h"
 #include "ergo/character/update_component.h"

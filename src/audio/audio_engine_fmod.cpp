@@ -6,7 +6,7 @@
 /// and the dummy are mutually exclusive TUs.
 ///
 /// Only one-shot fire-and-forget playback is wired. 3D, DSP chains, and
-/// FMOD Studio events are deferred (see spec/module/audio.md roadmap).
+/// FMOD Studio events are deferred (see spec/feature/module/audio.md roadmap).
 
 #include "ergo/audio/audio_engine.h"
 

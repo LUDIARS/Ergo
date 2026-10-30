@@ -6,7 +6,7 @@
 /// IMoveSource を Brain に登録し、`move_priority() > 0` のうち最高優先度の
 /// 1 つだけが採用される (加算ではない。加算したい速度は IEffectSource へ)。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/types.h"
 

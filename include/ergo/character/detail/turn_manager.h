@@ -4,7 +4,7 @@
 ///
 /// TCC の `TurnManager` に対応する。BrainBase の内部実装。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/turn_source.h"
 

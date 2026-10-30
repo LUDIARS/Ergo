@@ -5,7 +5,7 @@
 /// Scalar: any floating-point type.
 /// Arithmetic: any floating-point or integer type.
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include <concepts>
 #include <type_traits>

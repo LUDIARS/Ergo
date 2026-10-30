@@ -7,7 +7,7 @@
 /// 必要なホストは `set_move_filter` で delta を加工する (壁ずり・クランプ
 /// など)。filter は通常移動にのみ適用され、warp には適用されない。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/brain.h"
 

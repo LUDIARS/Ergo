@@ -6,7 +6,7 @@
 /// 1 つが採用され、Brain が `target_yaw_deg()` へ `turn_speed_deg()` (deg/s)
 /// で最短弧補間する。turn_speed_deg() が負なら即時スナップ。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 namespace ergo::character {
 

@@ -2,7 +2,7 @@
 
 > **状態**: 設計フェーズ (2026-05-23 起草)。 実装は別セッション。
 > **対象**: Ergo (本リポ) + Custos (LUDIARS/Custos)。 統合後 Custos は obsolete。
-> **本書の位置付け**: 既存 `spec/tool/ergo.md` を将来上書きする予定の **新仕様書**。
+> **本書の位置付け**: 既存 `spec/feature/tool/ergo.md` を将来上書きする予定の **新仕様書**。
 > 移行完了までは並存し、 plugin 単位で旧仕様 → 新仕様へ段階移行する。
 
 ## 1. 背景と問題意識
@@ -998,7 +998,7 @@ export function pickStrategy(app: AppConfig): InputStrategy {
 
 ## 7. ergo_custos の進化
 
-### 7.1 現状 (spec/module/custos.md)
+### 7.1 現状 (spec/feature/module/custos.md)
 
 - HTTP/1.0 only、 endpoints: `/health` `GET /screenshot` `POST /key`
 - callback 設計 (set_screenshot_provider / set_key_handler)
@@ -1023,7 +1023,7 @@ export function pickStrategy(app: AppConfig): InputStrategy {
 ### 7.4 後方互換
 
 - 既存の HTTP `/screenshot` `/key` は維持 (Phase 2 完了まで Custos が叩く可能性)
-- spec/module/custos.md を別 PR で更新 (本書とは別の PR)
+- spec/feature/module/custos.md を別 PR で更新 (本書とは別の PR)
 
 ### 7.5 WS 仕様 (RFC 6455 subset 自前実装)
 
@@ -1218,7 +1218,7 @@ client                              server
 
 ### Phase 1 — 基盤 (現セッション設計、 別セッション実装着手中)
 
-- 1.1 spec/tool/ergo-redesign.md (本書) を merge
+- 1.1 spec/feature/tool/ergo-redesign.md (本書) を merge
 - 1.2 IR schema を zod + TS 型で確定 (`tools/ergo/src/core/ir/types.ts`)
 - 1.3 React `<IRRenderer>` 雛形 + 最小 kind (panel/text/button) で動作確認
 - 1.4 `ergo_ui_native` module skeleton 作成 (IR client + 最小翻訳 + text/rect/panel primitives + flex layout を一括内蔵)
@@ -1257,7 +1257,7 @@ client                              server
 #### Phase 1 (基盤)
 
 成果物:
-- `spec/tool/ergo-redesign.md` (本書) main 入り
+- `spec/feature/tool/ergo-redesign.md` (本書) main 入り
 - `tools/ergo/src/core/ir/types.ts` (IR 全 kind の zod schema)
 - `tools/ergo/src/web/IRRenderer.tsx` (React renderer 雛形)
 - `tools/ergo/src/core/ws/protocol.ts` (WS message 型)
@@ -1266,7 +1266,7 @@ client                              server
 - `tools/ergo/src/core/auth/cernere.ts` (middleware skeleton、 デフォルト bypass)
 
 Acceptance:
-- [ ] spec/tool/ergo-redesign.md が main にいる
+- [ ] spec/feature/tool/ergo-redesign.md が main にいる
 - [ ] IR の最小 kind (`panel` / `text` / `button` / `slider`) が zod で定義され、 unit test pass
 - [ ] React `<IRRenderer>` が `?ir=1` パラメータで起動した状態で、 server から push された IR ツリーを 4 種 kind で再帰描画できる
 - [ ] WS heartbeat (15s ping / 30s timeout) と reconnect (1s→30s backoff) が integration test で確認
@@ -1302,7 +1302,7 @@ Acceptance:
 - [ ] `?ir=1` で React 描画、 `?ir=0` で Vanilla 描画の **並存** 確認
 - [ ] `ergo_ui_native` でも同じ IR が描画される
 - [ ] 既存機能の機能パリティ (snapshot test、 visual regression < 5px 差)
-- [ ] 各 plugin の IR / ops 一覧を `spec/tool/ergo-redesign.md` 付録 A に追記
+- [ ] 各 plugin の IR / ops 一覧を `spec/feature/tool/ergo-redesign.md` 付録 A に追記
 
 Plugin 別の追加 acceptance:
 - 3.1 `variable`: tree + table、 actor/binding registry に live edit
@@ -1481,7 +1481,7 @@ GET /api/plugins
   - Phase 4 はホストリポ側 PR
 - **IR 拡張ポイント**: Phase 3 の各 plugin 移植で IR に新 kind 追加。 zod schema を `tools/ergo/src/core/ir/types.ts` で central に更新
 - **ergo_custos WS は ergo_custos 自体の PR で先行**。 Phase 1 と同期 (横断変更は 1 PR、 CLAUDE.md §「横断変更」)
-- **本仕様書 (`spec/tool/ergo-redesign.md`) は Phase 完了ごとに更新**。 最終 Phase で `spec/tool/ergo.md` に統合 or 置換
+- **本仕様書 (`spec/feature/tool/ergo-redesign.md`) は Phase 完了ごとに更新**。 最終 Phase で `spec/feature/tool/ergo.md` に統合 or 置換
 - **Phase 1 完了時の動作確認**: `tools/ergo` を起動し、 `?ir=1` フラグで panel/text/button が Web に表示される + Pictor アプリで `--ergo-panel=demo` を渡すと同じ panel が in-proc 描画される
 
 ## 付録 A. 既存 plugin の IR 移植サンプル

@@ -5,7 +5,7 @@
 /// Pure data + callback. No threading, no rendering, no physics. Designed to
 /// be embedded as a member of any actor / entity that needs hit points.
 ///
-/// Spec: spec/module/health.md
+/// Spec: spec/feature/module/health.md
 /// Lexicon: spec/game-lexicon/features/core/health-system.toml (Ars)
 
 #include <cstdint>

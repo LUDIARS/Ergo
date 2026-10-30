@@ -7,7 +7,7 @@
 /// インターフェースと手動実装 (checks/manual_ground_check.h) のみ持つ。
 /// Gravity 等の Effect が DI で参照する。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 namespace ergo::character {
 

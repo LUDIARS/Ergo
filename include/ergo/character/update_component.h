@@ -7,7 +7,7 @@
 /// 天井など) をフレーム内キャッシュする。Control / Effect が同フレームの
 /// センサー結果を読めるよう、必ず Brain 反映前に実行される。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 namespace ergo::character {
 

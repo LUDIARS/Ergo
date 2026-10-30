@@ -13,7 +13,7 @@
 ///
 /// Both classes are move-only (no copy). Thread safety: none.
 ///
-/// Spec: spec/module/math.md
+/// Spec: spec/feature/module/math.md
 
 #include <cassert>
 #include <cstddef>

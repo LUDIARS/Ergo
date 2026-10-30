@@ -8,7 +8,7 @@
 /// - Semi-implicit Euler integration
 /// - Contact event tracking (Begin/Stay/End)
 ///
-/// Spec: spec/module/physics2d.md
+/// Spec: spec/feature/module/physics2d.md
 
 #include "ergo/physics2d/body.h"
 #include "ergo/physics2d/contact.h"

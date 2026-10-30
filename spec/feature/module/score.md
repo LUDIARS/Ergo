@@ -8,7 +8,7 @@
 I/O は持たず、 ハイスコアの永続化はホストの責務 (`set_high_score()` で
 ロード時に流し込む)。
 
-Ars 側ゲーム辞書 [`spec/game-lexicon/features/core/score-system.toml`](../../../ars/spec/game-lexicon/features/core/score-system.toml)
+Ars 側ゲーム辞書 (Ars リポジトリの `spec/game-lexicon/features/core/score-system.toml`)
 のリファレンス実装。
 
 ## カテゴリ

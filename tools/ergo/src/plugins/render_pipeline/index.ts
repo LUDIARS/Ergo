@@ -1,6 +1,6 @@
 /// render_pipeline plugin — Phase 3 単一グラフエディタ。
 ///
-/// `spec/tool/render_pipeline_system_b.md` 参照。 Pictor 系統B 解体 (Phase 3
+/// `spec/feature/tool/render_pipeline_system_b.md` 参照。 Pictor 系統B 解体 (Phase 3
 /// `LUDIARS/Pictor#60`) で **ハードコード描画パスが消える** ため、 旧 Scanner
 /// モード (Python regex で C++ をスキャンする) は不要になった。 本プラグインは
 /// `Pictor/profiles/*.profile.json` を single source of truth とし、 単一の

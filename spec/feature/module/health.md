@@ -8,7 +8,7 @@
 物理 / 描画 / スレッドに依存しない純粋な状態 + コールバック。 ホストが `Health`
 を**所有**して、 戦闘モジュールから `apply_damage()` を呼ぶ、 という使い方を想定。
 
-Ars 側ゲーム辞書 [`spec/game-lexicon/features/core/health-system.toml`](../../../ars/spec/game-lexicon/features/core/health-system.toml)
+Ars 側ゲーム辞書 (Ars リポジトリの `spec/game-lexicon/features/core/health-system.toml`)
 のリファレンス実装。
 
 ## カテゴリ

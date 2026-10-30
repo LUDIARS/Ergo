@@ -8,7 +8,7 @@
 `ergo::combo_counter` と組ませて「Good 以下でコンボ切る」 のような閾値ロジックを
 組むためのヘルパ `breaks_combo()` も提供。
 
-Ars 側ゲーム辞書 [`spec/game-lexicon/features/rhythm/timing-judge.toml`](../../../ars/spec/game-lexicon/features/rhythm/timing-judge.toml)
+Ars 側ゲーム辞書 (Ars リポジトリの `spec/game-lexicon/features/rhythm/timing-judge.toml`)
 のリファレンス実装。
 
 ## カテゴリ

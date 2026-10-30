@@ -6,7 +6,7 @@
 /// 速度が **加算** されて total_velocity に乗る (重力・ノックバック・
 /// 移動床など)。位置 warp 時には Brain が全 Effect をリセットする。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include "ergo/character/types.h"
 

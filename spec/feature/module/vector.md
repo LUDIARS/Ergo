@@ -42,7 +42,7 @@ ThorVG 等の SVG ラスタライザは「SVG → 2D ピクセル → テクス�
 | header_dir | `include/ergo/vector/` |
 | source_dir | `src/vector/` |
 | test_dir | `tests/vector/` |
-| spec | `spec/module/vector.md` (本書) |
+| spec | `spec/feature/module/vector.md` (本書) |
 | cmake_option | `ERGO_BUILD_VECTOR` |
 | tool_plugin | null (編集 UI は ui_layout 側) |
 | status | preview |

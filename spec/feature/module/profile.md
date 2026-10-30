@@ -150,7 +150,7 @@ public:
 
 C++ モジュールが出す trace を可視化する Web プラグイン。 既存の
 `particle` / `rive` / `variable` と同方式で `tools/ergo/src/plugins/profile/`
-に追加する (`spec/tool/ergo.md` 準拠)。
+に追加する (`spec/feature/tool/ergo.md` 準拠)。
 
 - trace JSON を読み込み (ファイルドロップ / 取得)
 - **プロセス → スレッド**でレーン分割

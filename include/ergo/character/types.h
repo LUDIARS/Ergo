@@ -5,7 +5,7 @@
 /// ergo_character はエンジン非依存の最下層モジュールなので、数学型も
 /// ここで自己完結させる (他モジュール / ホストの math 型へは依存しない)。
 ///
-/// Spec: spec/module/character.md
+/// Spec: spec/feature/module/character.md
 
 #include <cmath>
 

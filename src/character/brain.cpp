@@ -3,7 +3,7 @@
 namespace ergo::character {
 
 void BrainBase::update(float dt) {
-    // 処理順は spec/module/character.md「タスク」節 (TCC UpdateBrain 準拠)。
+    // 処理順は spec/feature/module/character.md「タスク」節 (TCC UpdateBrain 準拠)。
 
     // 1. Check 層の先行更新
     update_.process(dt);
