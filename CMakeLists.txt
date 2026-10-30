@@ -540,6 +540,20 @@ if(ERGO_BUILD_LOG)
         target_link_libraries(test_log_sink PRIVATE ergo_log ergo_gtest_main Threads::Threads)
         add_test(NAME test_log_sink COMMAND test_log_sink)
     endif()
+
+    # ergo_log_live — LiveSink streaming records to tools/ergo's `log` plugin
+    # over ergo_common_ws. Separate so ergo_log stays socket-free.
+    option(ERGO_BUILD_LOG_LIVE "Build ergo_log_live (LiveSink for the log plugin)" ON)
+    if(ERGO_BUILD_LOG_LIVE AND TARGET ergo_common_ws)
+        add_library(ergo_log_live src/log/live_sink.cpp)
+        target_include_directories(ergo_log_live PUBLIC include)
+        target_link_libraries(ergo_log_live PUBLIC ergo_log PRIVATE ergo_common_ws ergo_common)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_live_sink tests/log/test_live_sink.cpp)
+            target_link_libraries(test_live_sink PRIVATE ergo_log_live ergo_common ergo_gtest_main)
+            add_test(NAME test_live_sink COMMAND test_live_sink)
+        endif()
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
