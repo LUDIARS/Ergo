@@ -21,6 +21,7 @@ import makeUiLayoutPlugin       from "../plugins/ui_layout/index.js";
 import makeVfxSuggestPlugin     from "../plugins/vfx-suggest/index.js";
 import makeVfxBreedPlugin       from "../plugins/vfx-breed/index.js";
 import makeSceneEditorPlugin    from "../plugins/scene_editor/index.js";
+import makeLogPlugin            from "../plugins/log/index.js";
 
 export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeParticlePlugin,
@@ -34,4 +35,5 @@ export const PLUGIN_FACTORIES: PluginFactory[] = [
     makeVfxSuggestPlugin,
     makeVfxBreedPlugin,
     makeSceneEditorPlugin,
+    makeLogPlugin,
 ];
