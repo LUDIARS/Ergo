@@ -19,7 +19,9 @@
 /// on_record() only copies the record into a bounded queue (oldest records
 /// are dropped when it is full, and the drop count is reported to the
 /// tool), so logging never waits on the socket. Records queue while the
-/// tool is down and are sent once it connects. The sink never logs through
+/// tool is down and are sent once it connects. At most two `lines` frames
+/// sit in the socket's send queue at once, so a slow or stalled tool also
+/// backs records up in this bounded queue rather than growing memory. The sink never logs through
 /// ergo_log itself; failures surface through start()'s return value and
 /// is_connected().
 ///
@@ -78,8 +80,10 @@ public:
     /// port or app is empty. Does not install the sink: call add_sink().
     bool start(std::string host = "127.0.0.1", uint16_t port = 5170, std::string app = "app");
 
-    /// Stop the worker and close the socket. Records not sent yet stay
-    /// queued for the next start(). Safe to call repeatedly.
+    /// Stop the worker and close the socket, without waiting on a tool that
+    /// stopped reading. Records still in the queue stay queued for the next
+    /// start(); up to two `lines` frames already handed to the socket may be
+    /// lost. Safe to call repeatedly.
     void stop();
 
     /// True while the WebSocket session is open.

@@ -16,6 +16,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -48,6 +49,12 @@ public:
     /// (per design — sender must re-emit on reconnect via on_open).
     void send_text(std::string payload);
 
+    /// Frames queued by send_text() and not fully written to the socket yet
+    /// (the one being written included). A sender that can outpace the peer
+    /// checks this before queueing more, so a slow or stalled peer backs data
+    /// up on the sender's side instead of growing this queue without bound.
+    std::size_t unsent() const { return unsent_.load(std::memory_order_acquire); }
+
 private:
     void worker_loop();
     bool connect_once();
@@ -75,6 +82,7 @@ private:
 
     std::mutex                      send_mtx_;
     std::deque<std::string>         send_queue_;
+    std::atomic<std::size_t>        unsent_ {0};  // send_queue_ + frames being drained
 };
 
 } // namespace ergo::common::ws

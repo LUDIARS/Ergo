@@ -1,21 +1,134 @@
-// ergo_log_live — LiveSink without a socket: frame encoding, the bounded
-// queue and its drop count, and installation through ergo_log. The worker
-// and the socket are never started here (see spec/feature/tool/log.md for
-// the wire protocol the tools/ergo `log` plugin tests against).
+// ergo_log_live — LiveSink: frame encoding, the bounded queue and its drop
+// count, and installation through ergo_log, all without a socket. The last
+// tests start the worker against an in-process loopback server (127.0.0.1,
+// port 0) that answers the upgrade and then never reads, to pin down the
+// back-pressure: a stalled tool costs counted drops in LiveSink's own queue
+// and never blocks stop(). spec/feature/tool/log.md has the wire protocol
+// the tools/ergo `log` plugin tests against.
 
 #include "gtest/gtest.h"
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "ergo/common/json_min.h"
 #include "ergo/log/live_sink.h"
 #include "ergo/log/log.h"
 
+#ifdef _WIN32
+  #ifndef NOMINMAX
+  #define NOMINMAX
+  #endif
+  #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+  #endif
+  #include <winsock2.h>
+  #include <ws2tcpip.h>
+  using sock_t = SOCKET;
+  static const sock_t kBadSock = INVALID_SOCKET;
+  static void close_sock(sock_t s) { ::closesocket(s); }
+  using socklen_type = int;
+#else
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  #include <sys/select.h>
+  #include <sys/socket.h>
+  #include <unistd.h>
+  using sock_t = int;
+  static const sock_t kBadSock = -1;
+  static void close_sock(sock_t s) { ::close(s); }
+  using socklen_type = socklen_t;
+#endif
+
 using namespace ergo::log;
 namespace jsonm = ergo::common::jsonm;
+using Clock = std::chrono::steady_clock;
+using std::chrono::milliseconds;
 
 namespace {
+
+#ifdef _WIN32
+struct WsaInit {
+    WsaInit()  { WSADATA d; WSAStartup(MAKEWORD(2, 2), &d); }
+    ~WsaInit() { WSACleanup(); }
+} g_wsa_init;
+#endif
+
+template <class Pred>
+bool wait_until(Pred pred, milliseconds timeout = milliseconds(3000)) {
+    const auto deadline = Clock::now() + timeout;
+    while (Clock::now() < deadline) {
+        if (pred()) return true;
+        std::this_thread::sleep_for(milliseconds(2));
+    }
+    return pred();
+}
+
+bool readable(sock_t s, milliseconds timeout) {
+    fd_set rf;
+    FD_ZERO(&rf);
+    FD_SET(s, &rf);
+    timeval tv{};
+    tv.tv_sec  = static_cast<long>(timeout.count() / 1000);
+    tv.tv_usec = static_cast<long>((timeout.count() % 1000) * 1000);
+    return ::select(static_cast<int>(s + 1), &rf, nullptr, nullptr, &tv) > 0;
+}
+
+/// A tool that accepts the engine, answers the WebSocket upgrade and then
+/// never reads again (paused in a debugger, SIGSTOPped).
+class StalledServer {
+public:
+    StalledServer() {
+        listen_ = ::socket(AF_INET, SOCK_STREAM, 0);
+        sockaddr_in addr{};
+        addr.sin_family      = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        addr.sin_port        = 0;  // ephemeral
+        ok_ = listen_ != kBadSock
+           && ::bind(listen_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0
+           && ::listen(listen_, 4) == 0;
+        socklen_type len = sizeof(addr);
+        if (ok_ && ::getsockname(listen_, reinterpret_cast<sockaddr*>(&addr), &len) == 0) {
+            port_ = ntohs(addr.sin_port);
+        }
+    }
+    ~StalledServer() {
+        if (peer_ != kBadSock) close_sock(peer_);
+        if (listen_ != kBadSock) close_sock(listen_);
+    }
+
+    bool     ok()   const { return ok_ && port_ != 0; }
+    uint16_t port() const { return port_; }
+
+    bool accept_and_upgrade() {
+        if (!readable(listen_, milliseconds(3000))) return false;
+        peer_ = ::accept(listen_, nullptr, nullptr);
+        if (peer_ == kBadSock) return false;
+        std::string req;
+        char buf[1024];
+        while (req.find("\r\n\r\n") == std::string::npos) {
+            if (!readable(peer_, milliseconds(3000))) return false;
+            const int n = ::recv(peer_, buf, sizeof(buf), 0);
+            if (n <= 0) return false;
+            req.append(buf, static_cast<std::size_t>(n));
+        }
+        const std::string resp = "HTTP/1.1 101 Switching Protocols\r\n"
+                                 "Upgrade: websocket\r\nConnection: Upgrade\r\n"
+                                 "Sec-WebSocket-Accept: test\r\n\r\n";
+        return ::send(peer_, resp.data(), static_cast<int>(resp.size()), 0)
+               == static_cast<int>(resp.size());
+    }
+
+private:
+    sock_t   listen_ = kBadSock;
+    sock_t   peer_   = kBadSock;
+    uint16_t port_   = 0;
+    bool     ok_     = false;
+};
 
 Record make_record(Level lvl, uint64_t frame, const std::string& msg) {
     return Record{lvl, frame, static_cast<int64_t>(frame * 10), 77, msg};
@@ -208,4 +321,70 @@ TEST(LiveSink, StartRejectsBadArguments) {
     EXPECT_FALSE(live.is_connected());
     live.stop();   // never started: no-op
     live.stop();
+}
+
+// -------------------------------------------------------------------------
+// Against a tool that stops reading
+
+TEST(LiveSink, QueueStaysTheBoundWhileTheToolStopsReading) {
+    StalledServer srv;
+    ASSERT_TRUE(srv.ok());
+    constexpr std::size_t kCap = 256;
+    LiveSink live(kCap);
+    ASSERT_TRUE(live.start("127.0.0.1", srv.port(), "stall"));
+    ASSERT_TRUE(srv.accept_and_upgrade());
+    ASSERT_TRUE(wait_until([&] { return live.is_connected(); }));
+
+    // Feed full-size records until the socket backs up. From then on the
+    // worker must leave records in LiveSink's own queue (not move them into
+    // the transport's unbounded one), so the queue stays full.
+    const std::string big(LiveSink::kMaxMessageBytes, 'x');
+    bool saturated = false;
+    for (int round = 0; round < 60 && !saturated; ++round) {
+        for (std::size_t i = 0; i < kCap; ++i) live.on_record(Record{Level::Info, 0, 0, 1, big});
+        std::this_thread::sleep_for(milliseconds(200));
+        saturated = live.pending() == kCap;
+    }
+    ASSERT_TRUE(saturated);  // else the worker kept draining into the socket
+    EXPECT_TRUE(live.is_connected());
+
+    // Overflow is dropped and counted here, while still connected.
+    const uint64_t before = live.dropped();
+    for (std::size_t i = 0; i < 2 * kCap; ++i) live.on_record(Record{Level::Info, 0, 0, 1, big});
+    EXPECT_EQ(live.pending(), kCap);
+    EXPECT_GT(live.dropped(), before);
+
+    const auto t0 = Clock::now();
+    live.stop();
+    const auto took = std::chrono::duration_cast<milliseconds>(Clock::now() - t0);
+    EXPECT_LT(took.count(), 1000);
+    EXPECT_EQ(live.pending(), kCap);  // still queued for the next start()
+}
+
+TEST(LiveSink, StopIsPromptWhileThreadsKeepLogging) {
+    StalledServer srv;
+    ASSERT_TRUE(srv.ok());
+    LiveSink live;
+    ASSERT_TRUE(live.start("127.0.0.1", srv.port(), "busy"));
+    ASSERT_TRUE(srv.accept_and_upgrade());
+    ASSERT_TRUE(wait_until([&] { return live.is_connected(); }));
+
+    // Producers that never let the queue run empty must not keep the
+    // batching worker (and so stop()) busy.
+    std::atomic<bool> quit{false};
+    std::vector<std::thread> loggers;
+    for (int t = 0; t < 3; ++t) {
+        loggers.emplace_back([&live, &quit] {
+            while (!quit.load()) live.on_record(Record{Level::Info, 0, 0, 2, "line"});
+        });
+    }
+    std::this_thread::sleep_for(milliseconds(200));
+
+    const auto t0 = Clock::now();
+    live.stop();
+    const auto took = std::chrono::duration_cast<milliseconds>(Clock::now() - t0);
+    quit = true;
+    for (std::thread& t : loggers) t.join();
+    EXPECT_LT(took.count(), 1000);
+    EXPECT_FALSE(live.is_connected());
 }

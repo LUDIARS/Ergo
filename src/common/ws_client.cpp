@@ -243,6 +243,7 @@ void Client::stop() {
     if (thread_.joinable()) thread_.join();
     connected_.store(false, std::memory_order_release);
     std::lock_guard<std::mutex> lk(send_mtx_);
+    unsent_.fetch_sub(send_queue_.size(), std::memory_order_acq_rel);
     send_queue_.clear();
 }
 
@@ -250,6 +251,7 @@ void Client::send_text(std::string payload) {
     if (!connected_.load(std::memory_order_acquire)) return;
     std::lock_guard<std::mutex> lk(send_mtx_);
     send_queue_.push_back(std::move(payload));
+    unsent_.fetch_add(1, std::memory_order_acq_rel);
 }
 
 void Client::worker_loop() {
@@ -346,10 +348,17 @@ bool Client::drain_send_queue(int sock) {
     std::deque<std::string> local;
     { std::lock_guard<std::mutex> lk(send_mtx_); local.swap(send_queue_); }
     while (!local.empty()) {
-        if (stop_flag_.load(std::memory_order_acquire)) return false;  // stop() clears the rest
-        std::string frame = encode_text_masked(local.front());
+        bool ok = !stop_flag_.load(std::memory_order_acquire);
+        if (ok) {
+            const std::string frame = encode_text_masked(local.front());
+            ok = send_all(static_cast<socket_t>(sock), stop_flag_, frame.data(), frame.size());
+        }
+        if (!ok) {  // the rest of `local` is lost with the session
+            unsent_.fetch_sub(local.size(), std::memory_order_acq_rel);
+            return false;
+        }
         local.pop_front();
-        if (!send_all(static_cast<socket_t>(sock), stop_flag_, frame.data(), frame.size())) return false;
+        unsent_.fetch_sub(1, std::memory_order_acq_rel);
     }
     return true;
 }

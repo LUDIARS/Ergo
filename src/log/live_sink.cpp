@@ -4,6 +4,7 @@
 #include "ergo/common/ws_client.h"
 
 #include <algorithm>
+#include <atomic>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -81,7 +82,7 @@ struct LiveSink::Impl {
 
     std::mutex              wake_mtx;
     std::condition_variable wake_cv;
-    bool                    stopping = false;  // guarded by wake_mtx
+    std::atomic<bool>       stopping{false};   // written under wake_mtx
     std::thread             worker;
     bool                    started = false;   // start() / stop() caller only
 
@@ -127,22 +128,34 @@ struct LiveSink::Impl {
         wake_cv.notify_one();
     }
 
-    void flush() {
-        // A frame handed over while the session drops is lost with it.
-        while (client.is_connected()) {
+    // Frames the socket may hold at once. Past that, records wait in *this*
+    // queue, so a slow or stalled tool costs counted drops here instead of
+    // unbounded memory in the client's send queue.
+    static constexpr std::size_t kMaxFramesInFlight = 2;
+    static constexpr std::chrono::milliseconds kBackoffInterval{5};
+
+    /// Returns true when it stopped only because the socket is busy and
+    /// records are still waiting (the worker then re-checks sooner).
+    /// A frame handed over while the session drops, or before stop(), is
+    /// lost with it (at most kMaxFramesInFlight frames).
+    bool flush() {
+        while (client.is_connected() && !stopping.load(std::memory_order_acquire)) {
+            if (client.unsent() >= kMaxFramesInFlight) return true;
             std::string frame = take(kMaxBatchLines);
             if (frame.empty()) break;
             client.send_text(std::move(frame));
         }
+        return false;
     }
 
     void run() {
         std::unique_lock<std::mutex> lk(wake_mtx);
+        bool backlog = false;
         while (!stopping) {
-            wake_cv.wait_for(lk, kFlushInterval);
+            wake_cv.wait_for(lk, backlog ? kBackoffInterval : kFlushInterval);
             if (stopping) break;
             lk.unlock();
-            flush();
+            backlog = flush();
             lk.lock();
         }
     }

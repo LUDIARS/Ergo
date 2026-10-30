@@ -426,6 +426,30 @@ TEST(WsClient, SendWhileDisconnectedIsDropped) {
     EXPECT_EQ(f.payload, "after open");
 }
 
+TEST(WsClient, UnsentCountsFramesUntilWritten) {
+    LoopbackServer srv;
+    ASSERT_TRUE(srv.ok());
+    Client client;
+    EXPECT_EQ(client.unsent(), 0u);
+    client.start("127.0.0.1", srv.port(), "/ws");
+    ASSERT_TRUE(srv.accept_client());
+    ASSERT_TRUE(wait_until([&] { return client.is_connected(); }));
+
+    // A draining peer: the count returns to zero once the frames are written.
+    for (int i = 0; i < 3; ++i) client.send_text("f" + std::to_string(i));
+    for (int i = 0; i < 3; ++i) ASSERT_TRUE(srv.read_frame().ok);
+    EXPECT_TRUE(wait_until([&] { return client.unsent() == 0; }));
+
+    // A peer that stops reading: frames back up and stay counted...
+    const std::string chunk(64 * 1024, 'x');
+    for (int i = 0; i < 512; ++i) client.send_text(chunk);  // 32 MiB > any socket buffer
+    std::this_thread::sleep_for(milliseconds(200));
+    EXPECT_GT(client.unsent(), 0u);
+    // ...until stop() drops them.
+    client.stop();
+    EXPECT_EQ(client.unsent(), 0u);
+}
+
 TEST(WsClient, StopReturnsPromptlyWithoutServer) {
     // Reserve an ephemeral port, then release it so nothing listens there.
     uint16_t port = 0;
