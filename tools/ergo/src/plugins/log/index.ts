@@ -257,7 +257,8 @@ const factory: PluginFactory = () => {
                 if (c.role === "engine") ++engines;
                 else if (c.role === "ui") ++uis;
             }
-            return { ok: true, apps: apps.size, engines, uis };
+            // `clients` is the field the shell's sidebar badge reads.
+            return { ok: true, clients: conns.size, apps: apps.size, engines, uis };
         },
     };
 

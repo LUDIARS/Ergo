@@ -190,6 +190,17 @@ test("engines past MAX_ENGINES are refused with 1013, so the rings stay bounded"
     assert.equal(h.apps, MAX_APPS);
 });
 
+test("health() reports `clients` (the shell badge) next to the per-role counts", () => {
+    const plugin = makeLogPlugin();
+    engine(plugin, "game");
+    ui(plugin);
+    connect(plugin);   // no hello yet: still a client
+    const h = plugin.health!();
+    assert.equal(h.clients, 3);
+    assert.equal(h.engines, 1);
+    assert.equal(h.uis, 1);
+});
+
 test("GET /api/lines filters by level, since, text and frame", async () => {
     const plugin = makeLogPlugin();
     const eng = engine(plugin, "game");

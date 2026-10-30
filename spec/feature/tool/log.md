@@ -33,7 +33,7 @@ JSON のコードは書かない。
 | `http://localhost:5170/log/` | UI |
 | `http://localhost:5170/log/api/apps` | 保持しているアプリの一覧 (`{ apps: AppInfo[] }`) |
 | `http://localhost:5170/log/api/lines?app=...` | アプリの行 (下記) |
-| `http://localhost:5170/log/api/health` | プラグインヘルス (`apps` / `engines` / `uis`) |
+| `http://localhost:5170/log/api/health` | プラグインヘルス (`clients` / `apps` / `engines` / `uis`。`clients` は hello 前を含む全接続で、シェルのバッジに出る) |
 | `ws://localhost:5170/log/ws` | エンジン / UI 共通の WS 入口 |
 
 ### `GET /log/api/lines`
