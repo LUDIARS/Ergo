@@ -1,8 +1,18 @@
 #pragma once
 
-/// Internal WebSocket client used by ergo_bind. Bidirectional (send + recv),
-/// reconnecting, single-thread worker. Public-ish header so bind_engine.cpp
-/// can include it; consumers should use the bind.h API instead.
+/// Shared WebSocket client transport (target `ergo_common_ws`). Bidirectional
+/// (send + recv), reconnecting, single-thread worker. It is the one C++ WS
+/// client in the tree: ergo_bind and the engine-side tool links (log /
+/// particle / scene) all build their wire protocols on top of it instead of
+/// writing their own socket code.
+///
+/// Threading: on_text / on_open run on the worker thread, never on the
+/// caller's. A frame sent while disconnected is dropped, so a protocol that
+/// needs state on the peer must re-send it from on_open (which fires after
+/// every successful handshake, including reconnects). Inbound frames larger
+/// than 1 MiB drop the connection, which is then retried.
+///
+/// Kept separate from `ergo_common` so the JSON codec stays socket-free.
 
 #include <atomic>
 #include <chrono>
@@ -13,7 +23,7 @@
 #include <string>
 #include <thread>
 
-namespace ergo::bind::ws {
+namespace ergo::common::ws {
 
 class Client {
 public:
@@ -41,11 +51,13 @@ public:
 private:
     void worker_loop();
     bool connect_once();
-    bool perform_handshake(int sock);
+    /// `leftover` receives any frame bytes that arrived with the 101 response.
+    bool perform_handshake(int sock, std::string& leftover);
     bool drain_send_queue(int sock);
     /// Returns 1 when a full frame has been decoded into `payload`/`opcode`,
-    /// 0 when more bytes are needed, -1 on a fatal protocol violation
-    /// (oversized frame). The caller drops the connection on -1.
+    /// 0 when more bytes are needed, -1 when the peer closed the stream or on
+    /// a fatal protocol violation (oversized frame). The caller drops the
+    /// connection on -1.
     int  read_one_frame(int sock, std::string& rx_buf, std::string& payload, uint8_t& opcode);
 
     std::string                     host_;
@@ -65,4 +77,4 @@ private:
     std::deque<std::string>         send_queue_;
 };
 
-} // namespace ergo::bind::ws
+} // namespace ergo::common::ws

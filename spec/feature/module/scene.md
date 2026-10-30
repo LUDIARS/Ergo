@@ -2,181 +2,248 @@
 
 ## 概要
 
-`ergo_scene` は **ルックデヴ用の自由操作シーン**を提供し、 同時に **将来の
-GUI レベルエディタの土台**になるモジュール。
+`ergo_scene` は **ルックデヴ用シーンを「データとして CRUD できる編集対象
+ドキュメント」 として持つ**モジュール。 シーンは「カメラ + アクター群 +
+ポストプロセス設定」 から成り、 `*.scene.json` として読み書きできる。
 
-シーンは「カメラ + GameObject 群 + ポストプロセス設定」 から成る。 ホストは
-シーンを読み込み、 フリーカメラで自由に見回し、 GameObject の transform /
-マテリアルとポストプロセスを `tools/ergo` のエディタで調整できる。
+本モジュールが持つのは **データモデル層だけ**: ドキュメントの CRUD、 JSON
+load/save、 フィールド単位のパッチ適用、 カメラ行列、 複数シーンの合成
+(`SceneGraph`)。 描画 (アクター → drawable 変換、 ポストプロセスのパス構成)
+と `ergo_actor` / `ergo_bind` への結線は **ホスト側の責務で、 現時点では
+未実装 (将来)**。 `ergo_scene` はそれらに依存しない。
 
-設計の核心は **シーンを「コードで組む固定物」 でなく「データとして CRUD
-できる編集対象ドキュメント」 として扱う**こと。 ルックデヴ用途では
-「読み込んで・見て・調整する」 だけだが、 シーンモデルを最初から
-addressable + シリアライズ可能に設計しておくことで、 後から GUI レベル
-エディタ (オブジェクトの配置・追加・削除・保存) へ無改造で拡張できる。
+ライブ編集は `tools/ergo` の `scene_editor` プラグイン
+([`spec/feature/tool/scene_editor.md`](../tool/scene_editor.md)) で行う。
+エンジン側のクライアントは別ターゲット `ergo_scene_link`
+(`include/ergo/scene/editor_link.h`) で、 シーンを publish し、 エディタから
+届いたパッチを `Scene::apply_patch` でホストのスレッドに適用する。
+
+シーンモデルを最初から addressable (文字列 id) + シリアライズ可能にしてある
+ので、 後から GUI レベルエディタ (配置・追加・削除・保存) へ拡張するときも
+モデルを作り直さない。
+
+> `ergo_cast` の `Scene` (Actor を束ねる非所有のグルーピング層) とは別物。
+> `ergo_scene` の `Scene` は `ergo::scene` 名前空間のドキュメント。
 
 ## カテゴリ
 システム
 
 ## 所属ドメイン
-ルックデヴ / シーン構築 / レベルエディタ基盤 / 描画
+ルックデヴ / シーン構築 / レベルエディタ基盤
+
+## 必要なデータ
+- `*.scene.json` (下記「シーンファイル形式」)
+- (`ergo_scene_link` 使用時) `scene_editor` プラグインの接続先
+  (既定 `127.0.0.1:5170` / `/scene_editor/ws`) とアプリ名
 
 ## 依存
-- `ergo_render` — 描画オーケストレーション層 (下記「描画」)。
-  **現在 concurrent セッションが `feat/ergo-render` で実装中・main 未マージ**。
-  `ergo_scene` の実装は `ergo_render` の main 取り込み後に行う。 本 spec は
-  `ergo_render` の `RenderContext` / `FrameComposer` API を前提に設計する
-- `ergo_actor` (+ `ergo_bind`) — GameObject のツリー登録と変数公開を流用
-- C++17 標準ライブラリ (`<vector>`, `<string>`, `<memory>`, `<array>`)
+- `ergo_scene`: `ergo_common` のみ (JSON コーデック `ergo::common::jsonm`)
+- `ergo_scene_link`: `ergo_scene` + `ergo_common_ws` (共有 WebSocket
+  クライアント。 [`common.md`](common.md))。 `ERGO_BUILD_SCENE_LINK`
+  (既定 ON) で切り離せる
+- C++17 標準ライブラリ (`<vector>`, `<string>`, `<string_view>`, `<memory>`,
+  `<functional>`, `<mutex>`)
 - (テスト) GoogleTest 互換 mini-gtest
 
-## 構成要素
+描画系 (`ergo_render` / Pictor) と `ergo_actor` / `ergo_bind` には依存しない。
+
+## データモデル
 
 ### Scene
-編集対象ドキュメントの単位。
+編集対象ドキュメントの単位 (`include/ergo/scene/scene.h`)。
 
-- `camera` — フリーカメラ状態
-- `objects` — `GameObject` の集合。 各要素は **文字列 id で addressable**
-- `post_process` — ポストプロセス設定
-- `load(path)` / `save(path)` — `*.scene.json` の読み書き
+| 要素 | 内容 |
+|---|---|
+| `id` | シーン id。 `SceneGraph` の mount キー、 `scene_editor` のルーティングキー |
+| `domain` / `mount` | 所属ドメインとマウント先 (既定 `"level"` / `"/level"`) |
+| `imports` | 参照する他シーンのパス列 |
+| `camera` | `Camera` |
+| `post_process` | `PostProcess` |
+| `actors` | `ActorSpec` の列。 各要素は **文字列 id で addressable** |
 
-### GameObject
-シーンに置かれる 1 オブジェクト。 `ergo::actor::Actor` を継承し、 シーン
-ツリーへの登録と変数公開 (`bind_var`) を流用する。
+主な API: `load_json` / `load_file` / `load(path)` / `save(path)` /
+`to_json()`、 `add_actor` (空 id・重複 id は拒否) / `remove_actor` (子の
+`parent` を外す) / `clear_actors` / `find_actor`、 `add_import` /
+`clear_imports`、 `apply_patch` (下記)。
+
+### ActorSpec
+シーンに置かれる 1 アクターの記述。 `ergo_actor::Actor` のインスタンスでは
+なく、 純粋なデータ。
 
 | 属性 | 内容 |
 |---|---|
-| `id`        | シーン内一意の文字列 (シリアライズ・エディタ選択のキー) |
-| `transform` | position / rotation(quat) / scale。 `ergo_actor` が次フェーズ送りにした transform を **本モジュールが持つ** |
-| `visual`    | 描画リソース参照 (mesh / material 等)。 当面は `ResourceRef` (パス + kind) |
-| `parent`    | 親 GameObject の id (`ergo_actor` のツリーに対応) |
-
-`transform` 各成分と `visual` の主要パラメータを `bind_var` で公開する。
+| `id` | シーン内一意の文字列 (シリアライズ・エディタ選択のキー) |
+| `name` / `type` | 表示名 / 種別名 (既定 `"Actor"`) |
+| `parent` | 親アクターの id。 空ならルート (JSON では `null`) |
+| `transform` | `pos` (Vec3) / `rot` (クォータニオン `[x, y, z, w]`) / `scale` (Vec3) |
+| `visual` | `ResourceRef` (`kind` / `ref` / `material`) |
+| `components` | `ComponentSpec` の列。 `type` 以外のプロパティは (キー, JSON テキスト) で保持し、 スキーマを知らずに round-trip する |
+| `vars` | `VarSpec` (`name` / `type` / `value`) の列。 `value` は JSON テキスト |
+| `instance_of` | プレハブ参照 (JSON キーは `instanceOf`) |
+| `overrides` | `OverrideEntry` (`path` / `value` = JSON テキスト) の列。 プレハブ上書き |
 
 ### Camera
-ルックデヴ用フリーカメラ。 orbit (注視点まわり旋回) と fly (一人称移動) を
-持つ。 位置 / 注視点 / FOV を `bind_var` 公開する。
+`mode` (`orbit` / `fly`)、 `target`、 `position` / `front` (fly 用)、
+`distance`、 `yaw` / `pitch` (ラジアン)、 `fov_deg`、 `z_near` / `z_far`。
+`view_matrix(out)` / `projection_matrix(aspect, out)` で column-major の
+float[16] を返す。 入力からカメラを動かす `update` は持たない (操作は
+ホストがフィールドを書き換える)。
 
 ### PostProcess
-トーンマップ / bloom / カラーグレード等のパラメータ集合。 `ergo_render` の
-`FrameComposer` のポストプロセスパス構成に対応づく。 各パラメータを
-`bind_var` 公開する。
+`tonemap` (既定 `"none"`)、 `exposure`、 `bloom` (`enabled` / `threshold` /
+`intensity`)。 パラメータの入れ物で、 描画パスへの反映はホスト側。
 
-## 描画 — `ergo_render` との関係
+### SceneGraph
+複数の `Scene` を id で mount / unmount し、 1 つのアクターグラフとして
+見せる実行時コンポジタ。 `mount` (id 空・重複は拒否) / `unmount` /
+`is_mounted` / `find_scene` / `find_actor` (mount 順で最初の一致) /
+`for_each_actor`。
 
-`ergo_scene` は `ergo_render` の **上**に乗る。
+## パッチ API — `Scene::apply_patch`
 
-- `ergo_render` が担うのは横断オーケストレーション (初期化順 / パス構成 /
-  フレームループ / submit-present / screenshot)。
-- `ergo_render` は「**GameObject → drawable 変換**」 と「**FrameComposer の
-  パス構成 (ポストプロセス含む)**」 を *ゲーム側に残す* 設計。 `ergo_scene` が
-  その「ゲーム側」 を引き受ける — シーンの GameObject を drawable に変換し、
-  ポストプロセス設定をパス構成に反映する。
-- 依存方向は `ergo_scene → ergo_render → Pictor` の一方向。
+`bool apply_patch(const std::string& actor_id, std::string_view field, std::string_view value_json)`
 
-> 実装順: `ergo_render` が main にマージされてから `ergo_scene` の描画部を
-> 結線する。 それまでは Scene / GameObject / Camera / シリアライズの
-> データモデル層を先行実装できる (描画非依存)。
+`scene_editor` の wire 形式そのままの 1 フィールド編集を適用する。
+`value_json` は新しい値の JSON テキスト。
 
-## エディタ調整 — `ergo_bind` 経由
+| field | value | 備考 |
+|---|---|---|
+| `name` / `type` / `visual.kind` / `visual.ref` / `visual.material` | 文字列 | |
+| `transform.pos` / `transform.scale` | 有限数ちょうど 3 個の配列 | |
+| `transform.rot` | 数 4 個の配列 `[x, y, z, w]` | 正規化して格納。 長さ 0 は拒否 |
+| `vars/<name>/value` | 任意の JSON | 直列化して格納。 `<name>` の var が既に存在すること |
+| `parent` | アクター id / `""` / `null` | `""` と `null` は親を外す。 同じシーンに存在し、 自分自身でも子孫でもないこと (循環禁止) |
 
-GameObject の transform / マテリアル、 カメラ、 ポストプロセスのパラメータは
-すべて `bind_var` で公開する。
+未知のアクター・未知のフィールド・型や要素数の不一致・不正な JSON・旧形式の
+`transform.rot.xyz` は **false を返し、 シーンを一切変更しない**。
 
-- `tools/ergo` の `variable` プラグインでそのまま調整できる (既存機構)。
-- 各 GameObject は `ergo_actor` のツリーノードなので、 variable プラグインの
-  Actor ペインがそのまま **シーンツリービュー**になる。
-- = ルックデヴ段階では「専用 UI を作らず」 既存 variable プラグインで
-  パラメータ調整が成立する。
+## エディタ連携 — `ergo_scene_link`
 
-## レベルエディタ化の布石 (今後フェーズ)
+`ergo::scene::EditorLink` (`include/ergo/scene/editor_link.h`) が
+`scene_editor` プラグインのエンジン側クライアント。
 
-本モジュールは「いずれ GUI レベルエディタになる」 ことを見越して設計する。
+- `connect(host = "127.0.0.1", port = 5170, path = "/scene_editor/ws")` /
+  `disconnect()` / `is_connected()`。 接続は非同期で、 切れても自動で
+  再接続する
+- `set_app_name(app)` — エディタに表示されるエンジン名 (既定 `"anonymous"`)
+- `publish(scene)` — `{op:"scene", id, json: scene.to_json()}` を送り、
+  再接続用に記憶する。 ホスト側でシーンを変えたら再度呼ぶ
+- `unpublish(id)` — `{op:"scene_remove", id}` を送り、 記憶とキュー上の
+  パッチを捨てる
+- 接続が (再) 確立するたびに `{op:"hello", role:"engine", app}` と、
+  それまでに publish した全シーンを送り直す
+- 受信した `{op:"patch"}` はミューテックス付きのキューに積むだけ (ワーカー
+  スレッド)。 `poll(SceneGraph&)` / `poll(Scene&)` がホストのスレッドで
+  `apply_patch` を適用し、 **触れたシーンを毎回 publish し直す** (パッチが
+  拒否された場合も。 UI 側の値がエンジンの実際の値に戻る)
+- `set_transport(hook)` / `receive(frame)` でソケットを差し替えられる
+  (テスト用、 または独自トランスポートを持つホスト用)
 
-- **シーンはシリアライズ可能なドキュメント** (`*.scene.json`)。 GameObject の
-  id / transform / visual / 親子、 カメラ、 ポストプロセスを全て保存・復元
-  できる。 エディタの「保存」 はこの形式への書き出しになる。
-- **GameObject は id で addressable**。 エディタが列挙・選択・追加・削除
-  できる前提のコレクションにする (固定配列やハードコードにしない)。
-- 将来 `tools/ergo` に専用 `scene` (レベルエディタ) プラグインを追加する:
-  シーンツリー + 3D ビューポート + ギズモ + オブジェクトの配置 / 複製 /
-  削除 + save/load。 `variable` プラグインの「値の調整」 から「オブジェクトの
-  CRUD + 空間配置」 へ発展させる。
-- そのため Scene / GameObject のデータモデルは初版から addressable +
-  serializable で作る。 ルックデヴ初版とレベルエディタでモデルを作り直さない。
+```cpp
+ergo::scene::EditorLink link;
+link.set_app_name("lookdev");
+link.connect();
+link.publish(*scene);
+// フレームごと (メインスレッド)
+link.poll(*scene);
+```
 
 ## シーンファイル形式 (`*.scene.json`)
 
 ```jsonc
 {
   "version": 1,
+  "id": "stage_01",
+  "domain": "level",
+  "mount": "/level",
+  "imports": ["prefabs/enemy.scene.json"],
   "camera": {
     "mode": "orbit",
     "target": [0, 0, 0],
+    "position": [0, 0, 8], "front": [0, 0, -1],
     "distance": 8.0,
     "yaw": 0.6, "pitch": 0.3,
-    "fov_deg": 50
+    "fov_deg": 50, "z_near": 0.1, "z_far": 1000
   },
   "post_process": {
     "tonemap": "aces",
     "exposure": 1.0,
     "bloom": { "enabled": true, "threshold": 1.0, "intensity": 0.6 }
   },
-  "objects": [
+  "actors": [
     {
       "id": "ground",
+      "name": "Ground",
+      "type": "StaticMeshActor",
       "parent": null,
       "transform": { "pos": [0,0,0], "rot": [0,0,0,1], "scale": [10,1,10] },
-      "visual": { "kind": "mesh", "ref": "assets/ground.mesh", "material": "assets/ground.mat" }
+      "visual": { "kind": "mesh", "ref": "assets/ground.mesh", "material": "assets/ground.mat" },
+      "components": [{ "type": "Collider", "shape": "box" }],
+      "vars": [{ "name": "health", "type": "int", "value": 100 }],
+      "instanceOf": "prefabs/ground.scene.json",
+      "overrides": [{ "path": "vars/health", "value": 50 }]
     }
   ]
 }
 ```
 
-JSON コーデックは `ergo_common` (`ergo::common::jsonm`) を流用する。
+- `actors` が正規のキー。 `objects` は **非推奨の別名**で、 読み込み時に
+  `actors` が無ければ受け付ける。 書き出しは常に `actors`
+- `components` / `vars` / `overrides` は空なら書き出さない。
+  `name` と `instanceOf` も空なら書き出さない
+- 省略されたフィールドは既定値になる。 id の無いアクターは読み飛ばす
 
 ## 変数
-- `Scene`: `camera`, `objects` (id → GameObject の所有コレクション),
-  `post_process`
-- `GameObject`: `id`, `transform`, `visual`, (Actor 由来) `handle` / `name` /
-  `parent`
-- `Camera`: `mode`, `target`, `distance`, `yaw`, `pitch`, `fov_deg`
-  (fly モード時は `position` / `front`)
+- `Scene`: `id_` / `domain_` / `mount_` / `imports_` / `camera_` /
+  `post_process_` / `actors_` (`std::vector<ActorSpec>`)
+- `SceneGraph`: mount 済み `std::unique_ptr<Scene>` の列 (mount 順)
+- `EditorLink`: WS クライアント、 publish 済みシーンの最新フレーム
+  (publish 順)、 アプリ名、 受信パッチキュー (上限 4096 件、 超過時は古い
+  ものから捨てる)
 
 ## 作業
 
 ### 入力
-- `Scene::load(path)` — `*.scene.json` を読み、 GameObject を構築
-- フリーカメラへの操作 (orbit ドラッグ / fly の WASD 相当) — ホストが
-  入力を渡し `Camera::update(dt, input)` を呼ぶ
-- `variable` プラグインからの `bind_var` 値変更 (transform / PP 等)
+- `Scene::load_json` / `load_file` / `load(path)` — `*.scene.json`
+- `add_actor` / `remove_actor` / カメラ・ポストプロセスのフィールド書き換え
+  (ホスト)
+- `Scene::apply_patch` — フィールド単位の編集
+- (`ergo_scene_link`) `scene_editor` から届く `patch` メッセージ
 
 ### 出力
-- `Scene::save(path)` — 現在のシーンを `*.scene.json` に書き出す
-- `Scene` の drawable 列 + パス構成を `ergo_render` に渡す (描画結線後)
-- `bind_var` により公開された全パラメータ (variable プラグインへ)
+- `Scene::to_json()` / `save(path)` — `*.scene.json`
+- `Camera::view_matrix` / `projection_matrix`
+- (`ergo_scene_link`) `hello` / `scene` / `scene_remove` メッセージ
 
 ### タスク
-- シーン JSON のパース / 直列化 (`ergo_common::jsonm`)
-- GameObject の生成時に `ergo_actor::Actor` として登録、 transform / visual を
-  `bind_var` 公開
+- シーン JSON のパース / 直列化 (`ergo::common::jsonm`)
+- アクターの CRUD と親子の整合 (削除時に子を切り離す、 パッチで循環を拒否)
 - フリーカメラの行列計算 (view / projection)
-- GameObject → drawable 変換 (`ergo_render` 結線フェーズ)
-- ダミープラグ (リンクのみ用の no-op)
+- 複数シーンの mount と横断検索 (`SceneGraph`)
+- エディタとの往復 (`ergo_scene_link`): publish、 再接続時の再送、 パッチの
+  キューイングとメインスレッドでの適用、 適用後の再 publish
 
 ## テスト
-- 空シーンの生成 / GameObject 0 件
-- `*.scene.json` を load → GameObject 数・id・transform が一致
-- load した Scene を save → 再 load して round-trip 一致
-- id で GameObject を引ける / 存在しない id は null
-- GameObject 追加・削除でコレクションが更新される (エディタ前提の CRUD)
-- Camera の orbit / fly で view 行列が妥当に変化する
-- 親子 id 指定が `ergo_actor` のツリー親子に反映される
+- `test_scene`: 空シーンの既定値 / load してアクターを id で引ける /
+  save → 再 load の round-trip / 重複 id 拒否と削除時の子の切り離し /
+  旧 `objects` キーの読み込み / components・vars・instanceOf・overrides の
+  round-trip / `SceneGraph` の mount・unmount・横断 / orbit カメラと射影行列
+- `test_scene_patch`: フィールドごとに apply_patch → `to_json` → `load_json`
+  の round-trip / 回転の正規化 / 未知のアクター・フィールド、 型・要素数の
+  不一致、 旧 `transform.rot.xyz` の拒否 (シーン不変) / parent の自己参照・
+  不在・循環の拒否と解除 / `SceneGraph::find_scene`
+- `test_scene_editor_link` (ソケット不要): 接続時の hello + publish 済み
+  シーンの再送 / publish のフレーム内容 / パッチのキューイングと poll での
+  適用 / 拒否後も再 publish / `poll(SceneGraph&)` のルーティング /
+  `poll(Scene&)` が他シーンのパッチを残す / unpublish / 不正フレームの無視
 
 ## 制約 / 先送り
-- **描画結線は `ergo_render` の main 取り込み後**。 それまではデータモデル +
-  シリアライズ + カメラ計算を先行実装する
-- 初版 (ルックデヴ) は: シーン読み込み + フリーカメラ + `variable` プラグイン
-  でのパラメータ調整まで。 GUI でのオブジェクト配置 / ギズモ / 新規作成は
-  **レベルエディタフェーズ** (専用 `tools/ergo` プラグイン) に送る
-- `ergo_actor` の reparent 未対応に倣い、 動的な親子付け替えは初版スコープ外
+- **描画結線は未実装**。 アクター → drawable 変換と `PostProcess` のパス構成
+  への反映は、 `ergo_render` を使うホスト側で行う (将来の結線フェーズ)
+- `ergo_actor` / `ergo_bind` への登録 (`bind_var` での公開) は行わない。
+  ライブ調整は `scene_editor` プラグイン + `ergo_scene_link` で行う
+- エディタからのアクター追加・削除・複製、 ギズモ、 3D ビューポート、
+  エディタからの保存は未対応。 現在の `scene_editor` はシーンツリー +
+  インスペクタ (フィールド編集) まで
+- プレハブ (`instance_of` / `overrides`) は保持と round-trip のみで、
+  展開・適用はしない。 パッチで `overrides` を自動記録することもしない

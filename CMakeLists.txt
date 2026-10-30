@@ -102,11 +102,17 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
-# ergo_common — small utility lib shared across modules. Currently just the
-# minimal JSON codec (used by ergo_bind).
+# ergo_common — small utility lib shared across modules. JSON codec; WS
+# client in ergo_common_ws (kept apart so ergo_common stays socket-free).
 # ---------------------------------------------------------------------------
 add_library(ergo_common STATIC src/common/json_min.cpp)
 target_include_directories(ergo_common PUBLIC include)
+add_library(ergo_common_ws STATIC src/common/ws_client.cpp)
+target_include_directories(ergo_common_ws PUBLIC include)
+target_link_libraries(ergo_common_ws PUBLIC Threads::Threads)
+if(WIN32)
+    target_link_libraries(ergo_common_ws PUBLIC ws2_32)
+endif()
 
 # ---------------------------------------------------------------------------
 # Shared mini-gtest (header-only), bound into one static lib used by all tests
@@ -115,6 +121,13 @@ if(ERGO_BUILD_TESTS)
     enable_testing()
     add_library(ergo_gtest_main STATIC tests/gtest_main.cpp)
     target_include_directories(ergo_gtest_main PUBLIC third_party)
+
+    add_executable(test_json_min tests/common/test_json_min.cpp)
+    target_link_libraries(test_json_min PRIVATE ergo_common ergo_gtest_main)
+    add_test(NAME test_json_min COMMAND test_json_min)
+    add_executable(test_ws_client tests/common/test_ws_client.cpp)
+    target_link_libraries(test_ws_client PRIVATE ergo_common_ws ergo_gtest_main)
+    add_test(NAME test_ws_client COMMAND test_ws_client)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -260,6 +273,20 @@ if(ERGO_BUILD_PARTICLE)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
+
+    # ergo_particle_link — receive-only feeder for tools/ergo's `particle`
+    # plugin over ergo_common_ws. Separate so ergo_particle stays socket-free.
+    option(ERGO_BUILD_PARTICLE_LINK "Build ergo_particle_link (WS feeder for the particle plugin)" ON)
+    if(ERGO_BUILD_PARTICLE_LINK)
+        add_library(ergo_particle_link src/particle/editor_link.cpp)
+        target_include_directories(ergo_particle_link PUBLIC include)
+        target_link_libraries(ergo_particle_link PUBLIC ergo_particle PRIVATE ergo_common_ws ergo_common)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_editor_link tests/particle/test_editor_link.cpp)
+            target_link_libraries(test_editor_link PRIVATE ergo_particle_link ergo_gtest_main)
+            add_test(NAME test_editor_link COMMAND test_editor_link)
+        endif()
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -270,14 +297,10 @@ if(ERGO_BUILD_BIND)
     add_library(ergo_bind
         src/bind/types.cpp
         src/bind/bind_engine.cpp
-        src/bind/ws_client.cpp
     )
     target_include_directories(ergo_bind PUBLIC include)
     target_compile_definitions(ergo_bind PUBLIC ERGO_BIND_ENABLED=1)
-    target_link_libraries(ergo_bind PUBLIC ergo_common Threads::Threads)
-    if(WIN32)
-        target_link_libraries(ergo_bind PUBLIC ws2_32)
-    endif()
+    target_link_libraries(ergo_bind PUBLIC ergo_common ergo_common_ws Threads::Threads)
     # VarKind is a closed wire-protocol enum (no runtime converter registry by
     # design). Guard against it drifting: any switch over an enum that omits a
     # case with no default label is a hard error, so adding a new VarKind fails
@@ -296,7 +319,7 @@ if(ERGO_BUILD_BIND)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME test_types test_json_min test_bind_engine)
+        foreach(NAME test_types test_bind_engine)
             add_executable(${NAME} tests/bind/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_bind ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
@@ -345,21 +368,39 @@ if(ERGO_BUILD_CAST AND ERGO_BUILD_ACTOR AND ERGO_BUILD_BIND)
 endif()
 
 # ---------------------------------------------------------------------------
-# ergo_sound — WAV/OGG decode, streaming, mixing engine, waveform, quantizer
+# ergo_scene - serializable look-dev scene document (+ field-level patches).
 # ---------------------------------------------------------------------------
-# ergo_scene - serializable look-dev scene document.
 if(ERGO_BUILD_SCENE)
-    add_library(ergo_scene src/scene/scene.cpp)
+    add_library(ergo_scene src/scene/scene.cpp src/scene/scene_patch.cpp)
     target_include_directories(ergo_scene PUBLIC include)
     target_link_libraries(ergo_scene PUBLIC ergo_common)
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_scene tests/scene/test_scene.cpp)
-        target_link_libraries(test_scene PRIVATE ergo_scene ergo_gtest_main)
-        add_test(NAME test_scene COMMAND test_scene)
+        foreach(NAME test_scene test_scene_patch)
+            add_executable(${NAME} tests/scene/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_scene ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
+    endif()
+
+    # ergo_scene_link — engine client for tools/ergo's `scene_editor` plugin
+    # (publish scenes, apply patches) over ergo_common_ws.
+    option(ERGO_BUILD_SCENE_LINK "Build ergo_scene_link (WS client for the scene_editor plugin)" ON)
+    if(ERGO_BUILD_SCENE_LINK)
+        add_library(ergo_scene_link src/scene/editor_link.cpp)
+        target_include_directories(ergo_scene_link PUBLIC include)
+        target_link_libraries(ergo_scene_link PUBLIC ergo_scene PRIVATE ergo_common_ws)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_scene_editor_link tests/scene/test_scene_editor_link.cpp)
+            target_link_libraries(test_scene_editor_link PRIVATE ergo_scene_link ergo_gtest_main)
+            add_test(NAME test_scene_editor_link COMMAND test_scene_editor_link)
+        endif()
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# ergo_sound — WAV decode, streaming, mixing engine, waveform, quantizer
+# ---------------------------------------------------------------------------
 if(ERGO_BUILD_SOUND)
     add_library(ergo_sound
         src/sound/audio_decoder.cpp
