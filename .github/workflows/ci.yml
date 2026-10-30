@@ -13,7 +13,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Superseded PR pushes are cancelled; every main commit keeps its own result.
+  # PR runs: a newer push cancels the running build. push / dispatch runs are
+  # never cancelled mid-build, but GitHub keeps only one pending run per group,
+  # so a newer push replaces a still-queued one (that SHA's run shows "cancelled").
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
