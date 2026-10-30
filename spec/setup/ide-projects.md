@@ -49,7 +49,7 @@ include パス・コンパイル定義・システムライブラリ・ビルド
 | Ergo モジュール | `Ergo::input`、`Ergo::bind` など (`ergo_input` 等の素の名前も可) | Threads / Windows sockets 等も既存の依存設定から伝播。C++ 標準と MSVC の `/utf-8` も伝播 |
 | HTTP | `Ergo::http` | libcurl への依存を伝播。Windows TLS は Schannel、Xcode 依存構成は OpenSSL |
 | 管理対象ライブラリ一式 | `Ergo::thirdparty` (旧名 `ergo::thirdparty` も可) | 有効にした libcurl をまとめてリンク |
-| FMOD | `Ergo::audio` | `FMOD::FMOD` を伝播。実行時の DLL / dylib 配置・macOS の rpath / 署名はホストで設定 |
+| FMOD | `Ergo::audio` | `FMOD::FMOD` を伝播。DLL / .so / .dylib は `ergo_audio_stage_runtime(<exe>)` で exe の隣へ配置できる。macOS の rpath / 署名はホストで設定 |
 | Pictor / Vulkan | `Ergo::render`、`Ergo::particle` | ホストが先に `pictor` ターゲットを提供し、Vulkan SDK を設定する既存契約を使用 |
 
 基本プリセットは管理対象ライブラリを取得しない。Pictor は自動取得しない。

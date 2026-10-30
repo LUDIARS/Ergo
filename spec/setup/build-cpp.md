@@ -171,11 +171,14 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
   共有ライブラリ / プラグイン (`add_library(... SHARED)`) にもリンクできる。
 - **キャッシュ**: 管理対象の libcurl を ON にしても、ホストの `BUILD_SHARED_LIBS` /
   `BUILD_TESTING` は書き換えない ([`third-party-deps.md`](third-party-deps.md))。
+- **FMOD ランタイムの配置**: `ergo_audio_stage_runtime(<exe>)` をホストの
+  `CMakeLists.txt` から呼ぶ ([`../feature/module/audio.md`](../feature/module/audio.md))。
 
 回帰テスト: `test_host_consume` (C++14 + `BUILD_SHARED_LIBS=ON` のホストが
 `Ergo::input` / `Ergo::log` / `Ergo::bind` / `Ergo::physics2d` と SHARED プラグインを
-ビルドする)、`test_host_cache_isolation` (curl ON でホストのキャッシュが残る)。
-いずれも実際にホストプロジェクトを構成・ビルドする (ctest ラベル `host`)。
+ビルドする)、`test_host_cache_isolation` (curl ON でホストのキャッシュが残る)、
+`test_audio_stage_runtime`。いずれも実際にホストプロジェクトを構成・ビルドする
+(ctest ラベル `host`)。
 
 ## 注意点
 
