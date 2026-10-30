@@ -1,5 +1,7 @@
 #include "ergo/input/input_system.h"
 
+#include <algorithm>
+
 namespace ergo::input {
 
 InputSystem::InputSystem() = default;

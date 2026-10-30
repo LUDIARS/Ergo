@@ -311,8 +311,8 @@ TEST_F(SinkTest, ConcurrentAddRemoveWhileLogging) {
         });
     }
 
-    constexpr int kThreads = 4;
-    constexpr int kRounds  = 200;
+    static constexpr int kThreads = 4;
+    static constexpr int kRounds  = 200;
     std::atomic<int> late{0};
     std::vector<std::thread> mutators;
     for (int t = 0; t < kThreads; ++t) {
