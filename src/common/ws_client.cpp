@@ -42,6 +42,14 @@
   static int sock_last_err() { return errno; }
 #endif
 
+// A peer that vanished must surface as a send error, not as SIGPIPE killing
+// the host (Linux: per-call flag; macOS: SO_NOSIGPIPE set in connect_once).
+#ifdef MSG_NOSIGNAL
+  static constexpr int kSendFlags = MSG_NOSIGNAL;
+#else
+  static constexpr int kSendFlags = 0;
+#endif
+
 namespace ergo::common::ws {
 
 namespace {
@@ -83,7 +91,7 @@ std::string random_websocket_key() {
 
 bool send_all(socket_t s, const char* data, std::size_t len) {
     while (len > 0) {
-        int n = ::send(s, data, static_cast<int>(len), 0);
+        int n = ::send(s, data, static_cast<int>(len), kSendFlags);
         if (n > 0) { data += n; len -= static_cast<std::size_t>(n); }
         else if (n < 0 && EAGAIN_OR_WOULDBLOCK(sock_last_err())) {
             // Tiny backoff for the (rare) case the kernel buffer is full.
@@ -95,14 +103,26 @@ bool send_all(socket_t s, const char* data, std::size_t len) {
     return true;
 }
 
-bool read_http_response(socket_t s, std::string& out, int max_iters = 200) {
+// Reads the HTTP upgrade response from a non-blocking socket. A server may
+// send its first frame in the same segment as the 101 response (the particle
+// plugin pushes `state` right away), so bytes past the header terminator are
+// handed back in `leftover` to seed the frame buffer instead of being lost.
+// Gives up after ~2 s, or as soon as `stop` is raised.
+bool read_http_response(socket_t s, const std::atomic<bool>& stop,
+                        std::string& out, std::string& leftover, int max_iters = 200) {
     out.clear();
+    leftover.clear();
     char buf[1024];
-    for (int i = 0; i < max_iters; ++i) {
+    for (int i = 0; i < max_iters && !stop.load(std::memory_order_acquire); ++i) {
         int n = ::recv(s, buf, sizeof(buf), 0);
         if (n > 0) {
             out.append(buf, static_cast<std::size_t>(n));
-            if (out.find("\r\n\r\n") != std::string::npos) return true;
+            const std::size_t end = out.find("\r\n\r\n");
+            if (end != std::string::npos) {
+                leftover = out.substr(end + 4);
+                out.resize(end + 4);
+                return true;
+            }
         } else if (n == 0) {
             return false;
         } else if (EAGAIN_OR_WOULDBLOCK(sock_last_err())) {
@@ -212,15 +232,21 @@ bool Client::connect_once() {
 
     socket_t s = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (s == INVALID_SOCK) { freeaddrinfo(res); return false; }
+#ifdef SO_NOSIGPIPE
+    { int one = 1; ::setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one)); }
+#endif
     if (::connect(s, res->ai_addr, static_cast<int>(res->ai_addrlen)) != 0) {
         sock_close(s); freeaddrinfo(res); return false;
     }
     freeaddrinfo(res);
 
-    if (!perform_handshake(static_cast<int>(s))) { sock_close(s); return false; }
-
-    // Switch to non-blocking now so the read loop can interleave sends.
+    // Non-blocking from here on: the handshake read is then bounded (and
+    // abortable by stop()) even if the peer accepts but never answers, and the
+    // read loop below can interleave sends.
     sock_set_nonblock(s);
+
+    std::string rx;  // seeded with any frame bytes that followed the 101 response
+    if (!perform_handshake(static_cast<int>(s), rx)) { sock_close(s); return false; }
 
     connected_.store(true, std::memory_order_release);
     {
@@ -229,7 +255,6 @@ bool Client::connect_once() {
         if (cb) cb();
     }
 
-    std::string rx;
     bool ok = true;
     while (!stop_flag_.load(std::memory_order_acquire)) {
         // Drain pending sends first.
@@ -240,8 +265,9 @@ bool Client::connect_once() {
         uint8_t op = 0;
         int rv = read_one_frame(static_cast<int>(s), rx, payload, op);
         if (rv < 0) {
-            // Protocol violation (e.g. oversized frame). Drop the connection
-            // and let the worker back off before reconnecting.
+            // Peer closed the TCP stream without a close frame, or a protocol
+            // violation (e.g. oversized frame). Drop the connection and let
+            // the worker back off before reconnecting.
             ok = false;
             break;
         }
@@ -263,7 +289,7 @@ bool Client::connect_once() {
     return ok;
 }
 
-bool Client::perform_handshake(int sock) {
+bool Client::perform_handshake(int sock, std::string& leftover) {
     const std::string key = random_websocket_key();
     std::string req;
     req += "GET " + path_ + " HTTP/1.1\r\n";
@@ -275,7 +301,7 @@ bool Client::perform_handshake(int sock) {
     req += "\r\n";
     if (!send_all(static_cast<socket_t>(sock), req.data(), req.size())) return false;
     std::string resp;
-    if (!read_http_response(static_cast<socket_t>(sock), resp)) return false;
+    if (!read_http_response(static_cast<socket_t>(sock), stop_flag_, resp, leftover)) return false;
     return resp.compare(0, 12, "HTTP/1.1 101") == 0;
 }
 
@@ -290,12 +316,14 @@ bool Client::drain_send_queue(int sock) {
     return true;
 }
 
-// Mirrors the server-side cap in ergo_inspector. Any frame larger than this
-// is almost certainly a hostile or misconfigured peer; we refuse rather
-// than allowing rx to balloon to the attacker-declared length.
+// Any frame larger than this is almost certainly a hostile or misconfigured
+// peer; we refuse rather than allowing rx to balloon to the attacker-declared
+// length. Tool payloads (scene JSON, particle config, log batches) stay far
+// below it.
 static constexpr uint64_t kMaxFramePayloadBytes = 1ull << 20; // 1 MiB
 
 int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint8_t& opcode) {
+    bool dead = false;  // peer closed the stream or the socket errored
     auto try_recv = [&](std::size_t want) -> bool {
         // Try non-blocking read up to `want`. Returns true if rx grew enough.
         while (rx.size() < want) {
@@ -303,14 +331,15 @@ int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint
             int chunk = static_cast<int>(want - rx.size() < sizeof(buf) ? want - rx.size() : sizeof(buf));
             int n = ::recv(static_cast<socket_t>(sock), buf, chunk, 0);
             if (n > 0) rx.append(buf, static_cast<std::size_t>(n));
-            else if (n == 0) return false;
-            else if (EAGAIN_OR_WOULDBLOCK(sock_last_err())) return false;
-            else return false;
+            else if (n < 0 && EAGAIN_OR_WOULDBLOCK(sock_last_err())) return false;
+            else { dead = true; return false; }
         }
         return true;
     };
+    // Not enough bytes yet: 0 (wait for more), unless the stream is gone.
+    auto need_more = [&]() { return dead ? -1 : 0; };
 
-    if (!try_recv(2)) return 0;
+    if (!try_recv(2)) return need_more();
     const uint8_t b0 = static_cast<uint8_t>(rx[0]);
     const uint8_t b1 = static_cast<uint8_t>(rx[1]);
     opcode = b0 & 0x0F;
@@ -318,11 +347,11 @@ int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint
     uint64_t plen = b1 & 0x7F;
     std::size_t header = 2;
     if (plen == 126) {
-        if (!try_recv(4)) return 0;
+        if (!try_recv(4)) return need_more();
         plen = (uint64_t(uint8_t(rx[2])) << 8) | uint8_t(rx[3]);
         header = 4;
     } else if (plen == 127) {
-        if (!try_recv(10)) return 0;
+        if (!try_recv(10)) return need_more();
         plen = 0;
         for (int i = 0; i < 8; ++i) plen = (plen << 8) | uint8_t(rx[2 + i]);
         header = 10;
@@ -330,11 +359,11 @@ int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint
     if (plen > kMaxFramePayloadBytes) return -1;
     uint8_t mask[4] = {0,0,0,0};
     if (masked) {
-        if (!try_recv(header + 4)) return 0;
+        if (!try_recv(header + 4)) return need_more();
         for (int i = 0; i < 4; ++i) mask[i] = uint8_t(rx[header + i]);
         header += 4;
     }
-    if (!try_recv(header + static_cast<std::size_t>(plen))) return 0;
+    if (!try_recv(header + static_cast<std::size_t>(plen))) return need_more();
 
     payload.resize(static_cast<std::size_t>(plen));
     for (uint64_t i = 0; i < plen; ++i) {

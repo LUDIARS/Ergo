@@ -51,11 +51,13 @@ public:
 private:
     void worker_loop();
     bool connect_once();
-    bool perform_handshake(int sock);
+    /// `leftover` receives any frame bytes that arrived with the 101 response.
+    bool perform_handshake(int sock, std::string& leftover);
     bool drain_send_queue(int sock);
     /// Returns 1 when a full frame has been decoded into `payload`/`opcode`,
-    /// 0 when more bytes are needed, -1 on a fatal protocol violation
-    /// (oversized frame). The caller drops the connection on -1.
+    /// 0 when more bytes are needed, -1 when the peer closed the stream or on
+    /// a fatal protocol violation (oversized frame). The caller drops the
+    /// connection on -1.
     int  read_one_frame(int sock, std::string& rx_buf, std::string& payload, uint8_t& opcode);
 
     std::string                     host_;

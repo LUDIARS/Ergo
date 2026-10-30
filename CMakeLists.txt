@@ -95,6 +95,13 @@ if(ERGO_BUILD_TESTS)
     enable_testing()
     add_library(ergo_gtest_main STATIC tests/gtest_main.cpp)
     target_include_directories(ergo_gtest_main PUBLIC third_party)
+
+    add_executable(test_json_min tests/common/test_json_min.cpp)
+    target_link_libraries(test_json_min PRIVATE ergo_common ergo_gtest_main)
+    add_test(NAME test_json_min COMMAND test_json_min)
+    add_executable(test_ws_client tests/common/test_ws_client.cpp)
+    target_link_libraries(test_ws_client PRIVATE ergo_common_ws ergo_gtest_main)
+    add_test(NAME test_ws_client COMMAND test_ws_client)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -275,7 +282,7 @@ if(ERGO_BUILD_BIND)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME test_types test_json_min test_bind_engine)
+        foreach(NAME test_types test_bind_engine)
             add_executable(${NAME} tests/bind/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_bind ergo_gtest_main)
             add_test(NAME ${NAME} COMMAND ${NAME})
