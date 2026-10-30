@@ -29,6 +29,16 @@ export interface ShellPluginHealth {
     [key: string]: unknown;
 }
 
+/** External pack entry skipped at startup, listed under /api/health `rejected`. */
+export interface ShellRejectedPlugin {
+    /** The id the entry claimed, or "" when it never produced one. */
+    id:     string;
+    /** Pack entry file. */
+    source: string;
+    ok:     false;
+    err:    string;
+}
+
 export interface ShellEvents {
     /** Initial plugin list has loaded; payload mirrors /api/plugins. */
     "shell:ready":          { plugins: ShellPluginInfo[] };

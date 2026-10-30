@@ -37,14 +37,23 @@ std::atomic<int64_t> g_epoch_ns{clock_ns()};
 
 /// Per-thread event buffer. Intentionally leaked (one per recording thread)
 /// so collected events stay valid for export across the process lifetime.
+/// The registry that points at them (thread_buffers()) is leaked too: a
+/// global vector would be destroyed at exit before LeakSanitizer runs,
+/// turning every buffer into a reported leak, and a marker recorded during
+/// static destruction would push_back into the destroyed vector.
 struct ThreadBuffer {
     uint64_t           tid;
     std::vector<Event> events;
 };
 
 std::mutex                                g_mutex;        // registry + names
-std::vector<ThreadBuffer*>                g_buffers;
 std::unordered_map<uint64_t, std::string> g_thread_names;
+
+/// Registry of every ThreadBuffer, guarded by g_mutex. Never destroyed.
+std::vector<ThreadBuffer*>& thread_buffers() {
+    static auto* v = new std::vector<ThreadBuffer*>();
+    return *v;
+}
 
 uint64_t current_tid() {
     return static_cast<uint64_t>(
@@ -56,7 +65,7 @@ ThreadBuffer& tls_buffer() {
         auto* b = new ThreadBuffer{current_tid(), {}};
         b->events.reserve(4096);
         std::lock_guard<std::mutex> lk(g_mutex);
-        g_buffers.push_back(b);
+        thread_buffers().push_back(b);
         return b;
     }();
     return *buf;
@@ -121,18 +130,18 @@ bool is_enabled()         { return g_enabled.load(std::memory_order_relaxed); }
 void begin_session() {
     std::lock_guard<std::mutex> lk(g_mutex);
     g_epoch_ns.store(clock_ns(), std::memory_order_relaxed);
-    for (auto* b : g_buffers) b->events.clear();
+    for (auto* b : thread_buffers()) b->events.clear();
 }
 
 void clear() {
     std::lock_guard<std::mutex> lk(g_mutex);
-    for (auto* b : g_buffers) b->events.clear();
+    for (auto* b : thread_buffers()) b->events.clear();
 }
 
 std::size_t event_count() {
     std::lock_guard<std::mutex> lk(g_mutex);
     std::size_t n = 0;
-    for (const auto* b : g_buffers) n += b->events.size();
+    for (const auto* b : thread_buffers()) n += b->events.size();
     return n;
 }
 
@@ -220,7 +229,7 @@ std::string export_chrome_trace() {
         first = false;
     };
 
-    for (const auto* b : g_buffers) {
+    for (const auto* b : thread_buffers()) {
         for (const Event& e : b->events) {
             sep();
             out += "{\"name\":\"";

@@ -3,8 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_EFFECT } from "../../src/plugins/particle/schema.js";
-import { sanitizePresets } from "../../src/plugins/vfx-suggest/sanitize.js";
+import { DEFAULT_EFFECT } from "../../../src/plugins/particle/schema.js";
+import { sanitizePresets } from "../../../src/plugins/vfx-suggest/sanitize.js";
 
 const one = (config: object) => sanitizePresets([{ name: "x", config }])[0]!.config;
 

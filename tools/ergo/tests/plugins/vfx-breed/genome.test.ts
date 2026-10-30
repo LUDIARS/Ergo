@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_EFFECT, type ParticleEffectConfig } from "../../src/plugins/particle/schema.js";
-import { PARTICLE_RANGES } from "../../src/plugins/particle/ranges.js";
+import { DEFAULT_EFFECT, type ParticleEffectConfig } from "../../../src/plugins/particle/schema.js";
+import { PARTICLE_RANGES } from "../../../src/plugins/particle/ranges.js";
 import { numericValues, assertWithinRanges } from "./helpers.js";
-import { sanitizePresets } from "../../src/plugins/vfx-suggest/sanitize.js";
-import { GENES, geneIndex } from "../../src/plugins/vfx-breed/genes.js";
-import { encode, decode, fold } from "../../src/plugins/vfx-breed/genome.js";
-import { rgbaToHsva, hsvaToRgba } from "../../src/plugins/vfx-breed/color.js";
+import { sanitizePresets } from "../../../src/plugins/vfx-suggest/sanitize.js";
+import { GENES, geneIndex } from "../../../src/plugins/vfx-breed/genes.js";
+import { encode, decode, fold } from "../../../src/plugins/vfx-breed/genome.js";
+import { rgbaToHsva, hsvaToRgba } from "../../../src/plugins/vfx-breed/color.js";
 
 test("every numeric gene takes its range from the shared table", () => {
     for (const g of GENES) {

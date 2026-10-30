@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_EFFECT } from "../../src/plugins/particle/schema.js";
-import { GENES, geneIndex } from "../../src/plugins/vfx-breed/genes.js";
-import { parseWeights, toBias } from "../../src/plugins/vfx-breed/direction.js";
-import { makeAdvisor, unavailableAdvisor, type DirectionAdvisor } from "../../src/plugins/vfx-breed/advisor.js";
-import { parseGenerationRequest, COUNT_MAX, COUNT_MIN } from "../../src/plugins/vfx-breed/request.js";
-import { runGeneration } from "../../src/plugins/vfx-breed/generation.js";
-import { createVfxBreedPlugin } from "../../src/plugins/vfx-breed/index.js";
+import { DEFAULT_EFFECT } from "../../../src/plugins/particle/schema.js";
+import { GENES, geneIndex } from "../../../src/plugins/vfx-breed/genes.js";
+import { parseWeights, toBias } from "../../../src/plugins/vfx-breed/direction.js";
+import { makeAdvisor, unavailableAdvisor, type DirectionAdvisor } from "../../../src/plugins/vfx-breed/advisor.js";
+import { parseGenerationRequest, COUNT_MAX, COUNT_MIN } from "../../../src/plugins/vfx-breed/request.js";
+import { runGeneration } from "../../../src/plugins/vfx-breed/generation.js";
+import { createVfxBreedPlugin } from "../../../src/plugins/vfx-breed/index.js";
 
 function fakeAdvisor(weights: Record<string, number>): DirectionAdvisor & { calls: number } {
     const a = {

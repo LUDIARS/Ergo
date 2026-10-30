@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_EFFECT } from "../../src/plugins/particle/schema.js";
+import { DEFAULT_EFFECT } from "../../../src/plugins/particle/schema.js";
 // Browser modules are shipped as plain JavaScript, without declaration files.
 // @ts-ignore
-import { emitParticle, advanceParticles, drawParticles, createPreview } from "../../src/plugins/particle/ui/preview.js";
+import { emitParticle, advanceParticles, drawParticles, createPreview } from "../../../src/plugins/particle/ui/preview.js";
 
 function config() {
   const cfg = structuredClone(DEFAULT_EFFECT);
