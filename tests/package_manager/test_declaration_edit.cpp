@@ -1,6 +1,7 @@
 // W2 の書き換え (spec/feature/package-manager.md §7 W2): update が rev と expect_tag だけを書き他はバイト単位で同じ、
 // 持ち主の判定 (共有は Ergo のマニフェスト、 ergo と非公開はホスト)、 remove が needs を壊すと拒否、
-// add --kind link で結線ファイルが無ければ誤りでファイル不変。
+// add --kind link で結線ファイルが無ければ誤りでファイル不変、 add --kind tool は packages だけに足し host.use 不変
+// (tool に --optional / --features / --wiring、 宣言済みの tool の add は拒否)。
 
 #include "fixture_util.h"
 
@@ -145,7 +146,49 @@ TEST(PackageManagerAdd, PrivateLinkNeedsItsWiringFile) {
     AddRequest tool = private_link("newtool");
     tool.kind          = "tool";
     tool.wiring_exists = false;  // a tool has no wiring
-    EXPECT_TRUE(plan_add(before, &m, tool).ok);
+    const auto tool_added = plan_add(before, &m, tool);
+    ASSERT_TRUE(tool_added.ok);
+    EXPECT_NE(tool_added.text.find("    \"newtool\": {\n      \"kind\": \"tool\",\n"), std::string::npos);
+    EXPECT_EQ(tool_added.text.find("\"cmake\""), std::string::npos);
+    EXPECT_NE(tool_added.text.find("\"use\": []"), std::string::npos);  // host.use is unchanged
+    const auto tool_host = host_of(tool_added.text);
+    EXPECT_TRUE(tool_host.use.empty());
+    EXPECT_TRUE(tool_host.optional.empty());
+    ASSERT_EQ(tool_host.packages.size(), 1u);
+    EXPECT_EQ(tool_host.packages[0].kind, std::string("tool"));
+    const auto tool_back = plan_remove(tool_added.text, &m, "newtool");
+    ASSERT_TRUE(tool_back.ok);
+    EXPECT_EQ(tool_back.text, before);
+}
+
+TEST(PackageManagerAdd, ToolIsFetchedNeverSelected) {
+    const auto m = ergo_manifest();
+    const std::string before = fixture_text("host-only.json");
+    AddRequest tool = private_link("newtool");
+    tool.kind = "tool";
+    AddRequest optional_tool = tool;
+    optional_tool.optional = true;
+    EXPECT_FALSE(plan_add(before, &m, optional_tool).ok);
+    AddRequest featured_tool = tool;
+    featured_tool.features = "+x";
+    EXPECT_FALSE(plan_add(before, &m, featured_tool).ok);
+    AddRequest wired_tool = tool;
+    wired_tool.wiring = "cmake/packages/newtool.cmake";
+    EXPECT_FALSE(plan_add(before, &m, wired_tool).ok);
+
+    AddRequest lapilli;  // a tool of the Ergo manifest
+    lapilli.name = "lapilli";
+    const auto shared = plan_add(before, &m, lapilli);
+    EXPECT_FALSE(shared.ok);
+    EXPECT_NE(shared.error.find("'lapilli' is a tool package"), std::string::npos);
+
+    const auto declared = plan_add(before, &m, tool);
+    ASSERT_TRUE(declared.ok);
+    AddRequest again;  // an already-declared private tool
+    again.name = "newtool";
+    const auto refused = plan_add(declared.text, &m, again);
+    EXPECT_FALSE(refused.ok);
+    EXPECT_NE(refused.error.find("tool package"), std::string::npos);
 }
 
 TEST(PackageManagerAdd, RefusesWhatWouldBreakTheDeclaration) {

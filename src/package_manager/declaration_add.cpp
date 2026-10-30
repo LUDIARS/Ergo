@@ -1,4 +1,5 @@
 // plan_add — host.use に足す。 Ergo のマニフェストに無い名前は非公開 packages にも足す。
+// tool は取得するだけでリンクしないので、 host.use / optional / features には足さない (非公開の tool は packages だけ)。
 
 #include "ergo/package_manager/declaration_check.h"
 #include "ergo/package_manager/declaration_edit.h"
@@ -61,6 +62,27 @@ bool ensure_array(std::string& text, const char* key) {
     return json_has(text, {"host", key}) || json_set_member(text, {"host"}, key, "[]");
 }
 
+/// 足す名前の種類 ("link" / "tool")。 新しい非公開は要求の --kind、 宣言済みは持ち主の packages.<name>.kind。
+std::string package_kind(PackageOwner owner, const HostDeclaration& host, const ErgoManifest* ergo,
+                         const AddRequest& r) {
+    switch (owner) {
+        case PackageOwner::Unknown:
+            return r.kind.empty() ? "link" : r.kind;
+        case PackageOwner::HostPrivate:
+            for (const auto& p : host.packages) {
+                if (p.name == r.name) return p.kind;
+            }
+            return {};
+        case PackageOwner::ErgoShared:
+            if (const ManifestPackage* p = ergo ? ergo->find(r.name) : nullptr) return p->kind;
+            return {};
+        case PackageOwner::HostErgo:
+        case PackageOwner::Conflict:
+            return {};
+    }
+    return {};
+}
+
 } // namespace
 
 EditResult plan_add(const std::string& host_text, const ErgoManifest* ergo, const AddRequest& r) {
@@ -72,14 +94,14 @@ EditResult plan_add(const std::string& host_text, const ErgoManifest* ergo, cons
 
     std::string text = host_text;
     std::vector<std::string> notes;
-    switch (owner_of(r.name, &host, ergo)) {
+    const PackageOwner owner = owner_of(r.name, &host, ergo);
+    switch (owner) {
         case PackageOwner::Conflict:
             return edit_error("'" + r.name + "' is both private and in the Ergo manifest (PKG-15)");
         case PackageOwner::ErgoShared:
         case PackageOwner::HostPrivate:
             if (has_private_fields(r)) {
-                return edit_error("'" + r.name + "' is already declared (owner: " +
-                                  owner_name(owner_of(r.name, &host, ergo)) +
+                return edit_error("'" + r.name + "' is already declared (owner: " + owner_name(owner) +
                                   "); --kind/--code/--repository/--rev/--wiring are only for a new private package");
             }
             break;
@@ -88,23 +110,36 @@ EditResult plan_add(const std::string& host_text, const ErgoManifest* ergo, cons
             if (ergo->has_name(r.name)) {
                 return edit_error("'" + r.name + "' is an Ergo module or observed repository, not a package");
             }
-            {
-                auto added = add_private_package(text, r);
-                if (!added.ok) return added;
-                notes = added.notes;
-            }
             break;
         case PackageOwner::HostErgo:
             break;
     }
 
-    bool ok = ensure_array(text, "use") && json_append_string(text, {"host", "use"}, r.name);
-    if (r.optional) ok = ok && ensure_array(text, "optional") && json_append_string(text, {"host", "optional"}, r.name);
-    if (!r.features.empty()) {
-        ok = ok && (json_has(text, {"host", "features"}) || json_set_member(text, {"host"}, "features", "{}"));
-        ok = ok && json_set_member(text, {"host", "features"}, r.name, json_quote(r.features));
+    // host.use は link パッケージだけを選ぶ (PKG-01)。 tool は取得するだけで、 選ぶものが無い。
+    const bool tool = package_kind(owner, host, ergo, r) == "tool";
+    if (tool && owner != PackageOwner::Unknown) {
+        return edit_error("'" + r.name + "' is a tool package (fetched, never linked); nothing to add to host.use");
     }
-    if (!ok) return edit_error("cannot rewrite host.use / optional / features (unexpected JSON layout)");
+    if (tool && (r.optional || !r.features.empty() || !r.wiring.empty())) {
+        return edit_error("a tool package is fetched, never linked: --optional / --features / --wiring do not apply");
+    }
+    if (owner == PackageOwner::Unknown) {
+        auto added = add_private_package(text, r);
+        if (!added.ok) return added;
+        notes = added.notes;
+    }
+
+    if (tool) {
+        notes.push_back("a tool package is fetched, never linked: host.use is unchanged");
+    } else {
+        bool ok = ensure_array(text, "use") && json_append_string(text, {"host", "use"}, r.name);
+        if (r.optional) ok = ok && ensure_array(text, "optional") && json_append_string(text, {"host", "optional"}, r.name);
+        if (!r.features.empty()) {
+            ok = ok && (json_has(text, {"host", "features"}) || json_set_member(text, {"host"}, "features", "{}"));
+            ok = ok && json_set_member(text, {"host", "features"}, r.name, json_quote(r.features));
+        }
+        if (!ok) return edit_error("cannot rewrite host.use / optional / features (unexpected JSON layout)");
+    }
 
     auto result = detail::finish_edit(host_text, std::move(text), ergo);
     if (result.ok) result.notes.insert(result.notes.begin(), notes.begin(), notes.end());

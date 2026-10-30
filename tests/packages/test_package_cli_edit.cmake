@@ -7,6 +7,8 @@
 #   * --to main warns that STRICT will not pass
 #   * remove refuses to break modules.*.needs
 #   * add --kind link without the wiring file exits 2 and leaves the file alone
+#   * add --kind tool declares packages.<name> only (host.use unchanged); a tool
+#     with --optional, or a tool that is already declared, exits 2
 # Repositories are fake git repos reached by file:// URL; no network.
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir> -DERGO_PKG_CLI=<ergo_pkg>
@@ -177,3 +179,25 @@ file(READ "${H}/ergo-packages.json" _decl)
 string(JSON _pkgs LENGTH "${_decl}" packages)
 pkg_assert_eq("remove drops the private package" "${_pkgs}" "0")
 pkg_pass("add: private link needs its wiring file, remove drops it")
+
+# --- add (private tool) ------------------------------------------------------------------
+file(READ "${H}/ergo-packages.json" _decl_before)
+string(JSON _use_before GET "${_decl_before}" host use)
+pkg(2 add newtool --kind tool --optional --repository "${N_URL}" --rev ${N_SHA} --host "${H}")
+file(READ "${H}/ergo-packages.json" _decl)
+pkg_assert_eq("add --kind tool --optional leaves the file" "${_decl}" "${_decl_before}")
+pkg(0 add newtool --kind tool --repository "${N_URL}" --rev ${N_SHA} --host "${H}")
+file(READ "${H}/ergo-packages.json" _decl)
+string(JSON _use GET "${_decl}" host use)
+pkg_assert_eq("add --kind tool keeps host.use" "${_use}" "${_use_before}")
+string(JSON _kind GET "${_decl}" packages newtool kind)
+pkg_assert_eq("add --kind tool declares packages.newtool" "${_kind}" tool)
+pkg(2 add newtool --host "${H}")      # declared tool: nothing to select
+if(NOT PKG_OUT MATCHES "tool package")
+    pkg_fail("adding a declared tool should say it is a tool package\n${PKG_OUT}")
+endif()
+pkg(2 add lapilli --host "${H}")      # a tool of the Ergo manifest
+pkg(0 remove newtool --host "${H}")
+file(READ "${H}/ergo-packages.json" _decl)
+pkg_assert_eq("remove of the private tool round-trips" "${_decl}" "${_decl_before}")
+pkg_pass("add: a private tool goes to packages only, host.use unchanged")

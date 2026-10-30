@@ -13,12 +13,16 @@ TEST(PackageManagerLeak, LocalPathShapes) {
     EXPECT_TRUE(looks_like_local_path("/Users/someone/src"));
     EXPECT_TRUE(looks_like_local_path("/home/someone/src"));
     EXPECT_TRUE(looks_like_local_path("\\\\server\\share"));
+    EXPECT_TRUE(looks_like_local_path("\\\\\\\\server\\\\share"));  // escaped in CMake / C text
+    EXPECT_TRUE(looks_like_local_path("\\\\?\\C:\\work"));
 
     EXPECT_FALSE(looks_like_local_path("https://github.com/LUDIARS/Ergo.git"));
     EXPECT_FALSE(looks_like_local_path("cmake/packages/pictor.cmake"));
     EXPECT_FALSE(looks_like_local_path("<ergo>/cmake"));
     EXPECT_FALSE(looks_like_local_path("ergo.source_dir"));
     EXPECT_FALSE(looks_like_local_path("C:"));
+    EXPECT_FALSE(looks_like_local_path("\\\\1"));  // regex back-reference (ergo-bootstrap.cmake.in)
+    EXPECT_FALSE(looks_like_local_path("\\\\"));
 }
 
 TEST(PackageManagerLeak, SecretKeys) {
@@ -57,6 +61,7 @@ TEST(PackageManagerLeak, FindsPathsAndSecretsWithPointers) {
 
 TEST(PackageManagerLeak, TextLeaks) {
     EXPECT_TRUE(find_text_leaks("set(ERGO_SOURCE_DIR \"\" CACHE PATH \"x\")\n").empty());
+    EXPECT_TRUE(find_text_leaks("string(REGEX REPLACE \"^(x)$\" \"\\\\1\" y \"${z}\")\n").empty());
     const auto leaks = find_text_leaks("line one\nset(X \"C:/work/Ergo\")\n");
     ASSERT_EQ(leaks.size(), static_cast<std::size_t>(1));
     EXPECT_EQ(leaks[0].where, std::string("line 2"));
