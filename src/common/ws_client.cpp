@@ -25,6 +25,7 @@
   static int sock_last_err() { return WSAGetLastError(); }
 #else
   #include <sys/socket.h>
+  #include <sys/select.h>
   #include <netinet/in.h>
   #include <netdb.h>
   #include <unistd.h>
@@ -101,6 +102,38 @@ bool send_all(socket_t s, const char* data, std::size_t len) {
         }
     }
     return true;
+}
+
+// Connects a non-blocking socket, checking `stop` every 50 ms so stop() never
+// waits on the OS connect timeout (Windows retries a refused loopback SYN for
+// about 2 s before it reports the failure). Gives up after `timeout_ms`.
+bool connect_abortable(socket_t s, const sockaddr* addr, int addrlen,
+                       const std::atomic<bool>& stop, int timeout_ms = 5000) {
+    if (::connect(s, addr, addrlen) == 0) return true;
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK) return false;
+#else
+    if (errno != EINPROGRESS) return false;
+#endif
+    for (int waited = 0; waited < timeout_ms && !stop.load(std::memory_order_acquire); waited += 50) {
+        fd_set wr, ex;
+        FD_ZERO(&wr); FD_ZERO(&ex);
+        FD_SET(s, &wr); FD_SET(s, &ex);
+        timeval tv{0, 50 * 1000};
+        const int n = ::select(static_cast<int>(s) + 1, nullptr, &wr, &ex, &tv);
+        if (n == 0) continue;
+        if (n < 0) {
+#ifndef _WIN32
+            if (errno == EINTR) continue;
+#endif
+            return false;
+        }
+        int err = 0;
+        socklen_t len = sizeof(err);
+        if (::getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &len) != 0) return false;
+        return err == 0;
+    }
+    return false;
 }
 
 // Reads the HTTP upgrade response from a non-blocking socket. A server may
@@ -219,15 +252,14 @@ bool Client::connect_once() {
 #ifdef SO_NOSIGPIPE
     { int one = 1; ::setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one)); }
 #endif
-    if (::connect(s, res->ai_addr, static_cast<int>(res->ai_addrlen)) != 0) {
+    // Non-blocking from the start: connect and the handshake read are then
+    // bounded (and abortable by stop()) even if nothing listens or the peer
+    // accepts but never answers, and the read loop below can interleave sends.
+    sock_set_nonblock(s);
+    if (!connect_abortable(s, res->ai_addr, static_cast<int>(res->ai_addrlen), stop_flag_)) {
         sock_close(s); freeaddrinfo(res); return false;
     }
     freeaddrinfo(res);
-
-    // Non-blocking from here on: the handshake read is then bounded (and
-    // abortable by stop()) even if the peer accepts but never answers, and the
-    // read loop below can interleave sends.
-    sock_set_nonblock(s);
 
     std::string rx;  // seeded with any frame bytes that followed the 101 response
     if (!perform_handshake(static_cast<int>(s), rx)) { sock_close(s); return false; }
