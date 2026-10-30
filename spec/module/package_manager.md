@@ -63,9 +63,10 @@ build-packages (ビルドとパッケージ取り込み。 パッケージ・ハ
 | `remove <name>` | `host.use` / `optional` / `features` と非公開 `packages` (とそれを指す `legacy_vars`) から外す。 Ergo の `modules.*.needs` にある名前は終了 2。 宣言に無ければ無変更 | ホスト | 無し |
 | `update <name> --to <tag\|main\|sha\|branch> [--allow-off-main] [--cache <dir>]` | 40 桁 SHA に解決して持ち主のファイルの `rev` と `expect_tag` だけを書く (タグでなければ `expect_tag` を外す)。 共有パッケージは `--ergo` を明示したときだけ Ergo のマニフェストを書き、 無ければ終了 2。 `ergo` と非公開はホストの宣言 (無ければ終了 2)。 off-main は終了 2 (`--allow-off-main` で通す)。 最後に STRICT で通るかと次の操作 (どのリポで PR か) を表示する | 持ち主 | 要 |
 | `status --build <dir> [--junit <xml>] [--out <file>]` (W6) | P4 の入力 `<build>/ergo-packages.status.json` (`--out` で別の場所) を書く: ホストのコード (宣言の `host.code` → resolved.json の `host.id`)、 `git rev-parse HEAD`、 `CMakeCache.txt` の更新時刻 (UTC)、 テストの数 (`--junit` → `<build>/Testing/Temporary/LastTest.log` → `unknown`)。 ビルドの成否と CI の結果は取らない (§9 W-6)。 読めない `--junit`・`--build` 無しは終了 2、 漏れ検査に当たれば書かずに終了 3 | ビルドディレクトリ | 無し |
-| `fetch [<name>...] [--build <dir> \| --cache <dir>]` | 名前 (無ければ `host.use`) を `cmake -P cmake/packages/ErgoPackagePrefetch.cmake` で事前取得。 置き場所は `--cache` → `--build` の `FETCHCONTENT_BASE_DIR` (無ければ `<build>/_deps`) → 環境変数 `ERGO_DEPENDENCY_CACHE_DIR` | キャッシュのみ | 要 |
+| `fetch [<name>...] [--build <dir> \| --cache <dir>]` | 名前 (無ければ `host.use`) を `cmake -P cmake/packages/ErgoPackagePrefetch.cmake` で事前取得 (SHA pin は全履歴。shallow clone は先端より後ろの pin を取れない)。 置き場所は `--cache` → `--build` の `FETCHCONTENT_BASE_DIR` (無ければ `<build>/_deps`) → 環境変数 `ERGO_DEPENDENCY_CACHE_DIR` | キャッシュのみ | 要 |
 
 共通: `--host <dir>` (既定 `.`)、 `--ergo <dir>` (既定は環境変数 `ERGO_SOURCE_DIR`、 次にこの CLI を作った Ergo)。
+`ergo_pkg --help` は全コマンド、 `ergo_pkg <command> --help` はそのコマンドの書式を出す (解析と使い方は `cli_args.cpp` の 1 つのコマンドの表から作る)。
 `fetch` の cmake は `--cmake <exe>` (既定はこの CLI を作った cmake)。 シェルに渡す値は引用符・`%`・`$`・`` ` ``・改行を拒む。
 
 ## 変数

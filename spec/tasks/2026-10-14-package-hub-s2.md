@@ -81,4 +81,4 @@ Augur の契約 (`augur.contracts.json` と述語モジュール) は用意で�
 | C++ のビルド | 未実施 (C++ の変更なし) |
 | GCC での構成 | 未実施 (手元に GCC 環境なし。CMake スクリプトのみ) |
 | Pictor 実ソースを `ERGO_PACKAGE_SOURCE_DIR_PICTOR` で取り込み、`ergo_render` の実経路判定が今と同じか | 未確認 (実ホスト・実ソースでの構成は人の許可に従う。desktop / Android / iOS / Emscripten とも) |
-| `ci-packages` プリセットでの実取得 | 未確認 (ネットワーク取得は行っていない。取得経路はテスト内の file:// リポジトリで確認) |
+| `ci-packages` プリセットでの実取得 | 未確認 (ネットワーク取得は行っていない。取得経路はテスト内の file:// リポジトリで確認)。後日: `GIT_SHALLOW` で SHA pin を取っていたため、取得元の先端より後ろの実 pin (Pictor 625d83d・Tela 4142f77) は `reference is not a tree` で取れなかった。SHA pin を全履歴で取るよう直し、テストの pin を「タグ無し・先端でない commit」に変えて確かめる (`test_packages_prefetch`、`test_packages_hub_routes` の `fetch_untagged_pin`、`test_packages_bootstrap` の `fetch_ok`) |

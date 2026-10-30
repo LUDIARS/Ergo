@@ -158,8 +158,10 @@ CMake (`string(JSON)`)・C++ (`ergo_common` jsonm)・Node が同じファイル�
 3. **兄弟チェックアウト**: `ERGO_PACKAGES_SIBLING_ROOT` 設定時の `<root>/<Repo>`。
 4. **インストール済み**: マニフェストに `find_package` があるもの (今は Tela) だけ。SHA を照合できないので「版のみ照合」と記録し、
    STRICT では使わない (U3)。
-5. **取得**: `ERGO_PACKAGES_FETCH=ON` のときだけ。既存 `_ergo_fc_declare` で `repo@rev` を `GIT_SHALLOW` 取得
-   (`ERGO_DEPENDENCY_CACHE_DIR` 共有)。取得後 HEAD == pin を検証 (ホストが自前で持つ SHA 検証をハブが引き取る)。
+5. **取得**: `ERGO_PACKAGES_FETCH=ON` のときだけ。既存 `_ergo_fc_declare` で `repo@rev` を取得
+   (`ERGO_DEPENDENCY_CACHE_DIR` 共有。SHA pin は全履歴、タグ名は shallow: shallow clone はブランチ先端とタグしか持たず、
+   先端より後ろの pin を取れない)。取得後 HEAD == pin を検証 (ホストが自前で持つ SHA 検証をハブが引き取る)。全履歴なので
+   取得した checkout でも祖先関係 (drift) と PKG-08 を判定する。
 6. どれにも当たらなければ **構成エラー** (ソースの指し方・取得の許し方をエラー文に書く)。
 
 `cmake/packages/<name>.cmake` (1 パッケージ 1 ファイル) が結線する: `cache` を「ホスト未設定なら既定値」として設定
@@ -169,7 +171,7 @@ CMake (`string(JSON)`)・C++ (`ergo_common` jsonm)・Node が同じファイル�
 | 環境 | 動き |
 |---|---|
 | オフライン | ホスト供給・ローカルソース・兄弟だけで閉じる。既定で取得 OFF なのでネットワークに出ない |
-| CI | プリセット `ci-packages` で `ERGO_PACKAGES_FETCH=ON` + `ERGO_PACKAGES_STRICT=ON`。キャッシュ共有可 |
+| CI | プリセット `ci-packages` で `ERGO_PACKAGES_FETCH=ON` + `ERGO_PACKAGES_STRICT=ON`。キャッシュ共有可。pin が取得元の先端より後ろでも取れる (SHA pin は全履歴) |
 | worktree | `ERGO_PACKAGE_SOURCE_DIR_PICTOR=<worktree>`。SHA 不一致は非 STRICT で警告・記録、STRICT で停止。未コミット変更は `dirty` |
 | Emscripten | 同じ仕組み。`platforms` で `emscripten` を判定し、成り立たない機能を構成エラーにする。**実 wasm は未確認** (multi-RHI 待ち) |
 
@@ -213,7 +215,9 @@ PKG-17 だけは構成時に判定しない (File API の返答は generate の�
 1. `<build>/ergo-packages.resolved.json` (構成時にハブが `file(CONFIGURE)` で 1 回書く。同じ構成なら同じバイト列):
    パッケージごとの pin / 解決 SHA / 経路 / dirty / drift / 選んだ機能 / `project(VERSION)` / findings、モジュールごとの ON/OFF と理由
    (`ERGO_RENDER_BACKEND_REASON` などを写す)。
-2. CMake File API codemodel v2: ハブが `<build>/.cmake/api/v1/query/client-ergo/query.json` を置く。ターゲットの `sourceDir` が
+2. CMake File API codemodel v2: ハブが `<build>/.cmake/api/v1/query/client-ergo/query.json` を置く (CMake は問い合わせを
+   構成の前に読むので、これに答えるのは次の構成)。CMake 3.27 以上では `cmake_file_api(QUERY API_VERSION 1 CODEMODEL 2)`
+   も出し、同じ構成の generate が共有の問い合わせとして答える (読み手は client-ergo の返答が無ければ index の `objects` を使う)。ターゲットの `sourceDir` が
    最長一致するパッケージへ帰属させる (どれにも当たらなければ host)。既定でテスト・ダミー・ベンチ・`ergo_gtest_main` を除外
    (`--include-tests` で戻す)。`version` を検査し、違えば明示エラー。
 3. 観測の使用関係 (`ergo_package_viz scan --root <dir>`): `package.json` の `dependencies` / `devDependencies`

@@ -72,7 +72,10 @@ structure-visualization (`spec/domains/structure-visualization.domain.json`、 2
 ## 必要なデータ
 
 `ergo_package_model` が読める構成済みのビルドディレクトリ。 targets 図と `--check` は File API の返答が必須、
-packages 図は無くても書く (題に「実リンク未取得」)。
+packages 図は無くても書く (題に「実リンク未取得」)。 返答は CMake 3.27 以上なら 1 回の構成で揃う (ハブが
+`cmake_file_api(QUERY)` も出す)。 3.26 以下は 2 回目の構成で揃うので、 新しいビルドディレクトリでは `cmake <build>` を
+もう 1 回走らせる (構成ログに `ergo packages: P2 / --check need one more cmake run`)。 `ergo_package_graphs` は targets 図を
+最後に書くので、 返答が無くても packages / usage / host の 3 枚は書ける。
 
 ## 依存
 

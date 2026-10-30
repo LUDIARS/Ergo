@@ -35,7 +35,7 @@ Ergo が Pictor / Tela などの LUDIARS 製 C++ パッケージの版を 1 か�
 | 2 | `source` | `ERGO_PACKAGE_SOURCE_DIR_<NAME>=<dir>` | M2。`<dir>/CMakeLists.txt` が無ければ PKG-03 で止まる (次の経路へ進まない) |
 | 3 | `sibling` | `ERGO_PACKAGES_SIBLING_ROOT=<root>` | M2。`<root>/<Repo>` だけ (`Repo` は `repository` の末尾名、例 `Pictor`)。`.worktrees` などは見ない |
 | 4 | `installed` | マニフェストに `cmake.find_package` がある (今は Tela) | M2。`find_package(<Name> CONFIG)`。SHA は照合できず版だけ記録 (PKG-09 record)。**STRICT では使わない** |
-| 5 | `fetch` | `ERGO_PACKAGES_FETCH=ON` | M2。`repository@rev` を `GIT_SHALLOW` で取得 (`cmake/ErgoDependencies.cmake` の `_ergo_fc_declare`、`ERGO_DEPENDENCY_CACHE_DIR` 共有)。取得後 HEAD == pin を検証 (PKG-04) |
+| 5 | `fetch` | `ERGO_PACKAGES_FETCH=ON` | M2。`repository@rev` を取得 (`cmake/ErgoDependencies.cmake` の `_ergo_fc_declare`、`ERGO_DEPENDENCY_CACHE_DIR` 共有。SHA pin は全履歴、タグは shallow)。取得後 HEAD == pin を検証 (PKG-04) |
 | 6 | — | どれにも当たらない | PKG-03 (構成エラー。試した経路とソースの指し方を表示) |
 
 取り込んだパッケージは `add_subdirectory(<src> <build>/_ergo_packages/<name> EXCLUDE_FROM_ALL)` で組む。
@@ -103,8 +103,10 @@ cmake -S <host> -B build -DERGO_PACKAGES="pictor;tela" -DERGO_PACKAGES_SIBLING_R
 cmake -S <host> -B build -DERGO_PACKAGES="pictor;tela" -DERGO_PACKAGES_FETCH=ON -DERGO_PACKAGES_STRICT=ON
 ```
 
-- Ergo 単体の CI はプリセット `ci-packages` (`ERGO_PACKAGES=pictor;tela` + `FETCH=ON` + `STRICT=ON`)
-- 取得は `ERGO_FETCH_DEPENDENCIES` (第三者ライブラリの取得許可、既定 ON) も ON である必要がある (同じエンジンを使うため)
+- Ergo 単体で実際の Pictor / Tela をマニフェストの pin で取る構成はプリセット `ci-packages` (`ERGO_PACKAGES=pictor;tela` +
+  `FETCH=ON` + `STRICT=ON`。ネットワークが要る)
+- 取得は `ERGO_FETCH_DEPENDENCIES` (第三者ライブラリの取得許可、既定 ON) も ON である必要がある (同じエンジンを使うため)。
+  pin は 40 桁の SHA なので全履歴で取る (shallow clone はブランチ先端とタグしか持たず、先端より後ろの pin を取れない)
 - Pictor より前に走る必要のあるモバイルの Vulkan 結線はホストに残す
 - 一部モジュールだけを使い将来 wasm 化するホスト (Ludellus-Native 型) は今は M0 のまま。描画を Pictor 経由にする段階で最初から M2 で入る
 
@@ -169,18 +171,60 @@ ergo_pkg update <shared> --to <tag> --ergo <ergo>   # 共有パッケージの p
   `<FETCHCONTENT_BASE_DIR>/ergo_pkg_<name>-src` が pin と同じ HEAD ならそれを使う)。
 - `ergo_pkg` はコミット・ブランチ作成・PR をしない。宣言とブートストラップの変更はホストの feat ブランチで PR にする。
 - Ergo は公開リポ。宣言・ブートストラップに開発機の絶対パスやトークンを書かない (`ergo_pkg doctor` の LEAK で止まる)。
+- `add --kind tool` は非公開 `packages` にだけ足し、`host.use` は変えない (tool は取得するだけでリンクしない。`host.use` が
+  選ぶのは link だけ)。tool に `--optional` / `--features` / `--wiring` を付けると終了 2。
+- ブートストラップのひな形は Ergo の取得を全履歴に変えた (`GIT_SHALLOW FALSE`、`host.ergo.rev` が Ergo の main の先端より
+  後ろでも `-DERGO_BOOTSTRAP_FETCH=ON` で取れる)。それより前に `init` したホストは、Ergo を上げたら `ergo_pkg init` を
+  もう一度走らせてブートストラップを書き直す (それまで `doctor` はブートストラップを古い = error と報告する)。
+- `ergo_pkg --help` は全コマンド、`ergo_pkg <command> --help` はそのコマンドの書式を出す。
 - `add` / `remove` / `update` は該当の値だけを書き換え、キー順・改行・字下げは変えない。`update` は main の祖先でない
   commit (feature ブランチの先頭など) を拒む (`--allow-off-main` で通す)。`--to main` / `--to <sha>` はタグの無い pin なので
   STRICT で通らない旨を警告し、`expect_tag` を外す。版の解決はリポごとのツリーレス bare ミラー
   (`<cache>/mirrors/<Repo>.git`、`<cache>` は `--cache` → `ERGO_PKG_CACHE_DIR` → `ERGO_DEPENDENCY_CACHE_DIR` → 一時ディレクトリ) で行う。
 
+## 更新の確認とホストの状態 (W3–W7)
+
+pin より新しい版 (タグ・追跡ブランチの先頭) と main から外れた pin を確かめ、ホストの状態を図にする。設計は
+`spec/feature/package-manager.md` §3–§6。選択肢・既定値・環境変数の全体は
+[`spec/module/package_manager.md`](../module/package_manager.md) と [`spec/module/package_watch.md`](../module/package_watch.md)。
+`outdated` / `watch` は `ERGO_BUILD_PACKAGE_WATCH=ON` (既定) で作った `ergo_pkg` にある。
+
+```sh
+cd <host>
+ergo_pkg outdated [--json] [--fail-on tag|track|off-main]   # 今すぐ確かめる (前回状態は読み書きしない)
+# 遅れの距離 (何 commit) を出すには、リポごとのツリーレス bare ミラーを先に用意する (outdated / watch は作らない)
+git clone --bare --filter=tree:0 https://github.com/LUDIARS/Pictor.git <cache>/mirrors/Pictor.git
+ergo_pkg watch --host <host> [--host <host2>...] [--state <dir>] [--out <dir>]
+                                    # 前回状態との差分を <out>/events.json、ホストごとの報告を <host>/.ergo/watch-report.json
+ergo_pkg status --build build [--junit build/ctest-junit.xml]   # P4 の入力 build/ergo-packages.status.json
+ergo_package_viz build --view host --host <host> --out host.tela   # P4 ホスト状態図 (ergo_package_graphs も書く)
+```
+
+- 取れない依存は「未確認」と出し、「更新なし」とは書かない。`--fail-on` はその種類があれば終了 1 (CI の 1 段にできる)。
+- `<cache>` は `--cache` → `ERGO_PKG_CACHE_DIR` → `ERGO_DEPENDENCY_CACHE_DIR`。兄弟チェックアウト (`--root` →
+  `ERGO_PACKAGES_SIBLING_ROOT` の `<root>/<Repo>`) があればそれを読み、fetch しない。前回状態の既定は利用者ディレクトリ
+  (`$XDG_STATE_HOME/ergo/pkg-watch`、Windows は `%LOCALAPPDATA%/ergo/pkg-watch`)。リポとビルドディレクトリには置かない。
+- 由来 (W4: 更新が Praeforma の委託・AI・人のどれから来たか、審査中の PR 番号) は `watch --revisor-url` / `--concordia-url`
+  (環境変数 `ERGO_WATCH_REVISOR_URL` / `ERGO_WATCH_CONCORDIA_URL`、loopback だけ) で Revisor / Concordia を読む。HTTP は
+  `-DERGO_BUILD_HTTP=ON` で作った `ergo_pkg` だけが持つ。無いビルドや届かないときは報告の `sources.*` が `unavailable`、
+  URL を渡さなければ `off` (どちらも「更新なし」ではない)。
+- 定期実行と Discord への配送は Excubitor の update ドメインのジョブが行う (catalog で `ergo_watch: true` のホストを `--host` に
+  並べて `watch` を起動し、`events.json` を送る。`--state` は Excubitor のデータディレクトリ)。`ergo_pkg` は配送・コミット・
+  PR をしない。出来事の `next` (例 `ergo_pkg update pictor --to v2.3.0`) は持ち主のリポの feat ブランチで行う。
+- `watch` が前回状態を残したホストでは、構成の最後に `ergo packages: N update(s) known for host <code>` の 1 行が出る
+  (W5。状態が無ければ何も出さず、構成を止めない)。
+- Unity プロジェクト (UPM ホスト、W7): `ergo_pkg init --upm --code <c> --host <project>` で `.ergo/host.json` だけを作り、
+  `watch --host <project>` で同じく `.ergo/watch-report.json` を書く。読むのは Unity パッケージ `com.ludiars.ergo.packages` の
+  Window > LUDIARS > Ergo Packages。UPM の pin (`Packages/manifest.json` の `#<sha>`) は窓が書き換え、`ergo_pkg update` は
+  触らない。導入と使い方は [`unity/com.ludiars.ergo.packages/README.md`](../../unity/com.ludiars.ergo.packages/README.md)。
+
 ## 既知の制約
 
 - Pictor は desktop で glfw を暗黙に FetchContent する。ハブでは直せないため、オフラインで完結する
   構成は保証できない (Pictor 側に opt-out を依頼する。統合設計 §8 / N6)。
-- `GIT_SHALLOW` の取得は pin が取得元のブランチ先端かタグであることを前提とする (CMake の shallow clone は任意の過去 commit を
-  直接取れない)。過去の commit を固定するときは取得経路ではなくローカルソース経路を使う。shallow な checkout では
-  祖先関係を判定しない (drift は HEAD == pin だけを見る、PKG-08 は判定しない)。
+- 取得経路 (経路 5・`ergo_pkg fetch`・ブートストラップの `ERGO_BOOTSTRAP_FETCH`) は SHA pin を全履歴で取るので、取得した
+  checkout でも祖先関係 (drift の ahead / behind / diverged) と PKG-08 (expect_tag) を判定する。ホストが自分で用意した
+  shallow な checkout では従来どおり祖先関係を判定しない (drift は HEAD == pin だけを見る、PKG-08 は判定しない)。
 - Windows のパス長: 取得では `ERGO_DEPENDENCY_CACHE_DIR` を短いパスに置く。
 - Emscripten の実 wasm ビルドは未確認 (multi-RHI 待ち)。現 pin の Pictor は Emscripten で `pictor` を作らず
   `pictor_webgl` だけを作る。マニフェストでは `pictor` を `vulkan` の `provides` にしているので、`vulkan` が外れる
@@ -188,10 +232,12 @@ ergo_pkg update <shared> --to <tag> --ergo <ergo>   # 共有パッケージの p
 
 ## 図にする (S3: P1 パッケージ版一覧 / P2 ターゲットのリンク図)
 
-構成するとハブが `<build>/ergo-packages.resolved.json` と File API の問い合わせを置く。generate の後に:
+構成するとハブが `<build>/ergo-packages.resolved.json` と File API の問い合わせを置く。CMake 3.27 以上は 1 回の構成で
+File API の返答まで揃う (ハブが `cmake_file_api(QUERY)` も出す)。3.26 以下は問い合わせに次の構成で答えるので、新しいビルド
+ディレクトリでは `cmake <build>` をもう 1 回走らせる (構成ログに `ergo packages: P2 / --check need one more cmake run` が出る)。
 
 ```sh
-cmake --build build --target ergo_package_graphs          # build/graphs/packages.tela と targets.tela
+cmake --build build --target ergo_package_graphs          # build/graphs/{packages,usage,host,targets}.tela
 ergo_package_viz build --view packages --out packages.tela
 ergo_package_viz build --view targets --focus ergo --out targets.tela   # 焦点: パッケージ / 層 / ターゲット
 ergo_package_viz build --view targets --expand pictor --out targets.tela
@@ -199,6 +245,8 @@ ergo_package_viz build --check                            # PKG-17 宣言漏れ�
 tela_view --font <file.ttf> --graph packages.tela         # Tela は別インストール (Excubitor 経由で起動)
 ```
 
+- `ergo_package_graphs` は File API の返答が要る targets 図 (P2) を最後に書く。返答が無くて止まっても packages / usage /
+  host の 3 枚は書けている。
 - 図が Tela の上限 (8 グループ / 128 ノード / 256 辺) を超えるときは、推移簡約 → 畳み込み (host と Ergo 以外の
   パッケージを 1 ノード) → 分割 (`packages.1.tela` … と索引 `packages.index.tela`) の順に自動で落とす。
   上限を超えた 1 枚は書かない。

@@ -95,7 +95,7 @@
 | `add <name> [--optional] [--features ...]` | `host.use` に足す。Ergo のマニフェストに無い名前は `--repository/--rev` を要求して非公開 `packages` へ。`link` の結線ファイルが無ければ終了 2 (生成しない)。`--kind tool` は非公開 `packages` にだけ足し `host.use` は変えない (`host.use` は link だけを選ぶ。tool に `--optional` / `--features` / `--wiring`、宣言済みの tool の `add` は終了 2) | ホスト | 任意 |
 | `remove <name>` | `host.use` / 非公開 `packages` から外す。`modules.*.needs` を壊すなら拒否 | ホスト | 無し |
 | `update <name> --to <tag\|main\|sha>` | 対象を 40 桁 SHA に解決して `rev` と `expect_tag` を書く。`ergo` と非公開はホスト、共有パッケージは `--ergo <dir>` の Ergo マニフェスト。取り違えは終了 2 | 持ち主 | 要 |
-| `fetch [<name>...]` | 各 `repository@rev` を FetchContent と同じ置き場所へ事前取得 (`cmake/packages/ErgoPackagePrefetch.cmake` を起動)。オフラインでも経路 5 が当たるようにする | キャッシュのみ | 要 |
+| `fetch [<name>...]` | 各 `repository@rev` を FetchContent と同じ置き場所へ事前取得 (`cmake/packages/ErgoPackagePrefetch.cmake` を起動。pin は 40 桁 SHA なので全履歴で取り、先端より後ろの pin も取れる)。オフラインでも経路 5 が当たるようにする | キャッシュのみ | 要 |
 | `outdated [--json] [--fail-on <kind>]` | §3 の判定を今すぐ行って表示。前回状態は読み書きしない | 無し | 要 (無ければ未確認) |
 | `watch --host <dir>... [--state <dir>] [--out <dir>] [--revisor-url <u>] [--concordia-url <u>]` | 定期実行の本体。判定 → 前回状態と差分 → 新しい出来事を `events.json` に、ホストごとの報告を `<host>/.ergo/watch-report.json` に | 状態と報告のみ | 要 |
 | `status --host <dir> --build <dir> [--out <file>]` | ビルドとテストの状態を `ergo-packages.status.json` に | 出力のみ | 無し |
