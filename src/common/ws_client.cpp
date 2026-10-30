@@ -25,7 +25,7 @@
   static int sock_last_err() { return WSAGetLastError(); }
 #else
   #include <sys/socket.h>
-  #include <sys/select.h>
+  #include <poll.h>
   #include <netinet/in.h>
   #include <netdb.h>
   #include <unistd.h>
@@ -104,6 +104,31 @@ bool send_all(socket_t s, const char* data, std::size_t len) {
     return true;
 }
 
+// Waits up to `ms` for a pending non-blocking connect on `s`. Returns > 0
+// once it has finished (either way: read SO_ERROR), 0 on timeout or EINTR,
+// < 0 on a wait error.
+int wait_connect_slice(socket_t s, int ms) {
+#ifdef _WIN32
+    // Windows fd_set is a counted array of handles, so any SOCKET value fits,
+    // and a failed connect is reported through exceptfds. WSAPoll is avoided:
+    // before Windows 10 2004 it never reported a refused connect.
+    fd_set wr, ex;
+    FD_ZERO(&wr); FD_ZERO(&ex);
+    FD_SET(s, &wr); FD_SET(s, &ex);
+    timeval tv{0, ms * 1000};
+    return ::select(0, nullptr, &wr, &ex, &tv);
+#else
+    // poll(), not select(): FD_SET on an fd >= FD_SETSIZE (1024) is undefined
+    // (glibc's _FORTIFY_SOURCE aborts), and a host that raised RLIMIT_NOFILE
+    // can hand this worker such an fd. POLLERR / POLLHUP arrive unrequested.
+    pollfd p{};
+    p.fd     = s;
+    p.events = POLLOUT;
+    const int n = ::poll(&p, 1, ms);
+    return (n < 0 && errno == EINTR) ? 0 : n;
+#endif
+}
+
 // Connects a non-blocking socket, checking `stop` every 50 ms so stop() never
 // waits on the OS connect timeout (Windows retries a refused loopback SYN for
 // about 2 s before it reports the failure). Gives up after `timeout_ms`.
@@ -116,18 +141,9 @@ bool connect_abortable(socket_t s, const sockaddr* addr, int addrlen,
     if (errno != EINPROGRESS) return false;
 #endif
     for (int waited = 0; waited < timeout_ms && !stop.load(std::memory_order_acquire); waited += 50) {
-        fd_set wr, ex;
-        FD_ZERO(&wr); FD_ZERO(&ex);
-        FD_SET(s, &wr); FD_SET(s, &ex);
-        timeval tv{0, 50 * 1000};
-        const int n = ::select(static_cast<int>(s) + 1, nullptr, &wr, &ex, &tv);
+        const int n = wait_connect_slice(s, 50);
         if (n == 0) continue;
-        if (n < 0) {
-#ifndef _WIN32
-            if (errno == EINTR) continue;
-#endif
-            return false;
-        }
+        if (n < 0) return false;
         int err = 0;
         socklen_t len = sizeof(err);
         if (::getsockopt(s, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &len) != 0) return false;

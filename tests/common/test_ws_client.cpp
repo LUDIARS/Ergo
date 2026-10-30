@@ -31,6 +31,7 @@
   using socklen_type = int;
 #else
   #include <arpa/inet.h>
+  #include <fcntl.h>
   #include <netinet/in.h>
   #include <sys/select.h>
   #include <sys/socket.h>
@@ -444,6 +445,46 @@ TEST(WsClient, StopReturnsPromptlyWithoutServer) {
     const auto took = std::chrono::duration_cast<milliseconds>(Clock::now() - t0);
     EXPECT_LT(took.count(), 1000);
 }
+
+#ifndef _WIN32
+TEST(WsClient, StopReturnsPromptlyWhileConnecting) {
+    // A refused port fails at once on POSIX, so the test above never has a
+    // connect in flight there (on Windows it does: a refused SYN is retried
+    // for about 2 s). Fill a listener's accept queue (backlog 0, never
+    // accepts) so the kernel drops further SYNs and connect() stays pending,
+    // as against a host that silently drops SYNs.
+    sock_t ls = ::socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_NE(ls, kBadSock);
+    sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    ASSERT_EQ(::bind(ls, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0);
+    ASSERT_EQ(::listen(ls, 0), 0);
+    socklen_type len = sizeof(addr);
+    ASSERT_EQ(::getsockname(ls, reinterpret_cast<sockaddr*>(&addr), &len), 0);
+    std::vector<sock_t> fillers;
+    for (int i = 0; i < 4; ++i) {
+        sock_t f = ::socket(AF_INET, SOCK_STREAM, 0);
+        ASSERT_NE(f, kBadSock);
+        ::fcntl(f, F_SETFL, ::fcntl(f, F_GETFL, 0) | O_NONBLOCK);
+        (void)::connect(f, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+        fillers.push_back(f);
+    }
+    std::this_thread::sleep_for(milliseconds(100));  // let the fillers queue up
+
+    Client client;
+    client.start("127.0.0.1", ntohs(addr.sin_port), "/ws");
+    std::this_thread::sleep_for(milliseconds(200));  // worker is inside connect
+    EXPECT_FALSE(client.is_connected());
+
+    const auto t0 = Clock::now();
+    client.stop();
+    const auto took = std::chrono::duration_cast<milliseconds>(Clock::now() - t0);
+    EXPECT_LT(took.count(), 1000);
+    for (sock_t f : fillers) close_sock(f);
+    close_sock(ls);
+}
+#endif
 
 TEST(WsClient, StopReturnsPromptlyWhenServerNeverAnswers) {
     // TCP accepted (backlog) but no 101: the handshake read must not pin
