@@ -250,6 +250,20 @@ if(ERGO_BUILD_PARTICLE)
             add_test(NAME ${NAME} COMMAND ${NAME})
         endforeach()
     endif()
+
+    # ergo_particle_link — receive-only feeder for tools/ergo's `particle`
+    # plugin over ergo_common_ws. Separate so ergo_particle stays socket-free.
+    option(ERGO_BUILD_PARTICLE_LINK "Build ergo_particle_link (WS feeder for the particle plugin)" ON)
+    if(ERGO_BUILD_PARTICLE_LINK)
+        add_library(ergo_particle_link src/particle/editor_link.cpp)
+        target_include_directories(ergo_particle_link PUBLIC include)
+        target_link_libraries(ergo_particle_link PUBLIC ergo_particle PRIVATE ergo_common_ws ergo_common)
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_editor_link tests/particle/test_editor_link.cpp)
+            target_link_libraries(test_editor_link PRIVATE ergo_particle_link ergo_gtest_main)
+            add_test(NAME test_editor_link COMMAND test_editor_link)
+        endif()
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
