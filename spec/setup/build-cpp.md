@@ -189,7 +189,8 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
   requirement なので、リンクしたターゲットには自動で付く。Ergo のライブラリを
   リンクせずにヘッダだけを読むターゲットは自分で `/utf-8` を付ける。
 - 新規モジュール追加時は `CMakeLists.txt` への `add_library` 追加 +
-  `module_list.md` / `module_list.yaml` 更新が必要 (手順は
+  `module_list.md` / `module_list.yaml` / README / [config-reference.md](config-reference.md) /
+  `spec/domains` の更新が必要で、漏れは ctest `test_module_catalog` が検出する (手順は
   [`../../CLAUDE.md`](../../CLAUDE.md) 「新規モジュール追加手順」)。`Ergo::<名>`
   エイリアス・C++ 標準・`/utf-8` は `cmake/ErgoTargets.cmake` が全 `ergo_*`
   ライブラリに付けるので、モジュール側で書く必要はない。別のモジュールが無いと

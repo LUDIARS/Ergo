@@ -31,6 +31,10 @@ SHA を PR なしで検査したいときは workflow_dispatch で起動する
 | `unity-package-core` | 必須 | ubuntu-latest、.NET 8 | Unity パッケージ (`unity/com.ludiars.ergo.packages`) のコアを Unity なしで |
 
 - C++ の各レグは ctest の全テストを走らせる (後から足したテストも自動で入る)。
+  その中の `test_module_catalog` (`tests/test_module_catalog.cmake`、コンパイラ不要) は
+  `module_list.{md,yaml}`・README・[config-reference.md](config-reference.md)・
+  `tools/ergo` のプラグイン一覧・`spec/domains` とコードの食い違い、壊れた相対リンクを
+  検出する。手元では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
 - 結果は成否に関わらずアーティファクト `ctest-<レグ名>` に上がる:
   `ctest-junit.xml` と `Testing/Temporary/LastTest.log`。CMake 3.20 の ctest
   には `--output-junit` が無いので、`linux-gcc-cmake320` は LastTest.log だけ。

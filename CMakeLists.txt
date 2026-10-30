@@ -1750,6 +1750,15 @@ if(ERGO_BUILD_TESTS AND ERGO_BUILD_THIRDPARTY_SMOKE)
     add_test(NAME test_thirdparty_deps COMMAND test_thirdparty_deps)
 endif()
 
+# tests/test_module_catalog.cmake — module_list.{md,yaml} / README / config-reference
+# / tools/ergo plugin docs / spec/domains / spec links against the code (cmake -P,
+# no compiler). Ergo's own checkout only: it says nothing about a host's build.
+if(ERGO_BUILD_TESTS AND _ergo_top)
+    add_test(NAME test_module_catalog
+        COMMAND ${CMAKE_COMMAND} -DERGO_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_module_catalog.cmake)
+endif()
+
 # ---------------------------------------------------------------------------
 # tests/packages/ — package hub rule tests (cmake -P, no compiler needed), the
 # M0 invariance configure test (C-5) and the S2 route tests on fake packages
