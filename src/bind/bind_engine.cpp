@@ -1,6 +1,6 @@
 #include "ergo/bind/bind.h"
 #include "ergo/common/json_min.h"
-#include "ws_client.h"
+#include "ergo/common/ws_client.h"
 
 #include "actor_topology.h"
 #include "pending_write_queue.h"
@@ -18,6 +18,7 @@ namespace ergo::bind {
 namespace {
 
 namespace jsonm = ::ergo::common::jsonm;
+namespace ws    = ::ergo::common::ws;
 
 // ---- value <-> JSON --------------------------------------------------------
 

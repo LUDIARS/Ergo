@@ -1,4 +1,4 @@
-#include "ws_client.h"
+#include "ergo/common/ws_client.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -42,7 +42,7 @@
   static int sock_last_err() { return errno; }
 #endif
 
-namespace ergo::bind::ws {
+namespace ergo::common::ws {
 
 namespace {
 
@@ -346,4 +346,4 @@ int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint
     return 1;
 }
 
-} // namespace ergo::bind::ws
+} // namespace ergo::common::ws

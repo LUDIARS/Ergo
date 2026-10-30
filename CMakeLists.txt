@@ -76,11 +76,17 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
-# ergo_common — small utility lib shared across modules. Currently just the
-# minimal JSON codec (used by ergo_bind).
+# ergo_common — small utility lib shared across modules. JSON codec; WS
+# client in ergo_common_ws (kept apart so ergo_common stays socket-free).
 # ---------------------------------------------------------------------------
 add_library(ergo_common STATIC src/common/json_min.cpp)
 target_include_directories(ergo_common PUBLIC include)
+add_library(ergo_common_ws STATIC src/common/ws_client.cpp)
+target_include_directories(ergo_common_ws PUBLIC include)
+target_link_libraries(ergo_common_ws PUBLIC Threads::Threads)
+if(WIN32)
+    target_link_libraries(ergo_common_ws PUBLIC ws2_32)
+endif()
 
 # ---------------------------------------------------------------------------
 # Shared mini-gtest (header-only), bound into one static lib used by all tests
@@ -247,14 +253,10 @@ if(ERGO_BUILD_BIND)
     add_library(ergo_bind
         src/bind/types.cpp
         src/bind/bind_engine.cpp
-        src/bind/ws_client.cpp
     )
     target_include_directories(ergo_bind PUBLIC include)
     target_compile_definitions(ergo_bind PUBLIC ERGO_BIND_ENABLED=1)
-    target_link_libraries(ergo_bind PUBLIC ergo_common Threads::Threads)
-    if(WIN32)
-        target_link_libraries(ergo_bind PUBLIC ws2_32)
-    endif()
+    target_link_libraries(ergo_bind PUBLIC ergo_common ergo_common_ws Threads::Threads)
     # VarKind is a closed wire-protocol enum (no runtime converter registry by
     # design). Guard against it drifting: any switch over an enum that omits a
     # case with no default label is a hard error, so adding a new VarKind fails
