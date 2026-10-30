@@ -54,7 +54,15 @@ bool looks_like_local_path(const std::string& value) {
         (value[2] == '/' || value[2] == '\\')) {
         return true;
     }
-    if (value.rfind("\\\\", 0) == 0) return true;
+    // UNC (\\host\share, also written with escaped backslashes): a host segment then a separator.
+    // A regex back-reference such as "\\1" has no separator after it and is not a path.
+    if (value.rfind("\\\\", 0) == 0) {
+        const std::size_t host = value.find_first_not_of('\\');
+        if (host != std::string::npos) {
+            const std::size_t sep = value.find_first_of("\\/", host);
+            if (sep != std::string::npos && sep > host) return true;
+        }
+    }
     return value.find("/Users/") != std::string::npos || value.find("/home/") != std::string::npos;
 }
 

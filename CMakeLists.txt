@@ -47,7 +47,7 @@ option(ERGO_BUILD_PACKAGE_MODEL "Build ergo_package_model (resolved.json / CMake
 option(ERGO_BUILD_PACKAGE_SCAN  "Build ergo_package_scan (観測対象のチェックアウト → 根拠付きの使用関係)" ON)
 option(ERGO_BUILD_PACKAGE_VIZ   "Build ergo_package_viz (パッケージ版一覧 / ターゲットのリンク図 / 使用関係図 + CLI)" ON)
 option(ERGO_BUILD_PACKAGE_MANAGER "Build ergo_package_manager (ホスト宣言の読み取り・検査・漏れ検査)" ON)
-option(ERGO_BUILD_PACKAGE_CLI   "Build the ergo_pkg CLI (init / list / doctor / fetch、 ergo_package_manager が要る)" ON)
+option(ERGO_BUILD_PACKAGE_CLI   "Build the ergo_pkg CLI (init / list / doctor / fetch / add / remove / update / status、 outdated / watch は ERGO_BUILD_PACKAGE_WATCH。 ergo_package_manager が要る)" ON)
 option(ERGO_BUILD_PACKAGE_WATCH "Build ergo_package_watch (更新の検知 + ergo_pkg outdated / watch)" ON)
 option(ERGO_BUILD_CAST         "Build ergo_cast (Actor bundling Scene; render-independent)" ON)
 option(ERGO_BUILD_SCENE        "Build ergo_scene (serializable look-dev Scene document)" ON)
@@ -1243,6 +1243,8 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
     # ERGO_PACKAGES_SIBLING_ROOT の兄弟チェックアウト。 未設定なら観測対象は未観測として描く。
     # P4 はトップのソース (ホスト) の .ergo/watch-report.json と <build>/ergo-packages.status.json
     # (ergo_pkg watch / ergo_pkg status が書く。 無ければ札は "—")。
+    # P2 は File API の返答が要る (CMake 3.27+ は 1 回の構成で、 それ未満は 2 回目の構成で返る) ので最後に
+    # 書く: 返答が無くて止まっても P1 / P3 / P4 は書けている。
     set(_ergo_graphs_dir "${CMAKE_BINARY_DIR}/graphs")
     set(_ergo_usage_root "")
     if(ERGO_PACKAGES_SIBLING_ROOT)
@@ -1252,13 +1254,13 @@ if(ERGO_BUILD_PACKAGE_VIZ AND TARGET ergo_package_model AND TARGET ergo_package_
         COMMAND ${CMAKE_COMMAND} -E make_directory "${_ergo_graphs_dir}"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view packages
                 --out "${_ergo_graphs_dir}/packages.tela"
-        COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view targets
-                --out "${_ergo_graphs_dir}/targets.tela"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view usage ${_ergo_usage_root}
                 --manifest "${CMAKE_CURRENT_SOURCE_DIR}/ergo-packages.json"
                 --out "${_ergo_graphs_dir}/usage.tela"
         COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view host --host "${CMAKE_SOURCE_DIR}"
                 --out "${_ergo_graphs_dir}/host.tela"
+        COMMAND ergo_package_viz_cli "${CMAKE_BINARY_DIR}" --view targets
+                --out "${_ergo_graphs_dir}/targets.tela"
         DEPENDS ergo_package_viz_cli
         COMMENT "ergo_package_viz: writing package graphs to ${_ergo_graphs_dir}"
         VERBATIM)

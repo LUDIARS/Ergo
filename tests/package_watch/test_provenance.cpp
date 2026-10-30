@@ -8,6 +8,7 @@
 #include "ergo/package_watch/loopback_url.h"
 #include "ergo/package_watch/provenance.h"
 #include "ergo/package_watch/provenance_json.h"
+#include "ergo/package_watch/upm_dependency.h"
 #include "ergo/package_watch/watch_report.h"
 
 #include "gtest/gtest.h"
@@ -25,8 +26,9 @@ namespace {
 
 constexpr std::int64_t kT0 = 1792022400;  // 2026-10-15T00:00:00Z
 
+/// Revisor / Concordia の API 応答の見本 (Unity と共有しない入力なので fixtures/provenance/ に置く)。
 std::string read_fixture(const std::string& name) {
-    std::ifstream in(std::string(ERGO_PACKAGE_WATCH_FIXTURES) + "/" + name, std::ios::binary);
+    std::ifstream in(std::string(ERGO_PACKAGE_WATCH_FIXTURES) + "/provenance/" + name, std::ios::binary);
     std::ostringstream ss;
     ss << in.rdbuf();
     return ss.str();
@@ -50,10 +52,11 @@ RunListing runs_from(const char* name) {
 WatchDependency pictor() { return dependency("pictor", 1, "v2.2.0"); }
 
 /// ref は見ていない (observation.observed = false) 結果に由来だけを足す。
-std::vector<DependencyResult> provenance_results(const ProvenanceInputs& in, const WatchState& prev) {
+std::vector<DependencyResult> provenance_results(const ProvenanceInputs& in, const WatchState& prev,
+                                                 const WatchDependency& dep = pictor()) {
     std::vector<DependencyResult> results;
     DependencyResult r;
-    r.dependency = pictor();
+    r.dependency = dep;
     results.push_back(r);
     attach_provenance(results, in, prev);
     return results;
@@ -193,6 +196,7 @@ TEST(PackageWatchProvenance, OpenToMergedOnce) {
     EXPECT_EQ(merged.update.origin, std::string(kOriginPf));  // 由来は前回の review から写す
     EXPECT_EQ(merged.update.head, std::string("4f0e9a1"));
     EXPECT_EQ(merged.update.to_rev, std::string("9d8c7b6000000000000000000000000000000128"));
+    EXPECT_EQ(merged.update.next, std::string("ergo_pkg update pictor --to main"));
     EXPECT_EQ(count_entries(d2.next, UpdateKind::Review), static_cast<std::size_t>(2));
     EXPECT_EQ(count_entries(d2.next, UpdateKind::Merged), static_cast<std::size_t>(0));  // 状態には残さない
 
@@ -200,6 +204,24 @@ TEST(PackageWatchProvenance, OpenToMergedOnce) {
     const auto r3 = provenance_results({&reviews, &runs}, d2.next);
     const auto d3 = diff(d2.next, "Example", r3, kT0 + 1800);
     EXPECT_EQ(d3.events.size(), static_cast<std::size_t>(0));
+}
+
+TEST(PackageWatchProvenance, UpmMergedNextIsTheUnityWindow) {
+    // UPM ホストの pin は Unity の窓が書き換える (ergo_pkg update は触らない): merged の next も窓を案内する。
+    WatchDependency upm = pictor();
+    upm.owner = kUpmOwner;
+    const auto open = reviews_from("revisor-open.json", nullptr);
+    const auto runs = runs_from("concordia-runs.json");
+    const auto d1   = diff(WatchState{}, "Example", provenance_results({&open, &runs}, WatchState{}, upm), kT0);
+
+    auto reviews = reviews_from("revisor-open.json", "revisor-merged.json");
+    reviews.open.erase(reviews.open.begin());
+    const auto d2 = diff(d1.next, "Example", provenance_results({&reviews, &runs}, d1.next, upm), kT0 + 900);
+    ASSERT_EQ(count_kind(d2.events, UpdateKind::Merged), static_cast<std::size_t>(1));
+    const std::string& next = d2.events[0].update.next;
+    EXPECT_EQ(next.find("ergo_pkg"), std::string::npos);
+    EXPECT_EQ(next, std::string("Unity: Window > LUDIARS > Ergo Packages, set pictor to "
+                                "#9d8c7b6000000000000000000000000000000128"));
 }
 
 TEST(PackageWatchProvenance, UnavailableSourcesKeepState) {

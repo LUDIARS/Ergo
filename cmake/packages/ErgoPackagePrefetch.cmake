@@ -82,14 +82,16 @@ foreach(_n IN LISTS _names)
     set(_scratch "${_base}/_ergo_prefetch/${_lc}")
     file(REMOVE_RECURSE "${_scratch}")
     message(STATUS "ergo prefetch: fetching ${_n} at ${_pin}")
-    # Same content options as _ergo_fc_declare (cmake/ErgoDependencies.cmake).
+    # Same content options as _ergo_fc_declare (cmake/ErgoDependencies.cmake) for
+    # a SHA pin: full history, because a --depth 1 clone only holds branch and
+    # tag tips and a pin behind them is "not a tree" there.
     FetchContent_Populate(${_dep} QUIET
         SOURCE_DIR   "${_src}"
         BINARY_DIR   "${_scratch}/build"
         SUBBUILD_DIR "${_scratch}/subbuild"
         GIT_REPOSITORY "${_repo}"
         GIT_TAG        "${_pin}"
-        GIT_SHALLOW    TRUE)
+        GIT_SHALLOW    FALSE)
     file(REMOVE_RECURSE "${_scratch}")
     ergo_pkg_fetch_prefetched(_have "${_base}" "${_n}" "${_pin}")
     if(_have STREQUAL "")

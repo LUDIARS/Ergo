@@ -1,0 +1,15 @@
+{
+  "name": "ergo_common",
+  "id": "ergo_common::@00000000000000000001",
+  "type": "STATIC_LIBRARY",
+  "paths": {
+    "source": "external/ergo",
+    "build": "external/ergo"
+  },
+  "sources": [
+    {
+      "path": "external/ergo/src/common/json_min.cpp",
+      "compileGroupIndex": 0
+    }
+  ]
+}

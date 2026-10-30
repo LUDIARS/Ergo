@@ -44,6 +44,7 @@
 # error finding (a host extra manifest must not redefine public entries).
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageRules.cmake")
 
 # Internal: string member at <path...>, or "" when absent / null.

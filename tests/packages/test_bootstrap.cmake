@@ -5,11 +5,15 @@
 # network (spec/feature/package-manager.md §2.1 / §7).
 #
 # Fake Ergo checkouts (fixtures/boot_ergo) and fake hosts (fixtures/boot_host)
-# are laid out in the work dir; project NONE, no compiler, no git.
+# are laid out in the work dir; project NONE, no compiler. Only the fetch_ok
+# case uses git: a fake Ergo repository of two commits, reached by file://
+# URL and pinned at the first (untagged, behind the tip) commit.
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir>
-#         [-DERGO_TEST_GENERATOR=<gen>] -P tests/packages/test_bootstrap.cmake
+#         [-DGIT_EXECUTABLE=<git>] [-DERGO_TEST_GENERATOR=<gen>]
+#         -P tests/packages/test_bootstrap.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/pkg_test_support.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/pkg_git_support.cmake")
 
 file(TO_CMAKE_PATH "${ERGO_TEST_WORK_DIR}" W)
 file(REMOVE_RECURSE "${W}")
@@ -109,3 +113,20 @@ if(EXISTS "${CASE_BUILD}/_deps")
     pkg_fail("fetch_bad_rev: the bootstrap must not start FetchContent")
 endif()
 pkg_pass("bootstrap fetches only when ERGO_BOOTSTRAP_FETCH=ON (no network otherwise)")
+
+# 4. Fetching on: host.ergo.rev is the first of two commits, untagged and
+#    behind the tip, as a real pin is once Ergo's main moves on. A shallow
+#    clone reaches only branch and tag tips and could not check it out.
+make_ergo("${W}/repos/Ergo" fetched)
+pkg_git("${W}/repos/Ergo" init -q)
+pkg_git("${W}/repos/Ergo" add -A)
+pkg_git("${W}/repos/Ergo" commit -q -m "pin")
+pkg_git("${W}/repos/Ergo" rev-parse HEAD)
+set(_pin "${GIT_OUT}")
+file(WRITE "${W}/repos/Ergo/name.txt" "tip\n")
+pkg_git("${W}/repos/Ergo" commit -q -am "tip")
+pkg_file_url(_ergo_url "${W}/repos/Ergo")
+make_host("${W}/fetch/Host" "${_ergo_url}" "${_pin}")
+run_case(fetch_ok "${W}/fetch/Host" pass "" -DERGO_BOOTSTRAP_FETCH=ON "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}")
+expect_facts("fetch at a pin behind the tip" fetch fetched)
+pkg_pass("bootstrap fetches Ergo at a SHA pin behind the tip (ERGO_BOOTSTRAP_FETCH=ON, file://)")

@@ -5,6 +5,8 @@
 #   * doctor: clean -> 0; stale bootstrap -> 1; leak (§8) -> 1; back to 0
 #   * list --json
 #   * fetch of a private package into --cache (FetchContent's place)
+#   * --help lists all ten commands; `<command> --help` prints that command's
+#     synopsis and exits 0 (one command table drives parsing and help)
 # Ergo is a fake git checkout made from this tree's manifest and
 # cmake/packages/ (so init has a SHA); no network.
 #
@@ -49,6 +51,27 @@ function(hash_files out dir)
     endforeach()
     set(${out} "${_h}" PARENT_SCOPE)
 endfunction()
+
+# --- help -----------------------------------------------------------------------
+set(_commands init list doctor fetch add remove update outdated watch status)
+pkg(0 --help)
+foreach(_c IN LISTS _commands)
+    if(NOT PKG_OUT MATCHES "ergo_pkg ${_c} ")
+        pkg_fail("--help does not list `ergo_pkg ${_c}`\n${PKG_OUT}")
+    endif()
+endforeach()
+foreach(_c add remove update)
+    pkg(0 ${_c} --help)
+    if(NOT PKG_OUT MATCHES "ergo_pkg ${_c} <name>")
+        pkg_fail("`${_c} --help` lacks its synopsis\n${PKG_OUT}")
+    endif()
+    foreach(_other IN LISTS _commands)
+        if(NOT _other STREQUAL _c AND PKG_OUT MATCHES "ergo_pkg ${_other} ")
+            pkg_fail("`${_c} --help` should print only ${_c}\n${PKG_OUT}")
+        endif()
+    endforeach()
+endforeach()
+pkg_pass("help: all ten commands, per-command synopsis")
 
 # --- init ---------------------------------------------------------------------
 set(H "${W}/host")

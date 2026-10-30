@@ -1,6 +1,7 @@
 // ergo_pkg add <name> — host.use に足す。 Ergo のマニフェストに無い名前は非公開 packages に足す
 // (--repository と --rev が要る。 --rev がタグ・ブランチならミラーで解決する。 40 桁 SHA ならネットワークに出ない)。
 // link の結線ファイルがホストに無ければ終了 2 で、 ファイルは変えない (結線は生成しない)。
+// tool は取得するだけでリンクしないので packages にだけ足し、 host.use には足さない (--optional / --features は終了 2)。
 
 #include "commands.h"
 #include "edit_support.h"

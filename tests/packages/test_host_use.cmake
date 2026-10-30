@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.20)
 # Host declaration defaults on a configure (spec/feature/package-manager.md
 # §2.1, the Ludellus-Native steps of §5.2): a fake host takes a fake Ergo
 # through the generated bootstrap, and its declaration's use / optional /

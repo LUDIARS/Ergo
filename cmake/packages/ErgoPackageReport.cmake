@@ -287,13 +287,22 @@ function(ergo_pkg_report_write file json)
 endfunction()
 
 # ergo_pkg_report_install_query(<build_dir>)
-# Stateless-client query so the next generate step answers codemodel v2 for
-# the visualisation stage (ergo_package_model, S3). Only adds files under
-# <build_dir>/.cmake/api; it does not change the generated build.
+# Stateless-client query for codemodel v2 for the visualisation stage
+# (ergo_package_model, S3). CMake reads query files before it runs the
+# project, so the client-ergo query written here is answered by the next
+# cmake run. On CMake 3.27+ (project mode only: the command is not
+# scriptable, and test_report.cmake runs this under -P) the hub also asks
+# through cmake_file_api(QUERY), which this run's generate step answers (a
+# shared query the reader finds through index.objects). Only adds files
+# under <build_dir>/.cmake/api; it does not change the generated build.
 function(ergo_pkg_report_install_query build_dir)
     set(_ERGO_PKG_QUERY_CONTENT
         "{\n  \"requests\": [\n    { \"kind\": \"codemodel\", \"version\": 2 }\n  ]\n}\n")
     file(CONFIGURE
         OUTPUT "${build_dir}/.cmake/api/v1/query/client-ergo/query.json"
         CONTENT "@_ERGO_PKG_QUERY_CONTENT@" @ONLY)
+    get_property(_role GLOBAL PROPERTY CMAKE_ROLE)
+    if(_role STREQUAL "PROJECT" AND NOT CMAKE_VERSION VERSION_LESS 3.27)
+        cmake_file_api(QUERY API_VERSION 1 CODEMODEL 2)
+    endif()
 endfunction()

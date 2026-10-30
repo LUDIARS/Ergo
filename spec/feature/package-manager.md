@@ -92,10 +92,10 @@
 | `init [--code <c>] [--upm]` | ホストの宣言とブートストラップを作り `.gitignore` に `.ergo/` を足す。`--upm` は Unity プロジェクト用に `.ergo/host.json` だけ作る。2 回目は無変更 | ホスト | 無し |
 | `list [--json]` | 宣言・resolved.json・UPM 宣言を合わせた一覧 | 無し | 無し |
 | `doctor [--strict] [--json]` | 宣言の検査 (PKG 規則を CLI から)、ブートストラップの古さ、漏れ検査 (§6)。`--strict` は構成時の STRICT と同じ判定 | 無し | 無し |
-| `add <name> [--optional] [--features ...]` | `host.use` に足す。Ergo のマニフェストに無い名前は `--repository/--rev` を要求して非公開 `packages` へ。`link` の結線ファイルが無ければ終了 2 (生成しない) | ホスト | 任意 |
+| `add <name> [--optional] [--features ...]` | `host.use` に足す。Ergo のマニフェストに無い名前は `--repository/--rev` を要求して非公開 `packages` へ。`link` の結線ファイルが無ければ終了 2 (生成しない)。`--kind tool` は非公開 `packages` にだけ足し `host.use` は変えない (`host.use` は link だけを選ぶ。tool に `--optional` / `--features` / `--wiring`、宣言済みの tool の `add` は終了 2) | ホスト | 任意 |
 | `remove <name>` | `host.use` / 非公開 `packages` から外す。`modules.*.needs` を壊すなら拒否 | ホスト | 無し |
 | `update <name> --to <tag\|main\|sha>` | 対象を 40 桁 SHA に解決して `rev` と `expect_tag` を書く。`ergo` と非公開はホスト、共有パッケージは `--ergo <dir>` の Ergo マニフェスト。取り違えは終了 2 | 持ち主 | 要 |
-| `fetch [<name>...]` | 各 `repository@rev` を FetchContent と同じ置き場所へ事前取得 (`cmake/packages/ErgoPackagePrefetch.cmake` を起動)。オフラインでも経路 5 が当たるようにする | キャッシュのみ | 要 |
+| `fetch [<name>...]` | 各 `repository@rev` を FetchContent と同じ置き場所へ事前取得 (`cmake/packages/ErgoPackagePrefetch.cmake` を起動。pin は 40 桁 SHA なので全履歴で取り、先端より後ろの pin も取れる)。オフラインでも経路 5 が当たるようにする | キャッシュのみ | 要 |
 | `outdated [--json] [--fail-on <kind>]` | §3 の判定を今すぐ行って表示。前回状態は読み書きしない | 無し | 要 (無ければ未確認) |
 | `watch --host <dir>... [--state <dir>] [--out <dir>] [--revisor-url <u>] [--concordia-url <u>]` | 定期実行の本体。判定 → 前回状態と差分 → 新しい出来事を `events.json` に、ホストごとの報告を `<host>/.ergo/watch-report.json` に | 状態と報告のみ | 要 |
 | `status --host <dir> --build <dir> [--out <file>]` | ビルドとテストの状態を `ergo-packages.status.json` に | 出力のみ | 無し |
@@ -311,7 +311,7 @@ W7 は `spec/tasks/2026-10-15-package-manager-w7.md` (`unity/com.ludiars.ergo.pa
 | 段階 | 受入 |
 |---|---|
 | W1 | `host` 節の見本 3 種 (host のみ / 非公開 packages あり / 不正) の読み取りと拒否理由。`host` 節のファイルを Ergo マニフェストとして読むと構成エラー。非公開名と Ergo マニフェストの同名で PKG-15。`init` を 2 回走らせて 2 回目が無変更・`.gitignore` に `.ergo/` が 1 行。偽 Ergo + 偽ホストでブートストラップが `ERGO_SOURCE_DIR` → 兄弟の順に解決し、取得 OFF で通信しない。`doctor` がブートストラップの古さと漏れ (§8) を真偽両方で検出。`fetch` 後の `ERGO_PACKAGES_FETCH=ON` 構成がネットワーク無しで経路 5 に当たる。M0 の結果不変 (`test_packages_m0_invariance` 継続) |
-| W2 | `update --to <tag>` が `rev` と `expect_tag` だけを書き、他がバイト単位で同じ。共有パッケージは `--ergo` 側、`ergo` と非公開はホスト側 (取り違えで終了 2)。feature ブランチ / main の祖先でない SHA を拒否、`--allow-off-main` で通る。`--to main` で STRICT 警告。`remove` が `needs` を壊すと拒否。`add --kind link` で結線ファイルが無ければ終了 2 でファイル不変 |
+| W2 | `update --to <tag>` が `rev` と `expect_tag` だけを書き、他がバイト単位で同じ。共有パッケージは `--ergo` 側、`ergo` と非公開はホスト側 (取り違えで終了 2)。feature ブランチ / main の祖先でない SHA を拒否、`--allow-off-main` で通る。`--to main` で STRICT 警告。`remove` が `needs` を壊すと拒否。`add --kind link` で結線ファイルが無ければ終了 2 でファイル不変。`add --kind tool` は `packages` だけに足し `host.use` 不変、`--optional` 付きは終了 2 でファイル不変 |
 | W3 | tag / track / off-main の判定 (距離・semver・複数タグの最新 1 つ)。`diff` の決定性 (同じ入力で同じバイト列)。同じ主体の 2 回目で出来事 0、`track` の 6 時間畳み込み、pin を上げると解消。取得失敗で `observed:false`、前回状態不変。兄弟では fetch せず `as_of` が付く。指紋が同じならミラーを fetch しない (偽ソースの呼び出し回数)。報告と出来事が漏れ検査を通り、通らない入力では書かずに終了 3。`track` キーの追加で CMake の読み手の出力不変 |
 | W4 | local PR 見本 + run 見本の突合で pf / ai (trigger 写し) / human / unknown。open → merged で `merged` が 1 回。Revisor / Concordia が落ちていると `run`/`review` を出さず `unavailable`。loopback 以外の URL で終了 2。出来事に PR のタイトル・本文・ブランチ名が入らない (見本にわざと入れて確かめる) |
 | W5 | Ergo: 状態ファイルが無い / 壊れている / 別ホストのとき何も出さず構成を止めない。Excubitor: 出来事の見本から Discord 本文を作り秘匿が無い、出来事 0 件で「新規なし」(Excubitor の PR で定める) |
@@ -328,7 +328,7 @@ W7 は `spec/tasks/2026-10-15-package-manager-w7.md` (`unity/com.ludiars.ergo.pa
 | 報告・出来事・通知の本文 | パス・URL・ポート・トークン・セッション id・PR のタイトルと本文・ブランチ名 (委託のタスク名を含み得る) を載せない。local PR は番号と headSha7 だけ |
 | 認証 | トークンを引数・設定ファイル・報告・ログに書かない。webhook は Excubitor の暗号化設定にだけある |
 
-機械検査: `doctor` と Ergo のテストに漏れ検査を入れる。拒む形 = ドライブ文字始まり、`/Users/` `/home/`、`\\` 始まりの UNC、
+機械検査: `doctor` と Ergo のテストに漏れ検査を入れる。拒む形 = ドライブ文字始まり、`/Users/` `/home/`、`\\<ホスト>\` 形の UNC (CMake 文字列で `\` を重ねた形と `\\?\` を含む。後ろに区切りの無い正規表現の後方参照 `\\1` は対象外)、
 `token` / `secret` / `Authorization` をキーに持つ値。報告と出来事は書く前に同じ検査を通し、当たれば書かずに終了 3。
 各 PR の提出前に秘匿語辞書で照合して 0 件を確かめる。
 

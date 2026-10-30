@@ -13,7 +13,8 @@
 #   4. installed  find_package(<cmake.find_package.name> CONFIG) for packages
 #                 that declare it; never under ERGO_PACKAGES_STRICT (U3)
 #   5. fetch      only with ERGO_PACKAGES_FETCH=ON, through _ergo_fc_declare
-#                 of cmake/ErgoDependencies.cmake (GIT_SHALLOW, shared
+#                 of cmake/ErgoDependencies.cmake (a SHA pin gets full
+#                 history, so the PKG-08 / ancestry probes run; shared
 #                 ERGO_DEPENDENCY_CACHE_DIR), HEAD == pin verified (PKG-04).
 #                 A source already at the pin in FetchContent's place (left
 #                 by `ergo_pkg fetch` or an earlier configure) is used as is,
@@ -30,6 +31,7 @@
 # to ERGO_PACKAGES_ACQUIRE_FINDINGS.
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
+cmake_policy(SET CMP0057 NEW)  # if(IN_LIST) also under cmake -P, where no policy version is set
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageGit.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageHostDefaults.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ErgoPackageWiring.cmake")

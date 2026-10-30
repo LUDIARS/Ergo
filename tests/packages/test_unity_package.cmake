@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.20)
 # W7: structure of the Unity package unity/com.ludiars.ergo.packages (spec/feature/package-manager.md §6.4 / §7 W7).
 #   * package.json has the required keys (name, version 0.x, displayName, description, unity) and no dependencies
 #   * every asmdef is Editor only; Core has noEngineReferences; there is no Runtime/ folder

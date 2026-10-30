@@ -173,7 +173,8 @@ bool read_codemodel(const std::string& build_dir, PackageModel& model, std::stri
     const std::string index_name = latest_index(reply);
     if (index_name.empty()) {
         return fail(error, "File API: no reply index under " + detail::generic_utf8(reply) +
-                               " (run the CMake generate step first)");
+                               " (configure this build dir with cmake first; CMake < 3.27 answers the package"
+                               " hub's query on the next run, so run cmake on it once more)");
     }
     JsonValue index;
     if (!detail::parse_json_file(detail::generic_utf8(reply / fs::u8path(index_name)), index, error)) return false;

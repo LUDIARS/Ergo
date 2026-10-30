@@ -10,6 +10,7 @@
 //   ergo_pkg outdated [--json] [--fail-on <kind>]                    (W3)
 //   ergo_pkg watch  --host <dir>... [--state <dir>] [--out <dir>]    (W3)
 //   ergo_pkg status --build <dir> [--junit <xml>] [--out <file>]     (W6)
+//   ergo_pkg [<command>] --help    全コマンド / 1 コマンドの使い方 (cli_args.cpp のコマンドの表から)
 //
 // main は引数の解析とコマンドへの振り分けだけ。 終了コード: 0 成功 / 1 要対応の検出あり /
 // 2 引数・入力の誤り / 3 書けない・取れない。 コミット・ブランチ作成・PR はしない。
@@ -27,11 +28,11 @@ int main(int argc, char** argv) {
     Args args;
     std::string error;
     if (!parse_args(raw, args, &error)) {
-        std::fprintf(stderr, "ergo_pkg: %s\n%s", error.c_str(), usage());
+        std::fprintf(stderr, "ergo_pkg: %s\n%s", error.c_str(), usage().c_str());
         return kExitInput;
     }
     if (args.help) {
-        std::printf("%s", usage());
+        std::printf("%s", (args.command.empty() ? usage() : usage_for(args.command)).c_str());
         return kExitOk;
     }
     if (args.command == "init") return run_init(args);
