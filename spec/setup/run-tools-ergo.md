@@ -37,7 +37,7 @@ Ergo の共有プラグインホスト型 Web 開発者ツール (`tools/ergo`) 
 | 環境変数 | 既定 | 役割 |
 |---|---|---|
 | `PORT` | `5170` | サーバの listen ポート。Electron (`electron/main.cjs:17`) / ヘッドレス (`src/main.ts:10`) のどちらも参照 |
-| `ERGO_HOST` | `127.0.0.1` | bind するアドレス (ヘッドレスのみ、`src/main.ts:11`)。既定は LAN に出さない。Electron は読まない |
+| `ERGO_HOST` | `127.0.0.1` | bind するアドレス (ヘッドレスのみ、`src/main.ts:11`)。既定は LAN に出さない。Electron は読まない。LAN に出してもブラウザからは IP アドレスか `ERGO_HOST` の名前で開く (他の名前は `Host` 検査で 403。[`../feature/tool/ergo.md`](../feature/tool/ergo.md)「接続元の制限」) |
 
 `PORT` を変えるとエンジンクライアントの接続先 (`ws://127.0.0.1:<PORT>/<id>/ws`)
 も変わる点に注意 (後述)。プラグイン固有の変数 (`ERGO_PLUGIN_DIR` / `ERGO_PICTOR_PROFILE_DIR` /

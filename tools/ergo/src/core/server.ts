@@ -20,6 +20,7 @@ import { WebSocketServer } from "ws";
 
 import type { ExternalFactory } from "./external.js";
 import type { Plugin, PluginContext, PluginFactory, PluginHealth } from "./plugin.js";
+import { crossSiteProblem, wsHandshakeProblem } from "./request_guard.js";
 
 export interface BootOptions {
     port:      number;
@@ -166,12 +167,21 @@ function pluginHealth(p: Plugin): PluginHealth & { id: string; title: string } {
 /// every plugin's static UI + routes. A plugin whose routes(ctx) throws is
 /// handled like a factory failure (built-in: throw, external: skip and add
 /// to `rejected`). Returns the mounted plugins for attachWs().
+/// Every request first passes the cross-site / DNS-rebinding guard
+/// (request_guard.ts): `bindHost` is the ERGO_HOST name, if any.
 export function createApp(
-    loaded:   LoadedPlugin[],
-    rejected: RejectedPlugin[],
-    ctx:      PluginContext,
+    loaded:    LoadedPlugin[],
+    rejected:  RejectedPlugin[],
+    ctx:       PluginContext,
+    bindHost?: string,
 ): { app: Hono; plugins: Plugin[]; rejected: RejectedPlugin[] } {
     const app = new Hono();
+    // Before any route: a web page must not read or write through the tool.
+    app.use("*", async (c, next) => {
+        const problem = crossSiteProblem(new URL(c.req.url).host, c.req.header("origin"), bindHost);
+        if (problem !== null) return c.json({ ok: false, err: problem }, 403);
+        await next();
+    });
     const plugins: Plugin[] = [];
     const skipped: RejectedPlugin[] = [...rejected];
     const subApps = new Map<string, Hono>();
@@ -252,8 +262,14 @@ export function createApp(
 
 /// Route WebSocket upgrades on `server` by URL before accepting: only
 /// /${id}/ws of a plugin with onUpgrade is accepted, anything else has its
-/// socket destroyed. One WebSocketServer serves every plugin.
-export function attachWs(server: ServerType, plugins: Plugin[], ctx: PluginContext): WebSocketServer {
+/// socket destroyed. A handshake from another site (an Origin that is not
+/// the tool's own) is answered 403. One WebSocketServer serves every plugin.
+export function attachWs(
+    server:    ServerType,
+    plugins:   Plugin[],
+    ctx:       PluginContext,
+    bindHost?: string,
+): WebSocketServer {
     const byId = new Map<string, Plugin>();
     for (const p of plugins) if (p.onUpgrade) byId.set(p.id, p);
 
@@ -266,6 +282,14 @@ export function attachWs(server: ServerType, plugins: Plugin[], ctx: PluginConte
         const plugin = m ? byId.get(m[1]) : undefined;
         if (!plugin) {
             socket.destroy();
+            return;
+        }
+        // A browser does not apply same-origin rules to WebSocket: refuse a
+        // handshake from another site (native engine clients send no Origin).
+        const problem = wsHandshakeProblem(req.headers.host, req.headers.origin, bindHost);
+        if (problem !== null) {
+            ctx.log("warn", `[ergo] refused WS ${url.pathname}: ${problem}`);
+            socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
             return;
         }
         wss.handleUpgrade(req, socket, head, (ws) => {
@@ -283,7 +307,7 @@ export function boot(opts: BootOptions): void {
 
     // Instantiate every plugin once so we can attach state / WS handlers.
     const loaded = instantiatePlugins(builtins, externals, ctx.log);
-    const { app, plugins, rejected } = createApp(loaded.plugins, loaded.rejected, ctx);
+    const { app, plugins, rejected } = createApp(loaded.plugins, loaded.rejected, ctx, opts.hostname);
 
     // ---- HTTP + WS server (shared port) ----
     // Let @hono/node-server create + listen the HTTP server; we attach
@@ -298,5 +322,5 @@ export function boot(opts: BootOptions): void {
         }
     });
 
-    attachWs(httpServer, plugins, ctx);
+    attachWs(httpServer, plugins, ctx, opts.hostname);
 }

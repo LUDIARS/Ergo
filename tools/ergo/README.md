@@ -67,6 +67,12 @@ data roots and the LLM settings of `vfx-suggest` / `vfx-breed`) are listed in
 [`spec/setup/config-reference.md`](../../spec/setup/config-reference.md).
 `ANTHROPIC_API_KEY` is a secret: pass it in the shell environment only.
 
+Binding to 127.0.0.1 does not keep web pages out, so the server answers 403
+to cross-site requests: an HTTP request whose `Host` is not localhost, an IP
+literal or `ERGO_HOST`, or whose `Origin` is another site, and a WebSocket
+handshake with a foreign `Origin` (engines send none). See "接続元の制限" in
+[`spec/feature/tool/ergo.md`](../../spec/feature/tool/ergo.md).
+
 ## Testing
 
 ```bash

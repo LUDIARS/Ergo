@@ -61,6 +61,23 @@ Node sidecar 同梱が必要で、同じ UI 体験を出すのにコストが高
 | `http://localhost:5170/<id>/api/*`   | プラグイン固有の REST                            |
 | `ws://localhost:5170/<id>/ws`        | プラグイン固有の WebSocket                        |
 
+### 接続元の制限 (クロスサイト / DNS リバインディング)
+
+127.0.0.1 に bind していても、ブラウザは任意のサイトから
+`ws://127.0.0.1:5170/...` を開かせ、プリフライト無しの POST (`text/plain` など) も
+送らせる。DNS リバインディングのページは自分のホスト名のままここへ届く。そのため
+サーバ (`src/core/request_guard.ts`) は次を満たさない要求を **403** で拒む:
+
+- HTTP: `Host` が `localhost` / `*.localhost`、IP リテラル、または `ERGO_HOST` の名前で
+  あること。`Origin` があるなら、そのホストが `Host` と一致すること (= ツール自身の
+  UI)。`Origin: null` はクロスサイト扱い
+- WebSocket: `Origin` があるなら HTTP と同じ検査。`Origin` 無し (エンジンなどの
+  ネイティブクライアント、`ergo_common_ws` は送らない) はどのホスト名で
+  つないでもよい (ブラウザは WebSocket のハンドシェイクで必ず `Origin` を送る)
+
+`ERGO_HOST=0.0.0.0` で LAN に出したときは、ブラウザから IP アドレス (か `ERGO_HOST`
+に書いた名前) で開く。DNS 名で開くと `Host` が信頼できないので 403 になる。
+
 ## ディレクトリ構造
 
 ```
@@ -85,6 +102,7 @@ tools/ergo/
     │   ├── registry.ts   # 組み込み (汎用) プラグインの列挙
     │   ├── external.ts   # ERGO_PLUGIN_DIR からの外部プラグイン動的ロード
     │   ├── safe_path.ts  # resolveWithin: ルート外へ出るパスを拒む共通ガード (visus / ui_layout)
+    │   ├── request_guard.ts # クロスサイト / DNS リバインディングの要求を拒む (Host / Origin)
     │   └── server.ts     # Hono + http.Server + WS の共通土台 (id と形の検査を含む)
     └── plugins/          # 組み込み (汎用) プラグインのみ。1 プラグイン = 1 ディレクトリ
         ├── particle/     # 旧 particle-editor (index.ts / schema.ts / ranges.ts / ui/)
@@ -92,7 +110,7 @@ tools/ergo/
         └── <id>/         # rive / profile / pictor_perf / render_pipeline / visus /
                           # ui_layout / vfx-suggest / vfx-breed / scene_editor / log
 tests/                    # npm test (node:test + tsx)。src/ と同じ分け方
-├── core/                 # server / external / safe_path
+├── core/                 # server / external / safe_path / request_guard
 ├── helpers/              # fake_ws.ts などテスト用の部品
 └── plugins/<id>/         # プラグインごとのテスト
 ```
