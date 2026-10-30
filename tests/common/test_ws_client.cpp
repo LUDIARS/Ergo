@@ -442,7 +442,7 @@ TEST(WsClient, UnsentCountsFramesUntilWritten) {
 
     // A peer that stops reading: frames back up and stay counted...
     const std::string chunk(64 * 1024, 'x');
-    for (int i = 0; i < 512; ++i) client.send_text(chunk);  // 32 MiB > any socket buffer
+    for (int i = 0; i < 1024; ++i) client.send_text(chunk);  // 64 MiB: well past any socket buffer
     std::this_thread::sleep_for(milliseconds(200));
     EXPECT_GT(client.unsent(), 0u);
     // ...until stop() drops them.
