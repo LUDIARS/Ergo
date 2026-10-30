@@ -52,7 +52,9 @@ build/examples/ergo_example_compose_loop          # 既定は --check
   `cmake --build build --config Release --target ergo_example_compose_loop` とし、
   実行ファイルは `build\examples\Release\` に出る。
 - テスト込みで構成した場合 (`ERGO_BUILD_TESTS` は既定 ON) は
-  `ctest --test-dir build -R example_compose_loop` でも同じ検証が走る。
+  `ctest --test-dir build -C Release -R example_compose_loop` でも同じ検証が走る。
+  `-C` はマルチコンフィグ生成器では必須で、`--config` に渡したのと同じ構成名を指定する。
+  単一コンフィグ生成器では無視される。
 - 例は `ERGO_BUILD_EXAMPLES` (Ergo がトップレベルのとき既定 ON) で制御される。
 
 ## (d) 開発者ツールを起動する

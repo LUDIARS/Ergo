@@ -84,7 +84,7 @@ main に入る SHA は、入る前にその SHA 自体で CI が緑であるこ�
 
 ## 注意点
 
-- 新規モジュール追加の一連手順 (spec / include / src / tests / CMake /
-  module_list 更新 → 1 PR) は [`../../CLAUDE.md`](../../CLAUDE.md)
-  「新規モジュール追加手順」を参照。
+- 新規モジュール追加の一連手順 (spec / include / src / tests / CMake の option と
+  add_library / module_list / README / config-reference.md / spec/domains →
+  `test_module_catalog` で確認 → 1 PR) は [build-cpp.md](build-cpp.md) の「注意点」を参照。
 - PR / コミットメッセージは丁寧に書く (squash merge で main 履歴にそのまま残る)。

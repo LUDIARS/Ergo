@@ -183,12 +183,16 @@ LLM が無い・失敗したときも `vfx-suggest` / `vfx-breed` 以外のプ�
 
 | 変数 | 使うコマンド | 優先順位と役割 | 出典 |
 |---|---|---|---|
-| `ERGO_PKG_CACHE_DIR` | `outdated` / `watch` | ツリーレス bare ミラーの置き場。`--cache` > `ERGO_PKG_CACHE_DIR` > `ERGO_DEPENDENCY_CACHE_DIR` > 一時ディレクトリの `ergo_pkg` | `tools/package_cli/watch_paths.cpp:39` / `tools/package_cli/git_rev_resolver.cpp:44` |
+| `ERGO_PKG_CACHE_DIR` | `outdated` / `watch` | 既存のツリーレス bare ミラー `<cache>/mirrors/<Repo>.git` を探す場所 (作らない)。`--cache` > `ERGO_PKG_CACHE_DIR` > `ERGO_DEPENDENCY_CACHE_DIR`。どれも無ければミラーを使わず、遅れの距離 (commit 数) は出ない | `tools/package_cli/watch_paths.cpp:39` / `tools/package_cli/git_remote_source.cpp:39` |
+| `ERGO_PKG_CACHE_DIR` | `update` / `add` (`--rev` がタグ / ブランチ名のとき) | 版を解決するミラーの置き場 (無ければ作る)。`--cache` > `ERGO_PKG_CACHE_DIR` > `ERGO_DEPENDENCY_CACHE_DIR` > 一時ディレクトリの `ergo_pkg` | `tools/package_cli/git_rev_resolver.cpp:41-48` / `tools/package_cli/edit_support.cpp:15` |
 | `ERGO_DEPENDENCY_CACHE_DIR` | `fetch` (と上のミラー) | 取得先。`--cache` > `--build` の `FETCHCONTENT_BASE_DIR` (無ければ `<build>/_deps`) > `ERGO_DEPENDENCY_CACHE_DIR` | `tools/package_cli/cmd_fetch.cpp:55` |
 | `ERGO_SOURCE_DIR` | 全コマンド | 使う Ergo のチェックアウト。`--ergo` > `ERGO_SOURCE_DIR` > `ergo_pkg` をビルドした Ergo | `tools/package_cli/host_context.cpp:42` |
 | `ERGO_PACKAGES_SIBLING_ROOT` | `outdated` / `watch` | 兄弟チェックアウト `<root>/<Repo>` を取得元にする。`--root` > `ERGO_PACKAGES_SIBLING_ROOT` | `tools/package_cli/watch_paths.cpp:43` |
 | `ERGO_WATCH_REVISOR_URL` / `ERGO_WATCH_CONCORDIA_URL` | `watch` | Revisor / Concordia の URL (loopback だけ受け付ける)。`--revisor-url` / `--concordia-url` が優先。`-DERGO_BUILD_HTTP=ON` で作った `ergo_pkg` だけが読む | `tools/package_cli/provenance_endpoints.cpp:31-32` |
 | `LOCALAPPDATA` (Windows) / `XDG_STATE_HOME` / `HOME` | `watch` | 状態ディレクトリ (`.../ergo/pkg-watch`)。`--state` が優先 | `tools/package_cli/watch_paths.cpp:30-33` |
+
+一時ディレクトリに作られたミラーは `outdated` / `watch` からは見えないので、遅れの距離を
+出すなら `--cache` か `ERGO_PKG_CACHE_DIR` を両方のコマンドで揃える。
 
 `ERGO_BOOTSTRAP_FETCH` と、ホストのブートストラップの `ERGO_SOURCE_DIR` は環境変数では
 なくホストの CMake キャッシュ変数 (上の表の「ホストのブートストラップ」)。

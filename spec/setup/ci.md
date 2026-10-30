@@ -16,7 +16,11 @@ Ergo の CI が何をどの環境で検査しているか、どのチェック�
 
 `ci.yml` は main への push と pull_request で自動実行される。feat ブランチの
 SHA を PR なしで検査したいときは workflow_dispatch で起動する
-(`gh workflow run ci.yml --ref feat/<name>`)。
+(`gh workflow run ci.yml --ref feat/<name>`)。同じ ref の実行は 1 つずつ走る
+(`concurrency`): PR では新しい push が走行中の実行を取り消す。main の push 実行は
+マージ後の確認で、走行中のものは取り消さないが、GitHub は待機中の実行を ref ごとに
+1 つしか持たないので、さらに新しい push が来ると待機中のものは置き換えられ
+"cancelled" になる。ゲートが見るのは候補 SHA 自身の実行 (PR か workflow_dispatch)。
 
 ## レグ (`ci.yml`)
 
@@ -126,7 +130,8 @@ ctest --preset ci-packages
   (`ERGO_PACKAGES_FETCH=ON`) し、警告級の所見をすべてエラーにする
   (`ERGO_PACKAGES_STRICT=ON`)。実際の `ergo_render` バックエンドや
   `if(TARGET ...)` の下でだけ登録されるテストを含む統合構成で、
-  [packages.md](packages.md) が「Ergo 単体の CI」と呼ぶもの。
+  [packages.md](packages.md) の「Ergo 単体で実際の Pictor / Tela をマニフェストの pin で
+  取る構成」にあたる。
 - Windows だけで走らせる (Linux では Pictor の GLFW が wayland / X11 の
   開発パッケージを要求する)。
 - STRICT では `lib/lapilli` 未初期化 (PKG-16) がエラーになるので、checkout は

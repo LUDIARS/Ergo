@@ -189,10 +189,26 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
 - **MSVC で日本語コメントを含むヘッダ**: `/utf-8` は全ライブラリの usage
   requirement なので、リンクしたターゲットには自動で付く。Ergo のライブラリを
   リンクせずにヘッダだけを読むターゲットは自分で `/utf-8` を付ける。
-- 新規モジュール追加時は `CMakeLists.txt` への `add_library` 追加 +
-  `module_list.md` / `module_list.yaml` / README / [config-reference.md](config-reference.md) /
-  `spec/domains` の更新が必要で、漏れは ctest `test_module_catalog` が検出する (手順は
-  [`../../CLAUDE.md`](../../CLAUDE.md) 「新規モジュール追加手順」)。`Ergo::<名>`
-  エイリアス・C++ 標準・`/utf-8` は `cmake/ErgoTargets.cmake` が全 `ergo_*`
+- 新規モジュール `ergo_<名>` を足すときは、次を 1 PR で揃える。漏れは ctest
+  `test_module_catalog` (必須の全 C++ レグで走る) が検出する:
+  1. 仕様 `spec/module/<名>.md` を `template/module_template.md` に従って書く
+     (2026-10 以降の新規モジュールの置き場。既存は `spec/feature/module/<名>.md`)
+  2. `include/ergo/<名>/`・`src/<名>/`・`tests/<名>/` を作る
+  3. トップレベル `CMakeLists.txt` に `option(ERGO_BUILD_<名> ...)` と
+     `add_library(ergo_<名>)` を足す
+  4. `module_list.md` と `module_list.yaml` に行を足す (yaml は `domain` /
+     `cmake_option` / `depends` など全キー。`depends` は `target_link_libraries` の
+     `ergo_*` と一致させる)
+  5. `README.md` の「## モジュール」節の、所属ドメインの表に行を足す
+  6. [config-reference.md](config-reference.md) の「CMake オプション」表に
+     `ERGO_BUILD_<名>` の行を足す
+  7. `spec/domains/<ドメイン>.domain.json` の membership に `src/<名>/`・
+     `include/ergo/<名>/`・`tests/<名>/` を足す (yaml の `domain` と同じドメイン)
+  8. Web ツールが要るなら `tools/ergo/src/plugins/<id>/` にプラグインとして足し、
+     [`../feature/tool/ergo.md`](../feature/tool/ergo.md) のプラグイン一覧と
+     `tools/ergo/README.md` も更新する
+  9. `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake` が OK になることを確かめる
+
+  `Ergo::<名>` エイリアス・C++ 標準・`/utf-8` は `cmake/ErgoTargets.cmake` が全 `ergo_*`
   ライブラリに付けるので、モジュール側で書く必要はない。別のモジュールが無いと
   成り立たないモジュールは `cmake/ErgoModuleRequirements.cmake` の表に足す。
