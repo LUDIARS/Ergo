@@ -33,7 +33,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | **全体** | | | | |
 | `ERGO_BUILD_TESTS` | トップレベル ON / サブプロジェクト OFF | モジュールテスト (CTest 登録) と `cmake -P` の検査テスト (`test_module_catalog` / `test_packages_*` / `test_host_*`) | — | — |
 | `ERGO_BUILD_EXAMPLES` | トップレベル ON / サブプロジェクト OFF | `examples/` のヘッドレスな使用例 (`ergo_example_compose_loop`。テスト ON なら `example_compose_loop` / `example_compose_loop_trace` / `example_compose_loop_trace_json`) | `INPUT` / `CHARACTER` / `ACTOR` / `BIND` / `CAST` / `WORLD_TIME` / `HEALTH` / `COMBO_COUNTER` / `SCORE` / `TIMING_JUDGE` / `BLACKBOARD` / `LOG` / `FRAME` / `PROFILE` / `AUDIO` | スキップ (STATUS `skip example compose_loop: needs ...`) |
-| `ERGO_EXCLUDE_FROM_ALL` | サブプロジェクトかつ `ERGO_BUILD_TESTS=OFF` のとき ON、それ以外 OFF | Ergo のディレクトリに `EXCLUDE_FROM_ALL` を付ける。ホストの `all` にはホストがリンクしたものだけが入る (`ergo_pkg` CLI は `--target ergo_pkg_cli` で明示) | — | — |
+| `ERGO_EXCLUDE_FROM_ALL` | サブプロジェクトで ON / トップレベル OFF。`ERGO_BUILD_TESTS=ON` の間は効かない | Ergo のディレクトリに `EXCLUDE_FROM_ALL` を付ける。ホストの `all` にはホストがリンクしたものだけが入る (`ergo_pkg` CLI は `--target ergo_pkg_cli` で明示) | — | — |
 | `ERGO_POSITION_INDEPENDENT_CODE` | ON | Ergo のスコープで `CMAKE_POSITION_INDEPENDENT_CODE` を設定する。静的ライブラリをホストの共有ライブラリ / プラグインにリンクできる | — | — |
 | `ERGO_BUILD_DUMMY` | OFF | `ergo_<名>_dummy` (no-op 実装): `input` / `particle` / `bind` / `actor` / `sound` / `gpu_particle` / `frame` / `profile` / `log` / `io` / `world_time` / `blackboard` | 各モジュールの `ERGO_BUILD_<名>` | そのモジュールの dummy を作らない |
 | `ERGO_BUILD_BENCHMARKS` | OFF | マイクロベンチ `bench_particle_cpu` / `bench_curve` (CTest には登録しない) | `GPU_PARTICLE` | 作らない (メッセージなし) |

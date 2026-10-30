@@ -9,7 +9,11 @@ cmake_minimum_required(VERSION 3.20)
 #      and `all` builds host_app / test_math / host_plugin (SHARED, not on
 #      Windows) without building the Ergo libraries the host does not link.
 #   2. ctest sees only the host's own test, and it passes.
-#   3. A module whose required module is OFF stops the configure, naming both.
+#   3. Toggling ERGO_BUILD_TESTS in that build directory takes effect both
+#      ways: ON puts Ergo back in `all` (so its tests get built), OFF takes it
+#      out again, and `all` still skips the Ergo libraries the host does not
+#      link (ERGO_EXCLUDE_FROM_ALL is not frozen by the first configure).
+#   4. A module whose required module is OFF stops the configure, naming both.
 #
 #   cmake -DERGO_SOURCE_DIR=<ergo> -DERGO_TEST_WORK_DIR=<dir>
 #         [-DERGO_TEST_GENERATOR=<gen>] [-DERGO_TEST_PLATFORM=<platform>]
@@ -41,7 +45,8 @@ host_assert_cache("${B}" ERGO_EXCLUDE_FROM_ALL ON)
 host_assert_cache("${B}" ERGO_POSITION_INDEPENDENT_CODE ON)
 
 file(STRINGS "${B}/host_facts.txt" _facts)
-foreach(_expect "BUILD_SHARED_LIBS=ON" "BUILD_TESTING=ON" "CMAKE_CXX_STANDARD=14")
+foreach(_expect "BUILD_SHARED_LIBS=ON" "BUILD_TESTING=ON" "CMAKE_CXX_STANDARD=14"
+        "ergo_exclude_from_all=ON")
     if(NOT _expect IN_LIST _facts)
         host_fail("host scope after add_subdirectory lacks '${_expect}': ${_facts}")
     endif()
@@ -106,7 +111,33 @@ if(NOT _rc EQUAL 0)
 endif()
 host_pass("ctest: Ergo adds no tests to the host, host_smoke runs")
 
-# --- 3. configure-time module requirements --------------------------------
+# --- 3. toggling ERGO_BUILD_TESTS in an existing build directory ----------
+host_configure("${B}" "${_fixture}" _rc _log -DERGO_BUILD_TESTS=ON)
+if(NOT _rc EQUAL 0)
+    host_fail("reconfigure with ERGO_BUILD_TESTS=ON failed\n${_log}")
+endif()
+file(STRINGS "${B}/host_facts.txt" _facts)
+if("ergo_exclude_from_all=ON" IN_LIST _facts)
+    host_fail("ERGO_BUILD_TESTS=ON left Ergo out of `all`, so its tests would not be built: ${_facts}")
+endif()
+host_configure("${B}" "${_fixture}" _rc _log -DERGO_BUILD_TESTS=OFF)
+if(NOT _rc EQUAL 0)
+    host_fail("reconfigure with ERGO_BUILD_TESTS=OFF failed\n${_log}")
+endif()
+file(STRINGS "${B}/host_facts.txt" _facts)
+if(NOT "ergo_exclude_from_all=ON" IN_LIST _facts)
+    host_fail("ERGO_BUILD_TESTS=OFF did not take Ergo out of `all` again: ${_facts}")
+endif()
+host_build("${B}")
+file(STRINGS "${_files_txt}" _files)
+foreach(_line IN LISTS _files)
+    if(_line MATCHES "^unused=(.+)$" AND EXISTS "${CMAKE_MATCH_1}")
+        host_fail("`all` built an Ergo library the host does not link after the toggle: ${CMAKE_MATCH_1}")
+    endif()
+endforeach()
+host_pass("ERGO_BUILD_TESTS toggles ON and OFF in an existing build directory")
+
+# --- 4. configure-time module requirements --------------------------------
 set(B3 "${ERGO_TEST_WORK_DIR}/missing_requirements")
 host_configure("${B3}" "${_fixture}" _rc _log -DERGO_BUILD_IO=OFF -DERGO_BUILD_MATH=OFF)
 if(_rc EQUAL 0)

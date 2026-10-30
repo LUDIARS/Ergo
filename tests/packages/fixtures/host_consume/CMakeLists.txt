@@ -5,7 +5,8 @@
 #   - host_app links input / log / bind / physics2d: Ergo's usage requirements
 #     raise the host's C++14 (to C++20 through ergo_math); built with -Werror
 #     on GCC / Clang
-#   - test_math: the host's own target with the name of an Ergo test
+#   - test_math: the host's own target with the name of an Ergo test (defined
+#     only while ERGO_BUILD_TESTS is OFF)
 #   - host_plugin: a SHARED module linking Ergo's static libraries (PIC); not on
 #     Windows, where Ergo has no DLL story to test
 #   - host_smoke: the host's own test; Ergo must add none
@@ -23,8 +24,12 @@ target_link_libraries(host_app PRIVATE Ergo::input Ergo::log Ergo::bind Ergo::ph
 target_compile_options(host_app PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Werror>)
 add_test(NAME host_smoke COMMAND host_app)
 
-add_executable(test_math main.cpp)
-target_link_libraries(test_math PRIVATE Ergo::input Ergo::log Ergo::bind Ergo::physics2d)
+# Only while Ergo's tests are off (the default): a host that opts into them
+# (the script's ERGO_BUILD_TESTS toggle) gets Ergo's own test_math.
+if(NOT ERGO_BUILD_TESTS)
+    add_executable(test_math main.cpp)
+    target_link_libraries(test_math PRIVATE Ergo::input Ergo::log Ergo::bind Ergo::physics2d)
+endif()
 
 if(NOT WIN32)
     add_library(host_plugin SHARED plugin.cpp)
@@ -32,10 +37,12 @@ if(NOT WIN32)
 endif()
 
 get_property(_ergo_targets DIRECTORY "${ERGO_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
+get_property(_ergo_excluded DIRECTORY "${ERGO_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL)
 set(_facts
     "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
     "BUILD_TESTING=${BUILD_TESTING}"
-    "CMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}")
+    "CMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}"
+    "ergo_exclude_from_all=${_ergo_excluded}")
 foreach(_t IN LISTS _ergo_targets)
     if(NOT _t MATCHES "^ergo_(.+)$")
         continue()

@@ -29,7 +29,7 @@
 |---|---|---|
 | `ERGO_BUILD_TESTS`               | トップレベル: ON / サブプロジェクト: OFF | モジュールテストをビルドする (CTest 登録) |
 | `ERGO_BUILD_EXAMPLES`            | トップレベル: ON / サブプロジェクト: OFF | `examples/` のヘッドレスな使用例をビルドする ([integrate-modules.md](integrate-modules.md)) |
-| `ERGO_EXCLUDE_FROM_ALL`          | サブプロジェクトでテスト OFF のとき ON、それ以外 OFF | Ergo のターゲットを既定ビルド (`all`) から外す。ホストがリンクしたものだけがビルドされる |
+| `ERGO_EXCLUDE_FROM_ALL`          | サブプロジェクトで ON / トップレベル OFF。`ERGO_BUILD_TESTS=ON` の間は効かない | Ergo のターゲットを既定ビルド (`all`) から外す。ホストがリンクしたものだけがビルドされる |
 | `ERGO_POSITION_INDEPENDENT_CODE` | ON  | Ergo のライブラリを PIC でビルドする (ホストの共有ライブラリ / プラグインにリンクできる) |
 | `ERGO_BUILD_DUMMY`               | OFF | dummy プラグライブラリ (no-op 実装) をビルドする |
 | `ERGO_BUILD_BENCHMARKS`          | OFF | マイクロベンチ実行ファイルをビルドする (opt-in) |
@@ -158,7 +158,8 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
   ホストの `ctest` に Ergo のテストは出ず、ホストのターゲット名 (`test_math` 等) とも
   衝突しない。既存のビルドディレクトリはキャッシュの `ERGO_BUILD_TESTS=ON` を
   持ち続けるので、ビルドディレクトリを作り直すか `-DERGO_BUILD_TESTS=OFF` を渡す
-  (テスト ON の間は `ERGO_EXCLUDE_FROM_ALL` も既定 OFF)。明示的に上書きしたい場合は
+  (テスト ON の間は `ERGO_EXCLUDE_FROM_ALL` は効かない。`ERGO_BUILD_TESTS` は既存の
+  ビルドディレクトリでどちら向きに切り替えても反映される)。明示的に上書きしたい場合は
   `set(ERGO_BUILD_TESTS ON CACHE BOOL "" FORCE)` のように `add_subdirectory` の前で設定する。
 - **C++ 標準**: 各ライブラリが `cxx_std_17` (`ergo_math` は `cxx_std_20`) を PUBLIC に
   持つので、ホストが C++14 (MSVC の既定) でもリンクしたターゲットは自動で

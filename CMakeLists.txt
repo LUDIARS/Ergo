@@ -80,18 +80,22 @@ set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / du
 set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy)
 
 # As a subproject Ergo keeps its targets out of the host's `all`: only what the
-# host links is built. (Not while ERGO_BUILD_TESTS is ON, so registered tests
-# are also built.) Libraries are PIC so they also link into host shared
-# modules / plugins.
-if(_ergo_top OR ERGO_BUILD_TESTS)
+# host links is built. Never while ERGO_BUILD_TESTS is ON, so registered tests
+# are also built. The test gate is evaluated on every configure (not frozen
+# into the option's cached default), so toggling ERGO_BUILD_TESTS in an
+# existing build directory takes effect. Libraries are PIC so they also link
+# into host shared modules / plugins.
+if(_ergo_top)
     set(_ergo_exclude_default OFF)
 else()
     set(_ergo_exclude_default ON)
 endif()
 option(ERGO_EXCLUDE_FROM_ALL
-    "Keep Ergo's targets out of the default build (default: ON as a subproject without tests)"
+    "Keep Ergo's targets out of the default build (ignored while ERGO_BUILD_TESTS is ON; default: ON as a subproject)"
     ${_ergo_exclude_default})
-if(ERGO_EXCLUDE_FROM_ALL)
+if(ERGO_EXCLUDE_FROM_ALL AND ERGO_BUILD_TESTS)
+    message(STATUS "ergo: ERGO_BUILD_TESTS=ON, so ERGO_EXCLUDE_FROM_ALL is ignored (tests are built by `all`)")
+elseif(ERGO_EXCLUDE_FROM_ALL)
     set_property(DIRECTORY PROPERTY EXCLUDE_FROM_ALL ON)
 endif()
 option(ERGO_POSITION_INDEPENDENT_CODE "Build Ergo's libraries as position-independent code" ON)
