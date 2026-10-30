@@ -501,3 +501,24 @@ TEST(WsClient, StopReturnsPromptlyWhenServerNeverAnswers) {
     EXPECT_LT(took.count(), 1000);
     EXPECT_FALSE(client.is_connected());
 }
+
+TEST(WsClient, StopReturnsPromptlyWhenPeerStopsReading) {
+    // The peer keeps the TCP connection open but never reads (tool paused in
+    // a debugger): once the socket buffers fill, sending must not pin the
+    // worker, or stop() would block forever in join().
+    LoopbackServer srv;
+    ASSERT_TRUE(srv.ok());
+    Client client;
+    client.start("127.0.0.1", srv.port(), "/ws");
+    ASSERT_TRUE(srv.accept_client());
+    ASSERT_TRUE(wait_until([&] { return client.is_connected(); }));
+    const std::string chunk(64 * 1024, 'x');
+    for (int i = 0; i < 512; ++i) client.send_text(chunk);  // 32 MiB > any socket buffer
+    ASSERT_TRUE(srv.read_frame().ok);  // the worker has taken the queue and is sending
+
+    const auto t0 = Clock::now();
+    client.stop();
+    const auto took = std::chrono::duration_cast<milliseconds>(Clock::now() - t0);
+    EXPECT_LT(took.count(), 1000);
+    EXPECT_FALSE(client.is_connected());
+}

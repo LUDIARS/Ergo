@@ -90,12 +90,17 @@ std::string random_websocket_key() {
     return base64_encode(bytes, 16);
 }
 
-bool send_all(socket_t s, const char* data, std::size_t len) {
+// Gives up (false) as soon as `stop` is raised while the kernel buffer is
+// full: a peer that keeps the connection open but stops reading (tool paused
+// in a debugger, SIGSTOPped) must not keep the worker here, or stop() would
+// block forever in join().
+bool send_all(socket_t s, const std::atomic<bool>& stop, const char* data, std::size_t len) {
     while (len > 0) {
         int n = ::send(s, data, static_cast<int>(len), kSendFlags);
         if (n > 0) { data += n; len -= static_cast<std::size_t>(n); }
         else if (n < 0 && EAGAIN_OR_WOULDBLOCK(sock_last_err())) {
-            // Tiny backoff for the (rare) case the kernel buffer is full.
+            if (stop.load(std::memory_order_acquire)) return false;
+            // Tiny backoff while the kernel buffer is full.
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         } else {
             return false;
@@ -331,7 +336,7 @@ bool Client::perform_handshake(int sock, std::string& leftover) {
     req += "Sec-WebSocket-Key: " + key + "\r\n";
     req += "Sec-WebSocket-Version: 13\r\n";
     req += "\r\n";
-    if (!send_all(static_cast<socket_t>(sock), req.data(), req.size())) return false;
+    if (!send_all(static_cast<socket_t>(sock), stop_flag_, req.data(), req.size())) return false;
     std::string resp;
     if (!read_http_response(static_cast<socket_t>(sock), stop_flag_, resp, leftover)) return false;
     return resp.compare(0, 12, "HTTP/1.1 101") == 0;
@@ -341,9 +346,10 @@ bool Client::drain_send_queue(int sock) {
     std::deque<std::string> local;
     { std::lock_guard<std::mutex> lk(send_mtx_); local.swap(send_queue_); }
     while (!local.empty()) {
+        if (stop_flag_.load(std::memory_order_acquire)) return false;  // stop() clears the rest
         std::string frame = encode_text_masked(local.front());
         local.pop_front();
-        if (!send_all(static_cast<socket_t>(sock), frame.data(), frame.size())) return false;
+        if (!send_all(static_cast<socket_t>(sock), stop_flag_, frame.data(), frame.size())) return false;
     }
     return true;
 }
