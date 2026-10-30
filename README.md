@@ -151,8 +151,9 @@ ergo/
 | `ergo_particle` | CPU パーティクル sim + Pictor Vulkan ビルボード描画 | `particle` / `vfx-suggest` / `vfx-breed` (任意ターゲット `ergo_particle_link` が設定を受け取る) |
 | `ergo_gpu_particle` | Shuriken 相当 GPU コンピュートパーティクル (`IGpuBackend` 抽象) | — |
 
-Pictor 向けのプラグイン `render_pipeline` / `pictor_perf` / `visus` / `rive` は
-Ergo のモジュールではなく Pictor の資産や計測を扱う (同じく spec/feature/tool/ergo.md)。
+Ergo のモジュールに対応しないプラグインもある: `render_pipeline` / `pictor_perf` /
+`visus` は Pictor の資産と計測を、`rive` は Rive ファイル (`.riv`) の再生を扱う
+(同じく spec/feature/tool/ergo.md の「プラグイン一覧」)。
 
 ### ui-layout
 
