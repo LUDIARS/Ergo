@@ -104,6 +104,20 @@ Actio / Curare のトークンは環境変数で渡し、保存・画面表示�
 
 Studio を中心に Excubitor / Cc / Actio / Br / Curare / Revisor / Cernere を置き、各サービスの状態 (接続・応答異常・停止・未接続・認証が必要)、接続先、認証の方式、この Ergo プロセスが覚えている最終成功時刻を出す。辺は Studio → 各サービスの用途と、サービス同士の既知の連携 (Cc ⇄ Actio のプロジェクト / タスク同期、Cc → Revisor の local PR、Br → Actio のスプリント集計、Cu / Actio → Cr の認可) で、両端が動いているときだけ有効として描く。確認は読み取りだけで、Revisor は `repo list` の成否、Curare はトークンがあるときだけ `/api/v1/me` を見る。
 
+## 起動 (Excubitor) {#SPEC-ergo-studio-launch}
+
+デスクトップアプリは Excubitor の catalog code `ergo-studio` で起動する。定義はリポ直下の
+`excubitor.catalog.yaml` (Excubitor の per-repo catalog) にある。
+
+- `runtime: app` / `app_kind: electron`: `tools/ergo/node_modules/electron/dist/electron.exe .` を
+  `tools/ergo` で実行する。死活はプロセスの生存で見る (`health: process`)。
+- `build_command: npm run build`: `electron/main.cjs` は `dist/` を読むので、Excubitor の deploy で
+  tsc の出力を作り直す。依存 (`npm ci`) と submodule `lib/lapilli` (`@ludiars/one-shot` の参照先) は
+  本体フォルダで用意済みであることが前提。
+- `autostart: false` / `restart_policy: 'no'`: GUI なので自動で立ち上げ直さない。
+- 起動は Excubitor 経由・本体フォルダだけ。worktree からは起動しない (Excubitor も worktree の
+  catalog を読まない)。Excubitor が `LUDIARS_ROOT` / `EXCUBITOR_URL` を注入する (下表)。
+
 ## 設定 (環境変数)
 
 | 変数 | 既定 | 内容 |

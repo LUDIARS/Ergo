@@ -1,0 +1,25 @@
+# Excubitor catalog fragment (per-repo) -- Ergo
+#
+# Ergo Studio = tools/ergo の Electron デスクトップアプリ (spec/feature/tool/studio.md)。
+# 起動は Excubitor 経由に限る (worktree / 複製フォルダからは起動しない)。
+# electron/main.cjs は tsc の出力 dist/ を読むので、 deploy (update) 時は build_command で
+# dist を作り直す。 GUI なので自動起動・自動 respawn はしない。
+services:
+  - code: ergo-studio
+    name: Ergo Studio (統合環境アプリ)
+    description: LUDIARS のサービスと連携してゲームを AI と作る Ergo のデスクトップアプリ (Electron)。
+    tier: local-app
+    project_code: Eg
+    component: desktop
+    repo: LUDIARS/Ergo
+    runtime: app
+    app_kind: electron
+    cwd: ${ARS_ROOT}/Ergo/tools/ergo
+    exec: ${ARS_ROOT}/Ergo/tools/ergo/node_modules/electron/dist/electron.exe
+    exec_args:
+      - .
+    build_command: npm run build
+    autostart: false
+    restart_policy: 'no'
+    health:
+      type: process

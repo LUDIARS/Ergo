@@ -34,6 +34,9 @@
       "pathPattern": "^cpp-rules\\.json$"
     },
     {
+      "pathPattern": "^excubitor\\.catalog\\.yaml$"
+    },
+    {
       "pathPattern": "^tools/cpp-rules/(?:.*/)?[^/]+$"
     },
     {
