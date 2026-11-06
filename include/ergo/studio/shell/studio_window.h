@@ -3,6 +3,7 @@
 /// VulkanContext, ergo_render FrameComposer with one UiLayer, driving a
 /// ui::StudioApp. run() blocks until the window closes or `stop` is set.
 #include "ergo/studio/host/plugin_host.h"
+#include "ergo/studio/ui/studio_app.h"
 
 #include <atomic>
 #include <functional>
@@ -16,6 +17,7 @@ struct WindowConfig {
     int         height = 800;
     std::string font_path;    ///< TTF / OTF / TTC
     std::string shader_dir;   ///< holds ui_widget.vert.spv / ui_widget.frag.spv
+    ui::ViewLookup views;     ///< native tabs for plugins without their own view
 };
 
 /// Opens the window and runs the UI loop. Returns 0 on a normal close, or a

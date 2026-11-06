@@ -33,6 +33,13 @@ private:
     float advance_;
 };
 
+/// Cut `text` so that it fits `max_width` (whole code points, "…" appended).
+std::string fit_text(const std::string& text, float max_width, float font_size, const ITextMeasure& m);
+/// Break `text` into lines no wider than `max_width` (greedy; prefers spaces).
+std::vector<std::string> wrap_text(const std::string& text, float max_width, float font_size, const ITextMeasure& m);
+/// Keep the tail of `text` that fits `max_width` (a field shows where you type).
+std::string fit_tail(const std::string& text, float max_width, float font_size, const ITextMeasure& m);
+
 /// Colours of the Studio (one dark theme).
 struct Theme {
     ui_kit::Color background{0.11f, 0.12f, 0.14f, 1};
@@ -56,18 +63,40 @@ struct ClickBinding {
     ClickFn     fn;
 };
 
+/// A text field: the string it edits lives in the view (it must outlive the
+/// next rebuild), the app routes typed text to the focused one.
+struct FieldBinding {
+    std::string  path;        ///< resolved path of the field's frame
+    std::string* value = nullptr;
+    ClickFn      on_submit;   ///< Enter (single-line fields only)
+    bool         multiline = false;
+};
+
+/// What one build of the UI registers. `focused` is kept by the app across
+/// rebuilds (the path of the field that receives keys, empty = none).
+struct Bindings {
+    std::vector<ClickBinding> clicks;
+    std::vector<FieldBinding> fields;
+    std::string               focused;
+    void clear() {
+        clicks.clear();
+        fields.clear();
+    }
+};
+
 class ViewBuilder {
 public:
     /// Appends under `container`, whose resolved path will be `container_path`.
     ViewBuilder(ui_kit::Node& container, std::string container_path, const ITextMeasure& measure, const Theme& theme,
-                std::vector<ClickBinding>& clicks);
+                Bindings& bindings);
 
     /// The node this builder appends to (resolved again on every call:
     /// children live in vectors, so a reference would dangle after a sibling
     /// is added higher up).
     ui_kit::Node& node();
 
-    const Theme& theme() const { return theme_; }
+    const Theme&        theme() const { return theme_; }
+    const ITextMeasure& measure() const { return measure_; }
 
     void title(const std::string& text);
     void label(const std::string& text, const ui_kit::Color* color = nullptr, float font_size = 0);
@@ -81,6 +110,19 @@ public:
     void status(bool ok, const std::string& text);
     void separator();
     void spacer(float h);
+    /// One-line text input editing `value` (kept by the caller). Enter runs
+    /// `on_submit`. The width is fixed; long text shows its tail.
+    void text_field(std::string& value, const std::string& placeholder = {}, float width = 320, ClickFn on_submit = {});
+    /// A one-line input that shows a dot per character (tokens, passwords).
+    void secret_field(std::string& value, const std::string& placeholder = {}, float width = 320);
+    /// Multi-line input, `lines` rows high (Enter inserts a newline).
+    void text_area(std::string& value, float width, int lines);
+    /// A full-width clickable line (lists: files, issues, tasks...).
+    void list_item(const std::string& text, bool selected, ClickFn on_click, const std::string& detail = {});
+    /// Text wrapped to `max_width` px (at spaces, or anywhere for CJK); "\n" starts a new line.
+    void wrapped(const std::string& text, float max_width, const ui_kit::Color* color = nullptr, float font_size = 0);
+    /// A label cut to `max_width` px with "…" (table cells).
+    void clipped_label(const std::string& text, float max_width, const ui_kit::Color* color = nullptr);
 
     /// A horizontal row; `fill` makes it take the full width.
     ViewBuilder row(float gap = 8);
@@ -89,7 +131,9 @@ public:
 
 private:
     ViewBuilder(ui_kit::Node& root, std::vector<std::size_t> index, std::string path, const ITextMeasure& measure,
-                const Theme& theme, std::vector<ClickBinding>& clicks);
+                const Theme& theme, Bindings& bindings);
+    void          field_frame(std::string& value, const std::string& placeholder, float width, int lines, bool multiline,
+                              ClickFn on_submit, bool masked = false);
     ViewBuilder   child(ui_kit::Node n);   ///< add `n` and return a builder for it
     void          add(ui_kit::Node n);
     std::string   next_name(const char* kind);
@@ -99,7 +143,7 @@ private:
     std::string                path_;
     const ITextMeasure&        measure_;
     const Theme&               theme_;
-    std::vector<ClickBinding>& clicks_;
+    Bindings&                  bind_;
     int                        counter_ = 0;
 };
 

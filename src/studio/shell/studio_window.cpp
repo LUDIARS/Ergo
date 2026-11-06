@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <string>
+#include <vector>
 
 namespace ergo::studio::shell {
 namespace {
@@ -20,6 +22,49 @@ namespace {
 std::atomic<int> g_scroll_tenths{0};
 
 void on_scroll(GLFWwindow*, double, double dy) { g_scroll_tenths += static_cast<int>(dy * 10); }
+
+/// Keyboard input since the last frame. GLFW calls back on the thread that
+/// polls events, which is the frame loop's thread, so no lock is needed.
+std::string           g_typed;
+std::vector<ui::Key>  g_keys;
+
+void append_utf8(std::string& out, unsigned int cp) {
+    if (cp < 0x80) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x110000) {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+void on_char(GLFWwindow*, unsigned int cp) { append_utf8(g_typed, cp); }
+
+void on_key(GLFWwindow* w, int key, int, int action, int mods) {
+    if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
+    switch (key) {
+    case GLFW_KEY_BACKSPACE: g_keys.push_back(ui::Key::Backspace); break;
+    case GLFW_KEY_DELETE: g_keys.push_back(ui::Key::Delete); break;
+    case GLFW_KEY_ENTER:
+    case GLFW_KEY_KP_ENTER: g_keys.push_back(ui::Key::Enter); break;
+    case GLFW_KEY_ESCAPE: g_keys.push_back(ui::Key::Escape); break;
+    case GLFW_KEY_TAB: g_keys.push_back(ui::Key::Tab); break;
+    case GLFW_KEY_V:
+        if ((mods & GLFW_MOD_CONTROL) && action == GLFW_PRESS) {
+            if (const char* clip = glfwGetClipboardString(w)) g_typed += clip;   // UTF-8 from GLFW
+        }
+        break;
+    default: break;
+    }
+}
 
 } // namespace
 
@@ -38,6 +83,8 @@ int run_studio_window(host::PluginHost& host, const WindowConfig& cfg, const std
     }
     GLFWwindow* win = surface.glfw_window();
     glfwSetScrollCallback(win, &on_scroll);
+    glfwSetCharCallback(win, &on_char);
+    glfwSetKeyCallback(win, &on_key);
 
     pictor::VulkanContext vk;
     if (!vk.initialize(&surface)) {
@@ -74,7 +121,7 @@ int run_studio_window(host::PluginHost& host, const WindowConfig& cfg, const std
         return 6;
     }
 
-    ui::StudioApp app(host, font);
+    ui::StudioApp app(host, font, ui::Theme{}, cfg.views);
     auto last = std::chrono::steady_clock::now();
     int code = 0;
     while (!stop.load() && !surface.should_close()) {
@@ -96,6 +143,8 @@ int run_studio_window(host::PluginHost& host, const WindowConfig& cfg, const std
         in.y      = static_cast<float>(cy) * sy;
         in.down   = glfwGetMouseButton(win, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
         in.scroll = static_cast<float>(g_scroll_tenths.exchange(0)) / 10.0f;
+        in.text.swap(g_typed);
+        in.keys.swap(g_keys);
 
         app.set_viewport(fbw, fbh);
         app.frame(in, dt);

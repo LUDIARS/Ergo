@@ -1263,6 +1263,34 @@ if(ERGO_BUILD_STUDIO)
         endif()
         add_test(NAME test_studio_plugins COMMAND test_studio_plugins)
     endif()
+
+    # ergo_studio_views : native tabs drawn from each plugin's own HTTP API (no GPU)
+    if(TARGET ergo_studio_ui)
+        add_library(ergo_studio_views STATIC
+            tools/studio/views/api_view.cpp
+            tools/studio/views/explorer_view.cpp
+            tools/studio/views/json_render.cpp
+            tools/studio/views/log_view.cpp
+            tools/studio/views/musa_views.cpp
+            tools/studio/views/plugin_api.cpp
+            tools/studio/views/studio_view.cpp
+            tools/studio/views/thaleia_view.cpp
+            tools/studio/views/view_registry.cpp
+        )
+        target_include_directories(ergo_studio_views PUBLIC tools/studio)
+        target_link_libraries(ergo_studio_views PUBLIC ergo_studio_ui ergo_studio_host)
+        if(MSVC)
+            target_compile_options(ergo_studio_views PRIVATE /utf-8)
+        endif()
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_studio_views tests/studio/test_studio_views.cpp)
+            target_link_libraries(test_studio_views PRIVATE ergo_studio_views ergo_studio_plugins ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_studio_views PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_studio_views COMMAND test_studio_views)
+        endif()
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -2161,7 +2189,7 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
     target_include_directories(ergo_studio PRIVATE tools/studio)
     target_link_libraries(ergo_studio PRIVATE ergo_studio_plugins ergo_studio_host ergo_studio_net)
     if(_ergo_studio_shell)
-        target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
+        target_link_libraries(ergo_studio PRIVATE ergo_studio_shell ergo_studio_views)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
         add_dependencies(ergo_studio ergo_studio_shaders)
     endif()
