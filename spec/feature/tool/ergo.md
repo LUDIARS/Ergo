@@ -359,9 +359,24 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 
 ## タブ UI (ネイティブ)
 
-ウィンドウはプラグインごとのタブを並べる (`src/studio/ui/studio_app.cpp`)。タブの中身は
-プラグインの `IPluginView::build()` が `ViewBuilder` で組む。ビューを持たないプラグインは
-タブに id・説明・ヘルスを表示する。旧版のシェル拡張 API (`window.ergo.shell`) と
+ウィンドウは左のサイドバーにプラグインを並べ、選んだもののタブを右に出す
+(`src/studio/ui/studio_app.cpp`)。タブの中身は `IPluginView::build()` が `ViewBuilder` で組む
+(ラベル・ボタン・一覧・テキスト入力 / 秘匿入力 / 複数行入力・折り返し。キー入力と Ctrl+V の
+貼り付けはフォーカス中の入力欄へ入る)。
+
+プラグイン自身が `view()` を持たないときは、exe が `tools/studio/views/` (`ergo_studio_views`)
+のビューを id で付ける。ビューはプラグインの **自分の HTTP API** をプロセス内で
+ワーカースレッドから呼んで描くだけで、プラグインのクラスには依存しない (外部 pack にも効く)。
+
+| id | タブ |
+|---|---|
+| `studio` | プロジェクト (ソース状態・fetch / fast-forward・AI への指示)、タスク (登録・AI に実装させる)、実行、接続 |
+| `log` | アプリ一覧と行 (level / 文字列 / frame で絞り込み、1 秒ごとの追従) |
+| `musa_thaleia` | 文書ツリー・全文検索・描画した文書 |
+| `musa_terpsichore` | 状態・起動 / 停止・設定の編集 |
+| `musa_melpomene` | Issue 一覧と詳細・コメント・作成 / クローズ・通知・設定 (トークンは伏せ字) |
+| 上記以外 (外部 pack を含む) | エクスプローラ: ヘルス、既知の GET エンドポイントのボタン、任意の要求 (method / path / JSON body) と応答の JSON 表示 |
+旧版のシェル拡張 API (`window.ergo.shell`) と
 Electron IPC は廃止した (ブラウザの iframe が無いため)。拡張はプラグイン (組み込み
 または外部 pack) として足す。
 
