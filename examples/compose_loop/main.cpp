@@ -11,7 +11,7 @@
 ///   ergo_example_compose_loop [--check]   120 fixed-dt frames, verify the end state (default)
 ///   ergo_example_compose_loop --connect [host] [port]
 ///                                         real time until Ctrl+C; edit player.speed in
-///                                         tools/ergo http://localhost:5170/variable/
+///                                         ergo_studio (variable tab, port 5170)
 ///   ... --trace <file>                    write an ergo_profile Chrome trace on exit
 ///   ... --verbose                         log threshold Debug (default: Warn)
 
@@ -390,7 +390,7 @@ int main(int argc, char** argv) {
             const float real_dt =
                 opt.live ? std::min(ergo::frame::dt_seconds(), 0.1f) : kFixedDt;
 
-            // 2. Apply edits queued by tools/ergo, at the start of the frame.
+            // 2. Apply edits queued by ergo_studio, at the start of the frame.
             bind.apply_pending_writes();
             if (player.speed != seen_speed) {
                 report("player.speed %.2f -> %.2f", seen_speed, player.speed);
@@ -398,8 +398,8 @@ int main(int argc, char** argv) {
             }
             if (opt.live && static_cast<int>(bind.is_connected()) != seen_connected) {
                 seen_connected = static_cast<int>(bind.is_connected());
-                report(seen_connected ? "connected to tools/ergo"
-                                      : "waiting for tools/ergo (npm run dev, same PORT)");
+                report(seen_connected ? "connected to ergo_studio"
+                                      : "waiting for ergo_studio (same PORT)");
             }
 
             // 3. Host OS events -> inject*.

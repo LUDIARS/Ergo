@@ -204,9 +204,10 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
      `ERGO_BUILD_<名>` の行を足す
   7. `spec/domains/<ドメイン>.domain.json` の membership に `src/<名>/`・
      `include/ergo/<名>/`・`tests/<名>/` を足す (yaml の `domain` と同じドメイン)
-  8. Web ツールが要るなら `tools/ergo/src/plugins/<id>/` にプラグインとして足し、
+  8. Studio のツールが要るなら `tools/studio/plugins/<dir>/` にプラグインとして足して
+     `tools/studio/builtin_plugins.cpp` に登録し、
      [`../feature/tool/ergo.md`](../feature/tool/ergo.md) のプラグイン一覧と
-     `tools/ergo/README.md` も更新する
+     `tools/studio/README.md` も更新する
   9. `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake` が OK になることを確かめる
 
   `Ergo::<名>` エイリアス・C++ 標準・`/utf-8` は `cmake/ErgoTargets.cmake` が全 `ergo_*`

@@ -198,7 +198,7 @@ bool scan_usage(const ScanOptions& o, UsageModel& model, std::string* error) {
     b.node("ergo", UsageKind::Ergo, "Ergo").code = "Eg";
     for (const auto& t : manifest.tools) b.node(t.name, UsageKind::SharedTs).code = t.code;
 
-    // 読み取り元: Ergo (submodule)、 Ergo の Web ツール、 観測対象。
+    // 読み取り元: Ergo (submodule)、 Ergo の tool パッケージ (ergo_paths)、 観測対象。
     std::vector<Source> sources;
     sources.push_back(make_source("ergo", detail::Scope(resolver.ergo_root, "ergo:", &model.files_read),
                                   {}, true));

@@ -55,7 +55,7 @@ RPC ペイロードや設定ファイル程度を想定する。
 
 ## ws_client — 共有 WebSocket クライアント
 
-ツリー内で唯一の C++ WebSocket クライアント。 エンジン側から `tools/ergo`
+ツリー内で唯一の C++ WebSocket クライアント。 エンジン側から `ergo_studio`
 の各プラグインへ **外向きに**接続するために使う (サーバ機能は持たない)。
 
 ```cpp

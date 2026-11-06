@@ -3,7 +3,7 @@
 ## 概要
 パーティクルエフェクトの **CPU シミュレーション** と **Pictor を介した Vulkan
 ビルボード描画** を提供するモジュール。
-unified ergo tool の `particle` プラグイン (TS/Node, `tools/ergo/`) から WebSocket で配信される
+unified ergo tool の `particle` プラグイン (C++, `ergo_studio` の `tools/studio/plugins/particle/`) から WebSocket で配信される
 `ParticleEffectConfig` を受け取り (受信側は `ergo_particle_link` の `EditorLink`)、
 ホストアプリ側で生きた粒子を更新・描画する。
 ライブ編集 → 即視覚反映を主目的とする。

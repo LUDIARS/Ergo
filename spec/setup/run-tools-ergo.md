@@ -1,48 +1,63 @@
-# 開発者ツール `tools/ergo` を起動するための設定
+# 開発者ツール `ergo_studio` をビルドして起動するための設定
 
 ## 目的
 
-Ergo の共有プラグインホスト型 Web 開発者ツール (`tools/ergo`) を起動する。
-1 Node プロセス / 1 ポートで、組み込み (汎用) プラグインを iframe シェルに
-束ねて表示し、エンジンクライアント (`ergo_bind` / `ergo_particle_link` /
+Ergo の共有プラグインホスト型の開発者ツール、C++ ネイティブアプリ
+`ergo_studio.exe` (Ergo Studio) をビルドして起動する。
+1 プロセス / 1 ポートで、組み込み (汎用) プラグインをアプリのウィンドウの
+タブとして表示し、エンジンクライアント (`ergo_bind` / `ergo_particle_link` /
 `ergo_scene_link` / `ergo_log_live`) は同じポートの WebSocket に接続する。
-全体仕様は [`../feature/tool/ergo.md`](../feature/tool/ergo.md)。初めてなら
-[quickstart.md](quickstart.md) が clone から「ブラウザで値を変えて反映」までを通す。
+全体仕様は [`../feature/tool/ergo.md`](../feature/tool/ergo.md)、ソースの説明は
+[`../../tools/studio/README.md`](../../tools/studio/README.md)。初めてなら
+[quickstart.md](quickstart.md) が clone から「Studio で値を変えて反映」までを通す。
+
+旧 `tools/ergo` (Node + Hono + Electron + TypeScript、`npm run dev` / `npm start`)
+は 2026-11-06 に削除した。ポート・URL・WS のワイヤ契約は同じなので、
+エンジン側クライアントの接続先は変わらない。
 
 ## 前提
 
-- Node `>= 22.12.0` (`tools/ergo/package.json` の `engines.node`)
-- `git submodule update --init -- lib/lapilli` で共有 CLI 起動ライブラリを取得する。
-- 依存はバックエンドが `hono` + `@hono/node-server` + `ws`、起動形態に
-  `electron` + `tsx` + `typescript` (`tools/ergo/package.json`)
+- C++ モジュールと同じ CMake `>= 3.20` と C++17 コンパイラ ([build-cpp.md](build-cpp.md))
+- ウィンドウ付きで動かすには **Vulkan SDK** と Pictor (`-DERGO_PACKAGES=pictor`、
+  [packages.md](packages.md))。Pictor 無しでも同じターゲットがヘッドレス専用の exe
+  としてビルドされる
+- ソースの置き場所: exe は `tools/studio/` (`main.cpp` / `studio_settings.*` /
+  `builtin_plugins.cpp`)、組み込みプラグインは `tools/studio/plugins/<dir>/`、
+  ライブラリは `src/studio/{net,host,platform,ui,shell}` + `include/ergo/studio/`、
+  テストは `tests/studio/` (ctest、mini-gtest)
 
-## 起動モードと npm スクリプト
+## ビルドと起動モード
 
-`tools/ergo/package.json` の `scripts` に対応 (正本):
+```bash
+# リポジトリのルートで
+cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON
+cmake --build build --config Release --target ergo_studio
+```
+
+出力は `build/studio/ergo_studio.exe`。CMake オプション `ERGO_BUILD_STUDIO`
+(既定 ON) で Studio 一式を外せる ([config-reference.md](config-reference.md))。
 
 | コマンド | モード | 内容 |
 |---|---|---|
-| `npm start` (= `npm run app`) | **既定: Electron スタンドアロン** | `tsc` でビルド後 `electron .` で `BrowserWindow` を開き、同プロセスで Node サーバを boot |
-| `npm run serve` | ヘッドレス (1 回) | `tsx src/main.ts`。ウィンドウを開かず Node サーバのみ。ブラウザから接続 |
-| `npm run dev`   | ヘッドレス (watch) | `tsx watch src/main.ts`。ファイル変更で再起動 |
-| `npm run build` | ビルドのみ | `tsc -p tsconfig.json` (`npm start` が内部で実行) |
-| `npm test` | テスト | `node --import tsx --test "tests/**/*.test.ts"`。`tests/{core,helpers,plugins/<id>}/` にあり、一時ディレクトリとポート 0 を使う hermetic なテスト |
-| `npm run typecheck` | 型検査のみ | `tsc -p tsconfig.test.json` (`src/` と `tests/` を出力なしで検査)。CI のジョブ `tools-ergo` も実行する ([ci.md](ci.md)) |
+| `build/studio/ergo_studio.exe` | **既定: ウィンドウ付き** | GLFW + Vulkan + Pictor の UIRenderer でタブ UI を描き、同じプロセスでサーバを動かす |
+| `build/studio/ergo_studio.exe --headless` | ヘッドレス | ウィンドウを開かずサーバのみ。CI・リモート接続・エンジンからの接続確認に使う |
+| ctest `tests/studio/` | テスト | 一時ディレクトリとポート 0 を使う hermetic なテスト。通常の ctest に含まれる ([ci.md](ci.md)) |
 
-ヘッドレス (`serve` / `dev`) は CI・Docker・リモート接続・ブラウザ devtools
-主体のケース向け ([`../feature/tool/ergo.md`](../feature/tool/ergo.md) 「起動モード」)。
+LUDIARS の環境では手で起動せず、Excubitor のサービス `ergo-studio`
+(`excubitor.catalog.yaml`) から起動する。
 
 ## 設定キー
 
 | 環境変数 | 既定 | 役割 |
 |---|---|---|
-| `PORT` | `5170` | サーバの listen ポート。Electron (`electron/main.cjs:17`) / ヘッドレス (`src/main.ts:10`) のどちらも参照 |
-| `ERGO_HOST` | `127.0.0.1` | bind するアドレス (ヘッドレスのみ、`src/main.ts:11`)。既定は LAN に出さない。Electron は読まない。LAN に出してもブラウザからは IP アドレスか `ERGO_HOST` の名前で開く (他の名前は `Host` 検査で 403。[`../feature/tool/ergo.md`](../feature/tool/ergo.md)「接続元の制限」) |
+| `PORT` | `5170` | サーバの listen ポート (1..65535。それ以外は起動しない) |
+| `ERGO_HOST` | `127.0.0.1` | bind するアドレス。既定は LAN に出さない。LAN に出しても外部からは IP アドレスか `ERGO_HOST` の名前で接続する (他の名前は `Host` 検査で 403。[`../feature/tool/ergo.md`](../feature/tool/ergo.md)「接続元の制限」) |
 
 `PORT` を変えるとエンジンクライアントの接続先 (`ws://127.0.0.1:<PORT>/<id>/ws`)
 も変わる点に注意 (後述)。プラグイン固有の変数 (`ERGO_PLUGIN_DIR` / `ERGO_PICTOR_PROFILE_DIR` /
 `VISUS_PROJECT_ROOTS` / `ERGO_VFX_BACKEND` など) の一覧は
-[config-reference.md](config-reference.md) の「環境変数 (tools/ergo)」。
+[config-reference.md](config-reference.md) の「環境変数 (ergo_studio)」。
+環境変数を読むのは `tools/studio/studio_settings.cpp` だけで、プラグインは自分で読まない。
 
 ## ポートと URL
 
@@ -51,48 +66,48 @@ Ergo の共有プラグインホスト型 Web 開発者ツール (`tools/ergo`) 
 
 | URL | 役割 |
 |---|---|
-| `http://localhost:5170/`            | シェル UI (プラグイン選択) |
-| `http://localhost:5170/api/plugins` | 登録プラグイン一覧 |
+| `http://localhost:5170/api/plugins` | 登録プラグイン一覧 (ウィンドウのタブ) |
 | `http://localhost:5170/api/health`  | 全プラグイン集約ヘルス |
-| `http://localhost:5170/<id>/`       | プラグイン `<id>` の UI |
+| `http://localhost:5170/<id>/api/*`  | プラグイン `<id>` の REST |
 | `ws://localhost:5170/<id>/ws`       | プラグイン `<id>` の WebSocket |
+
+UI はブラウザのページではなくアプリのウィンドウ (タブ) にある。HTTP / WS は
+エンジン・ホスト・外部ツールとの接続口。
 
 ## 組み込み (汎用) プラグイン
 
-`src/core/registry.ts` の `PLUGIN_FACTORIES` に列挙されたものだけが組み込み
+`tools/studio/builtin_plugins.cpp` に登録されたものだけが組み込み
 (どのホストでも使う汎用エディタ)。一覧・対応する C++ モジュール・エンジン側の
 供給元・仕様書は [`../feature/tool/ergo.md`](../feature/tool/ergo.md) の
-「プラグイン一覧」にある (正本は `registry.ts`。ctest `test_module_catalog` が
+「プラグイン一覧」にある (正本は `builtin_plugins.cpp`。ctest `test_module_catalog` が
 両者の一致を検査する)。ゲーム固有エディタ (placer / spawn / skill 等) はここには
 無く、外部ロードする ([external-plugins.md](external-plugins.md))。
 
-`render_pipeline` / `visus` はホスト側の資産 (Pictor profile / 描画定義) を
-参照するため追加の env 設定が要る場合がある
+`render_pipeline` / `visus` / `ui_layout` はホスト側の資産 (Pictor profile /
+描画定義 / UI レイアウト) を参照するため env 設定が要る。未設定ならその API は 503 を返す
 ([plugin-data-roots.md](plugin-data-roots.md))。
 
 ## 手順
 
 ```bash
-cd tools/ergo
-npm install
+# ビルド (Vulkan SDK が要る)
+cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON
+cmake --build build --config Release --target ergo_studio
 
-# 既定: Electron スタンドアロン
-npm start
+# 既定: ウィンドウ付き
+build/studio/ergo_studio.exe
 
-# もしくはヘッドレス (ブラウザで http://localhost:5170/ を開く)
-npm run dev
+# もしくはヘッドレス (サーバのみ)
+build/studio/ergo_studio.exe --headless
 
 # ポートを変える場合 (PowerShell)
-$env:PORT = "5180"; npm run dev
+$env:PORT = "5180"; build\studio\ergo_studio.exe --headless
 ```
 
 ## 注意点
 
-- `dist/` と `node_modules/` は `tools/ergo/.gitignore` で追跡外。`npm start` は
-  毎回 `tsc` で `dist/` を作り直す。
-- Electron 経路では `electron/main.cjs` が `dist/core/*.js` を動的 import する
-  ため、`npm start` (= build → electron) の順を崩さない。`serve` / `dev` は
-  `tsx` で `src/` を直接実行するのでビルド不要。
-- Electron アプリは preload 経由で `window.ergo.electron` を露出し、選択中
-  プラグインに応じてウィンドウタイトルを `ergo — <title>` に更新する
-  (`electron/main.cjs:48-52`)。
+- `build/` は追跡外。exe のほかに `build/studio/shaders/` と、外部 plugin pack が
+  include する `build/studio/sdk/include/ergo/studio/plugin_abi.h` が出る。
+- 旧版のシェル拡張 API (`window.ergo.shell`) と Electron IPC は無い。拡張は
+  プラグイン (組み込みまたは外部 pack) として足す。
+- ウィンドウの文字は `ERGO_STUDIO_FONT` (既定 `<WINDIR>\Fonts\meiryo.ttc`) のフォントで描く。

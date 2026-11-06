@@ -18,7 +18,7 @@ enum class UsageKind {
     Related,     ///< observe の group が related (など musa 以外)
     SharedTs,    ///< 依存先として現れた共有ライブラリ (Lapilli・@ludiars/* など)
     Ergo,        ///< Ergo 本体と、 移植・語彙共有の根拠を持つ Ergo のモジュール
-    Tool,        ///< Ergo の Web ツール (tools/ergo など)
+    Tool,        ///< Ergo の tool パッケージ (ScanOptions::ergo_paths。既定は旧 tools/ergo)
     Unobserved,  ///< observe にあるが読めなかったもの
 };
 
@@ -39,7 +39,7 @@ const char* to_string(UsageEdgeKind kind);
 bool        is_dashed(UsageEdgeKind kind);
 
 struct UsageNode {
-    std::string id;          ///< observe 名 / モジュール名 / "ergo" / "tools/ergo" / "npm:<名>" / "repo:<名>"
+    std::string id;          ///< observe 名 / モジュール名 / "ergo" / ergo_paths の値 (既定 "tools/ergo") / "npm:<名>" / "repo:<名>"
     std::string name;        ///< 札の 1 行目
     std::string code;        ///< プロジェクトコード (分かれば)
     UsageKind   kind = UsageKind::SharedTs;

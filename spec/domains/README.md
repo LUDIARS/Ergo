@@ -22,7 +22,7 @@ Anatomia が参照するドメイン定義の **正本**。 1 ドメイン = 1 �
 
 - `pathPattern` は正規表現。 先頭を `(^|/)` にして、 リポジトリ相対でも
   絶対パスでも同じように当たるようにする。 ただしリポジトリ直下だけを指すファイルやツール
-  (`CMakeLists.txt`・`ergo-packages.json`・`CMakePresets.json`・`.gitmodules`・`tools/ergo/`・`examples/`・`contracts/`・`.github/workflows/`) は
+  (`CMakeLists.txt`・`ergo-packages.json`・`CMakePresets.json`・`.gitmodules`・`tools/studio/`・`examples/`・`contracts/`・`.github/workflows/`) は
   `^` で始め、 テスト用フィクスチャの中にある同名ファイルを巻き込まない
 - C++ モジュールは `src/<名>/`・`include/ergo/<名>/`・`tests/<名>/` の 3 本を必ず組で書く
   (欠けるとヘッダ・実装・テストが別ドメインに割れる)。 `include/` は `include/ergo/<名>/` まで
@@ -53,7 +53,7 @@ Praeforma のコア / ビジネスドメインとの対応・古い処理の一�
 | `build-packages` | `cmake/`・`ergo-packages.json`・`CMakePresets.json`・`tests/packages/`・`lib/`・`.gitmodules`・`package_manager` / `package_watch`・`tools/package_cli/`・`unity/com.ludiars.ergo.packages/`・`tests/unity_packages/`・`contracts/`・`.github/workflows/` |
 | `structure-visualization` | `graph_layout` / `tela_graph` / `render_viz` / `package_model` / `package_scan` / `package_viz`・`tools/render_viz/`・`tools/package_viz/` |
 | `observability` | `log` / `frame` / `profile` / `bind` / `custos` |
-| `dev-tools` | `tools/ergo/` |
+| `dev-tools` | `tools/studio/`・`src/studio/`・`include/ergo/studio/`・`tests/studio/` (Ergo Studio) |
 | `input` | `input` |
 | `physics` | `physics2d` |
 | `audio` | `audio` / `sound` |

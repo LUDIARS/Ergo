@@ -12,7 +12,7 @@ load/save、 フィールド単位のパッチ適用、 カメラ行列、 複�
 と `ergo_actor` / `ergo_bind` への結線は **ホスト側の責務で、 現時点では
 未実装 (将来)**。 `ergo_scene` はそれらに依存しない。
 
-ライブ編集は `tools/ergo` の `scene_editor` プラグイン
+ライブ編集は `ergo_studio` の `scene_editor` プラグイン
 ([`spec/feature/tool/scene_editor.md`](../tool/scene_editor.md)) で行う。
 エンジン側のクライアントは別ターゲット `ergo_scene_link`
 (`include/ergo/scene/editor_link.h`) で、 シーンを publish し、 エディタから

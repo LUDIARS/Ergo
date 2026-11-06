@@ -1,7 +1,13 @@
 # placer — block-based level designer
 
-Ergo の統一開発者ツール (`tools/ergo`) にホストされるプラグインの
-1 つ。URL は `http://localhost:5170/placer/`。
+Ergo の統一開発者ツール (`ergo_studio`) にホストされる外部プラグインの
+1 つ。ルートは `http://localhost:5170/placer/api/*`。
+
+> 2026-11-06: ホスト側の `tools/ergo` (Node / Electron) は削除され、C++ ネイティブの
+> `ergo_studio` に置き換わった。外部 plugin pack は C ABI の共有ライブラリ
+> (`include/ergo/studio/plugin_abi.h`) として `ERGO_PLUGIN_DIR` から読み込む
+> ([external-plugins.md](../../setup/external-plugins.md))。下記のレイアウト
+> (TypeScript) は AdventureCube 側の plugin pack の旧構成で、C ABI への作り直しが要る。
 
 AdventureCube 等の個別ゲームにリンクされず、**Ergo アプリの 1 モード**
 として独立ビルド・独立デプロイされる。データファイルだけが利用側と
@@ -168,10 +174,10 @@ WebSocket `/placer/ws` は予約。現状は接続を受け付け、保存時に
   現状 placer は **独立したファイル**を持ち、ゲームとは JSON 越しで
   接続する (デカップル方針)。
 
-## レイアウト
+## レイアウト (旧 TypeScript pack。履歴)
 
 ```
-tools/ergo/src/plugins/placer/
+<AdventureCube>/tools/ac-web/plugins/placer/
 ├── index.ts       ← plugin factory, Hono routes, WS stub
 ├── schema.ts      ← Block / Stage / Cell / PlacedObject types + normalise*
 ├── store.ts       ← JSON file persistence (atomic write)

@@ -6,7 +6,7 @@
 /// boundaries through RAII guards + macros. Recording is thread-local and
 /// lock-free; the collector merges per-thread buffers on export. Output is
 /// Chrome Trace Event JSON (viewable in chrome://tracing / Perfetto, or the
-/// tools/ergo `profile` plugin).
+/// ergo_studio `profile` plugin).
 ///
 /// Marker names must outlive the session (string literals / __func__) - the
 /// collector stores the pointer, not a copy, to keep the hot path alloc-free.

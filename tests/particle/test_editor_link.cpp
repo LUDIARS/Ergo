@@ -11,7 +11,7 @@ using namespace ergo::particle;
 
 namespace {
 
-// Shape of the `particle` plugin's broadcast (see plugins/particle/index.ts).
+// Shape of the `particle` plugin's broadcast (see tools/studio/plugins/particle/particle_plugin.cpp).
 std::string state_frame(const std::string& config_json) {
     return R"({"op":"state","clients":2,"config":)" + config_json + "}";
 }

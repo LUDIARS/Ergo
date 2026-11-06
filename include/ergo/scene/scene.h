@@ -4,7 +4,7 @@
 ///
 /// This first implementation intentionally owns the data model, CRUD, JSON
 /// load/save, field-level patches, and camera matrices only. Render
-/// submission is host-side. The live editor is the tools/ergo `scene_editor`
+/// submission is host-side. The live editor is the ergo_studio `scene_editor`
 /// plugin, fed by the separate `ergo_scene_link` target (scene/editor_link.h).
 
 #include <cstddef>

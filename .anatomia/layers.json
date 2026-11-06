@@ -558,150 +558,6 @@
       "layer": "infrastructure"
     },
     {
-      "glob": "tools/ergo/electron/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/public/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/core/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/log/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/log/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/particle/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/particle/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/pictor_perf/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/pictor_perf/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/profile/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/profile/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/render_pipeline/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/render_pipeline/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/rive/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/rive/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/scene_editor/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/scene_editor/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/ui_layout/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/ui_layout/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/variable/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/vfx-breed/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/vfx-breed/ui/*",
-      "layer": "presentation"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/vfx-suggest/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/visus/*",
-      "layer": "application"
-    },
-    {
-      "glob": "tools/ergo/tests/core/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/helpers/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/log/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/particle/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/pictor_perf/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/scene_editor/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/ui_layout/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/variable/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/vfx-breed/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/vfx-suggest/*",
-      "layer": "shared"
-    },
-    {
-      "glob": "tools/ergo/tests/plugins/visus/*",
-      "layer": "shared"
-    },
-    {
       "glob": "tools/cpp-rules/*",
       "layer": "shared"
     },
@@ -754,39 +610,135 @@
       "layer": "shared"
     },
     {
-      "glob": "tools/ergo/src/plugins/studio/*",
+      "glob": "include/ergo/studio/*",
       "layer": "application"
     },
     {
-      "glob": "tools/ergo/src/plugins/studio/clients/*",
+      "glob": "include/ergo/studio/net/*",
       "layer": "infrastructure"
     },
     {
-      "glob": "tools/ergo/src/plugins/studio/net/*",
-      "layer": "infrastructure"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/studio/domain/*",
-      "layer": "domain-logic"
-    },
-    {
-      "glob": "tools/ergo/src/plugins/studio/usecases/*",
+      "glob": "include/ergo/studio/host/*",
       "layer": "application"
     },
     {
-      "glob": "tools/ergo/src/plugins/studio/routes/*",
+      "glob": "include/ergo/studio/platform/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "include/ergo/studio/ui/*",
+      "layer": "application"
+    },
+    {
+      "glob": "include/ergo/studio/shell/*",
       "layer": "presentation"
     },
     {
-      "glob": "tools/ergo/src/plugins/studio/ui/*",
+      "glob": "src/studio/net/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/studio/host/*",
+      "layer": "application"
+    },
+    {
+      "glob": "src/studio/platform/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "src/studio/ui/*",
+      "layer": "application"
+    },
+    {
+      "glob": "src/studio/shell/*",
       "layer": "presentation"
     },
     {
-      "glob": "tools/ergo/src/plugins/studio/ui/views/*",
-      "layer": "presentation"
+      "glob": "tools/studio/*",
+      "layer": "application"
     },
     {
-      "glob": "tools/ergo/tests/studio/*",
+      "glob": "tools/studio/plugins/common/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tools/studio/plugins/studio/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/particle/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/variable/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/rive/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/profile/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/pictor_perf/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/render_pipeline/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/visus/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/ui_layout/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/vfx_suggest/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/vfx_breed/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/scene_editor/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/log/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/musa_melpomene/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/musa_terpsichore/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/musa_thaleia/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tests/studio/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/studio/fixtures/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/docs/*",
+      "layer": "shared"
+    },
+    {
+      "glob": "tests/docs/contracts/*",
       "layer": "shared"
     },
     {

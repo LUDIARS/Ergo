@@ -10,7 +10,7 @@
 2. `bind_var()` / `bind_accessor()` 経由で公開した変数が **そのアクター
    配下に紐付く** 形で variable プラグインに配信される
 
-UI (`tools/ergo/` の variable プラグイン) 側では Actor ツリーを左ペイン、
+UI (`ergo_studio` の variable プラグイン) 側では Actor ツリーを左ペイン、
 選択した Actor の変数を右ペインに表示する。
 
 ## カテゴリ
@@ -75,7 +75,7 @@ UI (`tools/ergo/` の variable プラグイン) 側では Actor ツリーを左�
 - `set_time_scale(-1.0)` → クランプされ `time_scale == 0.0`
 - インスタンス毎に独立 (A を pause しても B に影響しない)
 
-## UI 側 (tools/ergo variable プラグイン)
+## UI 側 (ergo_studio variable プラグイン)
 
 - 左ペイン: Actor ツリー (折りたたみ + 選択)
 - 右ペイン: 選択中 Actor の変数一覧 (flat もとのビュー)

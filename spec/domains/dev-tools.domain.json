@@ -1,10 +1,11 @@
 {
   "name": "dev-tools",
-  "description": "【AI 案・人の承認前】開発者ツールのプラグインホスト (tools/ergo)。 Node サーバ・Electron シェル・組み込みプラグイン (particle / variable / rive / profile / pictor_perf / render_pipeline / visus / ui_layout / vfx-suggest / vfx-breed / scene_editor / log)。 ゲーム固有のエディタは持たない。",
+  "description": "【AI 案・人の承認前】開発者ツール Ergo Studio (C++ ネイティブアプリ ergo_studio.exe)。 exe と組み込みプラグイン (tools/studio: studio / particle / variable / rive / profile / pictor_perf / render_pipeline / visus / ui_layout / vfx-suggest / vfx-breed / scene_editor / log / musa_*)、 ライブラリ (src/studio + include/ergo/studio: net / host / platform / ui / shell、 外部 plugin pack の C ABI)、 テスト (tests/studio)。 ゲーム固有のエディタは持たない。",
   "presetRules": [],
   "templateRules": [],
   "specRefs": [
     "spec/feature/tool/ergo.md",
+    "spec/feature/tool/studio.md",
     "spec/feature/tool/ergo-redesign.md",
     "spec/setup/run-tools-ergo.md",
     "spec/setup/external-plugins.md",
@@ -19,9 +20,6 @@
     "spec/architecture/domains-and-ux.md"
   ],
   "membership": [
-    {
-      "pathPattern": "^tools/ergo/(?:.*/)?[^/]+$"
-    },
     {
       "pathPattern": "^tools/studio/(?:.*/)?[^/]+$"
     },

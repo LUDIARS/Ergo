@@ -2,7 +2,8 @@
 
 ## プロジェクト概要
 
-Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツール群。
+Ergo はモジュラー型の C++17 フレームワーク + 付随する開発者ツール
+(C++ ネイティブアプリ `ergo_studio` とプラグイン群)。
 **全モジュール・全ツールを 1 つの main 系列に集約して開発する** (per-module の
 長命ブランチは作らない)。 一方で **変更は必ず feat ブランチ + PR で main に
 入れる** — main 直 push は禁止 (下記「ブランチ運用」参照)。
@@ -25,10 +26,13 @@ Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツ
 - **全モジュール / 全ツールのソースは main 系列の 1 ツリーに置く**
   (per-module の独立ブランチは作らない。 長命ブランチで分散させない)
 - 各モジュールは `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` に配置
-- Web 開発者ツールは **`tools/ergo/` に統合**。 新規ツールは単独
-  パッケージではなく `tools/ergo/src/plugins/<id>/` にプラグインとして追加する
-  (詳細は `spec/tool/ergo.md`)。 ゲーム固有のエディタは Ergo に入れず、
-  ホストリポの plugin pack + `ERGO_PLUGIN_DIR` でロードする
+- 開発者ツールは **ネイティブアプリ `ergo_studio` (`tools/studio/`) に統合**。
+  新規ツールは単独の exe やパッケージではなく `tools/studio/plugins/<dir>/` に
+  プラグインとして追加し、 `tools/studio/builtin_plugins.cpp` に登録する
+  (詳細は `spec/feature/tool/ergo.md`)。 ライブラリは `src/studio/` +
+  `include/ergo/studio/`、 テストは `tests/studio/`。 ゲーム固有のエディタは
+  Ergo に入れず、 ホストリポの plugin pack (C ABI の共有ライブラリ、
+  `include/ergo/studio/plugin_abi.h`) + `ERGO_PLUGIN_DIR` でロードする
 - 仕様書は `spec/module/<名>.md`
 - ドメイン定義 (Anatomia) の正本は `spec/domains/<名>.domain.json`。
   新しいトップレベルのソースディレクトリを足す PR では、 同じ PR で
@@ -50,7 +54,8 @@ Ergo はモジュラー型の C++17 フレームワーク + 付随する Web ツ
 3. `include/ergo/<名>/`, `src/<名>/`, `tests/<名>/` を作成
 4. トップレベル `CMakeLists.txt` に `add_library(ergo_<名>)` を追加
 5. `module_list.md` / `module_list.yaml` に行を追加
-6. (Web ツールが要るなら) `tools/ergo/src/plugins/<id>/` にプラグインとして追加
+6. (Studio のツールが要るなら) `tools/studio/plugins/<dir>/` にプラグインとして追加し、
+   `tools/studio/builtin_plugins.cpp` に登録
 7. 1 PR にまとめて push → レビュー → squash merge
 
 ### 横断変更 (モジュール + ツール)
@@ -86,20 +91,23 @@ target_link_libraries(myapp PRIVATE ergo_input ergo_bind)
 旧 worktree-per-module パターン
 (`git worktree add external/ergo/<mod> module/<mod>`) は使わない。
 
-## Web ツールの起動
+## 開発者ツール (Ergo Studio) の起動
 
-全ての Web 系開発ツールは `tools/ergo/` に統合済み (`particle` /
-`variable` プラグインなど)。
+全ての開発者ツールは C++ ネイティブアプリ `ergo_studio.exe` (`tools/studio/`) に
+統合済み (`particle` / `variable` プラグインなど)。
 
 ```bash
-cd <ergo>/tools/ergo
-npm install
-npm run dev           # watch, default port 5170
+cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON
+cmake --build build --config Release --target ergo_studio
+build/studio/ergo_studio.exe              # ウィンドウ付き (Vulkan SDK が要る)
+build/studio/ergo_studio.exe --headless   # サーバのみ、既定ポート 5170
 ```
 
-利用側 worktree 経由の場合: `<host>/external/ergo/tools/ergo`。
-旧 `tools/particle-editor/` / `tools/variable-editor/` は削除済み。
-仕様は `spec/tool/ergo.md` を参照。
+LUDIARS の環境では Excubitor のサービス `ergo-studio` (`excubitor.catalog.yaml`)
+から起動し、 手では起動しない。
+旧 `tools/particle-editor/` / `tools/variable-editor/`、 旧 `tools/ergo/`
+(Node / Electron、 2026-11-06 削除) は削除済み。
+仕様は `spec/feature/tool/ergo.md` を参照。
 
 ## 注意事項
 
@@ -117,7 +125,7 @@ npm run dev           # watch, default port 5170
 
 ### モジュール構造
 - **モジュールベース**: 機能は独立モジュール (`ergo_<domain>/`) に自己完結。 副作用は最小、 上層 (= consumer / tools) を import しない。
-- **プラグイン拡張思考**: 機能追加は既存モジュール改修ではなく **新規モジュール / plugin** として外側に出す。 既存 plugin host (= `tools/ergo`) に新規実装を inject する形が default。 既存 file を触らず増やせる経路を最初に検討する。
+- **プラグイン拡張思考**: 機能追加は既存モジュール改修ではなく **新規モジュール / plugin** として外側に出す。 既存 plugin host (= `ergo_studio`、 `tools/studio/`) に新規実装を inject する形が default。 既存 file を触らず増やせる経路を最初に検討する。
 
 ### SOLID 全 5
 - **S (Single Responsibility)**: 共通通り (1 モジュール / 1 ファイル / 1 責務)。
@@ -128,7 +136,7 @@ npm run dev           # watch, default port 5170
 
 ### レイヤ依存
 - `ergo_<domain>/` 同士は cross-import 禁止 (= 共有ロジックは `ergo_core` / `ergo_shared` 等の下層に集約)。
-- consumer (`tools/ergo` / 外部ゲーム) は plugin host 経由のみ。
+- consumer (`tools/studio` / 外部ゲーム) は plugin host 経由のみ。
 
 ### 参照
 - `coding-conventions` skill / [[project_ergo_redesign]] / [[project_ergo_tools]] / [[feedback_ergo_editor_plugin_pack]]

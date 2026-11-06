@@ -8,20 +8,22 @@
 
 ## 置き場所
 
-`tools/ergo/src/plugins/studio/` の組み込みプラグイン (Electron のデスクトップアプリでも、`npm run serve`
-のブラウザでも同じ)。新しいツールはプラグインとして足すという Ergo の方針 (CLAUDE.md) に従い、
-タブ (画面) は 1 プラグインの中で分ける。取得したプラグインの台帳だけは core (`src/core/plugin-ledger.ts`)
-に置き、`core/external.ts` から読む (core → plugin の逆依存を作らない)。
+`tools/studio/plugins/studio/` の組み込みプラグイン (C++ ネイティブアプリ `ergo_studio.exe` の
+ウィンドウでも、`--headless` のサーバだけでも同じ)。新しいツールはプラグインとして足すという
+Ergo の方針 (CLAUDE.md) に従い、タブ (画面) は 1 プラグインの中で分ける。取得したプラグインの
+台帳 (`plugin_ledger.cpp`) もこのプラグインが持ち、有効な pack は `tools/studio/main.cpp` が
+`ERGO_PLUGIN_DIR` と同じ扱いで外部ローダに渡す。旧 `tools/ergo` (Node / Electron /
+TypeScript) 版は 2026-11-06 に削除し、同じ API をネイティブで作り直した。
 
 | 層 | ファイル | 責務 |
 |---|---|---|
-| 設定 | `config.ts` | 環境変数を一度だけ読む (純関数) |
-| 接続 | `net/endpoints.ts` / `net/http.ts` / `net/exec.ts` | 接続先の解決、HTTP の失敗分類、外部コマンド |
-| クライアント | `clients/{concordia,actio,breviarium,curare,revisor,git}.ts` | 各サービスの API / CLI |
-| 判定 (純関数) | `domain/{delegation-request,request-guard,resource-sync,source-sync,plugin-source,connection-map}.ts` | 指示の組み立て、変更系の防御、取得・早送り・取得元の判定、連携図 |
-| 手順 | `usecases/{instruct,sync-resources,probe-connections}.ts`、`domain/{resource-download,plugin-installer}.ts` | 複数サービスにまたがる流れと I/O |
-| API | `routes/*.ts` | `/studio/api/*` |
-| 画面 | `ui/` (`app.js` + `views/*.js`) | タブ: プロジェクト / タスク / ソース / リソース / プラグイン / 連携 |
+| 設定 | `studio_config.*` | 環境変数を一度だけ読む (`tools/studio/studio_settings.cpp` と並び、環境変数を読む 2 か所のうちの 1 つ) |
+| 接続 | `endpoints.*` / `service_call.*` | 接続先の解決、サービス呼び出しと失敗分類 (HTTP は `src/studio/platform/` の WinHTTP クライアント) |
+| クライアント | `{concordia,actio,breviarium,curare,revisor,git}_client.*` | 各サービスの API / CLI |
+| 判定 (純関数) | `delegation_request.*` / `mutation_guard.*` / `resource_sync.*` / `source_sync.*` / `plugin_source.*` / `connection_map.*` | 指示の組み立て、変更系の防御、取得・早送り・取得元の判定、連携図 |
+| 手順 | `resource_download.*` / `plugin_installer.*` / `plugin_ledger.*` | 複数サービスにまたがる流れと I/O、取得した pack の台帳 |
+| API | `studio_plugin.*` / `studio_routes_{projects,tasks,sources}.cpp` | `/studio/api/*` |
+| 画面 | `IPluginView` (アプリのウィンドウのタブ) | タブ: プロジェクト / タスク / ソース / リソース / プラグイン / 連携 |
 
 ## 不変条件
 
@@ -42,7 +44,8 @@
 ### ST-INV-03 変更系の防御 {#SPEC-ergo-studio-guard}
 
 `/studio/api/*` の GET 以外は、Host が loopback、Origin を付けるなら
-同じ host:port、本文が JSON のときだけ受け付ける (`domain/request-guard.ts`)。別サイトから localhost へ
+同じ host:port、本文が JSON のときだけ受け付ける (`mutation_guard.cpp`。サーバ全体の
+`Host` / `Origin` 検査は `src/studio/net/request_guard.cpp`)。別サイトから localhost へ
 POST して AI への指示やプラグイン導入を起こさせない。
 
 
@@ -77,8 +80,9 @@ Curare の取得計画 (`POST /api/v1/acquisition/plan`、`overwrite: false`) �
 
 取得元は許可リスト (`ERGO_PLUGIN_OWNERS`、既定 `LUDIARS`) の GitHub owner
 だけ。rev を 40 桁の sha に解決してから subpath だけを取得し、中身 (コミット・プラグイン名・依存の有無・
-置き換え) を見せて承認を取る。導入するのはプレビューで取得した物そのもの (再取得しない)。依存は
-`npm install --ignore-scripts`。台帳に sha を固定して記録し、読み込みは次回起動時。
+置き換え) を見せて承認を取る。導入するのはプレビューで取得した物そのもの (再取得しない)。pack は
+C ABI の共有ライブラリなので、取得時に CMake で構成・ビルドする (`plugin_installer.cpp`。
+旧版の `npm install` は無い)。台帳に sha を固定して記録し、読み込みは次回起動時。
 
 
 ### ST-INV-09 秘密 {#SPEC-ergo-studio-secrets}
@@ -89,7 +93,7 @@ Actio / Curare のトークンは環境変数で渡し、保存・画面表示�
 
 ## 画面
 
-連携タブの図と表は `domain/connection-map.ts` が組み立てる (下の「連携の可視化」)。
+連携タブの図と表は `connection_map.cpp` が組み立てる (下の「連携の可視化」)。
 
 | タブ | 内容 | 使う API |
 |---|---|---|
@@ -109,12 +113,12 @@ Studio を中心に Excubitor / Cc / Actio / Br / Curare / Revisor / Cernere を
 デスクトップアプリは Excubitor の catalog code `ergo-studio` で起動する。定義はリポ直下の
 `excubitor.catalog.yaml` (Excubitor の per-repo catalog) にある。
 
-- `runtime: app` / `app_kind: electron`: `tools/ergo/node_modules/electron/dist/electron.exe .` を
-  `tools/ergo` で実行する。死活はプロセスの生存で見る (`health: process`)。
-- `build_command: npm run build`: `electron/main.cjs` は `dist/` を読むので、Excubitor の deploy で
-  tsc の出力を作り直す。依存 (`npm ci`) と submodule `lib/lapilli` (`@ludiars/one-shot` の参照先) は
-  本体フォルダで用意済みであることが前提。
-- `autostart: false` / `restart_policy: 'no'`: GUI なので自動で立ち上げ直さない。
+- `runtime: app` / `app_kind: native`: `build/studio/ergo_studio.exe` を本体フォルダで実行する。
+  死活はプロセスの生存で見る。
+- `build_command`: `cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON` →
+  `cmake --build build --config Release --target ergo_studio`。Excubitor の deploy (update) で
+  Pictor (pin) 込みで構成・ビルドし直す (Vulkan SDK が要る)。
+- GUI なので自動起動・自動 respawn はしない。
 - 起動は Excubitor 経由・本体フォルダだけ。worktree からは起動しない (Excubitor も worktree の
   catalog を読まない)。Excubitor が `LUDIARS_ROOT` / `EXCUBITOR_URL` を注入する (下表)。
 
@@ -133,10 +137,12 @@ Studio を中心に Excubitor / Cc / Actio / Br / Curare / Revisor / Cernere を
 
 ## 検証
 
-- 純関数のテスト: `tools/ergo/tests/studio/*.test.ts` (指示の組み立て、変更系の防御、接続先、取得の判定、
-  取得元と台帳、git 状態・早送り・連携図・設定・失敗の分類)。
-- 実施していないこと (2026-10-28 時点): テストの実行、Ergo の起動、各サービスとの実接続、Curare の
-  取得・プラグイン取得の実行、Electron での表示。
+- ctest (`tests/studio/`、mini-gtest): `test_studio_studio_domain.cpp` が純関数 (指示の組み立て、
+  変更系の防御、接続先、取得の判定、取得元と台帳、git 状態・早送り・連携図・設定・失敗の分類)、
+  `test_studio_studio_api.cpp` が `/studio/api/*` (HTTP は `fake_http.h` の偽クライアント)。
+  旧 `tools/ergo/tests/studio/*.test.ts` (node:test) は 2026-11-06 に削除した。
+- 実施していないこと (2026-10-28 時点): 各サービスとの実接続、Curare の
+  取得・プラグイン取得の実行、ウィンドウでの表示。
 
 ## 未決・今後
 

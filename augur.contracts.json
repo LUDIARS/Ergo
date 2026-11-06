@@ -21,6 +21,33 @@
       "module": "tests/custos/contracts/content-length.contract.mjs",
       "mode": "observe",
       "sample": 1
+    },
+    {
+      "id": "C-3",
+      "criterion": "C-3 verifyCatalogOk(root): cmake -P tests/test_module_catalog.cmake が test_module_catalog: OK を出す (相対リンク・プラグイン一覧・ドメイン定義の整合)",
+      "symbol": "verifyCatalogOk",
+      "file": "tests/docs/verify_studio_native_sweep.mjs",
+      "module": "tests/docs/contracts/catalog-ok.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-4",
+      "criterion": "C-4 verifyNoStaleToolsErgoRefs(root): 対象ドキュメントに残る tools/ergo・npm・Electron の言及は「削除済み / 旧」の履歴注記だけで、起動手順としては残らない",
+      "symbol": "verifyNoStaleToolsErgoRefs",
+      "file": "tests/docs/verify_studio_native_sweep.mjs",
+      "module": "tests/docs/contracts/no-stale-tools-ergo.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-5",
+      "criterion": "C-5 verifyStudioPathsInDomains(root): .anatomia/layers.json と spec/domains/dev-tools.domain.json は JSON として読め、tools/ergo を指さず tools/studio・src/studio・include/ergo/studio・tests/studio を指す",
+      "symbol": "verifyStudioPathsInDomains",
+      "file": "tests/docs/verify_studio_native_sweep.mjs",
+      "module": "tests/docs/contracts/studio-paths-in-domains.contract.mjs",
+      "mode": "observe",
+      "sample": 1
     }
   ]
 }

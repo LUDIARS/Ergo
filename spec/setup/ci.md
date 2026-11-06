@@ -10,7 +10,7 @@ Ergo の CI が何をどの環境で検査しているか、どのチェック�
 
 | ファイル | トリガ | 役割 |
 |---|---|---|
-| `.github/workflows/ci.yml` | main への push / pull_request / workflow_dispatch | C++ の全テスト (各ツールチェーン)、`tools/ergo`、Unity パッケージのコア |
+| `.github/workflows/ci.yml` | main への push / pull_request / workflow_dispatch | C++ の全テスト (各ツールチェーン。Ergo Studio の `tests/studio/` を含む)、Unity パッケージのコア |
 | `.github/workflows/packages-integration.yml` | 毎晩 (schedule) / workflow_dispatch | `ci-packages` プリセットで Ergo + Pictor + Tela を統合ビルド。PR のゲートにはしない |
 | `.github/workflows/harness.yml` | main への push / pull_request | LUDIARS 共通 harness (AIFormat)。**手で編集しない** (正本は AIFormat、Castra が配信) |
 
@@ -31,13 +31,17 @@ SHA を PR なしで検査したいときは workflow_dispatch で起動する
 | `build-and-test (linux-clang)` | 必須 | ubuntu-24.04、clang、`-Wall -Wextra`、Release | clang だけが出すエラー。警告はログに出すだけで `-Werror` はまだ付けない |
 | `build-and-test (linux-asan)` | 必須 | ubuntu-24.04、GCC、Debug、ASan + LSan + UBSan | 範囲外アクセス、解放後使用、リーク、未定義動作 (下記「サニタイザ」) |
 | `build-and-test (macos-14)` | 任意 | macos-14、AppleClang、Release | macOS 固有の差 (入力 HID / ソケット / オーディオ)。workflow_dispatch のときだけ走り、失敗してもワークフローは落とさない |
-| `tools-ergo` | 必須 | ubuntu-latest、Node 22 | `tools/ergo` の型 (src + tests)、`tsc` ビルド、node:test (サーバコア・plugin pack 読み込み・パスガード・各プラグインの中継) |
 | `unity-package-core` | 必須 | ubuntu-latest、.NET 8 | Unity パッケージ (`unity/com.ludiars.ergo.packages`) のコアを Unity なしで |
 
 - C++ の各レグは ctest の全テストを走らせる (後から足したテストも自動で入る)。
+  Ergo Studio (`ergo_studio`、`tests/studio/`) のテストもこの中で走る
+  (サーバコア・C ABI の plugin pack 読み込み・パスガード・各プラグインの中継。
+  一時ディレクトリとポート 0 だけを使い、ネットワーク・LLM 呼び出しなし)。
+  旧 `tools/ergo` の Node ジョブ `tools-ergo` は 2026-11-06 に削除した。
   その中の `test_module_catalog` (`tests/test_module_catalog.cmake`、コンパイラ不要) は
   `module_list.{md,yaml}`・README・[config-reference.md](config-reference.md)・
-  `tools/ergo` のプラグイン一覧・`spec/domains` とコードの食い違い、壊れた相対リンクを
+  `ergo_studio` のプラグイン一覧 (`tools/studio/builtin_plugins.cpp`)・`spec/domains` と
+  コードの食い違い、壊れた相対リンクを
   検出する。手元では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
 - 結果は成否に関わらずアーティファクト `ctest-<レグ名>` に上がる:
   `ctest-junit.xml` と `Testing/Temporary/LastTest.log`。CMake 3.20 の ctest
@@ -93,19 +97,19 @@ cmake --preset ci-asan        && cmake --build --preset ci-asan        && ctest 
   GCC レグは最低版の検査を兼ねるので CMake 3.20 の素のコマンドライン側。
 - ASan を clang で回すなら `cmake --preset ci-asan -DCMAKE_CXX_COMPILER=clang++`。
 
-### tools-ergo
+### Ergo Studio だけを回す
+
+Studio のテストは上の C++ レグに含まれる。手元で Studio だけ見るなら:
 
 ```bash
-git submodule update --init lib/lapilli      # @ludiars/one-shot (file: 依存)
-cd tools/ergo
-ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci       # Electron 本体はテストに要らない
-npm run typecheck && npm run build && npm test
+cmake -S . -B build -DERGO_BUILD_TESTS=ON
+cmake --build build --config Release --target ergo_studio
+ctest --test-dir build -C Release -R studio --output-on-failure
 ```
 
-`npm run typecheck` は `tsconfig.test.json` で src と tests をまとめて型検査する
-(`npm run build` の `tsconfig.json` は src だけ)。テストは
-`tools/ergo/tests/{core,helpers,plugins/<id>}/` に置き、一時ディレクトリと
-ポート 0 だけを使う (固定ポート・ネットワーク・LLM 呼び出しなし)。
+テストは `tests/studio/` (mini-gtest) に置き、一時ディレクトリとポート 0 だけを
+使う (固定ポート・ネットワーク・LLM 呼び出しなし)。Pictor / Vulkan SDK が無くても
+ヘッドレス側のテストは走る。
 
 ### unity-package-core
 
@@ -194,7 +198,6 @@ main のルールセット (GitHub の管理設定) で必須にするチェッ�
 - `build-and-test (linux-gcc-cmake320)`
 - `build-and-test (linux-clang)`
 - `build-and-test (linux-asan)`
-- `tools-ergo`
 - `unity-package-core`
 - `harness / harness` (GitHub PR 経由で入れる場合だけ。harness は
   pull_request と main への push でしか走らない)

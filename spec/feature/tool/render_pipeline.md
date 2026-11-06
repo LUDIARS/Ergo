@@ -1,6 +1,6 @@
 # render_pipeline plugin — Profile Graph Editor
 
-`tools/ergo` 統合開発者ツールの組み込みプラグイン。 Pictor の **パイプラインプロファイル** (`Pictor/profiles/*.profile.json`) を単一の **NodeGraph** で表示・編集する。
+`ergo_studio` (`tools/studio`) 統合開発者ツールの組み込みプラグイン。 Pictor の **パイプラインプロファイル** (`ERGO_PICTOR_PROFILE_DIR` の `*.profile.json`) を単一の **NodeGraph** で表示・編集する。
 
 Phase 3 (`feat/render-pipeline-graph-ui`) で旧 Scanner / Timeline / Profile Editor の 3 モードを廃止して **単一のグラフエディタ画面に統合**。 Pictor 系統B 解体 (LUDIARS/Pictor PR #60 系列) で「ハードコードされた描画パス」 が消えるため、 静的 scan は不要になり、 Profile が single source of truth になった。
 
@@ -59,16 +59,15 @@ WS で `{op:"timing"}` を受けると `state.timing[pass_id] = us` に格納し
 ## ファイルマップ
 
 ```
-tools/ergo/src/plugins/render_pipeline/
-├── index.ts            # plugin factory (Hono + WS)
-├── profile_schema.ts   # schema v2 (TypeScript mirror of pictor::PipelineProfileDef)
-├── profile_store.ts    # disk-backed list / load / save
-└── ui/
-    ├── index.html      # シェル DOM
-    ├── styles.css      # 3 ペイン + GraphView スタイル
-    └── app.js          # 単一 GraphView 実装
+tools/studio/plugins/render_pipeline/
+├── render_pipeline_plugin.{h,cpp}  # プラグイン本体 (HTTP + WS、 タブ用の in-process API)
+├── profile_schema.{h,cpp}          # schema v2 (pictor::PipelineProfileDef の鏡)
+├── profile_fields.{h,cpp}          # pass / attachment の項目定義
+└── profile_store.{h,cpp}           # ディスク上の list / load / save (ERGO_PICTOR_PROFILE_DIR)
 ```
 
+テストは `tests/studio/test_studio_render_pipeline.cpp`。 旧 `tools/ergo/src/plugins/render_pipeline/`
+(TypeScript + vis-network の UI) は 2026-11-06 に削除し、 グラフの表示はアプリのウィンドウのタブが担う。
 旧 `scanner/render_pipeline_scan.py` / `scanner/render_pipeline.json` は Phase 3 で撤去。 plugin 側の `/api/snapshot` / `/api/rescan` も撤去。
 
 ## schema v2 (Phase 3)

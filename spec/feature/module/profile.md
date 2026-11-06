@@ -17,7 +17,7 @@ C++ に言語機能としての AOP は無いため、 RAII スコープガー�
 2. 実行する → コレクタが marker event をスレッド別に蓄積
 3. `ergo::profile::dump("trace.json")` で **Chrome Trace Event 形式**の
    タイムラインを書き出す
-4. `tools/ergo` の `profile` プラグイン (または `chrome://tracing` / Perfetto)
+4. `ergo_studio` の `profile` プラグイン (または `chrome://tracing` / Perfetto)
    でタイムラインを閲覧する
 
 `ERGO_BUILD_PROFILE=OFF` 時はマクロが空に展開され **ゼロコスト** (リリース
@@ -98,7 +98,7 @@ public:
 ## trace 形式 — Chrome Trace Event
 
 出力は **Chrome Trace Event 形式** (`{ "traceEvents": [ ... ] }`) を採用する。
-業界標準で `chrome://tracing` / Perfetto でそのまま開け、 かつ `tools/ergo`
+業界標準で `chrome://tracing` / Perfetto でそのまま開け、 かつ `ergo_studio`
 プラグインでも描ける。 独自形式は作らない。
 
 | マーカー種別 | `ph` | 主フィールド |
@@ -146,11 +146,11 @@ public:
 - ゼロコスト: `ERGO_BUILD_PROFILE=OFF` で全マクロが `((void)0)` に展開
 - ダミープラグ (no-op) をリンクのみ用に提供
 
-## タイムライン UI (`tools/ergo` プラグイン `profile`)
+## タイムライン UI (`ergo_studio` プラグイン `profile`)
 
-C++ モジュールが出す trace を可視化する Web プラグイン。 既存の
-`particle` / `rive` / `variable` と同方式で `tools/ergo/src/plugins/profile/`
-に追加する (`spec/feature/tool/ergo.md` 準拠)。
+C++ モジュールが出す trace を可視化する Studio のプラグイン。 既存の
+`particle` / `rive` / `variable` と同方式で `tools/studio/plugins/profile/`
+に置く (`spec/feature/tool/ergo.md` 準拠)。
 
 - trace JSON を読み込み (ファイルドロップ / 取得)
 - **プロセス → スレッド**でレーン分割

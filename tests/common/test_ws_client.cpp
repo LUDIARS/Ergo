@@ -2,7 +2,7 @@
 //
 // Each test runs a tiny in-process WS server on 127.0.0.1 with an ephemeral
 // port (bind port 0, read back via getsockname), so nothing depends on a
-// fixed port or on tools/ergo. Waits are deadline-bounded polls, never fixed
+// fixed port or on ergo_studio. Waits are deadline-bounded polls, never fixed
 // sleeps standing in for "long enough".
 
 #include "ergo/common/ws_client.h"
@@ -371,7 +371,7 @@ TEST(WsClient, CloseFrameDisconnectsAndReconnects) {
 }
 
 TEST(WsClient, PeerDroppingTcpReconnects) {
-    // tools/ergo restarting closes the TCP stream without a close frame.
+    // ergo_studio restarting closes the TCP stream without a close frame.
     LoopbackServer srv;
     ASSERT_TRUE(srv.ok());
     Client   client;

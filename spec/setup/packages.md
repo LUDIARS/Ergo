@@ -258,8 +258,8 @@ tela_view --font <file.ttf> --graph packages.tela         # Tela は別インス
 ## 使用関係図 (S4: P3 usage)
 
 マニフェストの `observe` が指す兄弟チェックアウトを読んで、MUSA 系・関連・共有 TS (Lapilli など)・Ergo のモジュール・
-`tools/ergo` の使用関係を描く。読むのは `<root>/<path_hint>` の `package.json` / `.gitmodules` / `.git/index`
-(`.git` がチェックアウト内のディレクトリのときだけ) と、Ergo 自身の `.gitmodules` / `tools/ergo/package.json` / マニフェストだけ。
+Ergo の tool パッケージ (`ScanOptions::ergo_paths`。既定は旧 `tools/ergo` のままで、削除後は該当無しとして読み飛ばす) の使用関係を描く。読むのは `<root>/<path_hint>` の `package.json` / `.gitmodules` / `.git/index`
+(`.git` がチェックアウト内のディレクトリのときだけ) と、Ergo 自身の `.gitmodules` / `ergo_paths` の `package.json` / マニフェストだけ。
 
 ```sh
 ergo_package_viz build --view usage --root <兄弟チェックアウトの親> --out usage.tela

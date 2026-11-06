@@ -46,6 +46,9 @@
       "pathPattern": "(^|/)tests/[^/]+$"
     },
     {
+      "pathPattern": "(^|/)tests/docs/(?:.*/)?[^/]+$"
+    },
+    {
       "pathPattern": "(^|/)tests/thirdparty/(?:.*/)?[^/]+$"
     },
     {

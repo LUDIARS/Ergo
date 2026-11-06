@@ -1,7 +1,7 @@
 #pragma once
 
 /// Common types for ergo_bind. Mirrors the `variable` plugin's wire
-/// schema (tools/ergo/src/plugins/variable/protocol.ts, v1).
+/// schema (ergo_studio tools/studio/plugins/variable/, v1).
 
 #include <cstdint>
 #include <string>

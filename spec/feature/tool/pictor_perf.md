@@ -1,9 +1,9 @@
 # pictor_perf — Pictor パフォーマンスモニタープラグイン
 
-`tools/ergo` の built-in プラグイン。Pictor の `PerfQueryAPI::export_json()` が
-吐く性能スナップショットを browser で可視化する。
+`ergo_studio` (`tools/studio/plugins/pictor_perf/`) の built-in プラグイン。Pictor の
+`PerfQueryAPI::export_json()` が吐く性能スナップショットを Studio のタブで可視化する。
 
-- HTTP/UI: `/pictor_perf/`
+- UI: Studio の `pictor_perf` タブ
 - WS: `/pictor_perf/ws`
 - 取り込み (headless host): `POST /pictor_perf/api/publish` (body = perf JSON)
 - 単発取得: `GET /pictor_perf/api/snapshot`

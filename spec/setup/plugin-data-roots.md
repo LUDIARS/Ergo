@@ -2,47 +2,54 @@
 
 ## 目的
 
-組み込み (汎用) プラグインのうち、`render_pipeline` と `visus` は **ホスト側
-(Pictor / ゲームプロジェクト) の資産ファイル** を読み書きする。資産の場所を
-環境変数で指定するためのガイド。指定しない場合は cwd 相対の既定 (兄弟リポ
-推定) にフォールバックする。
+組み込み (汎用) プラグインのうち、`render_pipeline` / `visus` / `ui_layout` は
+**ホスト側 (Pictor / ゲームプロジェクト) の資産ファイル** を読み書きする。
+資産の場所を環境変数で指定するためのガイド。指定しない場合は cwd 相対の既定に
+フォールバックせず、そのプラグインのファイル API は **503** を返す
+(ヘルスにも出る)。
 
 ## 設定キー
 
-| 環境変数 | 対象プラグイン | 役割 / 既定の解決 |
+| 環境変数 | 対象プラグイン | 役割 / 未設定時 |
 |---|---|---|
-| `ERGO_PICTOR_PROFILE_DIR` | `render_pipeline` | Pictor の `*.profile.json` を置くディレクトリ。未設定時は cwd から `../../../Pictor/profiles` を試し、無ければ cwd の `profiles/` (`tools/ergo/src/plugins/render_pipeline/profile_store.ts:30-39`) |
-| `VISUS_PROJECT_ROOTS` | `visus` | 描画定義 (`*.visus.json` 等) を走査するプロジェクトルート。`;` 区切りで複数指定可。未設定時は `process.cwd()` 1 件 (`tools/ergo/src/plugins/visus/index.ts:47-52`) |
+| `ERGO_PICTOR_PROFILE_DIR` | `render_pipeline` | Pictor の `*.profile.json` を置くディレクトリ。未設定なら API は 503 |
+| `VISUS_PROJECT_ROOTS` | `visus` | 描画定義 (`*.visus.json` 等) を走査するプロジェクトルート。`;` 区切りで複数指定可。未設定なら API は 503 |
+| `ERGO_UI_LAYOUT_ROOT` | `ui_layout` | `*.uilayout.json` を読み書きしてよいルート。未設定ならファイル API は 503 |
 
-- どちらも相対指定は cwd 基準で絶対パス化される。
+- 読むのは `tools/studio/studio_settings.cpp` だけで、プラグインは環境変数を
+  自分で読まない (全変数は [config-reference.md](config-reference.md))。
 - `render_pipeline` の保存 (`POST /render_pipeline/api/profile`) は
-  `ERGO_PICTOR_PROFILE_DIR` が解決したディレクトリへ書き込む。
-- `visus` は指定ルート配下に閉じ込めるパス検証を行い、`..` やルート外の絶対パスでの
-  エスケープを弾く (共通ガード `tools/ergo/src/core/safe_path.ts` の `resolveWithin`)。
+  `ERGO_PICTOR_PROFILE_DIR` へ書き込む。
+- どのプラグインも指定ルート配下に閉じ込めるパス検証を行い、`..` やルート外の
+  絶対パスでのエスケープを弾く (共通ガード `tools/studio/plugins/common/safe_path.h` の
+  `resolve_within`)。
 
 ## 手順
 
 ```bash
-cd tools/ergo
-npm install
+# ビルド (run-tools-ergo.md)
+cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON
+cmake --build build --config Release --target ergo_studio
 
-# 例 (PowerShell): Pictor の profile を編集対象にしてヘッドレス起動
+# 例 (PowerShell): Pictor の profile を編集対象にして起動
 $env:ERGO_PICTOR_PROFILE_DIR = "E:\Document\Ars\Pictor\profiles"
 $env:VISUS_PROJECT_ROOTS     = "E:\Document\Ars\PrivateGame"
-npm run dev
+build\studio\ergo_studio.exe
 ```
 
 起動後:
 
-- `render_pipeline`: `http://localhost:5170/render_pipeline/` で
-  `*.profile.json` のグラフ編集 (エンドポイント詳細は
+- `render_pipeline`: Studio の `render_pipeline` タブで `*.profile.json` の
+  グラフ編集 (エンドポイント詳細は
   [`../feature/tool/render_pipeline.md`](../feature/tool/render_pipeline.md))
-- `visus`: `http://localhost:5170/visus/` で描画定義の一覧・編集
+- `visus`: Studio の `visus` タブで描画定義の一覧・編集
+- `ui_layout`: Studio の `ui_layout` タブで `*.uilayout.json` の編集
+  ([`../feature/module/ui_layout.md`](../feature/module/ui_layout.md))
 
 ## 注意点
 
-- 兄弟リポ推定 (`../../../Pictor/profiles`) は **Ergo と Pictor を横並びで
-  clone している前提**。配置が違う場合は `ERGO_PICTOR_PROFILE_DIR` を明示する。
+- 旧 `tools/ergo` (2026-11-06 削除) にあった兄弟リポ推定 (`../../../Pictor/profiles`)
+  と cwd の既定は無い。配置に関わらず `ERGO_PICTOR_PROFILE_DIR` を明示する。
 - これらの env は組み込みプラグイン用で、外部 (ゲーム固有) プラグインの
   ロードに使う `ERGO_PLUGIN_DIR` ([external-plugins.md](external-plugins.md))
   とは別物。

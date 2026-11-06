@@ -12,9 +12,9 @@ LUDIARS / AdventureCube などのアプリで共通利用する C++ モジュー
 
 設定・ビルド手順は用途別に [`spec/setup/`](spec/setup/) にまとめてある:
 
-- **まず一周する**: [クイックスタート](spec/setup/quickstart.md) (clone → 例 `examples/compose_loop` のビルド → ブラウザで値を変えて反映)
+- **まず一周する**: [クイックスタート](spec/setup/quickstart.md) (clone → 例 `examples/compose_loop` のビルド → Ergo Studio で値を変えて反映)
 - [複数モジュールを自分のフレームループにつなぐ](spec/setup/integrate-modules.md) / [CI のレグと手元での再現](spec/setup/ci.md)
-- [C++ モジュールをビルド](spec/setup/build-cpp.md) / [tools/ergo を起動](spec/setup/run-tools-ergo.md) / [外部プラグイン (ERGO_PLUGIN_DIR)](spec/setup/external-plugins.md) / [プラグインのデータルート](spec/setup/plugin-data-roots.md) / [ブランチ+PR 運用](spec/setup/branch-and-pr.md)
+- [C++ モジュールをビルド](spec/setup/build-cpp.md) / [ergo_studio をビルドして起動](spec/setup/run-tools-ergo.md) / [外部プラグイン (ERGO_PLUGIN_DIR)](spec/setup/external-plugins.md) / [プラグインのデータルート](spec/setup/plugin-data-roots.md) / [ブランチ+PR 運用](spec/setup/branch-and-pr.md)
 - [サードパーティ・ライブラリ管理 (curl)](spec/setup/third-party-deps.md)
 - [LUDIARS パッケージ・ハブ (Pictor / Tela の版固定・取り込み・照合、`ergo-packages.json`)](spec/setup/packages.md)
 - [Visual Studio / Xcode プロジェクト生成 (依存ライブラリのリンクを含む)](spec/setup/ide-projects.md)
@@ -50,23 +50,23 @@ ergo/
 │   ├── architecture/      # ドメインと UX の設計
 │   ├── setup/             # 用途別セットアップガイドと全設定キー
 │   ├── feature/module/    # モジュールの定義書 (初期からあるもの)
-│   ├── feature/tool/      # Web ツール / プラグインの仕様書
+│   ├── feature/tool/      # Ergo Studio / プラグインの仕様書
 │   ├── module/            # モジュールの定義書 (2026-10 以降に足したもの)
 │   ├── domains/           # Anatomia のドメイン定義 (正本)
 │   └── data/              # ファイル形式 (ergo-packages.json など)
-├── include/ergo/<name>/   # 各モジュールの公開ヘッダ
-├── src/<name>/            # 各モジュールの実装
-├── tests/<name>/          # 各モジュールのテスト (tests/ 直下は共通の main と一覧の検査)
+├── include/ergo/<name>/   # 各モジュールの公開ヘッダ (include/ergo/studio/ は Ergo Studio のライブラリ)
+├── src/<name>/            # 各モジュールの実装 (src/studio/ は Ergo Studio の net / host / platform / ui / shell)
+├── tests/<name>/          # 各モジュールのテスト (tests/ 直下は共通の main と一覧の検査、tests/studio/ は Ergo Studio)
 ├── examples/              # モジュールを組み合わせるヘッドレスの使用例 (ERGO_BUILD_EXAMPLES)
 ├── tools/
-│   ├── ergo/              # 統合 Web 開発者ツール (単一 Node サーバ + プラグイン)
+│   ├── studio/            # 統合開発者ツール Ergo Studio (C++ ネイティブ exe ergo_studio + 組み込みプラグイン)
 │   ├── package_cli/       # ergo_pkg CLI
 │   ├── package_viz/       # ergo_package_viz CLI
 │   ├── render_viz/        # ergo_render_viz CLI
 │   └── shuriken_migrator/ # (legacy) Unity Shuriken からの移行 CLI
 ├── unity/                 # Unity パッケージ (com.ludiars.ergo.packages)
 ├── shaders/               # パーティクル (compute / 描画) と描画ステージのシェーダ
-├── lib/lapilli/           # submodule: 共有 CLI 起動ライブラリ (tools/ergo が使う)
+├── lib/lapilli/           # submodule: 共有 CLI 起動ライブラリ (旧 tools/ergo が使っていた。パッケージ・ハブの tool 区分)
 ├── benchmarks/            # opt-in マイクロベンチ (ERGO_BUILD_BENCHMARKS)
 └── third_party/           # 同梱依存 (mini-gtest / nanosvg / earcut) と管理対象の外部依存の登録
 ```
@@ -79,7 +79,7 @@ ergo/
 [module_list.yaml](module_list.yaml) (機械処理用: 依存・付随ターゲット・プラグイン id) で、
 ここはその概観。仕様書は module_list.md の「仕様書」列が指す
 (`spec/feature/module/<名>.md` か `spec/module/<名>.md`)。「ツール」列の id は
-`tools/ergo` のプラグイン (一覧と接続方法は
+`ergo_studio` (`tools/studio/`) のプラグイン (一覧と接続方法は
 [spec/feature/tool/ergo.md](spec/feature/tool/ergo.md) の「プラグイン一覧」)。
 
 ### foundation (共通土台)
@@ -246,7 +246,7 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
 ## デモ集 (Pinacotheca)
 
 Pictor のシェーダー / パイプラインプリセットのデモは [LUDIARS/Pinacotheca](https://github.com/LUDIARS/Pinacotheca) (ラテン語で「絵画館」) にある。
-各デモは `ergo_bind` で値を公開しており、`tools/ergo` の variable plugin から実行中に調整できる
-(手順は Pinacotheca の README と [tools/ergo を起動](spec/setup/run-tools-ergo.md))。
+各デモは `ergo_bind` で値を公開しており、`ergo_studio` の variable plugin から実行中に調整できる
+(手順は Pinacotheca の README と [ergo_studio をビルドして起動](spec/setup/run-tools-ergo.md))。
 Pinacotheca が Ergo / Pictor を取り込む一方向で、Ergo から Pinacotheca は参照しない。
 個別に作ったゲームは Pinacotheca ではなく、それぞれのゲームのリポジトリに置く。

@@ -7,23 +7,23 @@ Ergo リポジトリに含まれる C++ モジュールの一覧。C++17 を基�
 ターゲット (`extra_targets`)・プラグイン id (`tool_plugins`) はそちらが正本。
 新規モジュールを追加したら **両方** にエントリを足すこと (CLAUDE.md の
 「新規モジュール追加手順」参照)。両者と CMake オプション・`include/ergo/`・
-`tools/ergo` のプラグイン・README の食い違いは ctest `test_module_catalog`
+`ergo_studio` (`tools/studio/`) のプラグイン・README の食い違いは ctest `test_module_catalog`
 (`tests/test_module_catalog.cmake`) が検出する。
 
 | 名前 | 概要 | カテゴリ | 公開ヘッダ | 実装 | 仕様書 | 付随ツール |
 |---|---|---|---|---|---|---|
 | `ergo_input`        | マウス・キーボード・ゲームパッド・USB HID の統一入力レイヤ (inject API でテスト可能) | システム | `include/ergo/input/`        | `src/input/`        | `spec/feature/module/input.md`        | — |
-| `ergo_particle`     | CPU パーティクル sim + Pictor Vulkan ビルボード renderer (optional)。`particle` プラグインから設定を受け取るフィーダーは任意ターゲット `ergo_particle_link` (`ERGO_BUILD_PARTICLE_LINK`) | システム | `include/ergo/particle/`     | `src/particle/`     | `spec/feature/module/particle.md`     | `tools/ergo/` (`particle` / `vfx-suggest` / `vfx-breed` plugin) |
+| `ergo_particle`     | CPU パーティクル sim + Pictor Vulkan ビルボード renderer (optional)。`particle` プラグインから設定を受け取るフィーダーは任意ターゲット `ergo_particle_link` (`ERGO_BUILD_PARTICLE_LINK`) | システム | `include/ergo/particle/`     | `src/particle/`     | `spec/feature/module/particle.md`     | `tools/studio/` (`particle` / `vfx-suggest` / `vfx-breed` plugin) |
 | `ergo_gpu_particle` | Shuriken 相当の GPU compute パーティクル。`IGpuBackend` 抽象で Vulkan/WebGPU 両対応   | システム | `include/ergo/gpu_particle/` | `src/gpu_particle/` | `spec/feature/module/gpu_particle.md` | — |
-| `ergo_bind`         | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`). アウトバウンド接続             | システム | `include/ergo/bind/`         | `src/bind/`         | `spec/feature/module/bind.md`         | `tools/ergo/` (`variable` plugin) |
-| `ergo_actor`        | シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (`ergo_bind` に委譲) | システム | `include/ergo/actor/`        | `src/actor/`        | `spec/feature/module/actor.md`        | `tools/ergo/` (`variable` plugin で表示) |
+| `ergo_bind`         | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`). アウトバウンド接続             | システム | `include/ergo/bind/`         | `src/bind/`         | `spec/feature/module/bind.md`         | `tools/studio/` (`variable` plugin) |
+| `ergo_actor`        | シーングラフ基底クラス。ツリーノード自動登録 + Actor 配下に変数を公開 (`ergo_bind` に委譲) | システム | `include/ergo/actor/`        | `src/actor/`        | `spec/feature/module/actor.md`        | `tools/studio/` (`variable` plugin で表示) |
 | `ergo_cast`         | Actor を名前付き Scene に束ねる軽量グルーピング層 (一括/個別 activate + snapshot)。非所有・描画非依存。`ergo_scene` (look-dev ドキュメント) とは別物 | システム | `include/ergo/cast/`         | `src/cast/`         | `spec/feature/module/cast.md`         | — |
-| `ergo_scene`        | 保存できるルックデヴ用シーン文書 (`*.scene.json` の CRUD・パッチ適用・カメラ行列・`SceneGraph`)。`scene_editor` プラグインとのライブ編集は任意ターゲット `ergo_scene_link` (`ERGO_BUILD_SCENE_LINK`) | システム | `include/ergo/scene/`        | `src/scene/`        | `spec/feature/module/scene.md`        | `tools/ergo/` (`scene_editor` plugin) |
+| `ergo_scene`        | 保存できるルックデヴ用シーン文書 (`*.scene.json` の CRUD・パッチ適用・カメラ行列・`SceneGraph`)。`scene_editor` プラグインとのライブ編集は任意ターゲット `ergo_scene_link` (`ERGO_BUILD_SCENE_LINK`) | システム | `include/ergo/scene/`        | `src/scene/`        | `spec/feature/module/scene.md`        | `tools/studio/` (`scene_editor` plugin) |
 | `ergo_sound`        | WAV デコード + ストリーミング + ミキサ + 波形処理 + Quantizer (外部 lib 無し)          | システム | `include/ergo/sound/`        | `src/sound/`        | `spec/feature/module/sound.md`        | — |
 | `ergo_audio`        | ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。`ergo_sound` とは独立・横並び | システム | `include/ergo/audio/`        | `src/audio/`        | `spec/feature/module/audio.md`        | — |
 | `ergo_frame`        | アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列                              | システム | `include/ergo/frame/`        | `src/frame/`        | `spec/feature/module/frame.md`        | — |
-| `ergo_profile`      | パフォーマンス確認用タイムライン。 AOP 的マーカー注入で速度/メモリ/スレッドを計測し Chrome Trace 形式で出力 | システム | `include/ergo/profile/`      | `src/profile/`      | `spec/feature/module/profile.md`      | `tools/ergo/` (`profile` plugin) |
-| `ergo_log`          | 4-level ロガー (Error/Warn/Info/Debug)。行頭にフレーム番号を埋め込む。出力先はシンクで差し替え、時刻源は注入可能。`log` プラグインへ行を流す `LiveSink` は任意ターゲット `ergo_log_live` (`ERGO_BUILD_LOG_LIVE`) | システム | `include/ergo/log/`          | `src/log/`          | `spec/feature/module/log.md`          | `tools/ergo/` (`log` plugin) |
+| `ergo_profile`      | パフォーマンス確認用タイムライン。 AOP 的マーカー注入で速度/メモリ/スレッドを計測し Chrome Trace 形式で出力 | システム | `include/ergo/profile/`      | `src/profile/`      | `spec/feature/module/profile.md`      | `tools/studio/` (`profile` plugin) |
+| `ergo_log`          | 4-level ロガー (Error/Warn/Info/Debug)。行頭にフレーム番号を埋め込む。出力先はシンクで差し替え、時刻源は注入可能。`log` プラグインへ行を流す `LiveSink` は任意ターゲット `ergo_log_live` (`ERGO_BUILD_LOG_LIVE`) | システム | `include/ergo/log/`          | `src/log/`          | `spec/feature/module/log.md`          | `tools/studio/` (`log` plugin) |
 | `ergo_io`           | 最小ファイル I/O ラッパー (`<filesystem>` の薄膜、UTF-8 `std::string` API)             | システム | `include/ergo/io/`           | `src/io/`           | `spec/feature/module/io.md`           | — |
 | `ergo_world_time`   | グローバル time-scale コンポーザ (HitStop / HitSlow)。Foundation/WorldTimeScale の C++ ポート | システム | `include/ergo/world_time/`   | `src/world_time/`   | `spec/feature/module/world_time.md`   | — |
 | `ergo_blackboard`   | グローバル名前付き Property レジストリ (subscribe + カテゴリ lifecycle、名前だけで `find<T>` / `subscribe<T>(name, cb)` / `visit`)。Foundation/Blackboard の C++ ポート | システム | `include/ergo/blackboard/`   | `src/blackboard/`   | `spec/feature/module/blackboard.md`   | — |
@@ -103,10 +103,13 @@ LUDIARS パッケージ (モジュールではなく、モジュールが使う�
   サブレンダラ実装本体・actor→drawable 変換・パス列の組み立ては
   `ergo_render` に入れずゲーム側に残す。
 
-## Web ツール
+## 開発者ツール (Ergo Studio)
 
-全ての Web 系開発者ツールは **`tools/ergo/`** に統合済み。新規ツールは
-単独パッケージではなく `tools/ergo/src/plugins/<id>/` に追加する。
+全ての開発者ツールは C++ ネイティブアプリ **`ergo_studio` (`tools/studio/`)** に
+統合済み (旧 `tools/ergo/` の Node / Electron 版は 2026-11-06 に削除)。新規ツールは
+単独の exe やパッケージではなく `tools/studio/plugins/<dir>/` に追加し、
+`tools/studio/builtin_plugins.cpp` に登録する。ライブラリは `src/studio/` +
+`include/ergo/studio/`、テストは `tests/studio/`。
 組み込みプラグインの一覧 (id・対応する C++ モジュール・エンジン側の供給元・
 仕様書) は [spec/feature/tool/ergo.md](spec/feature/tool/ergo.md) の
-「プラグイン一覧」が正本で、登録の実体は `tools/ergo/src/core/registry.ts`。
+「プラグイン一覧」が正本で、登録の実体は `tools/studio/builtin_plugins.cpp`。

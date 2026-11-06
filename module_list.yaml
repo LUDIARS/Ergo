@@ -3,7 +3,7 @@
 # 人間向けの一覧は module_list.md を参照。新規モジュール追加時は両方に
 # エントリを足すこと。tests/test_module_catalog.cmake (ctest
 # test_module_catalog) がこのファイルと CMakeLists.txt / include/ergo/ /
-# spec/domains/ / tools/ergo/ / README.md / module_list.md の食い違いを検出する。
+# spec/domains/ / tools/studio/ (ergo_studio のプラグイン) / README.md / module_list.md の食い違いを検出する。
 #
 # 書式の約束 (test_module_catalog が YAML パーサを使わずに読むため):
 #   - modules[] の各エントリは "  - name: " で始め、キーは 1 行 1 つ
@@ -28,7 +28,7 @@
 #                  cmake_option が null のものは別スイッチを持たない
 #                  (モジュールと一緒に、または外部ターゲットの有無で決まる)。
 #                  ERGO_BUILD_DUMMY の ergo_<名>_dummy は載せない
-#   tool_plugins:  付随する tools/ergo プラグイン id の列 (無ければ [])
+#   tool_plugins:  付随する ergo_studio (tools/studio/) プラグイン id の列 (無ければ [])
 #   status:        stable / preview / incomplete のいずれか
 #
 # schema (shared_libs[].*): name / summary / header_dir / source_dir / test_dir /

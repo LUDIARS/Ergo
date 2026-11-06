@@ -1,7 +1,7 @@
 #pragma once
 
 /// LiveSink — streams ergo_log records to the unified ergo tool's `log`
-/// plugin (tools/ergo/src/plugins/log/). Target `ergo_log_live`.
+/// plugin (ergo_studio, tools/studio/plugins/log/). Target `ergo_log_live`.
 ///
 /// Connects out to `ws://host:5170/log/ws` over the shared transport
 /// (`ergo_common_ws`), sends `{op:"hello", role:"engine", app}` on every

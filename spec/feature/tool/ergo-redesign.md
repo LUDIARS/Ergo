@@ -1,5 +1,12 @@
 # Ergo Redesign — 宣言的 UI 化 + Custos 統合 設計書
 
+> **履歴注記 (2026-11-06)**: 本書が前提にしていた Node / Hono / Electron / TypeScript の
+> `tools/ergo` は削除され、 C++ ネイティブアプリ `ergo_studio` (`tools/studio/` +
+> `src/studio/` + `include/ergo/studio/`) に置き換わった。 現行の仕様は
+> [ergo.md](ergo.md)、 設計判断は `spec/plan/2026-11-05-ergo-studio-native.md`。
+> 以下の `tools/ergo/src/...` のパス・IR レンダラ・zod schema・iframe シェル等は
+> 旧構成を前提にした設計記録としてそのまま残す (書き換えない)。
+
 > **状態**: 設計フェーズ (2026-05-23 起草)。 実装は別セッション。
 > **対象**: Ergo (本リポ) + Custos (LUDIARS/Custos)。 統合後 Custos は obsolete。
 > **本書の位置付け**: 既存 `spec/feature/tool/ergo.md` を将来上書きする予定の **新仕様書**。

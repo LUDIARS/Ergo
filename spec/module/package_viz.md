@@ -9,7 +9,7 @@
 | 図 | ノード | グループ (≤ 8) | 辺 |
 |---|---|---|---|
 | **P1** `--view packages` | パッケージ (host・Ergo・link・tool・第三者・observe) | host / Ergo / 描画 / 可視化 / ツール / 第三者 / 観測: MUSA / 観測: 関連 | 実線: link の `requires`、 File API の実リンクをパッケージ単位に畳んだもの。 破線: `ported_from`、 observe の `relations` |
-| **P3** `--view usage` | 観測対象 (MUSA 系・関連)・共有 TS (Lapilli・`@ludiars/*`)・Ergo と移植/語彙共有の根拠を持つモジュール・`tools/ergo` | Ergo / ツール / MUSA / 関連 / 共有 TS / 未観測 | 実線: submodule・`file:` / `workspace:` / `@ludiars/*` 依存。 破線: `ported_from`・`relations`。 入力は `ergo_package_scan` の UsageModel |
+| **P3** `--view usage` | 観測対象 (MUSA 系・関連)・共有 TS (Lapilli・`@ludiars/*`)・Ergo と移植/語彙共有の根拠を持つモジュール・Ergo の tool パッケージ (`ergo_paths`、既定は旧 `tools/ergo`) | Ergo / ツール / MUSA / 関連 / 共有 TS / 未観測 | 実線: submodule・`file:` / `workspace:` / `@ludiars/*` 依存。 破線: `ported_from`・`relations`。 入力は `ergo_package_scan` の UsageModel |
 | **P2** `--view targets` | ターゲット (既定の除外を除く) | application / presentation / domain-logic / infrastructure / shared (`.anatomia/layers.json`) + 外部パッケージ + 第三者 + 循環 | 直接の依存 (実線)。 循環 (強連結成分 ≥ 2) は `cycle` グループへ |
 | **P4** `--view host` | ホスト 1・Ergo 1・依存・更新 (タグ・main)・審査中・作業中 (local PR / run)・落ちた検査 | host / Ergo / 依存 / 更新: タグ・main / 更新: 審査中・作業中 / 検査 | 実線: host → Ergo・依存。 破線: 依存 → 更新・審査中・検査 (統合設計 §5.1 の点線は Tela に無いので破線にし、 検査のグループの色で見分ける)。 入力は `package_model::HostState` (spec/feature/package-manager.md §5.1、 段階 W6) |
 

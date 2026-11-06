@@ -15,8 +15,8 @@ Error / Warn を stderr、Info / Debug を stdout に出力する (従来どお�
 突き合わせられる。
 
 任意ターゲット `ergo_log_live` の `LiveSink` は、 行を統合開発者ツール
-(`tools/ergo`) の `log` プラグインへ WebSocket で流す。 GUI アプリや
-Electron / Custos 経由の実行でも、 ブラウザでレベル・文字列・フレーム範囲
+(`ergo_studio`) の `log` プラグインへ WebSocket で流す。 GUI アプリや
+Custos 経由の実行でも、 Studio のタブでレベル・文字列・フレーム範囲
 を絞り込みながら動作中のログを読める (プラグイン側は
 [`spec/feature/tool/log.md`](../tool/log.md))。
 

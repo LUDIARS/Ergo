@@ -18,7 +18,7 @@ Pictor / Vulkan / ウィンドウも使わない)。
 cmake -S . -B build
 cmake --build build --target ergo_example_compose_loop
 build/examples/ergo_example_compose_loop            # --check: 120 フレームを固定 dt で回して検証
-build/examples/ergo_example_compose_loop --connect  # tools/ergo とつないで実時間で回す (Ctrl+C で終了)
+build/examples/ergo_example_compose_loop --connect  # ergo_studio とつないで実時間で回す (Ctrl+C で終了)
 build/examples/ergo_example_compose_loop --trace compose_loop.trace.json
 ```
 
@@ -50,7 +50,7 @@ build/examples/ergo_example_compose_loop --trace compose_loop.trace.json
   `deactivate()` で Actor 群をまとめて止め、ループ側は
   `stage.is_active(&actor)` を見て `tick` するかを決める。
 - `apply_pending_writes()` はフレーム先頭で呼ぶ (`bind.md` のテスト項目
-  「フレーム頭で呼べば…」)。前フレームまでに届いた tools/ergo の編集が、
+  「フレーム頭で呼べば…」)。前フレームまでに届いた ergo_studio の編集が、
   そのフレームのシミュレーションから効く。
 
 ## 時間の流れ: real_dt → world_time → Actor::scaled_dt
@@ -75,7 +75,7 @@ dt = actor.scaled_dt(world_dt)                    … Actor ごとの time_scale
 - 実時間モードでは、デバッガ停止などで dt が跳ねるのを上限で抑える
   (例: `std::min(frame::dt_seconds(), 0.1f)`)。
 - `Actor` は自分の `time_scale` を `"<actor>.time_scale"` として
-  `ergo_bind` に公開するので、tools/ergo からアクター単位で止められる。
+  `ergo_bind` に公開するので、ergo_studio の `variable` タブからアクター単位で止められる。
 
 ## OS イベント → `inject*` の橋渡し
 
@@ -196,17 +196,17 @@ if(MSVC)
 endif()
 ```
 
-## tools/ergo とつなぐ
+## ergo_studio とつなぐ
 
-- **変数を動かしながら直す**: `tools/ergo` を起動し (`npm run dev`、既定ポート
-  5170)、`--connect [host] [port]` で例を実行する。`http://localhost:5170/variable/`
+- **変数を動かしながら直す**: `ergo_studio` を起動し (`build/studio/ergo_studio.exe`、既定ポート
+  5170)、`--connect [host] [port]` で例を実行する。Studio の `variable` タブ
   に `player.speed` と `player.time_scale` が出るので値を変えると、例が
   `player.speed 4.00 -> 6.50` のように表示する。自分のホストでは
   `bind::Engine::instance().connect(host, port)` を初期化時に 1 回呼び、
-  2. の `apply_pending_writes()` を毎フレーム呼ぶ。ポートは tools/ergo の
+  2. の `apply_pending_writes()` を毎フレーム呼ぶ。ポートは ergo_studio の
   `PORT` と合わせる ([run-tools-ergo.md](run-tools-ergo.md))。
 - **性能を見る**: `--trace <file>` で終了時に `ergo::profile::dump(file)` した
-  Chrome Trace を `http://localhost:5170/profile/` にドロップする。`frame` /
+  Chrome Trace を Studio の `profile` タブで開く。`frame` /
   `gameplay` のスコープと `player.z` / `score` のカウンタが見える。
 
 手順を通しで追うなら [quickstart.md](quickstart.md)。
