@@ -78,7 +78,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_BUILD_PACKAGE_WATCH` | ON | `ergo_package_watch` (`ergo_pkg outdated` / `watch` もこれで有効になる) | `PACKAGE_MANAGER` | スキップ (STATUS) |
 | `ERGO_BUILD_SHURIKEN_MIGRATOR` | ON | `ergo_shuriken_migrator` と CLI (legacy。一覧に載せない理由は `module_list.md`) | `PARTICLE` + `GPU_PARTICLE` | スキップ (STATUS) |
 | `ERGO_BUILD_HTTP` | **OFF** | `ergo_http`。ON にすると `ERGO_WITH_CURL` を強制する (取得対象の libcurl を伴うため既定 OFF) | 管理対象の libcurl (`CURL::libcurl`) | 構成エラー (取得が許されない・取得できないとき) |
-| `ERGO_BUILD_STUDIO` | ON | Ergo Studio のライブラリ (`ergo_studio_net` / `_host` / `_platform` / `_plugins`) とテスト ([ergo.md](../feature/tool/ergo.md)) | — | — |
+| `ERGO_BUILD_STUDIO` | ON | Ergo Studio のライブラリ (`ergo_studio_net` / `_host` / `_platform` / `_plugins` / `_ui`) とテスト。exe `ergo_studio` (`build/studio/`) は Pictor (`ERGO_PACKAGES=pictor`) と Vulkan SDK が揃ったときだけウィンドウ付き、無ければヘッドレスで作る ([ergo.md](../feature/tool/ergo.md)) | — (ウィンドウには Pictor + Vulkan) | ウィンドウ無しの exe になる (STATUS) |
 | **付随ターゲット** | | | | |
 | `ERGO_BUILD_PARTICLE_LINK` | ON | `ergo_particle_link` (`particle` プラグインから設定を受け取る受信専用の WS フィーダー) と `test_editor_link` | `PARTICLE` | 宣言されない |
 | `ERGO_BUILD_SCENE_LINK` | ON | `ergo_scene_link` (`scene_editor` プラグインのエンジン側クライアント) と `test_scene_editor_link` | `SCENE` | 宣言されない |
@@ -155,27 +155,41 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 `ci-linux-*` / `ci-asan` は隠しプリセット `ci-base` (Ninja、`ERGO_BUILD_TESTS=ON`、
 `ERGO_AUDIO_BACKEND=dummy`) を継承する。
 
-## 環境変数 (tools/ergo)
+## 環境変数 (ergo_studio)
 
-`tools/ergo/` の Node サーバ (と Electron) が `process.env` から読む変数の全部。
-**秘密情報は `ANTHROPIC_API_KEY` だけ**で、シェルの環境変数として渡し、ファイルに
-書いてコミットしない。
+`ergo_studio.exe` が読む変数の全部。読むのは `tools/studio/studio_settings.cpp` と
+`tools/studio/plugins/studio/studio_config.cpp` の 2 か所だけで、プラグインは環境変数を
+自分で読まない。**秘密情報は `ERGO_ACTIO_TOKEN` / `ERGO_CURARE_TOKEN`** で、
+シェル (か Excubitor) の環境変数として渡し、ファイルに書いてコミットしない。
+`musa_melpomene` の GitHub トークンは環境変数ではなく OS の資格情報ストアに置く。
 
 | 変数 | 既定 | 読むもの | 役割 | 出典 |
 |---|---|---|---|---|
-| `PORT` | `5170` | サーバ全体 | listen ポート (Electron とヘッドレスの両方) | `tools/ergo/src/main.ts:10` / `tools/ergo/electron/main.cjs:17` |
-| `ERGO_HOST` | `127.0.0.1` | サーバ全体 (ヘッドレスのみ) | bind するアドレス。LAN に出したいときだけ `0.0.0.0` などにする。この名前は `Host` 検査でも信頼される (ブラウザからは IP アドレスかこの名前で開く)。Electron (`npm start`) は読まない | `tools/ergo/src/main.ts:11` / `tools/ergo/src/core/server.ts:341` |
-| `ERGO_PLUGIN_DIR` | (なし) | 外部プラグインの読み込み | ゲーム固有の plugin pack のディレクトリ。OS のパス区切りで複数可 ([external-plugins.md](external-plugins.md)) | `tools/ergo/src/core/external.ts:90` |
-| `ERGO_PICTOR_PROFILE_DIR` | `../../../Pictor/profiles` → `./profiles` (cwd 相対) | `render_pipeline` | `*.profile.json` の場所 ([plugin-data-roots.md](plugin-data-roots.md)) | `tools/ergo/src/plugins/render_pipeline/profile_store.ts:31` |
-| `VISUS_PROJECT_ROOTS` | `process.cwd()` | `visus` | 描画定義のプロジェクトルート。`;` 区切りで複数可 | `tools/ergo/src/plugins/visus/index.ts:48` |
-| `ERGO_VFX_BACKEND` | `cli` | `vfx-suggest` / `vfx-breed` | LLM の呼び方: `cli` (Claude CLI) / `sdk` (Anthropic SDK)。それ以外はエラー | `tools/ergo/src/plugins/vfx-suggest/generator.ts:24` / `tools/ergo/src/plugins/vfx-breed/advisor.ts:33` |
-| `ERGO_VFX_MODEL` | `haiku` (`cli`) / `claude-haiku-4-5` (`sdk`) | `vfx-suggest` / `vfx-breed` | 使うモデル | `tools/ergo/src/plugins/vfx-suggest/generator.ts:25` / `tools/ergo/src/plugins/vfx-breed/advisor.ts:34` |
-| `CLAUDE_BIN` | `claude` | `vfx-suggest` / `vfx-breed` (`cli`) | Claude CLI の実行ファイル | `tools/ergo/src/plugins/vfx-suggest/generator-cli.ts:13` / `tools/ergo/src/plugins/vfx-breed/advisor-cli.ts:11` |
-| `ANTHROPIC_API_KEY` | (なし) | `vfx-suggest` / `vfx-breed` (`sdk`) | **秘密情報**。シェルの環境変数でだけ渡す (ファイル・設定に書かない、コミットしない) | `tools/ergo/src/plugins/vfx-suggest/generator-sdk.ts:13` / `tools/ergo/src/plugins/vfx-breed/advisor-sdk.ts:10` |
+| `PORT` | `5170` | サーバ全体 | listen ポート (1..65535。それ以外は起動しない) | `tools/studio/studio_settings.cpp` |
+| `ERGO_HOST` | `127.0.0.1` | サーバ全体 | bind するアドレス。LAN に出したいときだけ `0.0.0.0` などにする。この名前は `Host` 検査でも信頼される | `tools/studio/studio_settings.cpp` |
+| `ERGO_PLUGIN_DIR` | (なし) | 外部プラグインの読み込み | ゲーム固有の plugin pack のディレクトリ。OS のパス区切りで複数可 ([external-plugins.md](external-plugins.md))。`studio` の台帳で有効な pack が後ろに足される | `tools/studio/studio_settings.cpp` / `tools/studio/main.cpp` |
+| `ERGO_PICTOR_PROFILE_DIR` | (なし。未設定なら API は 503) | `render_pipeline` | `*.profile.json` の場所 ([plugin-data-roots.md](plugin-data-roots.md)) | `tools/studio/studio_settings.cpp` |
+| `VISUS_PROJECT_ROOTS` | (なし。未設定なら API は 503) | `visus` | 描画定義のプロジェクトルート。`;` 区切りで複数可 | `tools/studio/studio_settings.cpp` |
+| `ERGO_UI_LAYOUT_ROOT` | (なし。未設定ならファイル API は 503) | `ui_layout` | `*.uilayout.json` を読み書きしてよいルート | `tools/studio/studio_settings.cpp` |
+| `ERGO_VFX_BACKEND` | `cli` | `vfx-suggest` / `vfx-breed` | LLM の呼び方。`cli` (Claude CLI) だけ。それ以外はヘルスが `ok:false` で生成は失敗する | `tools/studio/studio_settings.cpp` |
+| `ERGO_VFX_MODEL` | `haiku` | `vfx-suggest` / `vfx-breed` | 使うモデル | `tools/studio/studio_settings.cpp` |
+| `CLAUDE_BIN` | `claude` | `vfx-suggest` / `vfx-breed` | Claude CLI の実行ファイル | `tools/studio/studio_settings.cpp` |
+| `ERGO_STUDIO_FONT` | `<WINDIR>\Fonts\meiryo.ttc` | ウィンドウ | UI の文字に使うフォント (TrueType の glyf/loca 輪郭が要る) | `tools/studio/studio_settings.cpp` |
+| `USERPROFILE` (Windows) / `HOME` | — | `studio` / `musa_*` | ホームディレクトリ (`.ergo-studio`、`.ars/{melpomene,terpsichore,spec}` の親) | `tools/studio/studio_settings.cpp` |
+| `ERGO_STUDIO_HOME` | `<home>/.ergo-studio` | `studio` | 台帳・取得したプラグインの置き場 | `tools/studio/plugins/studio/studio_config.cpp` |
+| `LUDIARS_ROOT` | (なし) | `studio` | catalog と Revisor CLI の場所 (Excubitor が注入する) | 同上 |
+| `EXCUBITOR_URL` | catalog から | `studio` | Excubitor の URL (Excubitor が注入する) | 同上 |
+| `ERGO_ACTIO_TOKEN` | (なし = local mode) | `studio` | **秘密情報**。Actio の Cernere Bearer トークン | 同上 |
+| `ERGO_CURARE_URL` | topology の `CURARE_URL` | `studio` | 遠隔の Cu Server | 同上 |
+| `ERGO_CURARE_TOKEN` | (なし) | `studio` | **秘密情報**。Curare の Cernere Bearer トークン | 同上 |
+| `ERGO_PLUGIN_OWNERS` | `LUDIARS` | `studio` | プラグイン取得を許す GitHub owner (カンマ区切り) | 同上 |
+| `ERGO_STUDIO_TIMEOUT_MS` | `8000` | `studio` | サービス呼び出し 1 回の上限 | 同上 |
+| `ERGO_STUDIO_TEST_FONT` | (なし。未設定ならスキップ) | テスト `test_studio_shell_text` | テストで使うフォント | `tests/studio/test_studio_shell_text.cpp` |
+
+コマンドライン: `--headless` でウィンドウを開かずサーバだけ動かす。
 
 LLM が無い・失敗したときも `vfx-suggest` / `vfx-breed` 以外のプラグインは影響を受けず、
-`vfx-breed` の進化は方向指示なしで動く。CI の `tools-ergo` ジョブは `npm ci` の前に
-`ELECTRON_SKIP_BINARY_DOWNLOAD=1` を設定する (npm の依存取得用で、サーバは読まない)。
+`vfx-breed` の進化は方向指示なしで動く。
 
 ## 環境変数 (`ergo_pkg`)
 
@@ -203,7 +217,7 @@ LLM が無い・失敗したときも `vfx-suggest` / `vfx-breed` 以外のプ�
 
 | ポート | 用途 | 上書き |
 |---|---|---|
-| `5170` | tools/ergo シェル + 全プラグイン (HTTP / WS)。エンジン側のクライアント (`ergo_bind` / `ergo_particle_link` / `ergo_scene_link` / `ergo_log_live`) も既定でここへつなぐ | `PORT` 環境変数 (クライアント側は各 `connect` の引数) |
+| `5170` | `ergo_studio` の全プラグイン (HTTP / WS)。エンジン側のクライアント (`ergo_bind` / `ergo_particle_link` / `ergo_scene_link` / `ergo_log_live`) も既定でここへつなぐ | `PORT` 環境変数 (クライアント側は各 `connect` の引数) |
 
 > 旧 `particle-editor` (5173) / `variable-editor` (5174) は廃止済みで、すべて
 > 5170 に統合 ([`../feature/tool/ergo.md`](../feature/tool/ergo.md) 「互換性」)。

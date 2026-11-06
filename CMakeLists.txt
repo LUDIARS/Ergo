@@ -286,7 +286,7 @@ if(ERGO_BUILD_PARTICLE)
         endforeach()
     endif()
 
-    # ergo_particle_link — receive-only feeder for tools/ergo's `particle`
+    # ergo_particle_link — receive-only feeder for Ergo Studio's `particle`
     # plugin over ergo_common_ws. Separate so ergo_particle stays socket-free.
     option(ERGO_BUILD_PARTICLE_LINK "Build ergo_particle_link (WS feeder for the particle plugin)" ON)
     if(ERGO_BUILD_PARTICLE_LINK)
@@ -303,7 +303,7 @@ endif()
 
 # ---------------------------------------------------------------------------
 # ergo_bind — outbound WS client publishing host vars to the unified
-# ergo tool's `variable` plugin (tools/ergo/)
+# Ergo Studio's `variable` plugin (tools/studio/plugins/variable)
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_BIND)
     add_library(ergo_bind
@@ -395,7 +395,7 @@ if(ERGO_BUILD_SCENE)
         endforeach()
     endif()
 
-    # ergo_scene_link — engine client for tools/ergo's `scene_editor` plugin
+    # ergo_scene_link — engine client for Ergo Studio's `scene_editor` plugin
     # (publish scenes, apply patches) over ergo_common_ws.
     option(ERGO_BUILD_SCENE_LINK "Build ergo_scene_link (WS client for the scene_editor plugin)" ON)
     if(ERGO_BUILD_SCENE_LINK)
@@ -576,7 +576,7 @@ if(ERGO_BUILD_LOG)
         add_test(NAME test_log_sink COMMAND test_log_sink)
     endif()
 
-    # ergo_log_live — LiveSink streaming records to tools/ergo's `log` plugin
+    # ergo_log_live — LiveSink streaming records to Ergo Studio's `log` plugin
     # over ergo_common_ws. Separate so ergo_log stays socket-free.
     option(ERGO_BUILD_LOG_LIVE "Build ergo_log_live (LiveSink for the log plugin)" ON)
     if(ERGO_BUILD_LOG_LIVE AND TARGET ergo_common_ws)
@@ -1076,7 +1076,7 @@ if(ERGO_BUILD_STUDIO)
         src/studio/host/plugin_loader.cpp
     )
     target_include_directories(ergo_studio_host PUBLIC include)
-    target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common)
+    target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common ${CMAKE_DL_LIBS})
     if(MSVC)
         target_compile_options(ergo_studio_host PRIVATE /utf-8)
     endif()

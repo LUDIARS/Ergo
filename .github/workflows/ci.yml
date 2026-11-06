@@ -167,33 +167,6 @@ jobs:
             build/Testing/Temporary/LastTest.log
           if-no-files-found: warn
 
-  # tools/ergo (Node): type-check src + tests, build dist/, run node:test.
-  tools-ergo:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tools/ergo
-    env:
-      # npm ci would otherwise download the Electron binary; tests never start it.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # lib/lapilli provides @ludiars/one-shot (a file: dependency).
-          submodules: true
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: tools/ergo/package-lock.json
-
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm test
-
   # W7: Core of the Unity package (unity/com.ludiars.ergo.packages) without Unity. The package structure and the
   # Fixtures byte match run in ctest above (test_unity_package_structure).
   unity-package-core:

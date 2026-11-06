@@ -2,12 +2,6 @@ build/
 build_*/
 CMakeUserPresets.json
 
-# tools/ergo — per-developer local state
-tools/ergo/placer-data.json
-tools/ergo/dist/
-tools/ergo/node_modules/
-tools/ergo/ergo-out.txt
-tools/ergo/ergo-err.txt
 
 # Cygwin/MSYS bash crash dumps
 bash.exe.stackdump
