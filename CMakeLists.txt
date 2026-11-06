@@ -1275,6 +1275,7 @@ if(ERGO_BUILD_STUDIO)
             tools/studio/views/plugin_api.cpp
             tools/studio/views/studio_view.cpp
             tools/studio/views/thaleia_view.cpp
+            tools/studio/views/vfx_suggest_view.cpp
             tools/studio/views/view_registry.cpp
         )
         target_include_directories(ergo_studio_views PUBLIC tools/studio)

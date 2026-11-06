@@ -2,6 +2,8 @@
 // API, and the views drawing what a plugin's routes answer (GPU free).
 #include "views/plugin_api.h"
 #include "views/view_registry.h"
+#include "plugins/particle/particle_plugin.h"
+#include "plugins/vfx_suggest/vfx_suggest_plugin.h"
 
 #include "ergo/studio/host/plugin_host.h"
 #include "ergo/studio/ui/studio_app.h"
@@ -228,4 +230,33 @@ TEST(StudioViews, ExplorerShowsHealthAndAnswers) {
 TEST(StudioViews, EveryBuiltInIdGetsAView) {
     ApiPlugin p;
     EXPECT_NE(views::make_view(p), nullptr);
+}
+
+TEST(StudioViews, VfxSuggestSendsACatalogPresetToParticle) {
+    namespace pl = ergo::studio::plugins;
+    auto host = host_with({&pl::particle::make_particle_plugin, [](const host::LogFn& log) {
+                               return pl::vfx_suggest::make_vfx_suggest_plugin({}, log);
+                           }});
+    host::IPlugin* particle = host->plugins()[0];
+    views::ViewRegistry reg(host.get());
+    FixedAdvanceMeasure measure;
+    StudioApp app(*host, measure, Theme{}, reg.lookup());
+    app.set_viewport(1400, 2400);
+    app.select_tab(2);
+    // The game buttons load first and move the form down: click after they are in.
+    ASSERT_TRUE(frames_until(app, [&] { return find_text(app.draw_list(), "UniLand") != nullptr; }));
+    click_text(app, "\xE3\x82\xAB\xE3\x82\xBF\xE3\x83\xAD\xE3\x82\xB0");   // カタログ (the button; the heading comes after it loads)
+    const std::string send = "particle \xE3\x81\xB8\xE9\x80\x81\xE3\x82\x8B";
+    const bool shown = frames_until(app, [&] { return find_text(app.draw_list(), send) != nullptr; });
+    if (!shown) {
+        for (const auto& c : app.draw_list()) {
+            if (c.kind == ergo::ui_kit::DrawKind::Text) std::printf("  text: %s\n", c.text.c_str());
+        }
+    }
+    ASSERT_TRUE(shown);
+    views::PluginApi api(*particle);
+    const std::string before = api.call_now("GET", "/api/effect", "").body;
+    click_text(app, send);
+    ASSERT_TRUE(frames_until(app, [&] { return has_text_containing(app.draw_list(), "particle \xE3\x81\xB8\xE9\x80\x81\xE3\x82\x8A\xE3\x81\xBE\xE3\x81\x97\xE3\x81\x9F"); }));
+    EXPECT_NE(api.call_now("GET", "/api/effect", "").body, before);
 }

@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
     int code = 0;
 #ifdef ERGO_STUDIO_HAS_SHELL
     if (!settings.headless) {
-        views::ViewRegistry views;   // native tabs; outlives the window's app
+        views::ViewRegistry views(&plugins);   // native tabs; outlives the window's app
         shell::WindowConfig wc;
         wc.font_path  = settings.font_path;
         wc.shader_dir = settings.shader_dir;

@@ -375,6 +375,7 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 | `musa_thaleia` | 文書ツリー・全文検索・描画した文書 |
 | `musa_terpsichore` | 状態・起動 / 停止・設定の編集 |
 | `musa_melpomene` | Issue 一覧と詳細・コメント・作成 / クローズ・通知・設定 (トークンは伏せ字) |
+| `vfx-suggest` | ゲームを選びシーンを書いて生成 (LLM)、カタログ、プリセットを `particle` へ送る (`POST /particle/api/effect`) |
 | 上記以外 (外部 pack を含む) | エクスプローラ: ヘルス、既知の GET エンドポイントのボタン、任意の要求 (method / path / JSON body) と応答の JSON 表示 |
 旧版のシェル拡張 API (`window.ergo.shell`) と
 Electron IPC は廃止した (ブラウザの iframe が無いため)。拡張はプラグイン (組み込み
