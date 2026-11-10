@@ -47,6 +47,7 @@ option(ERGO_BUILD_SCORE        "Build ergo_score"         ON)
 option(ERGO_BUILD_COMBO_COUNTER "Build ergo_combo_counter" ON)
 option(ERGO_BUILD_TIMING_JUDGE "Build ergo_timing_judge"  ON)
 option(ERGO_BUILD_UI_KIT       "Build ergo_ui_kit (retained-mode UI framework)" ON)
+option(ERGO_BUILD_STUDIO       "Build Ergo Studio libraries (the app itself also needs Pictor + Vulkan)" ON)
 option(ERGO_BUILD_UI_LAYOUT    "Build ergo_ui_layout (data-driven UI layout runtime)" ON)
 option(ERGO_BUILD_SHURIKEN_MIGRATOR "Build ergo_shuriken_migrator (Unity Shuriken → ergo_particle migrator + CLI)" ON)
 option(ERGO_BUILD_RENDER       "Build ergo_render (Pictor 横断オーケストレーション層)" ON)
@@ -1028,6 +1029,137 @@ if(ERGO_BUILD_UI_KIT)
             target_compile_options(test_ui_kit PRIVATE /utf-8)
         endif()
         add_test(NAME test_ui_kit COMMAND test_ui_kit)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Ergo Studio (native) — spec/plan/2026-11-05-ergo-studio-native.md
+#   ergo_studio_net  : loopback HTTP/1.1 + WebSocket server (no GPU)
+#   ergo_studio_host : plugin host on top of ergo_studio_net (no GPU)
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_STUDIO)
+    add_library(ergo_studio_net STATIC
+        src/studio/net/codec.cpp
+        src/studio/net/http_message.cpp
+        src/studio/net/http_parser.cpp
+        src/studio/net/request_guard.cpp
+        src/studio/net/server.cpp
+        src/studio/net/socket.cpp
+        src/studio/net/ws_frame.cpp
+    )
+    target_include_directories(ergo_studio_net PUBLIC include)
+    target_link_libraries(ergo_studio_net PUBLIC Threads::Threads)
+    if(WIN32)
+        target_link_libraries(ergo_studio_net PUBLIC ws2_32)
+    endif()
+    if(MSVC)
+        target_compile_options(ergo_studio_net PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_studio_net tests/studio/test_studio_net.cpp)
+        target_link_libraries(test_studio_net PRIVATE ergo_studio_net ergo_common_ws ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_net PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_net COMMAND test_studio_net)
+    endif()
+
+    # ergo_studio_host : plugin contract, loading, health, request routing (no GPU)
+    add_library(ergo_studio_host STATIC
+        src/studio/host/abi_plugin.cpp
+        src/studio/host/dynamic_library.cpp
+        src/studio/host/external_loader.cpp
+        src/studio/host/health_report.cpp
+        src/studio/host/plugin_host.cpp
+        src/studio/host/plugin_id.cpp
+        src/studio/host/plugin_loader.cpp
+    )
+    target_include_directories(ergo_studio_host PUBLIC include)
+    target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common)
+    if(MSVC)
+        target_compile_options(ergo_studio_host PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_studio_host tests/studio/test_studio_host.cpp)
+        target_link_libraries(test_studio_host PRIVATE ergo_studio_host ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_host PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_host COMMAND test_studio_host)
+
+        # A plain-C pack proves the ABI needs no C++ on the plugin side.
+        enable_language(C)
+        add_library(ergo_studio_echo_pack MODULE tests/studio/fixtures/echo_pack.c)
+        target_include_directories(ergo_studio_echo_pack PRIVATE include)
+        set_target_properties(ergo_studio_echo_pack PROPERTIES PREFIX "")
+        add_executable(test_studio_external tests/studio/test_studio_external.cpp)
+        target_link_libraries(test_studio_external PRIVATE ergo_studio_host ergo_gtest_main)
+        add_dependencies(test_studio_external ergo_studio_echo_pack)
+        if(MSVC)
+            target_compile_options(test_studio_external PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_external COMMAND test_studio_external)
+        # The built pack's path reaches the test through its environment (a path
+        # cannot be a compile definition in Praesidium's analysis configuration).
+        set_tests_properties(test_studio_external PROPERTIES
+            ENVIRONMENT "ERGO_TEST_ECHO_PACK=$<TARGET_FILE:ergo_studio_echo_pack>")
+    endif()
+
+    # ergo_studio_plugins : built-in plugins' logic and wiring (no GPU; views live in the shell)
+    add_library(ergo_studio_plugins STATIC
+        tools/studio/plugins/common/client_set.cpp
+        tools/studio/plugins/common/file_io.cpp
+        tools/studio/plugins/common/json_util.cpp
+        tools/studio/plugins/common/latest_blob_plugin.cpp
+        tools/studio/plugins/common/safe_path.cpp
+        tools/studio/plugins/log/line_ring.cpp
+        tools/studio/plugins/log/lines_query.cpp
+        tools/studio/plugins/log/log_apps.cpp
+        tools/studio/plugins/log/log_plugin.cpp
+        tools/studio/plugins/log/log_protocol.cpp
+        tools/studio/plugins/musa_terpsichore/command_api.cpp
+        tools/studio/plugins/musa_terpsichore/terpsichore_config.cpp
+        tools/studio/plugins/musa_terpsichore/terpsichore_plugin.cpp
+        tools/studio/plugins/musa_thaleia/document_browser.cpp
+        tools/studio/plugins/musa_thaleia/markdown_block.cpp
+        tools/studio/plugins/musa_thaleia/markdown_inline.cpp
+        tools/studio/plugins/musa_thaleia/markdown_json.cpp
+        tools/studio/plugins/musa_thaleia/thaleia_plugin.cpp
+        tools/studio/plugins/particle/particle_plugin.cpp
+        tools/studio/plugins/particle/particle_schema.cpp
+        tools/studio/plugins/pictor_perf/pictor_perf_plugin.cpp
+        tools/studio/plugins/profile/profile_plugin.cpp
+        tools/studio/plugins/rive/rive_plugin.cpp
+        tools/studio/plugins/scene_editor/parse_scene.cpp
+        tools/studio/plugins/scene_editor/scene_editor_plugin.cpp
+        tools/studio/plugins/scene_editor/scene_info.cpp
+        tools/studio/plugins/variable/variable_plugin.cpp
+        tools/studio/plugins/variable/variable_registry.cpp
+        tools/studio/plugins/visus/visus_plugin.cpp
+        tools/studio/plugins/visus/visus_store.cpp
+    )
+    target_include_directories(ergo_studio_plugins PUBLIC tools/studio)
+    target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host)
+    if(MSVC)
+        target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
+    endif()
+
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_studio_plugins
+            tests/studio/test_studio_plugins.cpp
+            tests/studio/test_studio_files.cpp
+            tests/studio/test_studio_thaleia.cpp
+            tests/studio/test_studio_terpsichore.cpp
+            tests/studio/test_studio_log.cpp
+            tests/studio/test_studio_scene_editor.cpp
+        )
+        target_link_libraries(test_studio_plugins PRIVATE ergo_studio_plugins ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_plugins PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_plugins COMMAND test_studio_plugins)
     endif()
 endif()
 

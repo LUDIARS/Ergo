@@ -78,6 +78,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_BUILD_PACKAGE_WATCH` | ON | `ergo_package_watch` (`ergo_pkg outdated` / `watch` もこれで有効になる) | `PACKAGE_MANAGER` | スキップ (STATUS) |
 | `ERGO_BUILD_SHURIKEN_MIGRATOR` | ON | `ergo_shuriken_migrator` と CLI (legacy。一覧に載せない理由は `module_list.md`) | `PARTICLE` + `GPU_PARTICLE` | スキップ (STATUS) |
 | `ERGO_BUILD_HTTP` | **OFF** | `ergo_http`。ON にすると `ERGO_WITH_CURL` を強制する (取得対象の libcurl を伴うため既定 OFF) | 管理対象の libcurl (`CURL::libcurl`) | 構成エラー (取得が許されない・取得できないとき) |
+| `ERGO_BUILD_STUDIO` | ON | Ergo Studio のライブラリ (`ergo_studio_net` / `_host` / `_platform` / `_plugins`) とテスト ([ergo.md](../feature/tool/ergo.md)) | — | — |
 | **付随ターゲット** | | | | |
 | `ERGO_BUILD_PARTICLE_LINK` | ON | `ergo_particle_link` (`particle` プラグインから設定を受け取る受信専用の WS フィーダー) と `test_editor_link` | `PARTICLE` | 宣言されない |
 | `ERGO_BUILD_SCENE_LINK` | ON | `ergo_scene_link` (`scene_editor` プラグインのエンジン側クライアント) と `test_scene_editor_link` | `SCENE` | 宣言されない |

@@ -45,6 +45,9 @@ schema_version: 2
 package_manifest: ergo-packages.json
 
 excluded:
+  - name: ergo_studio
+    reason: "ゲームに組み込むモジュールではなく、開発者ツール ergo_studio.exe (Ergo Studio) の層 (net / host / platform / ui / shell)。ERGO_BUILD_STUDIO でまとめて構成する"
+    ref: spec/plan/2026-11-05-ergo-studio-native.md
   - name: ergo_shuriken_migrator
     reason: "Unity Shuriken からの一回きりの移行用。使っているタイトルのツール側へ移してから削除する予定で、それまでは legacy ドメインに置く"
     ref: spec/architecture/domains-and-ux.md §5 L1

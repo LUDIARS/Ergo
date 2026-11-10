@@ -1,0 +1,704 @@
+{
+  "version": 1,
+  "native": [
+    {
+      "file": "src/studio/host/abi_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/host/dynamic_library.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/host/external_loader.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/host/health_report.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/host/plugin_host.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/host/plugin_id.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/host/plugin_loader.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/codec.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/http_message.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/http_parser.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/request_guard.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/server.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/socket.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/net/ws_frame.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/fixtures/echo_pack.c",
+      "standard": "c17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_external.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_files.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_host.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_log.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_net.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_plugins.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_scene_editor.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_terpsichore.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_thaleia.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/common/client_set.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/common/file_io.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/common/json_util.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/common/latest_blob_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/common/safe_path.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/log/line_ring.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/log/lines_query.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/log/log_apps.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/log/log_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/log/log_protocol.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_terpsichore/command_api.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_terpsichore/terpsichore_config.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_terpsichore/terpsichore_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_thaleia/document_browser.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_thaleia/markdown_block.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_thaleia/markdown_inline.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_thaleia/markdown_json.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/musa_thaleia/thaleia_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/particle/particle_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/particle/particle_schema.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/pictor_perf/pictor_perf_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/profile/profile_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/rive/rive_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/scene_editor/parse_scene.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/scene_editor/scene_editor_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/scene_editor/scene_info.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/variable/variable_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/variable/variable_registry.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/visus/visus_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/visus/visus_store.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    }
+  ],
+  "web": []
+}

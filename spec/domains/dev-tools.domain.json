@@ -21,6 +21,18 @@
   "membership": [
     {
       "pathPattern": "^tools/ergo/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "^tools/studio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/studio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/studio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/studio/(?:.*/)?[^/]+$"
     }
   ]
 }
