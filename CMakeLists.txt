@@ -1107,11 +1107,33 @@ if(ERGO_BUILD_STUDIO)
             ENVIRONMENT "ERGO_TEST_ECHO_PACK=$<TARGET_FILE:ergo_studio_echo_pack>")
     endif()
 
+    # ergo_studio_ui : the Studio window's UI as ui_kit trees (tabs, overview, views) — no GPU
+    if(TARGET ergo_ui_kit)
+        add_library(ergo_studio_ui STATIC
+            src/studio/ui/studio_app.cpp
+            src/studio/ui/view_builder.cpp
+        )
+        target_include_directories(ergo_studio_ui PUBLIC include)
+        target_link_libraries(ergo_studio_ui PUBLIC ergo_studio_host ergo_ui_kit)
+        if(MSVC)
+            target_compile_options(ergo_studio_ui PRIVATE /utf-8)
+        endif()
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_studio_ui tests/studio/test_studio_ui.cpp)
+            target_link_libraries(test_studio_ui PRIVATE ergo_studio_ui ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_studio_ui PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_studio_ui COMMAND test_studio_ui)
+        endif()
+    endif()
+
     # ergo_studio_platform : outgoing HTTP(S) and OS credential storage (Windows backend;
     # other platforms report "unsupported" instead of switching paths)
     if(WIN32)
         add_library(ergo_studio_platform STATIC
             src/studio/platform/process_quote.cpp
+            src/studio/platform/sha256.cpp
             src/studio/platform/url_encode.cpp
             src/studio/platform/win_credential_store.cpp
             src/studio/platform/win_process_runner.cpp
@@ -1121,6 +1143,7 @@ if(ERGO_BUILD_STUDIO)
     else()
         add_library(ergo_studio_platform STATIC
             src/studio/platform/process_quote.cpp
+            src/studio/platform/sha256.cpp
             src/studio/platform/unsupported_platform.cpp
             src/studio/platform/url_encode.cpp
         )
@@ -1173,15 +1196,25 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/studio/actio_client.cpp
         tools/studio/plugins/studio/breviarium_client.cpp
         tools/studio/plugins/studio/concordia_client.cpp
+        tools/studio/plugins/studio/connection_map.cpp
         tools/studio/plugins/studio/curare_client.cpp
         tools/studio/plugins/studio/delegation_request.cpp
         tools/studio/plugins/studio/endpoints.cpp
+        tools/studio/plugins/studio/git_client.cpp
         tools/studio/plugins/studio/mutation_guard.cpp
+        tools/studio/plugins/studio/plugin_installer.cpp
+        tools/studio/plugins/studio/plugin_ledger.cpp
         tools/studio/plugins/studio/plugin_source.cpp
+        tools/studio/plugins/studio/resource_download.cpp
         tools/studio/plugins/studio/resource_sync.cpp
+        tools/studio/plugins/studio/revisor_client.cpp
         tools/studio/plugins/studio/service_call.cpp
         tools/studio/plugins/studio/source_sync.cpp
         tools/studio/plugins/studio/studio_config.cpp
+        tools/studio/plugins/studio/studio_plugin.cpp
+        tools/studio/plugins/studio/studio_routes_projects.cpp
+        tools/studio/plugins/studio/studio_routes_sources.cpp
+        tools/studio/plugins/studio/studio_routes_tasks.cpp
         tools/studio/plugins/ui_layout/ui_layout_plugin.cpp
         tools/studio/plugins/variable/variable_plugin.cpp
         tools/studio/plugins/variable/variable_registry.cpp
@@ -1220,6 +1253,7 @@ if(ERGO_BUILD_STUDIO)
             tests/studio/test_studio_vfx_suggest.cpp
             tests/studio/test_studio_vfx_breed.cpp
             tests/studio/test_studio_studio_domain.cpp
+            tests/studio/test_studio_studio_api.cpp
             tests/studio/test_studio_log.cpp
             tests/studio/test_studio_scene_editor.cpp
         )
@@ -2058,4 +2092,90 @@ endif()
 
 if(ERGO_CXX_BASELINE)
     ludiars_cxx_check_targets(PREFIX ergo_ MODE WARNING)
+endif()
+
+# ---------------------------------------------------------------------------
+# Ergo Studio app — spec/plan/2026-11-05-ergo-studio-native.md
+#   ergo_studio_shell : window (GLFW) + Vulkan + Pictor UIRenderer + text overlay
+#   ergo_studio       : the executable (build/studio/ergo_studio.exe)
+# Placed after ergo_render. Without the real render path the executable still
+# builds as a headless server (no window) and says so at configure time.
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
+    set(ERGO_STUDIO_OUT "${CMAKE_BINARY_DIR}/studio")
+    set(_ergo_studio_shell OFF)
+    if(TARGET pictor AND TARGET ergo_render AND TARGET glfw AND ERGO_RENDER_BACKEND_ENABLED)
+        set(_ergo_studio_shell ON)
+    endif()
+
+    if(_ergo_studio_shell)
+        find_program(ERGO_GLSLC glslc HINTS "$ENV{VULKAN_SDK}/Bin" "$ENV{VULKAN_SDK}/bin")
+        if(NOT ERGO_GLSLC)
+            message(FATAL_ERROR "ergo_studio: glslc not found (install the Vulkan SDK or set ERGO_GLSLC). No silent fallback.")
+        endif()
+        add_library(ergo_studio_shell STATIC
+            src/studio/shell/font_atlas.cpp
+            src/studio/shell/studio_window.cpp
+            src/studio/shell/text_canvas.cpp
+            src/studio/shell/ui_layer.cpp
+        )
+        target_include_directories(ergo_studio_shell PUBLIC include)
+        target_link_libraries(ergo_studio_shell PUBLIC ergo_studio_ui ergo_render pictor glfw)
+        target_compile_features(ergo_studio_shell PUBLIC cxx_std_20)
+        if(MSVC)
+            target_compile_options(ergo_studio_shell PRIVATE /utf-8)
+        endif()
+
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_studio_shell_text tests/studio/test_studio_shell_text.cpp)
+            target_link_libraries(test_studio_shell_text PRIVATE ergo_studio_shell ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_studio_shell_text PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_studio_shell_text COMMAND test_studio_shell_text)
+        endif()
+
+        # UIRenderer's shaders, compiled next to the executable (shaders/).
+        get_target_property(_pictor_src pictor SOURCE_DIR)
+        set(_ergo_studio_spv)
+        foreach(_stage vert frag)
+            set(_in  "${_pictor_src}/shaders/ui/ui_widget.${_stage}")
+            set(_out "${ERGO_STUDIO_OUT}/shaders/ui_widget.${_stage}.spv")
+            add_custom_command(OUTPUT "${_out}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${ERGO_STUDIO_OUT}/shaders"
+                COMMAND "${ERGO_GLSLC}" "${_in}" -o "${_out}"
+                DEPENDS "${_in}"
+                COMMENT "ergo_studio: ui_widget.${_stage} -> SPIR-V")
+            list(APPEND _ergo_studio_spv "${_out}")
+        endforeach()
+        add_custom_target(ergo_studio_shaders DEPENDS ${_ergo_studio_spv})
+    else()
+        message(STATUS "ergo_studio: no real render path (pictor / ergo_render / glfw) — building the headless server only")
+    endif()
+
+    add_executable(ergo_studio
+        tools/studio/builtin_plugins.cpp
+        tools/studio/main.cpp
+        tools/studio/studio_settings.cpp
+    )
+    target_include_directories(ergo_studio PRIVATE tools/studio)
+    target_link_libraries(ergo_studio PRIVATE ergo_studio_plugins ergo_studio_host ergo_studio_net)
+    if(_ergo_studio_shell)
+        target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
+        target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
+        add_dependencies(ergo_studio ergo_studio_shaders)
+    endif()
+    if(MSVC)
+        target_compile_options(ergo_studio PRIVATE /utf-8)
+    endif()
+    # SDK for external packs (built at install time against plugin_abi.h, design J6).
+    add_custom_command(TARGET ergo_studio POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${ERGO_STUDIO_OUT}/sdk/include/ergo/studio"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/include/ergo/studio/plugin_abi.h"
+                "${ERGO_STUDIO_OUT}/sdk/include/ergo/studio/plugin_abi.h")
+    set_target_properties(ergo_studio PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${ERGO_STUDIO_OUT}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${ERGO_STUDIO_OUT}"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${ERGO_STUDIO_OUT}"
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${ERGO_STUDIO_OUT}")
 endif()

@@ -600,6 +600,8 @@ void UIContext::on(const std::string& node_path, EventKind kind, EventHandler cb
     handlers_[node_path].push_back({kind, std::move(cb)});
 }
 
+void UIContext::clear_handlers() { handlers_.clear(); }
+
 namespace {
 bool rect_contains(const Rect& r, float x, float y) {
     return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;

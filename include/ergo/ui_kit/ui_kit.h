@@ -124,6 +124,9 @@ public:
     /// ノードパスにイベントハンドラを登録する。 イベントは起点 → 祖先へ
     /// バブリングする (Event::propagate=false で停止)。
     void on(const std::string& node_path, EventKind kind, EventHandler cb);
+    /// 登録済みハンドラをすべて外す。 ドキュメントを作り直すホストが、
+    /// ポインタ状態 (hover / 押下中のパス) を保ったまま登録し直すために使う。
+    void clear_handlers();
 
     // ── アニメーション (P4) ──
     /// ノードのプロパティを現在値から `to` へ `duration` 秒かけて補間する。

@@ -182,6 +182,18 @@
       "packages": []
     },
     {
+      "file": "src/studio/platform/sha256.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "src/studio/platform/unsupported_platform.cpp",
       "standard": "c++17",
       "includes": [
@@ -231,6 +243,114 @@
     },
     {
       "file": "src/studio/platform/winhttp_client.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/shell/font_atlas.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "src/studio/shell/studio_window.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "src/studio/shell/text_canvas.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "src/studio/shell/ui_layer.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "src/studio/ui/studio_app.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/ui/view_builder.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/ui_kit/ui_kit.cpp",
       "standard": "c++17",
       "includes": [
         "include"
@@ -382,6 +502,40 @@
       "packages": []
     },
     {
+      "file": "tests/studio/test_studio_shell_text.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "tests/studio/test_studio_studio_api.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "tests/studio/test_studio_studio_domain.cpp",
       "standard": "c++17",
       "includes": [
@@ -411,6 +565,20 @@
     },
     {
       "file": "tests/studio/test_studio_thaleia.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_ui.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -457,6 +625,32 @@
       "includes": [
         "include",
         "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/builtin_plugins.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/main.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
         "tools/studio"
       ],
       "defines": [
@@ -999,6 +1193,19 @@
       "packages": []
     },
     {
+      "file": "tools/studio/plugins/studio/connection_map.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "tools/studio/plugins/studio/curare_client.cpp",
       "standard": "c++17",
       "includes": [
@@ -1038,7 +1245,46 @@
       "packages": []
     },
     {
+      "file": "tools/studio/plugins/studio/git_client.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "tools/studio/plugins/studio/mutation_guard.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/plugin_installer.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/plugin_ledger.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -1064,7 +1310,33 @@
       "packages": []
     },
     {
+      "file": "tools/studio/plugins/studio/resource_download.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "tools/studio/plugins/studio/resource_sync.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/revisor_client.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -1104,6 +1376,58 @@
     },
     {
       "file": "tools/studio/plugins/studio/studio_config.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/studio_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/studio_routes_projects.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/studio_routes_sources.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/studio_routes_tasks.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -1325,6 +1649,19 @@
     },
     {
       "file": "tools/studio/plugins/visus/visus_store.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/studio_settings.cpp",
       "standard": "c++17",
       "includes": [
         "include",
