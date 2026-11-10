@@ -25,6 +25,7 @@ Default port: **5170** (override with `PORT=...`).
 | `http://localhost:5170/render_pipeline/` | Pictor `*.profile.json` graph editor (`ERGO_PICTOR_PROFILE_DIR`) |
 | `http://localhost:5170/visus/`           | Visus definition editor (`VISUS_PROJECT_ROOTS`)        |
 | `http://localhost:5170/ui_layout/`       | UI layout editor; live bridge to the host's own `/ui_layout/{patch,state}` |
+| `http://localhost:5170/lookdev/`         | Look-dev: tune a game's lighting live, save presets, post a still to Discord / Slack |
 | `http://localhost:5170/vfx-suggest/`     | Particle presets from game / scene context via an LLM  |
 | `http://localhost:5170/vfx-breed/`       | Breed particle effects by picking favourites           |
 | `http://localhost:5170/scene_editor/`    | Scene tree and actor inspector. WS `/scene_editor/ws`; engine client `ergo_scene_link` |

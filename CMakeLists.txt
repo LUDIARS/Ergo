@@ -1216,6 +1216,9 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/studio/studio_routes_sources.cpp
         tools/studio/plugins/studio/studio_routes_tasks.cpp
         tools/studio/plugins/ui_layout/ui_layout_plugin.cpp
+        tools/studio/plugins/lookdev/lookdev_plugin.cpp
+        tools/studio/plugins/lookdev/lookdev_post.cpp
+        tools/studio/plugins/lookdev/lookdev_store.cpp
         tools/studio/plugins/variable/variable_plugin.cpp
         tools/studio/plugins/variable/variable_registry.cpp
         tools/studio/plugins/visus/visus_plugin.cpp
@@ -1271,6 +1274,7 @@ if(ERGO_BUILD_STUDIO)
             tools/studio/views/explorer_view.cpp
             tools/studio/views/json_render.cpp
             tools/studio/views/log_view.cpp
+            tools/studio/views/lookdev_view.cpp
             tools/studio/views/musa_views.cpp
             tools/studio/views/plugin_api.cpp
             tools/studio/views/studio_view.cpp

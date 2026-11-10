@@ -196,6 +196,17 @@ void StudioApp::rebuild() {
             fn();
         });
     }
+    for (auto& sl : bind_.sliders) {
+        SetFractionFn fn = sl.fn;
+        const std::string path = sl.path;
+        ctx_.on(path, ui_kit::EventKind::Click, [this, fn, path](ui_kit::Event& e) {
+            e.propagate = false;
+            const ui_kit::Node* track = ctx_.find(path);
+            if (track == nullptr || track->resolved_rect.w <= 0) return;
+            const float f = (e.x - track->resolved_rect.x) / track->resolved_rect.w;
+            fn(f < 0 ? 0.0f : (f > 1 ? 1.0f : f));
+        });
+    }
 }
 
 void StudioApp::build_tabs(ViewBuilder& bar) {

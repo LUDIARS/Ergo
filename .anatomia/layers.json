@@ -670,6 +670,10 @@
       "layer": "application"
     },
     {
+      "glob": "tools/studio/plugins/lookdev/*",
+      "layer": "application"
+    },
+    {
       "glob": "tools/studio/plugins/variable/*",
       "layer": "application"
     },

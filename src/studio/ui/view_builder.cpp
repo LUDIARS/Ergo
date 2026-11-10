@@ -287,6 +287,30 @@ void ViewBuilder::list_item(const std::string& text, bool selected, ClickFn on_c
     if (on_click) bind_.clicks.push_back({path, std::move(on_click)});
 }
 
+void ViewBuilder::slider(float fraction, SetFractionFn on_set, float width) {
+    const float f = fraction < 0 ? 0.0f : (fraction > 1 ? 1.0f : fraction);
+    Node track;
+    track.name                = next_name("slider");
+    track.kind                = NodeKind::Frame;
+    track.size                = {width, 14};
+    track.layout.w_sizing     = Sizing::Fixed;
+    track.layout.h_sizing     = Sizing::Fixed;
+    track.style.fill          = theme_.panel_alt;
+    track.style.corner_radius = 3;
+    Node fill;
+    fill.name                = "fill";
+    fill.kind                = NodeKind::Frame;
+    fill.size                = {width * f, 14};
+    fill.layout.w_sizing     = Sizing::Fixed;
+    fill.layout.h_sizing     = Sizing::Fixed;
+    fill.style.fill          = theme_.accent;
+    fill.style.corner_radius = 3;
+    track.children.push_back(std::move(fill));
+    const std::string path = path_ + "/" + track.name;
+    add(std::move(track));
+    if (on_set) bind_.sliders.push_back({path, std::move(on_set)});
+}
+
 void ViewBuilder::wrapped(const std::string& text, float max_width, const Color* color, float font_size) {
     const float size = font_size > 0 ? font_size : theme_.font_size;
     for (const auto& l : wrap_text(text, max_width, size, measure_)) {

@@ -63,6 +63,14 @@ struct ClickBinding {
     ClickFn     fn;
 };
 
+/// A slider: a click on its track reports where along it (0 = left .. 1 = right).
+using SetFractionFn = std::function<void(float)>;
+
+struct SliderBinding {
+    std::string   path;   ///< resolved path of the track
+    SetFractionFn fn;
+};
+
 /// A text field: the string it edits lives in the view (it must outlive the
 /// next rebuild), the app routes typed text to the focused one.
 struct FieldBinding {
@@ -77,10 +85,12 @@ struct FieldBinding {
 struct Bindings {
     std::vector<ClickBinding> clicks;
     std::vector<FieldBinding> fields;
+    std::vector<SliderBinding> sliders;
     std::string               focused;
     void clear() {
         clicks.clear();
         fields.clear();
+        sliders.clear();
     }
 };
 
@@ -119,6 +129,8 @@ public:
     void text_area(std::string& value, float width, int lines);
     /// A full-width clickable line (lists: files, issues, tasks...).
     void list_item(const std::string& text, bool selected, ClickFn on_click, const std::string& detail = {});
+    /// A horizontal track filled to `fraction` (0..1); a click sets the fraction under the pointer.
+    void slider(float fraction, SetFractionFn on_set, float width = 240);
     /// Text wrapped to `max_width` px (at spaces, or anywhere for CJK); "\n" starts a new line.
     void wrapped(const std::string& text, float max_width, const ui_kit::Color* color = nullptr, float font_size = 0);
     /// A label cut to `max_width` px with "…" (table cells).

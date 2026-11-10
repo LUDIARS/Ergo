@@ -2,6 +2,7 @@
 
 #include "explorer_view.h"
 #include "log_view.h"
+#include "lookdev_view.h"
 #include "musa_views.h"
 #include "studio_view.h"
 #include "thaleia_view.h"
@@ -13,6 +14,7 @@ std::unique_ptr<host::IPluginView> make_view(host::IPlugin& plugin, const Plugin
     const std::string& id = plugin.info().id;
     if (id == "studio") return std::make_unique<StudioView>(plugin);
     if (id == "log") return std::make_unique<LogView>(plugin);
+    if (id == "lookdev") return std::make_unique<LookdevView>(plugin, find ? find("variable") : nullptr);
     if (id == "musa_thaleia") return std::make_unique<ThaleiaView>(plugin);
     if (id == "musa_terpsichore") return std::make_unique<TerpsichoreView>(plugin);
     if (id == "musa_melpomene") return std::make_unique<MelpomeneView>(plugin);

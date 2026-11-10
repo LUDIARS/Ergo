@@ -1,6 +1,7 @@
 #include "builtin_plugins.h"
 
 #include "plugins/log/log_plugin.h"
+#include "plugins/lookdev/lookdev_plugin.h"
 #include "plugins/musa_melpomene/melpomene_plugin.h"
 #include "plugins/musa_terpsichore/terpsichore_plugin.h"
 #include "plugins/musa_thaleia/thaleia_plugin.h"
@@ -26,6 +27,7 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
         return p::studio::make_studio_plugin(s.studio, std::filesystem::u8path(s.sdk_dir), log);
     });
     f.push_back(&p::variable::make_variable_plugin);
+    f.push_back([cfg = s.studio](const host::LogFn& log) { return p::lookdev::make_lookdev_plugin(cfg, log); });
     f.push_back(&p::particle::make_particle_plugin);
     f.push_back(&p::scene_editor::make_scene_editor_plugin);
     f.push_back(&p::log::make_log_plugin);
