@@ -1107,10 +1107,35 @@ if(ERGO_BUILD_STUDIO)
             ENVIRONMENT "ERGO_TEST_ECHO_PACK=$<TARGET_FILE:ergo_studio_echo_pack>")
     endif()
 
+    # ergo_studio_platform : outgoing HTTP(S) and OS credential storage (Windows backend;
+    # other platforms report "unsupported" instead of switching paths)
+    if(WIN32)
+        add_library(ergo_studio_platform STATIC
+            src/studio/platform/process_quote.cpp
+            src/studio/platform/url_encode.cpp
+            src/studio/platform/win_credential_store.cpp
+            src/studio/platform/win_process_runner.cpp
+            src/studio/platform/winhttp_client.cpp
+        )
+        target_link_libraries(ergo_studio_platform PRIVATE winhttp advapi32)
+    else()
+        add_library(ergo_studio_platform STATIC
+            src/studio/platform/process_quote.cpp
+            src/studio/platform/unsupported_platform.cpp
+            src/studio/platform/url_encode.cpp
+        )
+    endif()
+    target_include_directories(ergo_studio_platform PUBLIC include)
+    if(MSVC)
+        target_compile_options(ergo_studio_platform PRIVATE /utf-8)
+    endif()
+
     # ergo_studio_plugins : built-in plugins' logic and wiring (no GPU; views live in the shell)
     add_library(ergo_studio_plugins STATIC
+        tools/studio/plugins/common/claude_cli.cpp
         tools/studio/plugins/common/client_set.cpp
         tools/studio/plugins/common/file_io.cpp
+        tools/studio/plugins/common/json_pretty.cpp
         tools/studio/plugins/common/json_util.cpp
         tools/studio/plugins/common/latest_blob_plugin.cpp
         tools/studio/plugins/common/safe_path.cpp
@@ -1119,6 +1144,12 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/log/log_apps.cpp
         tools/studio/plugins/log/log_plugin.cpp
         tools/studio/plugins/log/log_protocol.cpp
+        tools/studio/plugins/musa_melpomene/github_api.cpp
+        tools/studio/plugins/musa_melpomene/melpomene_config.cpp
+        tools/studio/plugins/musa_melpomene/melpomene_models.cpp
+        tools/studio/plugins/musa_melpomene/melpomene_plugin.cpp
+        tools/studio/plugins/musa_melpomene/notification_tracker.cpp
+        tools/studio/plugins/musa_melpomene/ticket_cache.cpp
         tools/studio/plugins/musa_terpsichore/command_api.cpp
         tools/studio/plugins/musa_terpsichore/terpsichore_config.cpp
         tools/studio/plugins/musa_terpsichore/terpsichore_plugin.cpp
@@ -1131,17 +1162,48 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/particle/particle_schema.cpp
         tools/studio/plugins/pictor_perf/pictor_perf_plugin.cpp
         tools/studio/plugins/profile/profile_plugin.cpp
+        tools/studio/plugins/render_pipeline/profile_fields.cpp
+        tools/studio/plugins/render_pipeline/profile_schema.cpp
+        tools/studio/plugins/render_pipeline/profile_store.cpp
+        tools/studio/plugins/render_pipeline/render_pipeline_plugin.cpp
         tools/studio/plugins/rive/rive_plugin.cpp
         tools/studio/plugins/scene_editor/parse_scene.cpp
         tools/studio/plugins/scene_editor/scene_editor_plugin.cpp
         tools/studio/plugins/scene_editor/scene_info.cpp
+        tools/studio/plugins/studio/actio_client.cpp
+        tools/studio/plugins/studio/breviarium_client.cpp
+        tools/studio/plugins/studio/concordia_client.cpp
+        tools/studio/plugins/studio/curare_client.cpp
+        tools/studio/plugins/studio/delegation_request.cpp
+        tools/studio/plugins/studio/endpoints.cpp
+        tools/studio/plugins/studio/mutation_guard.cpp
+        tools/studio/plugins/studio/plugin_source.cpp
+        tools/studio/plugins/studio/resource_sync.cpp
+        tools/studio/plugins/studio/service_call.cpp
+        tools/studio/plugins/studio/source_sync.cpp
+        tools/studio/plugins/studio/studio_config.cpp
+        tools/studio/plugins/ui_layout/ui_layout_plugin.cpp
         tools/studio/plugins/variable/variable_plugin.cpp
         tools/studio/plugins/variable/variable_registry.cpp
         tools/studio/plugins/visus/visus_plugin.cpp
+        tools/studio/plugins/vfx_breed/breed_direction.cpp
+        tools/studio/plugins/vfx_breed/breed_genes.cpp
+        tools/studio/plugins/vfx_breed/breed_genome.cpp
+        tools/studio/plugins/vfx_breed/breed_ops.cpp
+        tools/studio/plugins/vfx_breed/breed_request.cpp
+        tools/studio/plugins/vfx_breed/breed_rng.cpp
+        tools/studio/plugins/vfx_breed/vfx_breed_plugin.cpp
+        tools/studio/plugins/vfx_suggest/ks_export.cpp
+        tools/studio/plugins/vfx_suggest/vfx_catalog.cpp
+        tools/studio/plugins/vfx_suggest/vfx_prompt.cpp
+        tools/studio/plugins/vfx_suggest/vfx_sanitize.cpp
+        tools/studio/plugins/vfx_suggest/vfx_suggest_plugin.cpp
         tools/studio/plugins/visus/visus_store.cpp
     )
     target_include_directories(ergo_studio_plugins PUBLIC tools/studio)
-    target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host)
+    include(cmake/ErgoEmbedText.cmake)
+    ergo_embed_text(ergo_studio_plugins ergo_vfx_catalog_json tools/studio/plugins/vfx_suggest/catalog.json)
+    target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform)
     if(MSVC)
         target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
     endif()
@@ -1152,6 +1214,12 @@ if(ERGO_BUILD_STUDIO)
             tests/studio/test_studio_files.cpp
             tests/studio/test_studio_thaleia.cpp
             tests/studio/test_studio_terpsichore.cpp
+            tests/studio/test_studio_melpomene.cpp
+            tests/studio/test_studio_ui_layout.cpp
+            tests/studio/test_studio_render_pipeline.cpp
+            tests/studio/test_studio_vfx_suggest.cpp
+            tests/studio/test_studio_vfx_breed.cpp
+            tests/studio/test_studio_studio_domain.cpp
             tests/studio/test_studio_log.cpp
             tests/studio/test_studio_scene_editor.cpp
         )

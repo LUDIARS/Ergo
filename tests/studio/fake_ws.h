@@ -79,6 +79,12 @@ inline ergo::studio::net::HttpRequest req(const std::string& method, const std::
     return r;
 }
 
+inline JsonValue parse_json(const std::string& s) {
+    JsonValue v;
+    ergo::common::jsonm::parse(s, v);
+    return v;
+}
+
 inline const ergo::studio::host::LogFn& quiet() {
     static const ergo::studio::host::LogFn fn = [](const std::string&, const std::string&) {};
     return fn;
