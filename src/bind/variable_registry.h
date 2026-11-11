@@ -110,16 +110,6 @@ public:
         return true;
     }
 
-    /// Refresh last_seen from the getter after an applied write so the
-    /// change-detection pass does not re-emit it.
-    void refresh_last_seen(Handle h) {
-        std::lock_guard<std::mutex> lk(mtx_);
-        auto it = by_handle_.find(h);
-        if (it != by_handle_.end() && it->second.getter) {
-            it->second.last_seen = it->second.getter();
-        }
-    }
-
     /// Snapshot all entries (for replay on (re)connect).
     std::vector<Entry> snapshot() const {
         std::lock_guard<std::mutex> lk(mtx_);

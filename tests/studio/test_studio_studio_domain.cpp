@@ -4,7 +4,7 @@
 #include "plugins/studio/concordia_client.h"
 #include "plugins/studio/delegation_request.h"
 #include "plugins/studio/endpoints.h"
-#include "plugins/studio/mutation_guard.h"
+#include "plugins/common/mutation_guard.h"
 #include "plugins/studio/plugin_source.h"
 #include "plugins/studio/resource_sync.h"
 #include "plugins/studio/source_sync.h"

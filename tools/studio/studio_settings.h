@@ -32,11 +32,18 @@ struct StudioSettings {
     std::string shader_dir;                ///< <exe dir>/shaders
     std::string sdk_dir;                   ///< <exe dir>/sdk (plugin_abi.h for building packs)
     plugins::studio::StudioConfig studio;  ///< the studio plugin's settings (ERGO_STUDIO_HOME, LUDIARS_ROOT, ...)
-    bool        headless = false;          ///< --headless: server only, no window
-    std::string error;                     ///< a setting that cannot be used (e.g. PORT=abc)
+    bool        headless  = false;         ///< --headless: server only, no window
+    bool        show_help = false;         ///< --help / -h: print studio_usage() and start nothing
+    std::string error;                     ///< an argument or setting that cannot be used (e.g. --foo, PORT=abc)
 };
 
-/// `exe_dir` is the directory of ergo_studio.exe.
+/// `exe_dir` is the directory of ergo_studio.exe. The command line accepts only
+/// --headless and --help / -h; anything else sets `error` (arguments are checked
+/// before the environment, so a typo is reported even when PORT is also bad).
 StudioSettings read_settings(const EnvFn& env, const std::filesystem::path& exe_dir, int argc, char** argv);
+
+/// The --help text: every option read_settings accepts and every environment
+/// variable it (and the plugin configs it fills) reads. Keep in step with read_settings.
+std::string studio_usage();
 
 } // namespace ergo::studio::app

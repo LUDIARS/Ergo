@@ -1,5 +1,7 @@
 #include "builtin_plugins.h"
 
+#include "lesson_variables.h"
+#include "plugins/lesson/lesson_plugin.h"
 #include "plugins/log/log_plugin.h"
 #include "plugins/musa_melpomene/melpomene_plugin.h"
 #include "plugins/musa_terpsichore/terpsichore_plugin.h"
@@ -16,16 +18,21 @@
 #include "plugins/vfx_breed/vfx_breed_plugin.h"
 #include "plugins/vfx_suggest/vfx_suggest_plugin.h"
 #include "plugins/visus/visus_plugin.h"
+#include "views/lesson_view.h"
+
+#include "ergo/studio/platform/clipboard.h"
 
 namespace ergo::studio::app {
 
 std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
     namespace p = ergo::studio::plugins;
     std::vector<host::PluginFactory> f;
+    // The lesson plugin reads and sets the game's variables through the variable plugin.
+    const auto game_variables = std::make_shared<GameVariableBridge>();
     f.push_back([s](const host::LogFn& log) {
         return p::studio::make_studio_plugin(s.studio, std::filesystem::u8path(s.sdk_dir), log);
     });
-    f.push_back(&p::variable::make_variable_plugin);
+    f.push_back([game_variables](const host::LogFn& log) { return make_bridged_variable_plugin(game_variables, log); });
     f.push_back(&p::particle::make_particle_plugin);
     f.push_back(&p::scene_editor::make_scene_editor_plugin);
     f.push_back(&p::log::make_log_plugin);
@@ -51,6 +58,11 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
     });
     f.push_back([home = s.user_home](const host::LogFn& log) {
         return p::musa_thaleia::make_thaleia_plugin(p::musa_thaleia::default_thaleia_root(home), log);
+    });
+    f.push_back([game_variables](const host::LogFn& log) -> std::unique_ptr<host::IPlugin> {
+        auto plugin = p::lesson::make_lesson_plugin(game_variables, log);
+        plugin->attach_view(std::make_shared<views::LessonView>(*plugin, platform::make_system_clipboard()));
+        return plugin;
     });
     return f;
 }

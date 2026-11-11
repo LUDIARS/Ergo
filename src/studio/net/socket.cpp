@@ -18,6 +18,18 @@
 #include <mutex>
 
 namespace ergo::studio::net::sock {
+namespace {
+
+// A client that went away while its response is written must surface as a
+// send error, not as SIGPIPE killing the Studio (Linux: per-call flag;
+// macOS: SO_NOSIGPIPE on each accepted socket, below). Same as ergo_common_ws.
+#ifdef MSG_NOSIGNAL
+constexpr int kSendFlags = MSG_NOSIGNAL;
+#else
+constexpr int kSendFlags = 0;
+#endif
+
+} // namespace
 
 bool init() {
 #ifdef _WIN32
@@ -77,6 +89,10 @@ Handle accept_one(Handle listener) {
     if (c == INVALID_SOCKET) return kInvalid;
 #else
     if (c < 0) return kInvalid;
+#  ifdef SO_NOSIGPIPE
+    int one = 1;
+    setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one));
+#  endif
 #endif
     return static_cast<Handle>(c);
 }
@@ -89,7 +105,7 @@ bool send_all(Handle s, const char* data, std::size_t len) {
     std::size_t done = 0;
     while (done < len) {
         const auto n = ::send(static_cast<decltype(::socket(0, 0, 0))>(s), data + done,
-                              static_cast<int>(len - done), 0);
+                              static_cast<int>(len - done), kSendFlags);
         if (n <= 0) return false;
         done += static_cast<std::size_t>(n);
     }

@@ -6,7 +6,9 @@
 # libcurl with no CLI, no docs, no tests. TLS backend is chosen per platform
 # from what the OS provides so the build needs no external crypto SDK:
 #   - Windows : Schannel (system)
-#   - others  : no built-in TLS by default (callers can flip ERGO_CURL_USE_SSL)
+#   - others  : curl's own default — OpenSSL via find_package (needs the
+#               OpenSSL development package, e.g. libssl-dev); with
+#               ERGO_CURL_USE_SSL=OFF there is no TLS at all
 #
 # Consume with:  target_link_libraries(<tgt> PRIVATE CURL::libcurl)
 #                #include <curl/curl.h>
