@@ -96,6 +96,10 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_CURL_USE_SSL` | ON | curl の TLS backend を有効化 (Windows は Schannel、`cmake/deps/curl.cmake`) | `ERGO_WITH_CURL` | 宣言されない |
 | `ERGO_DEPENDENCY_CACHE_DIR` | (空) | 取得ソースの共有キャッシュ dir (空 = `<build>/_deps`) | — | — |
 | `ERGO_SOURCE_DIR_<UPPER>` | (空) | その依存を取得せずローカルソースで差し替える (オフライン用、例 `ERGO_SOURCE_DIR_CURL`) | — | — |
+| **Lorica の守り** ([hardening.md](hardening.md)、`cmake/ErgoHardening.cmake`) | | | | |
+| `ERGO_HARDENING` | `auto` | Ergo の全ターゲットに Lorica (境界の部品・baseline の守り・危険な C 関数の拒否) を入れる。`auto` は Lorica が対応しないツールチェイン (macOS / iOS / Android / Emscripten / MinGW、CMake 3.24 未満) で WARNING を出して守り無しでビルド、`required` はそこで構成エラー | Windows の MSVC 系か Linux の GCC / Clang、CMake 3.24 以上 | `auto` は WARNING (`built WITHOUT Lorica hardening`)、`required` は構成エラー |
+| `ERGO_HARDENING_PROFILE` | `auto` | ネットワークの受け口のターゲット (`ergo_hardening_mark_network`) の段階: `auto` (使えれば EXTENDED、無理なら理由を STATUS)・`extended` (必須)・`baseline` | `ERGO_HARDENING` が有効 | `extended` で使えなければ構成エラー |
+| `LORICA_SOURCE_DIR` | (空、環境変数 `LORICA_SOURCE_DIR` があればその値) | Lorica のローカルのチェックアウト。空なら `ERGO_SOURCE_DIR_LORICA`、それも空なら固定 commit を取得 | — | Lorica でないディレクトリは構成エラー |
 | **LUDIARS パッケージ・ハブ** ([packages.md](packages.md) の「変数」) | | | | |
 | `ERGO_PACKAGES` | (空) | 使う link パッケージの列 (`pictor;tela`)。空ならホストの宣言の `host.use`、それも無ければ互換モード M0 | — | — |
 | `ERGO_PACKAGES_OPTIONAL` | (空) | 選んだうち、どの経路でも見つからなければ使わないもの (空なら `host.optional`) | — | — |
@@ -137,6 +141,7 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 | 変数 | 読むもの | 役割 |
 |---|---|---|
 | `FMOD_SDK_DIR` | `cmake/FindFMOD.cmake` | FMOD Core SDK の場所 (同名のキャッシュ変数でもよい) |
+| `LORICA_SOURCE_DIR` | `cmake/ErgoHardening.cmake` | キャッシュに `LORICA_SOURCE_DIR` が無い初回の構成で、その既定値にする (入れ子の構成をするテストに外側のビルドの Lorica を渡す) |
 | `LOCALAPPDATA` (Windows) / `XDG_STATE_HOME` / `HOME` | `cmake/packages/ErgoPackageWatchNotice.cmake` | `ergo_pkg watch` の状態ディレクトリ (`.../ergo/pkg-watch`) を探して、構成ログに更新の知らせを出す |
 
 ## CMake プリセット

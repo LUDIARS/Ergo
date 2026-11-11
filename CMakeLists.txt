@@ -111,6 +111,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ${ERGO_POSITION_INDEPENDENT_CODE})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
+# Lorica hardening options and ergo_hardening_mark_network(); applied to every
+# target by ergo_harden_targets() at the end of this file (spec/setup/hardening.md).
+include(ErgoHardening)
+
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
@@ -125,6 +129,7 @@ target_link_libraries(ergo_common_ws PUBLIC Threads::Threads)
 if(WIN32)
     target_link_libraries(ergo_common_ws PUBLIC ws2_32)
 endif()
+ergo_hardening_mark_network(ergo_common_ws)
 
 # ---------------------------------------------------------------------------
 # Shared mini-gtest (header-only), bound into one static lib used by all tests
@@ -158,6 +163,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
 # <build>/ergo-packages.resolved.json. See spec/setup/packages.md.
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/packages/ErgoPackages.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoModuleRequirements.cmake")
+# Lorica: after the package hub, which may bring it in with a package.
+ergo_hardening_setup()
 
 # ---------------------------------------------------------------------------
 # ergo_http — libcurl-backed synchronous HTTP client. The public header hides
@@ -175,6 +182,7 @@ if(ERGO_BUILD_HTTP)
         src/http/curl_global.cpp)
     target_include_directories(ergo_http PUBLIC include)
     target_link_libraries(ergo_http PRIVATE CURL::libcurl)
+    ergo_hardening_mark_network(ergo_http)
 
     if(ERGO_BUILD_TESTS)
         add_executable(test_http_client tests/http/test_http_client.cpp)
@@ -793,6 +801,7 @@ if(ERGO_BUILD_CUSTOS)
     target_include_directories(ergo_custos PUBLIC include)
     target_include_directories(ergo_custos PRIVATE third_party)
     target_link_libraries(ergo_custos PUBLIC Threads::Threads)
+    ergo_hardening_mark_network(ergo_custos)
     if(WIN32)
         target_link_libraries(ergo_custos PRIVATE ws2_32)
     endif()
@@ -1049,6 +1058,7 @@ if(ERGO_BUILD_STUDIO)
     )
     target_include_directories(ergo_studio_net PUBLIC include)
     target_link_libraries(ergo_studio_net PUBLIC Threads::Threads)
+    ergo_hardening_mark_network(ergo_studio_net)
     if(WIN32)
         target_link_libraries(ergo_studio_net PUBLIC ws2_32)
     endif()
@@ -1077,6 +1087,7 @@ if(ERGO_BUILD_STUDIO)
     )
     target_include_directories(ergo_studio_host PUBLIC include)
     target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common)
+    ergo_hardening_mark_network(ergo_studio_host)
     if(MSVC)
         target_compile_options(ergo_studio_host PRIVATE /utf-8)
     endif()
@@ -1149,6 +1160,7 @@ if(ERGO_BUILD_STUDIO)
         )
     endif()
     target_include_directories(ergo_studio_platform PUBLIC include)
+    ergo_hardening_mark_network(ergo_studio_platform)
     if(MSVC)
         target_compile_options(ergo_studio_platform PRIVATE /utf-8)
     endif()
@@ -1237,6 +1249,7 @@ if(ERGO_BUILD_STUDIO)
     include(cmake/ErgoEmbedText.cmake)
     ergo_embed_text(ergo_studio_plugins ergo_vfx_catalog_json tools/studio/plugins/vfx_suggest/catalog.json)
     target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform)
+    ergo_hardening_mark_network(ergo_studio_plugins)
     if(MSVC)
         target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
     endif()
@@ -2160,6 +2173,7 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
     )
     target_include_directories(ergo_studio PRIVATE tools/studio)
     target_link_libraries(ergo_studio PRIVATE ergo_studio_plugins ergo_studio_host ergo_studio_net)
+    ergo_hardening_mark_network(ergo_studio)
     if(_ergo_studio_shell)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
@@ -2179,3 +2193,8 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
         RUNTIME_OUTPUT_DIRECTORY_RELEASE "${ERGO_STUDIO_OUT}"
         RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${ERGO_STUDIO_OUT}")
 endif()
+
+# ---------------------------------------------------------------------------
+# Lorica on every target compiled above (keep last). See cmake/ErgoHardening.cmake.
+# ---------------------------------------------------------------------------
+ergo_harden_targets()

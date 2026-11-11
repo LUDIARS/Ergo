@@ -23,6 +23,7 @@ Ergo は **C++17 モジュール群** (`ergo_<domain>`、`ergo_math` / `ergo_phy
 | 変更を main に入れる (ブランチ + PR 運用) | [branch-and-pr.md](branch-and-pr.md) | feat ブランチ + PR (main 直 push 禁止) |
 | LUDIARS パッケージ (Pictor / Tela) の版の固定と記録 | [packages.md](packages.md) | `ergo-packages.json`、互換モード M0 |
 | CI の各ジョブの内容と手元での再現 | [ci.md](ci.md) | GitHub Actions / CMake プリセット |
+| Lorica の守り (ビルドの守り) | [hardening.md](hardening.md) | `ERGO_HARDENING` / `ERGO_HARDENING_PROFILE` / `LORICA_SOURCE_DIR` |
 | 環境変数 / ビルドフラグ / ポートを一覧で見る | [config-reference.md](config-reference.md) | 全キー早見表 |
 
 ## 前提
