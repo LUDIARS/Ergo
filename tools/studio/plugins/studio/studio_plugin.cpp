@@ -1,6 +1,6 @@
 #include "studio_plugin.h"
 
-#include "mutation_guard.h"
+#include "../common/mutation_guard.h"
 
 namespace ergo::studio::plugins::studio {
 

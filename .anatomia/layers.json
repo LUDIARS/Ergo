@@ -18,6 +18,10 @@
       "layer": "application"
     },
     {
+      "glob": "examples/lesson_action_feel/*",
+      "layer": "application"
+    },
+    {
       "glob": "include/ergo/actor/*",
       "layer": "domain-logic"
     },
@@ -907,6 +911,10 @@
     },
     {
       "glob": "tools/studio/plugins/musa_thaleia/*",
+      "layer": "application"
+    },
+    {
+      "glob": "tools/studio/plugins/lesson/*",
       "layer": "application"
     },
     {

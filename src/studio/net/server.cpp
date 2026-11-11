@@ -90,10 +90,10 @@ bool Server::start(std::string& err) {
 
 void Server::stop() {
     if (!running_.exchange(false)) return;
-    sock::shutdown_both(listen_sock_);
+    sock::shutdown_both(listen_sock_);   // wakes accept_one() in the accept thread
     sock::close(listen_sock_);
-    listen_sock_ = sock::kInvalid;
     if (accept_thread_.joinable()) accept_thread_.join();
+    listen_sock_ = sock::kInvalid;       // only after the join: accept_loop() reads it
     std::vector<ConnThread> threads;
     {
         std::lock_guard<std::mutex> lk(conn_mtx_);

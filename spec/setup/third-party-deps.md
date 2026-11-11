@@ -34,7 +34,7 @@ curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を�
 | `ERGO_FETCH_DEPENDENCIES` | ON | 依存を upstream から取得してよいかのマスタースイッチ。OFF かつ source override も無い状態で依存が要求されると **FATAL_ERROR** (無言で素通りしない) |
 | `ERGO_WITH_CURL` | OFF | libcurl を取得してビルド |
 | `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF | スモークテストをビルド (curl を強制 ON) |
-| `ERGO_CURL_USE_SSL` | ON | curl の TLS backend を有効化 (Windows は Schannel = OS 内蔵、外部 SSL SDK 不要) |
+| `ERGO_CURL_USE_SSL` | ON | curl の TLS backend を有効化 (Windows は Schannel = OS 内蔵、外部 SSL SDK 不要。Linux は curl 自身の既定で OpenSSL を探す: `libssl-dev` が要る。2026-11-11 に Ubuntu 24.04 / OpenSSL 3.0.13 で確認、CA bundle は configure 時に見つけた `/etc/ssl/certs/ca-certificates.crt`) |
 | `ERGO_DEPENDENCY_CACHE_DIR` | (空) | 取得ソースの共有キャッシュ dir。空なら `<build>/_deps` |
 | `ERGO_SOURCE_DIR_<UPPER>` | (空) | その依存を fetch せずローカルチェックアウトで差し替える (オフライン用) |
 
@@ -45,8 +45,12 @@ curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を�
 
 | 名前 | pin | TLS / 備考 | consume |
 |---|---|---|---|
-| curl | tag `curl-8_19_0` | static libcurl のみ (CLI/docs/test/install 無効、関数スコープの通常変数で指定)。Windows は Schannel | `target_link_libraries(<t> PRIVATE CURL::libcurl)` / `#include <curl/curl.h>` |
+| curl | tag `curl-8_19_0` | static libcurl のみ (CLI/docs/test/install 無効、関数スコープの通常変数で指定)。Windows は Schannel、Linux は OpenSSL | `target_link_libraries(<t> PRIVATE CURL::libcurl)` / `#include <curl/curl.h>` |
 | lorica | commit `5e8281b0e60fa16f814e16eaa620715937e8618d` (LUDIARS/Lorica、2026-11-11 の main) | `WITH` 系のスイッチではなく、Lorica が対応するツールチェインでは常に取り込む (`cmake/ErgoHardening.cmake`)。使うのはヘッダだけの `Lorica::boundary` と守りの CMake 関数で、`LORICA_BUILD_PROTECTION` / `LORICA_BUILD_TESTS` は関数スコープの通常変数で OFF。`LORICA_SOURCE_DIR` か `ERGO_SOURCE_DIR_LORICA` でローカルのチェックアウトを使う。ホストがすでに Lorica を持っていればそれを使う | 全ターゲットに自動 (`spec/setup/hardening.md`)。ヘッダは `#include <lorica/checked_size.hpp>` など |
+
+curl を使っているもの: `ergo_http` (`ERGO_BUILD_HTTP=ON` で curl を強制 ON)、`ergo_studio_platform` の Windows 以外の
+HTTP(S) (`src/studio/platform/curl_http_client.cpp`。`CURL::libcurl` があるときだけ。無ければ「この build には HTTP が
+無い」という明示の失敗を返す。Studio は curl を強制 ON にしない: 素の Ergo ビルドをネットワーク非依存に保つため)。
 
 傘 target: `ergo_thirdparty` (= `ergo::thirdparty`) は ON になっている依存をまとめて
 リンクする。どのスイッチが ON かを気にせず依存できる。

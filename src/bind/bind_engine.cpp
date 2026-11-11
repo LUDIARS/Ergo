@@ -346,11 +346,13 @@ void Engine::apply_pending_writes() {
         if (w.value.kind != kind) continue;
         const Value clamped = clamp_to_meta(w.value, meta);
         setter(clamped);
-        // Update last_seen so change detection below doesn't re-emit.
-        impl_->vars.refresh_last_seen(w.handle);
+        // last_seen is left alone on purpose: the change detection below then
+        // publishes the value the host really holds after the write (clamped,
+        // or overridden by the host), so the server's copy follows the engine
+        // instead of keeping the value it had before the set.
     }
 
-    // Detect external changes and push them to the server.
+    // Detect changes (external ones and the writes applied above) and push them to the server.
     if (!impl_->client.is_connected()) return;
     for (auto& [n, v] : impl_->vars.collect_changes()) {
         impl_->send_value(n, v);

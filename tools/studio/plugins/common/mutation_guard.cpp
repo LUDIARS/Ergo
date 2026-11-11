@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace ergo::studio::plugins::studio {
+namespace ergo::studio::plugins {
 namespace {
 
 std::string lower(std::string s) {
@@ -82,4 +82,4 @@ std::optional<std::string> check_mutation(const std::string& method_in, const st
     return std::nullopt;
 }
 
-} // namespace ergo::studio::plugins::studio
+} // namespace ergo::studio::plugins
