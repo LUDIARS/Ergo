@@ -1074,6 +1074,7 @@ if(ERGO_BUILD_STUDIO)
         src/studio/host/plugin_host.cpp
         src/studio/host/plugin_id.cpp
         src/studio/host/plugin_loader.cpp
+        src/studio/host/usage_hint.cpp
     )
     target_include_directories(ergo_studio_host PUBLIC include)
     target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common)
@@ -2249,6 +2250,19 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
         COMMAND ${CMAKE_COMMAND} -E make_directory "${ERGO_STUDIO_OUT}/sdk/include/ergo/studio"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/include/ergo/studio/plugin_abi.h"
                 "${ERGO_STUDIO_OUT}/sdk/include/ergo/studio/plugin_abi.h")
+    if(ERGO_BUILD_TESTS)
+        # ergo_studio's command line (--help / --headless / unknown options) and environment.
+        add_executable(test_studio_settings
+            tests/studio/test_studio_settings.cpp
+            tools/studio/studio_settings.cpp
+        )
+        target_include_directories(test_studio_settings PRIVATE tools/studio)
+        target_link_libraries(test_studio_settings PRIVATE ergo_studio_plugins ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_settings PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_settings COMMAND test_studio_settings)
+    endif()
     set_target_properties(ergo_studio PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${ERGO_STUDIO_OUT}"
         RUNTIME_OUTPUT_DIRECTORY_DEBUG "${ERGO_STUDIO_OUT}"

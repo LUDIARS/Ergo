@@ -13,6 +13,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace ergo::studio::host {
 
@@ -24,7 +25,14 @@ struct PluginInfo {
     std::string title;
     std::string description;
     std::string icon;
+    /// Optional one line the Studio logs under the plugin at start-up: how a
+    /// client reaches it without the window (e.g. the WebSocket a game dials).
+    /// "{addr}" stands for the server's <host>:<port>. "" = nothing to add.
+    std::string usage_hint;
 };
+
+/// `hint` with every "{addr}" replaced by `addr` (<host>:<port>).
+std::string expand_usage_hint(std::string_view hint, std::string_view addr);
 
 /// Logging handed to every plugin (stdout / stderr of the Studio process).
 using LogFn = net::LogFn;

@@ -185,3 +185,10 @@ TEST(StudioHostRouter, RoutesApiAndPluginPaths) {
     EXPECT_FALSE(host.accepts("log"));
     EXPECT_FALSE(host.accepts("nope"));
 }
+
+TEST(StudioHost, UsageHintNamesTheServerAddress) {
+    EXPECT_EQ(expand_usage_hint("ws://{addr}/variable/ws", "127.0.0.1:5491"), "ws://127.0.0.1:5491/variable/ws");
+    EXPECT_EQ(expand_usage_hint("{addr} and {addr}", "h:1"), "h:1 and h:1");
+    EXPECT_EQ(expand_usage_hint("no token {add", "h:1"), "no token {add");
+    EXPECT_EQ(expand_usage_hint("", "h:1"), "");
+}

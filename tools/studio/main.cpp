@@ -88,6 +88,10 @@ int main(int argc, char** argv) {
     std::signal(SIGINT, [](int) { g_stop = true; });
 
     const auto settings = app::read_settings(&env, exe_dir(), argc, argv);
+    if (settings.show_help && settings.error.empty()) {
+        std::fputs(app::studio_usage().c_str(), stdout);
+        return 0;
+    }
     if (!settings.error.empty()) {
         log_line("error", "[ergo] " + settings.error);
         return 1;
@@ -114,9 +118,13 @@ int main(int argc, char** argv) {
         log_line("error", "[ergo] " + err);
         return 1;
     }
-    log_line("info", "[ergo] http://" + settings.bind_host + ":" + std::to_string(server.port()) + "/");
+    const std::string addr = settings.bind_host + ":" + std::to_string(server.port());
+    log_line("info", "[ergo] http://" + addr + "/");
     for (auto* p : plugins.plugins()) {
         log_line("info", "[ergo]   -> " + p->info().title + "  (/" + p->info().id + "/" + (p->socket() ? ", ws" : "") + ")");
+        if (!p->info().usage_hint.empty()) {
+            log_line("info", "[ergo]        " + host::expand_usage_hint(p->info().usage_hint, addr));
+        }
     }
     for (const auto& r : plugins.rejected()) log_line("error", "[ergo]   !! rejected " + r.source + ": " + r.reason);
 

@@ -68,7 +68,8 @@ void log_demo_changes(const host::LogFn& log, const std::vector<DemoEntry>& befo
 LessonPlugin::LessonPlugin(std::shared_ptr<platform::IHttpClient> http, std::shared_ptr<IGameVariables> variables,
                            host::LogFn log)
     : info_{"lesson", "授業", "odeum-lesson の授業とつなぎ、課題の進み具合の報告 (生徒) と実演の切り替え (実演) を自動で行う。",
-            "\xF0\x9F\x8E\x93"},
+            "\xF0\x9F\x8E\x93",
+            "without the window: POST http://{addr}/lesson/api/connect, JSON body {\"link\":\"<connection string>\"}"},
       log_(std::move(log)),
       session_(LessonClient(std::move(http)), std::move(variables)),
       worker_([this] { run(); }) {}

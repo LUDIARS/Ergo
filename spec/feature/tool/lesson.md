@@ -233,6 +233,9 @@ loopback の Host、Origin を付けるなら同じ host:port、本文が JSON) 
   `net::Server` への GET / POST / PUT / DELETE と本文・ヘッダ、404、リダイレクト、時間切れ、本文の上限、
   `ftp://` の拒否、`https://` を平文のサーバへ向けると TLS の失敗になり平文の要求は届かないこと、試験内の
   小さな listener での chunked / close 区切り / 壊れた chunked)。
+- `tests/studio/test_studio_settings.cpp`: `ergo_studio` のコマンドライン (`--help` / `-h`、`--headless`、`PORT` /
+  `ERGO_HOST` との組み合わせ、知らないオプション・位置引数・壊れた `PORT` のエラー、知らないオプションが `--help`
+  より優先されること) と、`--help` の文面が `read_settings` の読む全オプション・全環境変数を挙げていること。
 - `tests/studio/test_studio_lesson_view.cpp`: タブの文言 (未接続、貼り付けの拒否理由、生徒、実演、従わないゲーム、失敗の種類)
   と、画面に token・コード・貼り付けた文字列が出ないこと。
 - `tests/studio/test_studio_lesson.cpp` の `StudioLessonRoutes`: 経路の state / connect / disconnect、405 / 404、
@@ -276,6 +279,138 @@ Odeum のサンプル講座 (`action-game`) が名前を出す変数を、実際
 - 起動: `ergo_example_lesson_action_feel [--host H] [--port P] [--plain] [--seconds S] [--status-every S]`
   (Studio の `variable` プラグイン `ws://H:P/variable/ws`、既定 `127.0.0.1:5170`)。切り替えのたびと接続の状態、
   数秒ごとの状態を標準出力に 1 行ずつ出す。`--check` は Studio なしで観測値が切り替えに従うかを確かめる (ctest)。
+  `--help` / `-h` は使い方を標準出力に出して 0 で終わる。知らないオプション・範囲外の値・値の無い `--port` などは
+  そのオプションを名指しして 2 で終わる (何も始めない)。
+
+### 端末から使う (窓なし) {#SPEC-ergo-lesson-terminal}
+
+ビルドの出力 (`cmake -S . -B <build> -G Ninja` で確認、2026-11-11、Linux):
+
+| 物 | 場所 |
+|---|---|
+| Studio | `<build>/studio/ergo_studio` (Windows は `ergo_studio.exe`。`studio/` は CMake が全構成で固定している) |
+| サンプル | `<build>/examples/ergo_example_lesson_action_feel` (Visual Studio などの複数構成の generator では構成名のフォルダが挟まる見込み。未確認) |
+
+Pictor / Vulkan / GLFW の無い build の Studio は常に窓なし (configure で「building the headless server only」と出る)。
+窓のある build では `--headless` で窓を出さない。止めるのはどちらも Ctrl+C (SIGINT)。
+
+`ergo_studio --help` (`-h` も同じ) は使い方を標準出力に出して 0 で終わり、サーバも窓も始めない。受け付ける
+オプションは `--headless` と `--help` / `-h` だけで、それ以外 (`--no-such-option`、位置引数) は名指しのエラーを
+出して 1 で終わる (`--help` と一緒に書いてもエラーが優先)。文面の正本は `tools/studio/studio_settings.cpp` の
+`studio_usage()` (Linux での出力。Windows では区切り `;` と `USERPROFILE` になる):
+
+```text
+usage: ergo_studio [--headless]
+       ergo_studio --help | -h
+
+Ergo Studio: the loopback HTTP / WebSocket server the engine clients and tools talk to,
+plus its window. Stop it with Ctrl+C (SIGINT).
+
+options:
+  --headless   server only, no window (a build without the window is always headless)
+  --help, -h   print this text and exit (nothing is started)
+
+environment (unset or empty = the default):
+  PORT                     port to listen on, 1..65535 (default 5170)
+  ERGO_HOST                address to bind (default 127.0.0.1)
+  ERGO_PLUGIN_DIR          external plugin pack directories (separated by ':')
+  ERGO_STUDIO_HOME         plugin ledger and fetched plugins (default <home>/.ergo-studio)
+  LUDIARS_ROOT             where the Excubitor catalog and the Revisor CLI are (studio plugin)
+  EXCUBITOR_URL            Excubitor URL (default: from the catalog)
+  ERGO_ACTIO_TOKEN         Actio bearer token (unset = Actio local mode)
+  ERGO_CURARE_URL          a remote Curare server (default: from the Excubitor topology)
+  ERGO_CURARE_TOKEN        Curare bearer token
+  ERGO_PLUGIN_OWNERS       GitHub owners plugins may be fetched from, comma list (default LUDIARS)
+  ERGO_STUDIO_TIMEOUT_MS   limit of one service call in ms (default 8000)
+  VISUS_PROJECT_ROOTS      project roots the visus plugin scans (';' separated)
+  ERGO_UI_LAYOUT_ROOT      file root of the ui_layout plugin (unset = not configured)
+  ERGO_PICTOR_PROFILE_DIR  Pictor *.profile.json directory (render_pipeline plugin)
+  ERGO_VFX_BACKEND         vfx_suggest / vfx_breed backend (default cli, the only one)
+  ERGO_VFX_MODEL           model name passed to the claude CLI (default haiku)
+  CLAUDE_BIN               claude CLI to run (default claude)
+  ERGO_STUDIO_FONT         window font (default <WINDIR>\Fonts\meiryo.ttc when WINDIR is set)
+  WINDIR                   Windows directory, for the default font
+  HOME                     home directory (melpomene / terpsichore / thaleia, studio home)
+
+At start-up the log prints the server address and each plugin with its path; plugins
+that clients reach directly add one line saying how (e.g. the variable WebSocket).
+```
+
+```text
+$ ergo_studio --no-such-option; echo $?
+[err] [ergo] unknown option "--no-such-option" (ergo_studio --help lists the options)
+1
+```
+
+起動したときのログには、サーバの番地とプラグインの一覧に加えて、窓なしで使う入口が 1 行ずつ出る (プラグインの
+`PluginInfo::usage_hint`。`{addr}` が `<host>:<port>` になる):
+
+```text
+[info] [ergo] http://127.0.0.1:5491/
+[info] [ergo]   -> Ergo Studio  (/studio/)
+[info] [ergo]   -> Variable Editor  (/variable/, ws)
+[info] [ergo]        games and clients: ws://127.0.0.1:5491/variable/ws (first frame {"op":"hello","role":"engine"|"ui"})
+...
+[info] [ergo]   -> 授業  (/lesson/)
+[info] [ergo]        without the window: POST http://127.0.0.1:5491/lesson/api/connect, JSON body {"link":"<connection string>"}
+```
+
+授業につなぐ: `curl -X POST -H 'Content-Type: application/json' -d '{"link":"<接続文字列>"}' http://127.0.0.1:<port>/lesson/api/connect`
+(`Content-Type` が JSON でなければ `403 forbidden`、上の LS-INV-06)。結果は `GET /lesson/api/state` で見る。
+
+変数を切り替える (`/variable/ws` の role "ui" のクライアント。`tools/studio/plugins/variable/variable_plugin.cpp`):
+
+1. 送る `{"op":"hello","role":"ui"}` → 届く `{"op":"actors","nodes":[...]}` と `{"op":"registry","vars":[...]}`
+   (`vars` の各要素は `{app, kind, meta, name, value}`)。
+2. 送る `{"op":"set","name":"feel.hit_stop","value":true}` → Studio がその変数を持つゲームへ渡し、ゲームが値を変えると
+   全 ui クライアントに `{"op":"value","name":"feel.hit_stop","value":true}` が届く。登録されていない名前の `set` は
+   何も起こさない (返事も無い)。
+
+実際に行った手順と出力 (2026-11-11、この Linux、`cmake -G Ninja` の build、`NO_PROXY=127.0.0.1,localhost`、
+Node 22 の `WebSocket` で書いた使い捨てのクライアント `ws_switch.mjs`: hello を送り、`registry` が来たら `set` を送り、
+`value` が来たら閉じる):
+
+```text
+$ PORT=5491 <build>/studio/ergo_studio --headless &
+$ <build>/examples/ergo_example_lesson_action_feel --port 5491 --plain --status-every 1 &
+$ node ws_switch.mjs ws://127.0.0.1:5491/variable/ws feel.hit_stop true
+> {"op":"hello","role":"ui"}
+< {"nodes":[],"op":"actors"}
+< {"op":"registry","vars":[{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.camera_shake","value":false},{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.hit_stop","value":false}, ...]}
+> {"op":"set","name":"feel.hit_stop","value":true}
+< {"name":"feel.hit_stop","op":"value","value":true}
+```
+
+そのときのサンプルの出力:
+
+```text
+[lesson_action_feel] started (--plain): hit_stop=OFF knockback=OFF camera_shake=OFF, Studio ws://127.0.0.1:5491/variable/ws
+[lesson_action_feel] waiting for the Studio (variable plugin)
+[lesson_action_feel] connected to the Studio
+[lesson_action_feel] world=1.0s hits=3 hit_stop=OFF knockback=OFF camera_shake=OFF hit_stop_last_seconds=0.000 knockback_last_impulse=0.000 enemy_offset=0.000 shake=0.000
+[lesson_action_feel] feel.hit_stop: OFF -> ON
+[lesson_action_feel] world=2.0s hits=5 hit_stop=ON knockback=OFF camera_shake=OFF hit_stop_last_seconds=0.080 knockback_last_impulse=0.000 enemy_offset=0.000 shake=0.000
+```
+
+`ergo_example_lesson_action_feel --help` の出力:
+
+```text
+usage: ergo_example_lesson_action_feel [--host H] [--port P] [--plain] [--seconds S] [--status-every S]
+       ergo_example_lesson_action_feel --check
+       ergo_example_lesson_action_feel --help | -h
+
+Headless sample for the Odeum lesson link (not a playable game): publishes feel.hit_stop,
+feel.knockback, feel.camera_shake (writable) and feel.hit_stop_last_seconds,
+feel.knockback_last_impulse (read-only) to the Studio's variable plugin at ws://H:P/variable/ws.
+
+  --host H           Studio host (default 127.0.0.1)
+  --port P           Studio port, 1..65535 (default 5170; the Studio's PORT)
+  --plain            start with all three effects OFF
+  --seconds S        stop after S seconds of real time (default 0 = until Ctrl+C / SIGTERM)
+  --status-every S   status line every S seconds, 0.1..3600 (default 2)
+  --check            offline self-check without a Studio (exit 0 = the observations follow the toggles)
+  --help, -h         print this text and exit
+```
 
 ## 未決・今後
 

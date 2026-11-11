@@ -9,7 +9,8 @@ const char* const kUi     = "ui";
 VariablePlugin::VariablePlugin()
     : info_{"variable", "Variable Editor",
             "Live-edit variables exposed by engine clients via BIND_VAR() (ergo_bind), grouped by ergo_actor.",
-            "\xF0\x9F\x8E\x9B"} {}
+            "\xF0\x9F\x8E\x9B",
+            "games and clients: ws://{addr}/variable/ws (first frame {\"op\":\"hello\",\"role\":\"engine\"|\"ui\"})"} {}
 
 net::HttpResponse VariablePlugin::handle(const net::HttpRequest& req, const std::string& sub) {
     if (req.method != "GET") return net::HttpResponse::json(405, "{\"ok\":false,\"err\":\"method not allowed\"}");

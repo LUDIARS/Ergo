@@ -13,6 +13,8 @@
 ///       (default 127.0.0.1:5170). --plain starts with all three effects OFF (演出を抜いた状態).
 ///   ergo_example_lesson_action_feel --check
 ///       offline: fixed-dt frames without a Studio; verifies the observations follow the toggles.
+///   ergo_example_lesson_action_feel --help | -h
+///       prints the usage (stdout, exit 0). An unknown option or a bad value is an error (exit 2).
 ///
 /// Every toggle change (from the Studio or not) and the link state are logged
 /// on stdout, plus a status line every --status-every seconds (default 2).
@@ -40,6 +42,7 @@ std::atomic<int> g_stop{0};
 void on_signal(int) { g_stop = 1; }
 
 struct Options {
+    bool          help  = false;
     bool          check = false;
     bool          plain = false;
     std::string   host  = "127.0.0.1";
@@ -56,28 +59,49 @@ bool parse_number(const char* s, double lo, double hi, double& out) {
     return true;
 }
 
-bool parse_options(int argc, char** argv, Options& o) {
+const char* const kUsage =
+    "usage: ergo_example_lesson_action_feel [--host H] [--port P] [--plain] [--seconds S] [--status-every S]\n"
+    "       ergo_example_lesson_action_feel --check\n"
+    "       ergo_example_lesson_action_feel --help | -h\n"
+    "\n"
+    "Headless sample for the Odeum lesson link (not a playable game): publishes feel.hit_stop,\n"
+    "feel.knockback, feel.camera_shake (writable) and feel.hit_stop_last_seconds,\n"
+    "feel.knockback_last_impulse (read-only) to the Studio's variable plugin at ws://H:P/variable/ws.\n"
+    "\n"
+    "  --host H           Studio host (default 127.0.0.1)\n"
+    "  --port P           Studio port, 1..65535 (default 5170; the Studio's PORT)\n"
+    "  --plain            start with all three effects OFF\n"
+    "  --seconds S        stop after S seconds of real time (default 0 = until Ctrl+C / SIGTERM)\n"
+    "  --status-every S   status line every S seconds, 0.1..3600 (default 2)\n"
+    "  --check            offline self-check without a Studio (exit 0 = the observations follow the toggles)\n"
+    "  --help, -h         print this text and exit\n";
+
+/// "" when every argument is understood, else what is wrong with the first one that is not.
+std::string parse_options(int argc, char** argv, Options& o) {
     for (int i = 1; i < argc; ++i) {
         const std::string a     = argv[i];
         const bool        value = i + 1 < argc;
         double            n     = 0.0;
-        if (a == "--check") {
+        if (a == "--help" || a == "-h") {
+            o.help = true;
+        } else if (a == "--check") {
             o.check = true;
         } else if (a == "--plain") {
             o.plain = true;
-        } else if (a == "--host" && value) {
-            o.host = argv[++i];
-        } else if (a == "--port" && value && parse_number(argv[++i], 1, 65535, n)) {
-            o.port = static_cast<std::uint16_t>(n);
-        } else if (a == "--seconds" && value && parse_number(argv[++i], 0, 1e9, n)) {
-            o.seconds = n;
-        } else if (a == "--status-every" && value && parse_number(argv[++i], 0.1, 3600, n)) {
-            o.status_every = n;
+        } else if (a == "--host" || a == "--port" || a == "--seconds" || a == "--status-every") {
+            if (!value) return "option " + a + " needs a value";
+            const char* v  = argv[++i];
+            bool        ok = true;
+            if (a == "--host") o.host = v;
+            else if (a == "--port" && (ok = parse_number(v, 1, 65535, n))) o.port = static_cast<std::uint16_t>(n);
+            else if (a == "--seconds" && (ok = parse_number(v, 0, 1e9, n))) o.seconds = n;
+            else if (a == "--status-every" && (ok = parse_number(v, 0.1, 3600, n))) o.status_every = n;
+            if (!ok) return "bad value for " + a + ": \"" + v + "\"";
         } else {
-            return false;
+            return "unknown option \"" + a + "\"";
         }
     }
-    return true;
+    return {};
 }
 
 void say(const char* fmt, ...) {
@@ -134,10 +158,13 @@ int run_check() {
 
 int main(int argc, char** argv) {
     Options opt;
-    if (!parse_options(argc, argv, opt)) {
-        std::fprintf(stderr,
-                     "usage: %s [--host H] [--port P] [--plain] [--seconds S] [--status-every S] | --check\n", argv[0]);
+    if (const std::string err = parse_options(argc, argv, opt); !err.empty()) {
+        std::fprintf(stderr, "ergo_example_lesson_action_feel: %s (--help lists the options)\n", err.c_str());
         return 2;
+    }
+    if (opt.help) {
+        std::fputs(kUsage, stdout);
+        return 0;
     }
     if (opt.check) return run_check();
 
