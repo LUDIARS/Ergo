@@ -42,7 +42,12 @@ SHA を PR なしで検査したいときは workflow_dispatch で起動する
 - 結果は成否に関わらずアーティファクト `ctest-<レグ名>` に上がる:
   `ctest-junit.xml` と `Testing/Temporary/LastTest.log`。CMake 3.20 の ctest
   には `--output-junit` が無いので、`linux-gcc-cmake320` は LastTest.log だけ。
-- Linux / macOS のレグは ccache (レグ名ごとのキャッシュ) を使う。Visual Studio
+- Linux / macOS のレグは ccache (レグ名ごとのキャッシュ) を使う。ccache は速くする
+  だけの best-effort で、ステップは `continue-on-error`。導入に成功したときだけ
+  次のステップが環境変数 `CMAKE_CXX_COMPILER_LAUNCHER=ccache` を立てる (CMake 3.17 以上は
+  これを `CMAKE_CXX_COMPILER_LAUNCHER` の既定値にする)。導入に失敗してもレグは
+  キャッシュ無しでビルド・テストまで走る (ccache の失敗だけでレグを赤にしない)。
+  そのため各レグの構成コマンドはランチャを含まず、下の「ローカル再現」と同じ。Visual Studio
   ジェネレータはコンパイララウンチャを使えないので、Windows は
   `--parallel` (MSBuild `/m`) と `CL=/MP` で並列化する。
 - `windows-msvc` はテスト後に Ergo 自身をホストとして `ergo_pkg status` と
@@ -54,7 +59,8 @@ SHA を PR なしで検査したいときは workflow_dispatch で起動する
 ## ローカル再現
 
 いずれもリポジトリのルートで実行する。CI と同じく ccache を使うなら
-構成に `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache` を足す。
+構成の前に `export CMAKE_CXX_COMPILER_LAUNCHER=ccache` とする (または構成に
+`-DCMAKE_CXX_COMPILER_LAUNCHER=ccache` を足す)。
 
 ### windows-msvc
 

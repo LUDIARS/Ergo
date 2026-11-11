@@ -42,7 +42,7 @@ jobs:
             os: ubuntu-24.04
             shell: bash
             build-dir: build
-            configure: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+            configure: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
             build: cmake --build build --parallel
             test: ctest --test-dir build --parallel 4 --output-on-failure
           # clang with -Wall -Wextra (warnings are shown, not yet errors).
@@ -50,7 +50,7 @@ jobs:
             os: ubuntu-24.04
             shell: bash
             build-dir: build/ci-linux-clang
-            configure: cmake --preset ci-linux-clang -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            configure: cmake --preset ci-linux-clang
             build: cmake --build --preset ci-linux-clang
             test: ctest --preset ci-linux-clang --output-junit ctest-junit.xml
           # GCC Debug with AddressSanitizer + LeakSanitizer + UBSan.
@@ -58,7 +58,7 @@ jobs:
             os: ubuntu-24.04
             shell: bash
             build-dir: build/ci-asan
-            configure: cmake --preset ci-asan -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            configure: cmake --preset ci-asan
             build: cmake --build --preset ci-asan
             test: ctest --preset ci-asan --output-junit ctest-junit.xml
     defaults:
@@ -68,11 +68,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # ccache only speeds the build up. If it cannot be installed the leg
+      # still builds and tests, uncached: the launcher is set only on success.
       - name: ccache
+        id: ccache
         if: runner.os == 'Linux'
+        continue-on-error: true
         uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: ${{ matrix.name }}
+
+      - name: Use ccache as the compiler launcher
+        if: steps.ccache.outcome == 'success'
+        run: echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
 
       - name: Install CMake 3.20.5
         if: matrix.name == 'linux-gcc-cmake320'
@@ -144,12 +152,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: ccache
+        id: ccache
+        continue-on-error: true
         uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: macos-14
 
+      - name: Use ccache as the compiler launcher
+        if: steps.ccache.outcome == 'success'
+        run: echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> "$GITHUB_ENV"
+
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
 
       - name: Build
         run: cmake --build build --parallel
