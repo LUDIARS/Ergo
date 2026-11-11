@@ -51,6 +51,7 @@ class FakeVars final : public IGameVariables {
 public:
     std::map<std::string, GameVariable>            vars;
     std::vector<std::pair<std::string, JsonValue>> sets;
+    bool follows = false;   ///< true: like a game that applies the set and publishes the new value
 
     std::optional<GameVariable> find(const std::string& name) const override {
         const auto it = vars.find(name);
@@ -60,6 +61,7 @@ public:
     bool request_set(const std::string& name, const JsonValue& value) override {
         if (!vars.count(name)) return false;
         sets.emplace_back(name, value);
+        if (follows) vars[name].value = deep_copy(value);
         return true;
     }
 };
@@ -613,8 +615,9 @@ TEST(StudioLessonSession, AFailedStatePollKeepsTheLinkAndRecovers) {
 
 // ---- presenter -----------------------------------------------------------------------
 
-TEST(StudioLessonPresenter, ASeqChangeAppliesTheDemoStates) {
+TEST(StudioLessonPresenter, TheGameIsComparedWithTheCueOnEveryPoll) {
     Linked t("presenter");
+    t.vars->follows                = true;
     t.vars->vars["feel.hit_stop"]  = var("bool", jbool(false));
     t.vars->vars["feel.knockback"] = var("bool", jbool(true));
 
@@ -632,24 +635,78 @@ TEST(StudioLessonPresenter, ASeqChangeAppliesTheDemoStates) {
     EXPECT_TRUE(t.vars->sets[0].second.b);
     EXPECT_EQ(t.vars->sets[1].first, std::string("feel.knockback"));
     EXPECT_FALSE(t.vars->sets[1].second.b);
-    for (const auto& e : t.session.view().demo) EXPECT_TRUE(e.status == DemoStatus::Applied);
+    // Requested, not yet applied: applied means the game publishes the wanted value.
+    for (const auto& e : t.session.view().demo) EXPECT_TRUE(e.status == DemoStatus::Requested);
 
-    t.session.poll();   // same seq: nothing is repeated
+    t.session.poll();   // the game followed: nothing is requested again
+    EXPECT_EQ(t.vars->sets.size(), 2u);
+    for (const auto& e : t.session.view().demo) EXPECT_TRUE(e.status == DemoStatus::Applied);
+    t.session.poll();
     EXPECT_EQ(t.vars->sets.size(), 2u);
 
-    t.http->routes[kStateUrl] = {200, presenter_state(2, R"({"hit_stop":false,"knockback":false})")};
-    t.session.poll();   // a new cue applies every cued feature again
+    // The game restarts mid-demo: its variables are bound again at their defaults.
+    t.vars->vars["feel.hit_stop"]  = var("bool", jbool(false));
+    t.vars->vars["feel.knockback"] = var("bool", jbool(true));
+    t.session.poll();   // same seq, but the game diverged: both are requested again
     ASSERT_EQ(t.vars->sets.size(), 4u);
-    EXPECT_FALSE(t.vars->sets[2].second.b);
+    EXPECT_TRUE(t.vars->sets[2].second.b);
+    EXPECT_FALSE(t.vars->sets[3].second.b);
+    for (const auto& e : t.session.view().demo) EXPECT_TRUE(e.status == DemoStatus::Requested);
+    t.session.poll();
+    EXPECT_EQ(t.vars->sets.size(), 4u);
+    for (const auto& e : t.session.view().demo) EXPECT_TRUE(e.status == DemoStatus::Applied);
+
+    // Something else flips one of them: only that one is requested.
+    t.vars->vars["feel.knockback"].value = jbool(true);
+    t.session.poll();
+    ASSERT_EQ(t.vars->sets.size(), 5u);
+    EXPECT_EQ(t.vars->sets[4].first, std::string("feel.knockback"));
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Applied);
+    EXPECT_TRUE(t.session.view().demo[1].status == DemoStatus::Requested);
+
+    t.http->routes[kStateUrl] = {200, presenter_state(2, R"({"hit_stop":false,"knockback":false})")};
+    t.session.poll();   // the next cue changes the wanted value of hit_stop only
+    ASSERT_EQ(t.vars->sets.size(), 6u);
+    EXPECT_EQ(t.vars->sets[5].first, std::string("feel.hit_stop"));
+    EXPECT_FALSE(t.vars->sets[5].second.b);
     EXPECT_EQ(count(*t.http, kProgressUrl), 0u);   // a presenter never reports progress
+}
+
+TEST(StudioLessonPresenter, AGameThatDoesNotFollowIsShownAndAskedOncePerPoll) {
+    Linked t("presenter");   // FakeVars does not follow: like a read_only variable, the value stays
+    t.vars->vars["feel.hit_stop"] = var("bool", jbool(false));
+    t.http->routes[kStateUrl] = {200, presenter_state(1, R"({"hit_stop":true})")};
+
+    t.session.poll();
+    ASSERT_EQ(t.vars->sets.size(), 1u);
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Requested);
+    for (std::size_t poll = 2; poll <= 5; ++poll) {
+        t.session.poll();
+        EXPECT_EQ(t.vars->sets.size(), poll);   // one small request per poll, no more
+        EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::NotFollowing);
+    }
+    t.http->routes[kStateUrl] = {200, presenter_state(2, R"({"hit_stop":true})")};
+    t.session.poll();   // a new cue with the same wanted value does not hide that the game ignores it
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::NotFollowing);
+
+    t.vars->vars["feel.hit_stop"].value = jbool(true);   // e.g. the developer made the variable writable and set it
+    t.session.poll();
+    EXPECT_EQ(t.vars->sets.size(), 6u);
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Applied);
+
+    t.vars->vars["feel.hit_stop"] = var("bool", jbool(false));   // diverged again: a fresh request, not "not following" yet
+    t.session.poll();
+    EXPECT_EQ(t.vars->sets.size(), 7u);
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Requested);
 }
 
 TEST(StudioLessonPresenter, AnUnboundVariableStaysPendingUntilTheGameBindsIt) {
     Linked t("presenter");
+    t.vars->follows                = true;
     t.vars->vars["feel.knockback"] = var("bool", jbool(false));
     t.http->routes[kStateUrl] = {200, presenter_state(5, R"({"hit_stop":true,"knockback":true})")};
 
-    t.session.poll();   // joined mid-class: seq 5 is new to this session
+    t.session.poll();   // joined mid-class
     ASSERT_EQ(t.vars->sets.size(), 1u);
     EXPECT_EQ(t.vars->sets[0].first, std::string("feel.knockback"));
     auto demo = t.session.view().demo;
@@ -657,10 +714,11 @@ TEST(StudioLessonPresenter, AnUnboundVariableStaysPendingUntilTheGameBindsIt) {
     EXPECT_EQ(demo[0].feature, std::string("hit_stop"));
     EXPECT_TRUE(demo[0].status == DemoStatus::WaitingForGame);
     EXPECT_TRUE(demo[0].on.value_or(false));
-    EXPECT_TRUE(demo[1].status == DemoStatus::Applied);
+    EXPECT_TRUE(demo[1].status == DemoStatus::Requested);
 
     t.session.poll();   // still no game for it
     EXPECT_EQ(t.vars->sets.size(), 1u);
+    EXPECT_TRUE(t.session.view().demo[1].status == DemoStatus::Applied);
 
     t.vars->vars["feel.hit_stop"] = var("int32", jnum(0));   // bound, but not a bool: not set, and said so
     t.session.poll();
@@ -672,10 +730,15 @@ TEST(StudioLessonPresenter, AnUnboundVariableStaysPendingUntilTheGameBindsIt) {
     ASSERT_EQ(t.vars->sets.size(), 2u);
     EXPECT_EQ(t.vars->sets[1].first, std::string("feel.hit_stop"));
     EXPECT_TRUE(t.vars->sets[1].second.b);
-    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Applied);
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Requested);
 
     t.session.poll();
     EXPECT_EQ(t.vars->sets.size(), 2u);
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::Applied);
+
+    t.vars->vars.erase("feel.hit_stop");   // the game went away
+    t.session.poll();
+    EXPECT_TRUE(t.session.view().demo[0].status == DemoStatus::WaitingForGame);
 }
 
 TEST(StudioLessonPresenter, APendingSwitchIsSupersededByTheNextCue) {

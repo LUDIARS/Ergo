@@ -1299,6 +1299,20 @@ if(ERGO_BUILD_STUDIO)
             target_compile_options(test_studio_lesson PRIVATE /utf-8)
         endif()
         add_test(NAME test_studio_lesson COMMAND test_studio_lesson)
+
+        # The presenter's demo switches against a real ergo_bind engine over the Studio's own loopback server.
+        if(TARGET ergo_bind)
+            add_executable(test_studio_lesson_game
+                tests/studio/test_studio_lesson_game.cpp
+                tools/studio/lesson_variables.cpp
+            )
+            target_link_libraries(test_studio_lesson_game PRIVATE
+                ergo_studio_plugins ergo_studio_host ergo_studio_net ergo_bind ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_studio_lesson_game PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_studio_lesson_game COMMAND test_studio_lesson_game)
+        endif()
     endif()
 endif()
 

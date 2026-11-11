@@ -64,6 +64,9 @@ std::string demo_text(const lesson::DemoEntry& e) {
     switch (e.status) {
     case lesson::DemoStatus::NotCued: return name + "  —";
     case lesson::DemoStatus::Applied: return name + "  " + want;
+    case lesson::DemoStatus::Requested: return name + "  " + want + "  切り替えを頼みました (ゲームが従うのを待っています)";
+    case lesson::DemoStatus::NotFollowing:
+        return name + "  " + want + "  ゲームが従っていません (読み取り専用の変数か、ゲームが値を戻しています。毎回頼み直しています)";
     case lesson::DemoStatus::WaitingForGame: return name + "  " + want + "  未反映 (ゲームがこの変数を公開するのを待っています)";
     case lesson::DemoStatus::NotBool: return name + "  " + want + "  未反映 (ゲームの変数が bool ではありません)";
     case lesson::DemoStatus::NoVariable: return name + "  " + want + "  対応する変数がありません";
@@ -88,7 +91,8 @@ void build_demo(ui::ViewBuilder& b, const std::vector<lesson::DemoEntry>& demo) 
     if (demo.empty()) panel.muted("この授業には切り替える機能がありません");
     for (const auto& e : demo) {
         const bool waiting = e.status != lesson::DemoStatus::Applied && e.status != lesson::DemoStatus::NotCued;
-        panel.label(demo_text(e), waiting ? &panel.theme().warn : nullptr);
+        const bool broken  = e.status == lesson::DemoStatus::NotFollowing;
+        panel.label(demo_text(e), broken ? &panel.theme().error : waiting ? &panel.theme().warn : nullptr);
     }
 }
 

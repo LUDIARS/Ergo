@@ -3,7 +3,8 @@
 namespace ergo::studio::plugins::lesson {
 namespace {
 
-bool is_pending(DemoStatus s) { return s == DemoStatus::WaitingForGame || s == DemoStatus::NotBool; }
+/// The game was already asked for the wanted value at an earlier poll.
+bool was_requested(DemoStatus s) { return s == DemoStatus::Requested || s == DemoStatus::NotFollowing; }
 
 } // namespace
 
@@ -11,17 +12,12 @@ bool operator==(const DemoEntry& a, const DemoEntry& b) {
     return a.feature == b.feature && a.variable == b.variable && a.on == b.on && a.status == b.status;
 }
 
-void DemoApplier::observe(uint64_t seq, const std::map<std::string, bool>& states,
-                          const std::map<std::string, std::string>& features) {
-    const bool same_seq = seq_ && *seq_ == seq;
-    auto was_applied = [&](const DemoEntry& e) {
-        if (!same_seq) return false;
+void DemoApplier::observe(const std::map<std::string, bool>& states, const std::map<std::string, std::string>& features) {
+    auto previous_status = [&](const DemoEntry& e) {
         for (const auto& old : entries_) {
-            if (old.status == DemoStatus::Applied && old.feature == e.feature && old.variable == e.variable && old.on == e.on) {
-                return true;
-            }
+            if (old.feature == e.feature && old.variable == e.variable && old.on == e.on) return old.status;
         }
-        return false;
+        return DemoStatus::WaitingForGame;   // not looked at yet: apply() decides
     };
 
     std::vector<DemoEntry> next;
@@ -31,7 +27,7 @@ void DemoApplier::observe(uint64_t seq, const std::map<std::string, bool>& state
         e.variable = variable;
         if (const auto it = states.find(feature); it != states.end()) {
             e.on     = it->second;
-            e.status = was_applied(e) ? DemoStatus::Applied : DemoStatus::WaitingForGame;
+            e.status = previous_status(e);
         }
         next.push_back(std::move(e));
     }
@@ -44,26 +40,32 @@ void DemoApplier::observe(uint64_t seq, const std::map<std::string, bool>& state
         next.push_back(std::move(e));
     }
     entries_ = std::move(next);
-    seq_     = seq;
 }
 
 void DemoApplier::apply(IGameVariables& variables) {
     for (auto& e : entries_) {
-        if (!is_pending(e.status) || !e.on) continue;
+        if (!e.on || e.status == DemoStatus::NoVariable) continue;
         const auto current = variables.find(e.variable);
         if (!current) {
             e.status = DemoStatus::WaitingForGame;
-        } else if (current->kind != "bool") {
-            e.status = DemoStatus::NotBool;
-        } else {
-            e.status = variables.request_set(e.variable, jbool(*e.on)) ? DemoStatus::Applied : DemoStatus::WaitingForGame;
+            continue;
         }
+        if (current->kind != "bool") {
+            e.status = DemoStatus::NotBool;
+            continue;
+        }
+        if (current->value.is_bool() && current->value.b == *e.on) {
+            e.status = DemoStatus::Applied;
+            continue;
+        }
+        if (!variables.request_set(e.variable, jbool(*e.on))) {
+            e.status = DemoStatus::WaitingForGame;   // unbound between find() and the request
+            continue;
+        }
+        e.status = was_requested(e.status) ? DemoStatus::NotFollowing : DemoStatus::Requested;
     }
 }
 
-void DemoApplier::reset() {
-    seq_.reset();
-    entries_.clear();
-}
+void DemoApplier::reset() { entries_.clear(); }
 
 } // namespace ergo::studio::plugins::lesson

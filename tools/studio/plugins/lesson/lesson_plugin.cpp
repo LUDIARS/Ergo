@@ -30,6 +30,37 @@ const char* call_name(LessonCall c) {
     return "";
 }
 
+const char* demo_status_name(DemoStatus s) {
+    switch (s) {
+    case DemoStatus::NotCued: return "not cued";
+    case DemoStatus::Applied: return "applied";
+    case DemoStatus::Requested: return "requested";
+    case DemoStatus::NotFollowing: return "requested again: the game is not following";
+    case DemoStatus::WaitingForGame: return "waiting for the game to bind the variable";
+    case DemoStatus::NotBool: return "the variable is not a bool";
+    case DemoStatus::NoVariable: return "no variable for this feature";
+    }
+    return "";
+}
+
+/// One line per demo feature whose wanted value or status changed (names are lesson data, not secrets).
+void log_demo_changes(const host::LogFn& log, const std::vector<DemoEntry>& before, const std::vector<DemoEntry>& after) {
+    for (const auto& e : after) {
+        bool same = false;
+        for (const auto& old : before) {
+            if (old.feature == e.feature) {
+                same = old == e;
+                break;
+            }
+        }
+        if (same || !e.on) continue;
+        std::string line = "[lesson] demo " + e.feature;
+        if (!e.variable.empty()) line += " (" + e.variable + ")";
+        line += std::string(" = ") + (*e.on ? "ON" : "OFF") + ": " + demo_status_name(e.status);
+        log(e.status == DemoStatus::Applied || e.status == DemoStatus::Requested ? "info" : "warn", line);
+    }
+}
+
 } // namespace
 
 LessonPlugin::LessonPlugin(std::shared_ptr<platform::IHttpClient> http, std::shared_ptr<IGameVariables> variables,
@@ -104,6 +135,7 @@ void LessonPlugin::log_changes(const SessionView& before, const SessionView& aft
     if (!after.linked && before.linked) {
         log_("info", after.end == LinkEnd::Unlinked ? "[lesson] unlinked by the server (tool_unlinked)" : "[lesson] disconnected");
     }
+    log_demo_changes(log_, before.demo, after.demo);
     if (after.failure.failed() && (after.failure != before.failure || after.failed_call != before.failed_call)) {
         log_("warn", std::string("[lesson] ") + call_name(after.failed_call) + " failed: " + failure_summary(after.failure));
     }

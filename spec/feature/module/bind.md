@@ -59,7 +59,10 @@ Win32 サーバ実装に依存しない。
 - 接続成功時に `hello` を送り、登録済み全変数を `bind` で再送 (再接続シナリオ)
 - 登録/解除のスレッド安全管理
 - 値変化検出 (毎フレーム getter を呼んで last_seen と比較; 違えば `value` 送信)
-- `set` 受信 → MPSC キューへ enqueue → apply_pending_writes() で setter 呼び出し
+- `set` 受信 → MPSC キューへ enqueue → apply_pending_writes() で setter 呼び出し。適用後の値は同じ
+  apply_pending_writes() の値変化検出で `value` として送り返す (クランプ後・ホストが上書きした後の、
+  実際に持っている値)。サーバ側の値が engine に追随し、Studio の `lesson` プラグインはそれで実演の
+  切り替えが反映されたかを判断する。値が変わらなかった `set` (`read_only`・型不一致・同じ値) は送らない
 - ダミープラグ (リンクのみ満たす no-op)
 - リリース分離 (`ERGO_BIND_ENABLED` 未定義時は BIND_VAR が空展開)
 
@@ -74,6 +77,8 @@ Win32 サーバ実装に依存しない。
 - メタデータが登録メッセージに含まれること
 - 範囲外の set 値はクランプされること (meta.min/max があれば)
 - 型不一致の set は無視されること
+- 適用した set の値が `value` で送り返されること (`tests/studio/test_studio_lesson_game.cpp` が Studio の
+  サーバ越しに確認する。`read_only` の変数への set は適用も送り返しもされない)
 - `apply_pending_writes` をフレーム頭で呼べば反映が次フレームで visible
 - 切断中の bind 呼び出しは登録テーブルにのみ残り、再接続時に再送されること
 - `ERGO_BIND_ENABLED` 未定義時にビルド・リンクが通ること (ダミー使用)

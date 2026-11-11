@@ -84,7 +84,7 @@ void LessonSession::poll() {
         demo_.reset();
         report_progress();
     } else if (role_ == Role::Presenter) {
-        demo_.observe(r.value->demo->seq, r.value->demo->states, r.value->features);   // parse_state guarantees demo
+        demo_.observe(r.value->demo->states, r.value->features);   // parse_state guarantees demo
         demo_.apply(*variables_);
     }
 }

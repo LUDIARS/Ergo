@@ -79,11 +79,21 @@ bool wait_until(const std::function<bool()>& done) {
     return true;
 }
 
+/// A game that binds feel.hit_stop = false and never follows a set (like a read_only variable).
+class StuckVars final : public IGameVariables {
+public:
+    std::optional<GameVariable> find(const std::string& name) const override {
+        if (name != "feel.hit_stop") return std::nullopt;
+        return GameVariable{"bool", jbool(false)};
+    }
+    bool request_set(const std::string& name, const JsonValue&) override { return name == "feel.hit_stop"; }
+};
+
 struct Fixture {
-    Fixture()
+    explicit Fixture(std::shared_ptr<IGameVariables> vars = std::make_shared<NoVars>())
         : http(std::make_shared<FakeHttp>()),
           clipboard(std::make_shared<FakeClipboard>()),
-          plugin(http, std::make_shared<NoVars>(), [](const std::string&, const std::string&) {}),
+          plugin(http, std::move(vars), [](const std::string&, const std::string&) {}),
           view(plugin, clipboard) {}
     std::shared_ptr<FakeHttp>      http;
     std::shared_ptr<FakeClipboard> clipboard;
@@ -169,6 +179,26 @@ TEST(StudioLessonView, APresenterSeesWhichFeaturesWaitForTheGame) {
     EXPECT_TRUE(b.mentions("hit_stop  [feel.hit_stop]  ON  未反映"));
     EXPECT_TRUE(b.has("knockback  [feel.knockback]  —"));
     EXPECT_TRUE(b.has("slow_motion  OFF  対応する変数がありません"));
+}
+
+TEST(StudioLessonView, APresenterSeesThatTheGameDoesNotFollow) {
+    Fixture f(std::make_shared<StuckVars>());
+    f.http->routes[kPair] = {200, R"({"token":")" + std::string(kToken) +
+                                      R"(","role":"presenter","class":{"title":"Action"},"poll_ms":1000})"};
+    f.http->routes[kState] = {200, R"({"role":"presenter","class":{"title":"Action"},
+      "features":{"hit_stop":"feel.hit_stop"},"assignment":null,"demo":{"seq":1,"states":{"hit_stop":true}}})"};
+    f.clipboard->next = {true, kLink, {}};
+    build(f.view).clicks[0].fn();
+    ASSERT_TRUE(wait_until([&] {
+        const auto demo = f.plugin.shown().session.demo;
+        return demo.size() == 1 && demo[0].status == DemoStatus::Requested;
+    }));
+    EXPECT_TRUE(build(f.view).mentions("hit_stop  [feel.hit_stop]  ON  切り替えを頼みました"));
+    ASSERT_TRUE(wait_until([&] {   // the next poll (1 s later) still sees OFF
+        const auto demo = f.plugin.shown().session.demo;
+        return demo.size() == 1 && demo[0].status == DemoStatus::NotFollowing;
+    }));
+    EXPECT_TRUE(build(f.view).mentions("hit_stop  [feel.hit_stop]  ON  ゲームが従っていません"));
 }
 
 TEST(StudioLessonView, FailuresAreShownByClass) {
