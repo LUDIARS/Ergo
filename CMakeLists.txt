@@ -1128,18 +1128,19 @@ if(ERGO_BUILD_STUDIO)
         endif()
     endif()
 
-    # ergo_studio_platform : outgoing HTTP(S) and OS credential storage (Windows backend;
+    # ergo_studio_platform : outgoing HTTP(S), OS credential storage, processes, clipboard (Windows backend;
     # other platforms report "unsupported" instead of switching paths)
     if(WIN32)
         add_library(ergo_studio_platform STATIC
             src/studio/platform/process_quote.cpp
             src/studio/platform/sha256.cpp
             src/studio/platform/url_encode.cpp
+            src/studio/platform/win_clipboard.cpp
             src/studio/platform/win_credential_store.cpp
             src/studio/platform/win_process_runner.cpp
             src/studio/platform/winhttp_client.cpp
         )
-        target_link_libraries(ergo_studio_platform PRIVATE winhttp advapi32)
+        target_link_libraries(ergo_studio_platform PRIVATE winhttp advapi32 user32)
     else()
         add_library(ergo_studio_platform STATIC
             src/studio/platform/process_quote.cpp
@@ -1162,6 +1163,13 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/common/json_util.cpp
         tools/studio/plugins/common/latest_blob_plugin.cpp
         tools/studio/plugins/common/safe_path.cpp
+        tools/studio/plugins/lesson/demo_apply.cpp
+        tools/studio/plugins/lesson/lesson_client.cpp
+        tools/studio/plugins/lesson/lesson_link.cpp
+        tools/studio/plugins/lesson/lesson_plugin.cpp
+        tools/studio/plugins/lesson/lesson_protocol.cpp
+        tools/studio/plugins/lesson/lesson_session.cpp
+        tools/studio/plugins/lesson/step_check.cpp
         tools/studio/plugins/log/line_ring.cpp
         tools/studio/plugins/log/lines_query.cpp
         tools/studio/plugins/log/log_apps.cpp
@@ -1262,6 +1270,35 @@ if(ERGO_BUILD_STUDIO)
             target_compile_options(test_studio_plugins PRIVATE /utf-8)
         endif()
         add_test(NAME test_studio_plugins COMMAND test_studio_plugins)
+    endif()
+
+    # ergo_studio_views : the built-in plugins' tabs (ui_kit trees over a plugin's in-process API; no GPU)
+    if(TARGET ergo_studio_ui)
+        add_library(ergo_studio_views STATIC
+            tools/studio/views/lesson_view.cpp
+        )
+        target_link_libraries(ergo_studio_views PUBLIC ergo_studio_plugins ergo_studio_ui)
+        if(MSVC)
+            target_compile_options(ergo_studio_views PRIVATE /utf-8)
+        endif()
+    endif()
+
+    # "lesson" plugin (spec/feature/tool/lesson.md): link / protocol / checks / session, the bridge to the
+    # variable plugin (composition root), and the tab when ergo_studio_views exists.
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_studio_lesson
+            tests/studio/test_studio_lesson.cpp
+            tools/studio/lesson_variables.cpp
+        )
+        target_link_libraries(test_studio_lesson PRIVATE ergo_studio_plugins ergo_gtest_main)
+        if(TARGET ergo_studio_views)
+            target_sources(test_studio_lesson PRIVATE tests/studio/test_studio_lesson_view.cpp)
+            target_link_libraries(test_studio_lesson PRIVATE ergo_studio_views)
+        endif()
+        if(MSVC)
+            target_compile_options(test_studio_lesson PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_lesson COMMAND test_studio_lesson)
     endif()
 endif()
 
@@ -2101,7 +2138,7 @@ endif()
 # Placed after ergo_render. Without the real render path the executable still
 # builds as a headless server (no window) and says so at configure time.
 # ---------------------------------------------------------------------------
-if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
+if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views)
     set(ERGO_STUDIO_OUT "${CMAKE_BINARY_DIR}/studio")
     set(_ergo_studio_shell OFF)
     if(TARGET pictor AND TARGET ergo_render AND TARGET glfw AND ERGO_RENDER_BACKEND_ENABLED)
@@ -2155,11 +2192,12 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
 
     add_executable(ergo_studio
         tools/studio/builtin_plugins.cpp
+        tools/studio/lesson_variables.cpp
         tools/studio/main.cpp
         tools/studio/studio_settings.cpp
     )
     target_include_directories(ergo_studio PRIVATE tools/studio)
-    target_link_libraries(ergo_studio PRIVATE ergo_studio_plugins ergo_studio_host ergo_studio_net)
+    target_link_libraries(ergo_studio PRIVATE ergo_studio_views ergo_studio_plugins ergo_studio_host ergo_studio_net)
     if(_ergo_studio_shell)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)

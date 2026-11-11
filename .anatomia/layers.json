@@ -906,6 +906,10 @@
       "layer": "application"
     },
     {
+      "glob": "tools/studio/plugins/lesson/*",
+      "layer": "application"
+    },
+    {
       "glob": "tools/studio/views/*",
       "layer": "presentation"
     },

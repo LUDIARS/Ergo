@@ -1,5 +1,7 @@
-// Non-Windows builds: the HTTP client and the credential store are not
-// implemented yet. They fail loudly instead of switching to another path.
+// Non-Windows builds: the HTTP client, the credential store, the process
+// runner and the clipboard are not implemented yet. They fail loudly instead
+// of switching to another path.
+#include "ergo/studio/platform/clipboard.h"
 #include "ergo/studio/platform/credential_store.h"
 #include "ergo/studio/platform/http_client.h"
 #include "ergo/studio/platform/process_runner.h"
@@ -43,8 +45,18 @@ public:
     }
 };
 
+class UnsupportedClipboard final : public IClipboard {
+public:
+    ClipboardText read_text() override {
+        ClipboardText r;
+        r.error = kUnsupported;
+        return r;
+    }
+};
+
 } // namespace
 
+std::shared_ptr<IClipboard>       make_system_clipboard() { return std::make_shared<UnsupportedClipboard>(); }
 std::shared_ptr<IProcessRunner>   make_system_process_runner() { return std::make_shared<UnsupportedProcessRunner>(); }
 std::optional<std::filesystem::path> find_on_path(const std::string&) { return std::nullopt; }
 std::shared_ptr<IHttpClient>      make_system_http_client() { return std::make_shared<UnsupportedHttpClient>(); }
