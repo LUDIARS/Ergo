@@ -15,9 +15,10 @@
 #   test_lorica_verify_binary_<t>  Lorica's tools/verify_binary.py on the main
 #                                  executables (only when python3 is found)
 #
-# Where Ergo builds without Lorica (macOS, CMake < 3.24, ...) or the generator
-# writes no compile_commands.json (Visual Studio), the tests say so and ctest
-# counts a skip, not a pass.
+# Where Lorica's build profiles do not apply (macOS, CMake < 3.24, ...) or the
+# generator writes no compile_commands.json (Visual Studio), the tests say so and
+# ctest counts a skip, not a pass. The probe still runs its Lorica::boundary
+# checks first there (a wrong header fails it).
 # ---------------------------------------------------------------------------
 include_guard(GLOBAL)
 

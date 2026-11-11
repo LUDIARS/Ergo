@@ -26,7 +26,12 @@
 # Toolchains Lorica's profiles do not cover (macOS / iOS / Android / Emscripten
 # / MinGW, or CMake older than Lorica's 3.24) are not silently weakened: with
 # ERGO_HARDENING=auto (default) configuration says so with a WARNING and builds
-# without Lorica; ERGO_HARDENING=required makes that a configure error.
+# without Lorica's build flags (lorica_harden_target / lorica_deprecate_unsafe_apis);
+# ERGO_HARDENING=required makes that a configure error. Lorica::boundary (the
+# header-only input checks the parsers include) is acquired there too and linked
+# to every target: with CMake 3.24+ through Lorica's own CMakeLists.txt, below
+# 3.24 (which Lorica's CMakeLists.txt refuses) as an include-only INTERFACE
+# target over Lorica's source. No source at all is a configure error.
 #
 # Hosts that already provide Lorica (add_subdirectory / FetchContent /
 # find_package before Ergo) are reused: Ergo adds no second copy.
@@ -103,6 +108,7 @@ function(_ergo_hardening_acquire_lorica)
     set(LORICA_BUILD_TESTS OFF)
     set(LORICA_BUILD_FUZZER OFF)
     if(LORICA_SOURCE_DIR)
+        set_property(GLOBAL PROPERTY ERGO_LORICA_SOURCE "${LORICA_SOURCE_DIR}")
         if(NOT EXISTS "${LORICA_SOURCE_DIR}/cmake/LoricaHardening.cmake")
             message(FATAL_ERROR "LORICA_SOURCE_DIR='${LORICA_SOURCE_DIR}' is not a Lorica checkout")
         endif()
@@ -116,6 +122,43 @@ function(_ergo_hardening_acquire_lorica)
     endif()
 endfunction()
 
+# Where Lorica's build profiles do not apply: Lorica::boundary only (the parsers
+# include its headers on every platform). CMake 3.24+ adds Lorica's own
+# CMakeLists.txt, which defines nothing platform-specific with its protection
+# library and tests OFF; older CMake cannot (Lorica requires 3.24), so the
+# source alone is acquired and an include-only target is made over it.
+function(_ergo_hardening_acquire_boundary)
+    if(TARGET Lorica::boundary)
+        message(STATUS "ergo: using the host's Lorica::boundary")
+        return()
+    endif()
+    if(NOT CMAKE_VERSION VERSION_LESS 3.24)
+        _ergo_hardening_acquire_lorica()
+        return()
+    endif()
+    if(LORICA_SOURCE_DIR)
+        set(_src "${LORICA_SOURCE_DIR}")
+        message(STATUS "ergo: Lorica headers from LORICA_SOURCE_DIR=${_src}")
+    else()
+        # ERGO_SOURCE_DIR_LORICA or the pinned fetch, source only (no add_subdirectory);
+        # ERGO_FETCH_DEPENDENCIES=OFF without either is a configure error.
+        ergo_populate_dependency(lorica OUT_SOURCE_DIR _src)
+    endif()
+    if(NOT EXISTS "${_src}/include/lorica/checked_size.hpp" OR NOT EXISTS "${_src}/include/lorica/input_budget.hpp")
+        message(FATAL_ERROR
+            "ergo: '${_src}' has no include/lorica/ headers. Ergo's parsers need Lorica::boundary "
+            "on every platform; set LORICA_SOURCE_DIR or ERGO_SOURCE_DIR_LORICA to a Lorica checkout.")
+    endif()
+    # The same shape as Lorica's own target (CMakeLists.txt: lorica_boundary,
+    # cxx_std_17, the include directory as a BUILD_INTERFACE).
+    add_library(lorica_boundary INTERFACE)
+    add_library(Lorica::boundary ALIAS lorica_boundary)
+    target_compile_features(lorica_boundary INTERFACE cxx_std_17)
+    target_include_directories(lorica_boundary INTERFACE "$<BUILD_INTERFACE:${_src}/include>")
+    set_property(GLOBAL PROPERTY ERGO_LORICA_SOURCE "${_src}")
+    message(STATUS "ergo: Lorica::boundary as an include-only target over ${_src} (CMake ${CMAKE_VERSION} < 3.24)")
+endfunction()
+
 # ergo_hardening_setup(): call once from Ergo's top-level CMakeLists.txt, after
 # the package hub (a hub-acquired package may bring Lorica itself).
 function(ergo_hardening_setup)
@@ -125,9 +168,11 @@ function(ergo_hardening_setup)
             message(FATAL_ERROR "ergo: ERGO_HARDENING=required but ${_reason}. No silent fallback.")
         endif()
         message(WARNING
-            "ergo: Ergo's targets are built WITHOUT Lorica hardening: ${_reason}. "
-            "This build has no stack protector / FORTIFY / RELRO / unsafe-API rejection from Lorica. "
+            "ergo: Lorica's build hardening is NOT applied to Ergo's targets: ${_reason}. "
+            "This build gets no stack protector / FORTIFY / RELRO / unsafe-API rejection from Lorica; "
+            "the input limits (Lorica::boundary) are still checked. "
             "Set ERGO_HARDENING=required to make this an error.")
+        _ergo_hardening_acquire_boundary()
         set_property(GLOBAL PROPERTY ERGO_HARDENING_ACTIVE FALSE)
         set_property(GLOBAL PROPERTY ERGO_HARDENING_REASON "${_reason}")
         return()
@@ -238,7 +283,7 @@ endfunction()
 # tests/thirdparty) get the same Lorica source through LORICA_SOURCE_DIR in
 # their environment, so they stay offline.
 function(_ergo_hardening_forward_to_tests)
-    set(_src "${LORICA_SOURCE_DIR}")
+    get_property(_src GLOBAL PROPERTY ERGO_LORICA_SOURCE)
     if(NOT _src)
         get_target_property(_real Lorica::boundary ALIASED_TARGET)
         if(_real)
@@ -255,6 +300,14 @@ endfunction()
 function(ergo_harden_targets)
     get_property(_active GLOBAL PROPERTY ERGO_HARDENING_ACTIVE)
     if(NOT _active)
+        # No build profile here, but the parsers still include Lorica's headers.
+        _ergo_hardening_compiled_targets(_targets)
+        foreach(_t IN LISTS _targets)
+            target_link_libraries(${_t} PRIVATE "$<BUILD_INTERFACE:Lorica::boundary>")
+        endforeach()
+        list(LENGTH _targets _n)
+        message(STATUS "ergo: Lorica::boundary linked to ${_n} target(s), without Lorica's build hardening")
+        _ergo_hardening_forward_to_tests()
         return()
     endif()
     get_property(_extended GLOBAL PROPERTY ERGO_HARDENING_EXTENDED)

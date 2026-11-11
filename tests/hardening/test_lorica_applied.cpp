@@ -11,7 +11,7 @@
 // lines of every unit are checked by test_lorica_compile_commands.
 //
 // Defines from CMake (expectations, not results):
-//   ERGO_LORICA_ACTIVE             Lorica applies to this toolchain (else skip, 77)
+//   ERGO_LORICA_ACTIVE             Lorica's build profiles apply here (else: boundary checks, then skip 77)
 //   ERGO_LORICA_EXPECT_UNSAFE_API  lorica_deprecate_unsafe_apis applies here
 //   ERGO_LORICA_EXPECT_EXTENDED    this target should carry the EXTENDED profile
 //   ERGO_LORICA_EXTENDED_UNAVAILABLE  the EXTENDED variant on a toolchain without
@@ -60,10 +60,10 @@ using strcpy_result = decltype(strcpy(arg<char*>(), arg<const char*>()));
 
 #include "gtest/gtest.h"
 
-#if ERGO_LORICA_ACTIVE
+// Lorica::boundary is linked everywhere, also where Lorica's build profiles do
+// not apply (ergo_harden_targets), so the headers are always there.
 #include <lorica/checked_size.hpp>
 #include <lorica/input_budget.hpp>
-#endif
 
 #if ERGO_LORICA_ACTIVE
 
@@ -157,8 +157,11 @@ TEST(LoricaApplied, ExtendedProfile) {
 #endif
 }
 
+#endif  // ERGO_LORICA_ACTIVE
+
 // Lorica::boundary is header-only: the include path it carries is what links
-// it in. Run the checks at run time (volatile inputs), not as constants.
+// it in. Run the checks at run time (volatile inputs), not as constants. These
+// run in every build: the parsers' input limits depend on them.
 TEST(LoricaApplied, CheckedAddRejectsOverflow) {
     volatile std::size_t max = std::numeric_limits<std::size_t>::max();
     volatile std::size_t one = 1;
@@ -182,13 +185,15 @@ TEST(LoricaApplied, InputBudgetRefusesOnePastTheLimit) {
     EXPECT_FALSE(exact.consume(1, 0, 0));  // spent
 }
 
-#endif  // ERGO_LORICA_ACTIVE
-
 int main() {
 #if !ERGO_LORICA_ACTIVE
-    // macOS / iOS / Android / MinGW or CMake older than 3.24: Ergo builds without
-    // Lorica there (configure WARNING). Say so and let ctest count a skip, never a pass.
-    std::printf("SKIPPED: Lorica hardening is not active in this build (see the configure WARNING)\n");
+    // macOS / iOS / Android / MinGW or CMake older than 3.24: no Lorica build
+    // flags there (configure WARNING). The boundary checks above still run and
+    // fail the test if Lorica's headers are wrong; the flag checks cannot, so
+    // ctest counts a skip, never a pass.
+    if (const int rc = RUN_ALL_TESTS(); rc != 0) return rc;
+    std::printf("SKIPPED: Lorica::boundary checked; Lorica's build hardening is not active in this build "
+                "(see the configure WARNING), so the flag checks did not run\n");
     return 77;
 #elif ERGO_LORICA_EXTENDED_UNAVAILABLE
     std::printf("SKIPPED: Lorica's EXTENDED profile is not available with this toolchain (configure STATUS says why)\n");

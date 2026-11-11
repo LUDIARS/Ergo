@@ -42,9 +42,18 @@ EXTENDED の対象 (外から入力を受け続けるもの。毎フレームの
 Lorica の守りの設定は Windows の MSVC 系と Linux の GCC / Clang だけで、CMake 3.24 以上が要る。
 macOS (AppleClang / Xcode)、iOS、Android (NDK)、Emscripten、MinGW、CMake 3.20〜3.23 では:
 
-- `ERGO_HARDENING=auto` (既定): `ergo: Ergo's targets are built WITHOUT Lorica hardening: <理由>` の WARNING を出し、
-  Lorica を取り込まずにビルドする (黙って外さない)。
+- `ERGO_HARDENING=auto` (既定): `ergo: Lorica's build hardening is NOT applied to Ergo's targets: <理由>` の WARNING を出す
+  (黙って外さない)。Lorica の守りのフラグ (`lorica_harden_target`・`lorica_deprecate_unsafe_apis`) は付かないが、
+  **入力の上限の検査 (`Lorica::boundary`) は入る** (parser が `<lorica/...>` を include するので、どの環境でも要る)。
+  - CMake 3.24 以上 (macOS など): Lorica の `CMakeLists.txt` を通常どおり取り込む (保護ライブラリとテストは OFF なので、
+    OS に依る記述は動かない)。
+  - CMake 3.24 未満: Lorica の `CMakeLists.txt` は `cmake_minimum_required(VERSION 3.24)` で取り込めないので、ソースだけを
+    取得し (`LORICA_SOURCE_DIR` → `ERGO_SOURCE_DIR_LORICA` → 固定 commit の取得)、Ergo 側で include の場所と `cxx_std_17`
+    だけを持つ INTERFACE の `Lorica::boundary` を作る (ホストが持っていればそれを使う)。
+  - 取得元が無い (オフラインで `ERGO_FETCH_DEPENDENCIES=OFF` など) ときは構成エラー。ヘッダ無しでは続けない。
 - `ERGO_HARDENING=required`: 構成エラー。
+- `test_lorica_applied` はこの構成でも `lorica::checked_add` と `input_budget` の実行の確認をしてから skip を返す
+  (ヘッダが本物でなければ失敗)。フラグの確認と `test_lorica_compile_commands` は skip。
 
 危険な C 関数の拒否は、Lorica が clang-cl・MinGW・glibc 2.40 以上の Clang を断るので、そこでは
 `ergo: unsafe C API rejection not applied with this toolchain: <理由>` を STATUS に出して baseline だけを入れる。
@@ -108,8 +117,9 @@ build/fuzz-clang/fuzz_studio_net -max_total_time=30 /tmp/corpus/studio_net
 | `test_lorica_compile_commands` | `tests/hardening/test_lorica_compile_commands.cmake` (`cmake -P`)。`compile_commands.json` (Ergo が最上位のときだけ `CMAKE_EXPORT_COMPILE_COMMANDS=ON`) の Ergo 自身のソース (ビルドツリーの取得物は除く) の全エントリに、Lorica の include の場所、`-fstack-protector-strong`・`-fstack-clash-protection`・`-fcf-protection=full` (AArch64 は `-mbranch-protection=standard`)・PIC/PIE、C++ には `-D_GLIBCXX_ASSERTIONS`・`-D_LIBCPP_HARDENING_MODE=…`・`-include …/unsafe_api.hpp`・`-Werror=deprecated-declarations`、最適化ありの構成で最後の `_FORTIFY_SOURCE` が `-D_FORTIFY_SOURCE=3`、EXTENDED のターゲットには `-ftrivial-auto-var-init=zero` があり、打ち消すフラグ (`-fno-stack-protector`・`-D_FORTIFY_SOURCE=0`・`-fcf-protection=none`・`-Wno-deprecated-declarations` など) が無いことを見る。欠けたエントリはファイル名とターゲット名を挙げて落ちる。C のソースは C に付くフラグだけ |
 | `test_lorica_verify_binary_<target>` | `python3` が見つかるときだけ登録 (無ければ configure の STATUS)。Lorica の `tools/verify_binary.py` を `ergo_studio`・`ergo_pkg_cli`・`test_lorica_applied` に掛ける (ELF: PIE・NX・full RELRO、PE: ASLR・NX・CFG) |
 
-skip になるとき (ctest は「通過」ではなく skip と数える): Lorica が掛からない構成 (macOS・CMake 3.20〜3.23 など。
-上の WARNING の構成) では全部、Visual Studio ジェネレータ (`compile_commands.json` を作らない) と MSVC では
+skip になるとき (ctest は「通過」ではなく skip と数える): Lorica の守りのプロファイルが掛からない構成 (macOS・CMake 3.20〜3.23 など。
+上の WARNING の構成) では全部 (`test_lorica_applied*` は `Lorica::boundary` の実行の確認を済ませてから skip。
+`verify_binary` は登録しない)、Visual Studio ジェネレータ (`compile_commands.json` を作らない) と MSVC では
 `test_lorica_compile_commands`。MSVC の baseline (`/GS /sdl /guard:cf`・`/we4996`) は翻訳単位の中から見える印が無いので、
 Windows では構成時の確認と `verify_binary.py` (PE のフラグ) が受け持つ。
 
@@ -124,7 +134,8 @@ private リポを CI で読むときの決まり) で取得する。`ci.yml` の
 3. `Checkout Lorica`: `actions/checkout` で `build/_lorica` に、その commit を。
 4. 構成に `-DLORICA_SOURCE_DIR=<その場所> -DERGO_HARDENING=required`。
 
-`linux-gcc-cmake320` (CMake 3.20) と macOS は Lorica が対応しないので取得しない (WARNING で守りなし、上のテストは skip)。
+`linux-gcc-cmake320` (CMake 3.20) と macOS も、ヘッダ (`Lorica::boundary`) が要るので同じ手順で取得し、
+`-DLORICA_SOURCE_DIR` だけを渡す (`ERGO_HARDENING=required` は付けない。Lorica の守りのフラグは付かず WARNING、フラグのテストは skip)。
 
 ## 守りの確かめ方
 

@@ -152,3 +152,10 @@ stack protector が主な候補だが、内訳は分けて測っていない。
 - 上限を入れた経路: odeum-lesson の応答 (`lesson_protocol`: 本文 1 MiB・値 16384・深さ 16・手順 256・features / demo.states 各 256・文字列 4096 バイト・保持する文字列の合計 256 KiB。それまでは JSON の既定 64 MiB / 値 1,048,576 だけ)、接続文字列 (`lesson_link`: 2048 バイト)、WinHTTP の応答本文 (64 MiB。libcurl 側は main で済み、WinHTTP は無制限だった)。境界テストは `tests/studio/test_studio_lesson_limits.cpp` (7 件)。
 - 既にあったもの (確認だけ): `/lesson/api/*` (Studio の HTTP の既存の上限 + `check_mutation`)、libcurl の応答 64 MiB と要求の検査 (`http_request_check`)、`poll_ms` の 1〜10 s への丸め、トークン 32 桁・エラーコード 40 文字。`studio_settings` はファイルを読まない (環境変数と引数だけ、`PORT` は範囲検査済み) ので変更なし。
 - 結果: GCC Release ctest 131/131。lesson まわり 5 本 (`test_studio_lesson`・`_game`・`_limits`・`test_studio_platform_http`・`test_studio_settings`) は clang TSan と GCC ASan + UBSan (RelWithDebInfo `-g1`) でそれぞれ 2 回ずつ通過。WinHTTP の変更は Windows でビルドしていない (未確認)。
+
+## 7. 直し: 守りのプロファイルが使えない構成でも `Lorica::boundary` を入れる (2026-11-11)
+
+- 不具合: CMake 3.24 未満 / macOS などで `ergo_hardening_setup()` が Lorica を取得せずに戻り、`<lorica/...>` を include する parser (json_min・ws_client・studio net など) がコンパイルで落ちていた (CI の `linux-gcc-cmake320`)。§2・§5 の「守りなしでビルドする」は実際にはビルドできなかった。
+- 直し (`cmake/ErgoHardening.cmake`): その構成でも `Lorica::boundary` を取得して全ターゲットに `PRIVATE $<BUILD_INTERFACE:...>` で渡す。外すのは `lorica_harden_target` / `lorica_deprecate_unsafe_apis` だけ。CMake 3.24 以上は Lorica の `CMakeLists.txt` をそのまま取り込む (保護ライブラリ・テスト・fuzz が OFF なら OS で FATAL になる箇所は無い)。3.24 未満はソースだけ (`LORICA_SOURCE_DIR` → `ERGO_SOURCE_DIR_LORICA` → 固定 commit、`ergo_populate_dependency`) を取り、include の場所と `cxx_std_17` だけの INTERFACE `lorica_boundary` / `Lorica::boundary` を作る。ホストが持っていればそれを使う。取得元が無い・ヘッダが無いときは構成エラー。
+- `test_lorica_applied*` は守りなしの構成でも `checked_add` / `input_budget` を実行してから skip。CI は macOS と `linux-gcc-cmake320` でも Lorica を取得する (`ERGO_HARDENING=required` は付けない)。
+- 確認: CMake 3.20.5 (CI の `linux-gcc-cmake320` と同じ構成) でビルドと ctest 128/128 (skip 3: `test_lorica_applied`・`_extended`・`test_lorica_compile_commands`。`verify_binary` は登録しない)。CMake 3.24 以上で OS が対応外の枝 (macOS) は記述を読んだだけで未実行。

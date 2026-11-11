@@ -39,9 +39,10 @@ SHA を PR なしで検査したいときは workflow_dispatch で起動する
   `module_list.{md,yaml}`・README・[config-reference.md](config-reference.md)・
   `tools/ergo` のプラグイン一覧・`spec/domains` とコードの食い違い、壊れた相対リンクを
   検出する。手元では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
-- windows-msvc・linux-clang・linux-asan (と `packages-integration.yml`) は、private の `LUDIARS/Lorica` を
-  secret `LUDIARS_REPO_TOKEN` で `third_party/dependencies.cmake` の固定 commit に取得し、
-  `-DLORICA_SOURCE_DIR=… -DERGO_HARDENING=required` で構成する。secret が空ならそのレグは `::error::` で落ちる
+- C++ をビルドする全レグ (macOS と `packages-integration.yml` を含む) は、private の `LUDIARS/Lorica` を
+  secret `LUDIARS_REPO_TOKEN` で `third_party/dependencies.cmake` の固定 commit に取得し、`-DLORICA_SOURCE_DIR=…` で
+  構成する (parser が Lorica のヘッダを使う)。守りのプロファイルが使える windows-msvc・linux-clang・linux-asan・`ci-packages`
+  は `-DERGO_HARDENING=required` も付ける。secret が空ならそのレグは `::error::` で落ちる
   (手順と `test_lorica_*` のテストは [hardening.md](hardening.md) の「CI での Lorica の取得」)。手元の再現では
   `-DLORICA_SOURCE_DIR=<Lorica の checkout>` を足す。
 - 結果は成否に関わらずアーティファクト `ctest-<レグ名>` に上がる:
