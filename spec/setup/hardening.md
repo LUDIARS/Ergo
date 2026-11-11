@@ -75,6 +75,23 @@ macOS (AppleClang / Xcode)、iOS、Android (NDK)、Emscripten、MinGW、CMake 3.
 
 値の根拠は各ヘッダのコメントと [../plan/2026-11-11-lorica-adoption.md](../plan/2026-11-11-lorica-adoption.md)。
 
+## sanitizer と fuzz
+
+```bash
+# ASan + UBSan (既存の CI のレグと同じ)
+cmake --preset ci-asan -DLORICA_SOURCE_DIR=<lorica> && cmake --build --preset ci-asan && ctest --preset ci-asan
+# ThreadSanitizer (手元)
+cmake --preset ci-tsan -DLORICA_SOURCE_DIR=<lorica> && cmake --build --preset ci-tsan && ctest --preset ci-tsan
+# libFuzzer (Clang)。入口ごとに 30 秒ほど
+cmake --preset fuzz-clang -DLORICA_SOURCE_DIR=<lorica> && cmake --build --preset fuzz-clang
+mkdir -p /tmp/corpus && cp -r tests/studio/fuzz_corpus/studio_net /tmp/corpus/
+build/fuzz-clang/fuzz_studio_net -max_total_time=30 /tmp/corpus/studio_net
+```
+
+入口 (`tests/<module>/fuzz_*.cpp`): `studio_net` (HTTP + WS)、`json_min`、`custos_request_head`、`vector_svg`、
+`shuriken_prefab`。同じ入口を種 (`tests/<module>/fuzz_corpus/<name>/`) と端の入力で 1 回ずつ呼ぶ
+`fuzz_regress_<name>` は、どのコンパイラでも `ERGO_BUILD_TESTS` で作られ ctest に入る。
+
 ## 守りの確かめ方
 
 ```bash

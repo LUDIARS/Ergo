@@ -78,7 +78,7 @@ public:
     uint16_t port() const { return bound_port_; }
 
 private:
-    void accept_loop();
+    void accept_loop(std::intptr_t listener);
     void serve_connection(std::intptr_t sock);
 
     ServerConfig                cfg_;

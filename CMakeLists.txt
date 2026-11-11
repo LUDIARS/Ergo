@@ -2196,6 +2196,31 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_ui)
 endif()
 
 # ---------------------------------------------------------------------------
+# Fuzz entry points of the parsers that read untrusted bytes: fixed-input
+# regression tests always (with ERGO_BUILD_TESTS), libFuzzer binaries with
+# ERGO_BUILD_FUZZERS=ON (Clang). See cmake/ErgoFuzz.cmake.
+# ---------------------------------------------------------------------------
+include(ErgoFuzz)
+if(TARGET ergo_studio_net)
+    ergo_add_fuzz_entry(studio_net SOURCE tests/studio/fuzz_studio_net.cpp LIBS ergo_studio_net
+        CORPUS tests/studio/fuzz_corpus/studio_net)
+endif()
+ergo_add_fuzz_entry(json_min SOURCE tests/common/fuzz_json_min.cpp LIBS ergo_common
+    CORPUS tests/common/fuzz_corpus/json_min)
+if(TARGET ergo_custos)
+    ergo_add_fuzz_entry(custos_request_head SOURCE tests/custos/fuzz_request_head.cpp LIBS ergo_custos
+        CORPUS tests/custos/fuzz_corpus/request_head)
+endif()
+if(TARGET ergo_vector)
+    ergo_add_fuzz_entry(vector_svg SOURCE tests/vector/fuzz_svg_parser.cpp LIBS ergo_vector
+        CORPUS tests/vector/fuzz_corpus/svg_parser)
+endif()
+if(TARGET ergo_shuriken_migrator)
+    ergo_add_fuzz_entry(shuriken_prefab SOURCE tests/shuriken_migrator/fuzz_prefab_yaml.cpp LIBS ergo_shuriken_migrator
+        CORPUS tests/shuriken_migrator/fuzz_corpus/prefab_yaml)
+endif()
+
+# ---------------------------------------------------------------------------
 # Lorica on every target compiled above (keep last). See cmake/ErgoHardening.cmake.
 # ---------------------------------------------------------------------------
 ergo_harden_targets()

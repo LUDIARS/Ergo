@@ -82,7 +82,9 @@ bool Server::start(std::string& err) {
     listen_sock_ = sock::listen_tcp(cfg_.bind_host, cfg_.port, bound_port_, err);
     if (listen_sock_ == sock::kInvalid) return false;
     running_ = true;
-    accept_thread_ = std::thread([this] { accept_loop(); });
+    // The thread gets its own copy of the listening socket: stop() resets the
+    // member while the loop may still be reading it (TSan data race).
+    accept_thread_ = std::thread([this, listener = listen_sock_] { accept_loop(listener); });
     return true;
 }
 
@@ -101,9 +103,9 @@ void Server::stop() {
     for (auto& t : threads) if (t.thread.joinable()) t.thread.join();
 }
 
-void Server::accept_loop() {
+void Server::accept_loop(std::intptr_t listener) {
     while (running_) {
-        const auto c = sock::accept_one(listen_sock_);
+        const auto c = sock::accept_one(listener);
         if (c == sock::kInvalid) {
             if (!running_) break;
             continue;
