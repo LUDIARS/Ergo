@@ -190,7 +190,7 @@ target_link_libraries(myapp PRIVATE Ergo::input Ergo::bind)
   requirement なので、リンクしたターゲットには自動で付く。Ergo のライブラリを
   リンクせずにヘッダだけを読むターゲットは自分で `/utf-8` を付ける。
 - 新規モジュール `ergo_<名>` を足すときは、次を 1 PR で揃える。漏れは ctest
-  `test_module_catalog` (必須の全 C++ レグで走る) が検出する:
+  `test_module_catalog` (ctest の全テストに含まれ、Revisor の `ctest` でも走る) が検出する:
   1. 仕様 `spec/module/<名>.md` を `template/module_template.md` に従って書く
      (2026-10 以降の新規モジュールの置き場。既存は `spec/feature/module/<名>.md`)
   2. `include/ergo/<名>/`・`src/<名>/`・`tests/<名>/` を作る

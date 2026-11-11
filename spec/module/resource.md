@@ -74,7 +74,7 @@
 - [x] R6: `loader` — バイト列ロード + resolve_and_load 複合
 - [x] R7: テスト (scorer / catalog / resolver+loader、実ファイル読込を含む)
 - [x] R8: CMake 統合 (`ERGO_BUILD_RESOURCE`) + module_list.md / .yaml + README
-- [ ] R9: ローカルビルド + ctest green 確認 → PR → CI green
+- [ ] R9: ローカルビルド + ctest green 確認 → PR → Revisor のローカルレビュー通過
 
 ## テスト
 

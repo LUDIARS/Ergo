@@ -1366,6 +1366,10 @@ Acceptance:
 
 #### 9.5.6 CI 構成 (案)
 
+> 現在の方針では GitHub Actions で Ergo のビルド・テストを走らせない (マージのゲートは Revisor の
+> ローカルレビュー、[../../setup/ci.md](../../setup/ci.md))。下の案はその前に書いたもので、採るなら
+> 同じ段をローカルの検証手順として置く。
+
 ```
 .github/workflows/ergo-redesign.yml
    ├─ lint (eslint + prettier + clang-format)

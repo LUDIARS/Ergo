@@ -150,7 +150,7 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 | `ci-linux-gcc` | configure + build + test | Ninja、Release、`g++`、テスト ON、audio は dummy (Linux のみ) | [ci.md](ci.md) |
 | `ci-linux-clang` | configure + build + test | Ninja、Release、`clang++`、`-Wall -Wextra` | [ci.md](ci.md) |
 | `ci-asan` | configure + build + test | Ninja、Debug、ASan + UBSan。test プリセットが `ASAN_OPTIONS=detect_leaks=1` / `UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1` を設定 | [ci.md](ci.md) |
-| `ci-packages` | configure + build (Release) + test | `ERGO_PACKAGES=pictor;tela` + `ERGO_PACKAGES_FETCH` + `ERGO_PACKAGES_STRICT`、テスト ON、audio は dummy (ネットワークが要る。`packages-integration.yml` が使う) | [ci.md](ci.md) / [packages.md](packages.md) |
+| `ci-packages` | configure + build (Release) + test | `ERGO_PACKAGES=pictor;tela` + `ERGO_PACKAGES_FETCH` + `ERGO_PACKAGES_STRICT`、テスト ON、audio は dummy (ネットワークが要る。統合ビルドの手元確認に使う) | [ci.md](ci.md) / [packages.md](packages.md) |
 
 `ci-linux-*` / `ci-asan` は隠しプリセット `ci-base` (Ninja、`ERGO_BUILD_TESTS=ON`、
 `ERGO_AUDIO_BACKEND=dummy`) を継承する。
@@ -174,8 +174,8 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 | `ANTHROPIC_API_KEY` | (なし) | `vfx-suggest` / `vfx-breed` (`sdk`) | **秘密情報**。シェルの環境変数でだけ渡す (ファイル・設定に書かない、コミットしない) | `tools/ergo/src/plugins/vfx-suggest/generator-sdk.ts:13` / `tools/ergo/src/plugins/vfx-breed/advisor-sdk.ts:10` |
 
 LLM が無い・失敗したときも `vfx-suggest` / `vfx-breed` 以外のプラグインは影響を受けず、
-`vfx-breed` の進化は方向指示なしで動く。CI の `tools-ergo` ジョブは `npm ci` の前に
-`ELECTRON_SKIP_BINARY_DOWNLOAD=1` を設定する (npm の依存取得用で、サーバは読まない)。
+`vfx-breed` の進化は方向指示なしで動く。テストだけ回すときは `npm ci` の前に
+`ELECTRON_SKIP_BINARY_DOWNLOAD=1` を設定する (npm の依存取得用で、サーバは読まない。手順は [ci.md](ci.md) の「tools-ergo」)。
 
 ## 環境変数 (`ergo_pkg`)
 
@@ -214,5 +214,5 @@ LLM が無い・失敗したときも `vfx-suggest` / `vfx-breed` 以外のプ�
 - ツール起動: [run-tools-ergo.md](run-tools-ergo.md)
 - 外部プラグイン: [external-plugins.md](external-plugins.md)
 - プラグイン資産ルート: [plugin-data-roots.md](plugin-data-roots.md)
-- CI と手元での再現: [ci.md](ci.md)
+- 検証の構成とローカルでの実行: [ci.md](ci.md)
 - ブランチ + PR 運用: [branch-and-pr.md](branch-and-pr.md)

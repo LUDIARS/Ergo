@@ -27,7 +27,7 @@ Ergo の共有プラグインホスト型 Web 開発者ツール (`tools/ergo`) 
 | `npm run dev`   | ヘッドレス (watch) | `tsx watch src/main.ts`。ファイル変更で再起動 |
 | `npm run build` | ビルドのみ | `tsc -p tsconfig.json` (`npm start` が内部で実行) |
 | `npm test` | テスト | `node --import tsx --test "tests/**/*.test.ts"`。`tests/{core,helpers,plugins/<id>}/` にあり、一時ディレクトリとポート 0 を使う hermetic なテスト |
-| `npm run typecheck` | 型検査のみ | `tsc -p tsconfig.test.json` (`src/` と `tests/` を出力なしで検査)。CI のジョブ `tools-ergo` も実行する ([ci.md](ci.md)) |
+| `npm run typecheck` | 型検査のみ | `tsc -p tsconfig.test.json` (`src/` と `tests/` を出力なしで検査)。手元の検証手順 `tools-ergo` でも実行する ([ci.md](ci.md)) |
 
 ヘッドレス (`serve` / `dev`) は CI・Docker・リモート接続・ブラウザ devtools
 主体のケース向け ([`../feature/tool/ergo.md`](../feature/tool/ergo.md) 「起動モード」)。

@@ -1,66 +1,53 @@
-# CI (GitHub Actions) のレグとローカル再現
+# 検証の構成とローカルでの実行
 
 ## 目的
 
-Ergo の CI が何をどの環境で検査しているか、どのチェックが必須か、各レグを
-手元で再現するコマンドをまとめる。main に入れる前に通すべきチェックと
-その運用は [branch-and-pr.md](branch-and-pr.md) 「CI ゲート」。
+Ergo の変更をどこでどう検証するか、手元で走らせる構成ごとのコマンドをまとめる。
+main に入れるまでの運用は [branch-and-pr.md](branch-and-pr.md) 「マージのゲート」。
 
-## ワークフロー
+## 現在の検証の経路
 
-| ファイル | トリガ | 役割 |
+- **GitHub Actions では Ergo のビルド・テストを走らせない。** 以前の
+  `ci` / `packages-integration` ワークフロー (各ツールチェーンの ctest、`tools/ergo`、
+  Unity パッケージのコア、Pictor / Tela との統合ビルド) はリポジトリの方針で廃止した。
+  下の各構成は、そのとき検査していた内容を手元で回すためのコマンドとして残している。
+- **マージのゲートは Revisor のローカルレビュー。** Revisor は登録されたテストケース
+  `configure` / `build` / `ctest` (CMake の構成・ビルドと ctest の全テスト) を走らせ、
+  あわせて Praesidium の事前検査、Anatomia の検査、漏洩検査を行う。テストケースの
+  コマンドと引数は Revisor 側の登録 (運用者の Revisor) にあり、このリポジトリには無い。
+- **リポジトリに残るワークフローは `.github/workflows/harness.yml` だけ。** LUDIARS 共通の
+  harness ゲート (AIFormat の決定的チェック) で、GitHub PR と main への push で走る。
+  **手で編集しない** (正本は AIFormat、Castra が配信する)。
+
+## 構成の一覧
+
+| 構成 | 環境 | 主に捕まえるもの |
 |---|---|---|
-| `.github/workflows/ci.yml` | main への push / pull_request / workflow_dispatch | C++ の全テスト (各ツールチェーン)、`tools/ergo`、Unity パッケージのコア |
-| `.github/workflows/packages-integration.yml` | 毎晩 (schedule) / workflow_dispatch | `ci-packages` プリセットで Ergo + Pictor + Tela を統合ビルド。PR のゲートにはしない |
-| `.github/workflows/harness.yml` | main への push / pull_request | LUDIARS 共通 harness (AIFormat)。**手で編集しない** (正本は AIFormat、Castra が配信) |
+| windows-msvc | Windows、Visual Studio ジェネレータ、Release、`ERGO_AUDIO_BACKEND=dummy` | 主開発環境 (Windows / MSVC) のビルド・テストの回帰 |
+| linux-gcc-cmake320 | Linux、GCC、**CMake 3.20.5**、Ninja、Release | 宣言した最低版 (`CMakeLists.txt:1` の 3.20) に無い CMake 機能 (例: `file(COPY_FILE)` は 3.21)、ポリシー未設定 (`IN_LIST` の CMP0057)、libstdc++ での include 漏れ |
+| linux-clang | Linux、clang、`-Wall -Wextra`、Release | clang だけが出すエラー。警告は出すだけで `-Werror` は付けない |
+| linux-asan | Linux、GCC、Debug、ASan + LSan + UBSan | 範囲外アクセス、解放後使用、リーク、未定義動作 (下記「サニタイザ」) |
+| macos | macOS、AppleClang、Release | macOS 固有の差 (入力 HID / ソケット / オーディオ) |
+| tools-ergo | Node 22 | `tools/ergo` の型 (src + tests)、`tsc` ビルド、node:test (サーバコア・plugin pack 読み込み・パスガード・各プラグインの中継) |
+| unity-package-core | .NET 8 | Unity パッケージ (`unity/com.ludiars.ergo.packages`) のコアを Unity なしで |
+| packages-integration | Windows、プリセット `ci-packages` | Ergo + Pictor + Tela をマニフェストの pin で取得した統合ビルド (下記) |
 
-`ci.yml` は main への push と pull_request で自動実行される。feat ブランチの
-SHA を PR なしで検査したいときは workflow_dispatch で起動する
-(`gh workflow run ci.yml --ref feat/<name>`)。同じ ref の実行は 1 つずつ走る
-(`concurrency`): PR では新しい push が走行中の実行を取り消す。main の push 実行は
-マージ後の確認で、走行中のものは取り消さないが、GitHub は待機中の実行を ref ごとに
-1 つしか持たないので、さらに新しい push が来ると待機中のものは置き換えられ
-"cancelled" になる。ゲートが見るのは候補 SHA 自身の実行 (PR か workflow_dispatch)。
-
-## レグ (`ci.yml`)
-
-| チェック名 | 必須 | 環境 | 主に捕まえるもの |
-|---|---|---|---|
-| `build-and-test (windows-msvc)` | 必須 | windows-latest、Visual Studio ジェネレータ、Release、`ERGO_AUDIO_BACKEND=dummy` | 主開発環境 (Windows / MSVC) のビルド・テストの回帰 |
-| `build-and-test (linux-gcc-cmake320)` | 必須 | ubuntu-24.04、GCC、**CMake 3.20.5**、Ninja、Release | 宣言した最低版 (`CMakeLists.txt:1` の 3.20) に無い CMake 機能 (例: `file(COPY_FILE)` は 3.21)、ポリシー未設定 (`IN_LIST` の CMP0057)、libstdc++ での include 漏れ |
-| `build-and-test (linux-clang)` | 必須 | ubuntu-24.04、clang、`-Wall -Wextra`、Release | clang だけが出すエラー。警告はログに出すだけで `-Werror` はまだ付けない |
-| `build-and-test (linux-asan)` | 必須 | ubuntu-24.04、GCC、Debug、ASan + LSan + UBSan | 範囲外アクセス、解放後使用、リーク、未定義動作 (下記「サニタイザ」) |
-| `build-and-test (macos-14)` | 任意 | macos-14、AppleClang、Release | macOS 固有の差 (入力 HID / ソケット / オーディオ)。workflow_dispatch のときだけ走り、失敗してもワークフローは落とさない |
-| `tools-ergo` | 必須 | ubuntu-latest、Node 22 | `tools/ergo` の型 (src + tests)、`tsc` ビルド、node:test (サーバコア・plugin pack 読み込み・パスガード・各プラグインの中継) |
-| `unity-package-core` | 必須 | ubuntu-latest、.NET 8 | Unity パッケージ (`unity/com.ludiars.ergo.packages`) のコアを Unity なしで |
-
-- C++ の各レグは ctest の全テストを走らせる (後から足したテストも自動で入る)。
+- C++ の各構成は ctest の全テストを走らせる (後から足したテストも自動で入る)。
   その中の `test_module_catalog` (`tests/test_module_catalog.cmake`、コンパイラ不要) は
   `module_list.{md,yaml}`・README・[config-reference.md](config-reference.md)・
   `tools/ergo` のプラグイン一覧・`spec/domains` とコードの食い違い、壊れた相対リンクを
-  検出する。手元では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
-- 結果は成否に関わらずアーティファクト `ctest-<レグ名>` に上がる:
-  `ctest-junit.xml` と `Testing/Temporary/LastTest.log`。CMake 3.20 の ctest
-  には `--output-junit` が無いので、`linux-gcc-cmake320` は LastTest.log だけ。
-- Linux / macOS のレグは ccache (レグ名ごとのキャッシュ) を使う。ccache は速くする
-  だけの best-effort で、ステップは `continue-on-error`。導入に成功したときだけ
-  次のステップが環境変数 `CMAKE_CXX_COMPILER_LAUNCHER=ccache` を立てる (CMake 3.17 以上は
-  これを `CMAKE_CXX_COMPILER_LAUNCHER` の既定値にする)。導入に失敗してもレグは
-  キャッシュ無しでビルド・テストまで走る (ccache の失敗だけでレグを赤にしない)。
-  そのため各レグの構成コマンドはランチャを含まず、下の「ローカル再現」と同じ。Visual Studio
-  ジェネレータはコンパイララウンチャを使えないので、Windows は
-  `--parallel` (MSBuild `/m`) と `CL=/MP` で並列化する。
-- `windows-msvc` はテスト後に Ergo 自身をホストとして `ergo_pkg status` と
-  `ergo_package_graphs` を走らせ、`build/graphs/*.tela` と
-  `ergo-packages.{status,resolved}.json` をアーティファクト
-  `ergo-package-graphs` に上げる (パッケージマネージャの P4 ホスト図の
-  dogfood。失敗してもレグは落とさない)。
+  検出する。単体では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
+- CMake プリセットの名前の `ci-` は以前の GitHub Actions のレグに由来する。
+  ドキュメントと手元の手順が参照しているので名前は変えていない。中身は手元の検証構成。
+- Linux / macOS では ccache を使うと再ビルドが速くなる。構成の前に
+  `export CMAKE_CXX_COMPILER_LAUNCHER=ccache` とする (または構成に
+  `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache` を足す)。Visual Studio ジェネレータは
+  コンパイララウンチャを使えないので、Windows は `--parallel` (MSBuild `/m`) と
+  `CL=/MP` で並列化する。
 
-## ローカル再現
+## ローカルでの実行
 
-いずれもリポジトリのルートで実行する。CI と同じく ccache を使うなら
-構成の前に `export CMAKE_CXX_COMPILER_LAUNCHER=ccache` とする (または構成に
-`-DCMAKE_CXX_COMPILER_LAUNCHER=ccache` を足す)。
+いずれもリポジトリのルートで実行する。
 
 ### windows-msvc
 
@@ -71,10 +58,18 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --build-config Release --parallel 4 --output-on-failure
 ```
 
+テストの後に Ergo 自身をホストとしてパッケージマネージャの P4 ホスト図を作るなら
+(dogfood):
+
+```powershell
+.\build\Release\ergo_pkg.exe status --build build --host . --ergo .
+cmake --build build --config Release --target ergo_package_graphs   # build/graphs/*.tela
+```
+
 ### linux-gcc-cmake320
 
 プリセット (`CMakePresets.json` は version 3) には CMake 3.21 以上が要るので、
-このレグだけ素のコマンドラインで構成する。
+この構成だけ素のコマンドラインで構成する。
 
 ```bash
 python3 -m venv /tmp/cmake320
@@ -95,9 +90,17 @@ cmake --preset ci-asan        && cmake --build --preset ci-asan        && ctest 
 
 - ビルドディレクトリは `build/<プリセット名>`。テストプリセットは
   失敗時の出力と 4 並列を指定済み。
-- `ci-linux-gcc` (GCC + 手元の CMake、Release) も同じ形で使える。CI の
-  GCC レグは最低版の検査を兼ねるので CMake 3.20 の素のコマンドライン側。
+- `ci-linux-gcc` (GCC + 手元の CMake、Release) も同じ形で使える。最低版の
+  CMake 3.20 を確かめるときは上の素のコマンドライン側を使う。
 - ASan を clang で回すなら `cmake --preset ci-asan -DCMAKE_CXX_COMPILER=clang++`。
+
+### macos
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+cmake --build build --parallel
+ctest --test-dir build --parallel 4 --output-on-failure
+```
 
 ### tools-ergo
 
@@ -119,6 +122,8 @@ npm run typecheck && npm run build && npm test
 dotnet test tests/unity_packages/Ergo.Packages.Core.Tests.csproj
 ```
 
+パッケージの構造と Fixtures のバイト一致は ctest の `test_unity_package_structure` が見る。
+
 ### packages-integration
 
 Windows で、サブモジュールを初期化してから:
@@ -130,41 +135,28 @@ cmake --build --preset ci-packages --parallel
 ctest --preset ci-packages
 ```
 
-## packages-integration
-
 - `ci-packages` は `ERGO_PACKAGES=pictor;tela` をパッケージハブで取得
   (`ERGO_PACKAGES_FETCH=ON`) し、警告級の所見をすべてエラーにする
   (`ERGO_PACKAGES_STRICT=ON`)。実際の `ergo_render` バックエンドや
   `if(TARGET ...)` の下でだけ登録されるテストを含む統合構成で、
   [packages.md](packages.md) の「Ergo 単体で実際の Pictor / Tela をマニフェストの pin で
-  取る構成」にあたる。
-- Windows だけで走らせる (Linux では Pictor の GLFW が wayland / X11 の
-  開発パッケージを要求する)。
-- STRICT では `lib/lapilli` 未初期化 (PKG-16) がエラーになるので、checkout は
-  `submodules: recursive`。
-- 取得したソース (FetchContent の基底ディレクトリ =
-  `ERGO_DEPENDENCY_CACHE_DIR`) は `ergo-packages.json` と
-  `third_party/dependencies.cmake` のハッシュをキーにキャッシュする。
-- **まだ PR のゲートではない**。最初の緑が出るまで `continue-on-error: true`。
-  緑が続いたら `continue-on-error` を外し、必要なら pull_request を
-  `ergo-packages.json` / `CMakePresets.json` / `cmake/**` / `third_party/**` /
-  `src/render/**` / `src/tela_graph/**` / `src/package_*/**` /
-  `tests/packages/**` の paths 絞りで足す。
-- Pictor / Tela は公開リポジトリなので既定のトークンで取得できる。非公開に
-  なった場合は、読み取り専用トークンを secret に置き、構成の前に
-  `git config --global url."https://x-access-token:<token>@github.com/".insteadOf "https://github.com/"`
-  を実行するステップを足す。
+  取る構成」にあたる。ネットワークが要る。
+- Windows で回す (Linux では Pictor の GLFW が wayland / X11 の開発パッケージを要求する)。
+- STRICT では `lib/lapilli` 未初期化 (PKG-16) がエラーになるので、サブモジュールは
+  `--recursive` で初期化しておく。
+- 取得したソースは FetchContent の基底ディレクトリ (`ERGO_DEPENDENCY_CACHE_DIR`) に
+  残るので、同じディレクトリを渡せば次回は取り直さない。
 
 ## サニタイザ
 
-### ASan / LSan / UBSan (`linux-asan`、必須)
+### ASan / LSan / UBSan (`linux-asan`)
 
 - `ci-asan` プリセット: Debug、コンパイルとリンクの両方に
   `-fsanitize=address,undefined`。`-fno-sanitize-recover=undefined` で UB は
   その場でテストを落とす。テストプリセットが `ASAN_OPTIONS=detect_leaks=1` と
   `UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1` を設定する。
-- CI ではランナーの `vm.mmap_rnd_bits` を 28 に下げてから走らせる
-  (新しいカーネルの既定値ではサニタイザのシャドウメモリの配置が壊れることがある)。
+- 新しいカーネルの既定値ではサニタイザのシャドウメモリの配置が壊れることがある。
+  起動直後に落ちるときは `sudo sysctl vm.mmap_rnd_bits=28` に下げてから走らせる。
 - **ergo_profile の意図的な非解放**: スレッドごとのイベントバッファは
   エクスポートのためにプロセスの寿命の間残す (解放しない)。バッファを指す
   登録簿 (`src/profile/profile.cpp` の `thread_buffers()`) も破棄しない
@@ -174,9 +166,9 @@ ctest --preset ci-packages
   オブジェクトを足すときも同じく「到達可能なまま残す」形にし、
   サプレッションで隠さない。
 
-### TSan (後続)
+### TSan (未整備)
 
-ThreadSanitizer のレグはまだ無い。スレッドを立てるテスト
+ThreadSanitizer の構成はまだ無い。スレッドを立てるテスト
 (`test_profile` / `test_polling_thread` / `test_double_buffer` / `test_log` /
 `test_custos_module` / `test_http_server` / `test_screenshot_bridge` /
 `test_particle_system` / `test_audio_engine`) を `-fsanitize=thread` で
@@ -189,23 +181,4 @@ ThreadSanitizer のレグはまだ無い。スレッドを立てるテスト
 | ergo_custos | `src/custos/http_server.{h,cpp}` の `listen_fd_` | `shutdown()` が書き、`accept_loop` が読む素の `int` |
 
 予定: これらのテストに `LABELS threads` を付け、`ci-tsan` プリセットと
-`ctest -L threads` の夜間レグを報告のみで足す。3 件が直ったら必須にする。
-
-## 必須チェック
-
-main のルールセット (GitHub の管理設定) で必須にするチェック名は次のとおり
-(名前は完全一致で指定する):
-
-- `build-and-test (windows-msvc)`
-- `build-and-test (linux-gcc-cmake320)`
-- `build-and-test (linux-clang)`
-- `build-and-test (linux-asan)`
-- `tools-ergo`
-- `unity-package-core`
-- `harness / harness` (GitHub PR 経由で入れる場合だけ。harness は
-  pull_request と main への push でしか走らない)
-
-`build-and-test (macos-14)` と `packages-integration` は必須にしない。
-レグを足したり名前を変えたりしたら、このリストとルールセットを同じ変更で
-更新する。運用 (候補 SHA の扱い、main が赤のとき) は
-[branch-and-pr.md](branch-and-pr.md) 「CI ゲート」。
+`ctest -L threads` で手元で回せるようにする。
