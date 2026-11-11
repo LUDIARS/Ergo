@@ -1,5 +1,6 @@
 #include "visus_plugin.h"
 
+#include <cmath>
 #include <cstdlib>
 
 namespace ergo::studio::plugins::visus {
