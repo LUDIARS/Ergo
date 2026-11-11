@@ -1128,8 +1128,10 @@ if(ERGO_BUILD_STUDIO)
         endif()
     endif()
 
-    # ergo_studio_platform : outgoing HTTP(S), OS credential storage, processes, clipboard (Windows backend;
-    # other platforms report "unsupported" instead of switching paths)
+    # ergo_studio_platform : outgoing HTTP(S), OS credential storage, processes, clipboard. Windows uses the OS
+    # (WinHTTP, Credential Manager, ...). Elsewhere HTTP(S) is libcurl when the managed curl is built
+    # (-DERGO_WITH_CURL=ON; TLS from its backend, OpenSSL on Linux) and an explicit "not available in this build"
+    # error otherwise; the credential store, process runner and clipboard report "unsupported" (no other path).
     if(WIN32)
         add_library(ergo_studio_platform STATIC
             src/studio/platform/process_quote.cpp
@@ -1143,11 +1145,31 @@ if(ERGO_BUILD_STUDIO)
         target_link_libraries(ergo_studio_platform PRIVATE winhttp advapi32 user32)
     else()
         add_library(ergo_studio_platform STATIC
+            src/studio/platform/http_request_check.cpp
             src/studio/platform/process_quote.cpp
             src/studio/platform/sha256.cpp
             src/studio/platform/unsupported_platform.cpp
             src/studio/platform/url_encode.cpp
         )
+        if(TARGET CURL::libcurl)
+            target_sources(ergo_studio_platform PRIVATE src/studio/platform/curl_http_client.cpp)
+            target_link_libraries(ergo_studio_platform PRIVATE CURL::libcurl)
+            message(STATUS "ergo_studio_platform: HTTP(S) through the managed libcurl")
+        else()
+            target_sources(ergo_studio_platform PRIVATE src/studio/platform/unsupported_http_client.cpp)
+            message(STATUS "ergo_studio_platform: no HTTP client in this build (configure with -DERGO_WITH_CURL=ON for one)")
+        endif()
+        if(ERGO_BUILD_TESTS)
+            # The libcurl backend's request checks (always) and, with libcurl, loopback requests to the
+            # Studio's own server.
+            add_executable(test_studio_platform_http tests/studio/test_studio_platform_http.cpp)
+            target_include_directories(test_studio_platform_http PRIVATE src/studio/platform)
+            target_link_libraries(test_studio_platform_http PRIVATE ergo_studio_platform ergo_studio_net ergo_gtest_main)
+            if(TARGET CURL::libcurl)
+                target_compile_definitions(test_studio_platform_http PRIVATE ERGO_STUDIO_TEST_CURL=1)
+            endif()
+            add_test(NAME test_studio_platform_http COMMAND test_studio_platform_http)
+        endif()
     endif()
     target_include_directories(ergo_studio_platform PUBLIC include)
     if(MSVC)

@@ -158,8 +158,27 @@ token と接続コードはメモリにだけ持つ。ディスクに書かず�
 
 ### LS-INV-03 代わりの経路を持たない {#SPEC-ergo-lesson-no-fallback}
 
-通信は `platform::IHttpClient` だけ (Windows は WinHTTP)。実装の無い環境では「未対応」の失敗をそのまま
+通信は `platform::IHttpClient` (`make_system_http_client()`) だけ。実装の無い環境では「未対応」の失敗をそのまま
 画面に出し、別の経路に切り替えない。クリップボードも同じ。取り決めと違う応答は既定値で埋めずに失敗にする。
+
+| 環境 | `make_system_http_client()` |
+|---|---|
+| Windows | WinHTTP (OS の TLS・proxy・証明書ストア) |
+| Windows 以外、`-DERGO_WITH_CURL=ON` | managed libcurl (`src/studio/platform/curl_http_client.cpp`)。TLS は libcurl の backend (Linux は OpenSSL) と configure 時の CA bundle。証明書とホスト名の検証は常に有効。proxy は環境変数 (`https_proxy` / `no_proxy` …) |
+| Windows 以外、curl なし (既定) | 毎回「この build には HTTP が無い (`-DERGO_WITH_CURL=ON` で構成する)」の失敗 |
+
+libcurl を選んだ理由 (2026-11-11): リポに既に managed 依存として pin 済み (`curl-8_19_0`) で、Linux では OpenSSL で
+`https://` まで扱え、この環境でも取得・ビルドできた。自前のソケット実装 (http だけ) より `https://` の授業サーバに
+そのままつながる。Studio は curl を強制 ON にはしない (素のビルドをネットワーク非依存に保つ規約)。
+
+libcurl 版の約束 (`src/studio/platform/http_request_check` が純関数で検査する):
+
+- `http://` と `https://` だけ (libcurl の他のプロトコルは使わない)。リダイレクトは最大 10 回、`https://` から
+  `http://` へは下りない (WinHTTP の既定と同じ)。`https://` を平文に落とすことはない。
+- ヘッダの名前・値に改行や NUL があれば送らずに失敗にする。libcurl が勝手に足す `Content-Type`
+  (フォーム) と `Expect: 100-continue` は付けない。
+- 応答本文は 64 MiB まで。超えたら失敗 (メモリを埋めない)。`timeout_ms` は全体の上限。
+- 失敗の文言は libcurl の一般的な文 (`TLS failed: ...` を含む) だけで、URL・ホスト・ポート・ヘッダを含めない。
 
 ### LS-INV-04 通信は UI スレッドの外 {#SPEC-ergo-lesson-thread}
 
@@ -181,11 +200,17 @@ HTTP はワーカースレッド 1 本だけが行う。UI スレッドは指示
 - `tests/studio/test_studio_lesson_game.cpp`: 本物の `ergo_bind` エンジンを Studio のサーバ (`net::Server` +
   `variable`) に loopback でつなぎ、実演の切り替えが依頼済み → 反映済みになること、エンジンの再接続 (再起動)
   後に戻ること、`read_only` の変数が「従っていない」になることを確かめる。
+- `tests/studio/test_studio_platform_http.cpp` (Windows 以外): 要求の検査の表 (scheme、URL、method、ヘッダの
+  改行、空の値、timeout、本文の上限) と、libcurl がある build では loopback の実通信 (Studio 自身の
+  `net::Server` への GET / POST / PUT / DELETE と本文・ヘッダ、404、リダイレクト、時間切れ、本文の上限、
+  `ftp://` の拒否、`https://` を平文のサーバへ向けると TLS の失敗になり平文の要求は届かないこと、試験内の
+  小さな listener での chunked / close 区切り / 壊れた chunked)。
 - `tests/studio/test_studio_lesson_view.cpp`: タブの文言 (未接続、貼り付けの拒否理由、生徒、実演、従わないゲーム、失敗の種類)
   と、画面に token・コード・貼り付けた文字列が出ないこと。
 - 確認していないこと (2026-11-11 時点):
   - 実際の odeum-lesson との接続 (テストは `tests/studio/fake_http.h` の偽の HTTP だけ)。
   - Windows でのビルドと動作。WinHTTP 経由の通信と `win_clipboard.cpp` は Linux ではコンパイルもしていない。
+  - macOS での libcurl 版 (curl 8.19 は SecureTransport を持たないので、OpenSSL などの TLS backend が要る)。
   - 窓のある Studio での表示 (Pictor + Vulkan + GLFW が要る)。`✓` などの字がフォントにあるかも未確認。
   - 実際のゲームの変数。**ActionGameSample の Ergo 版はまだ無い**。Odeum のサンプル講座が使う `feel.*`
     (`feel.hit_stop`、`feel.hit_stop_last_seconds` など) は取り決めた名前であり、これから作るサンプルが

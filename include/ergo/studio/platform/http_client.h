@@ -1,8 +1,10 @@
 #pragma once
 /// Outgoing HTTP(S) for plugins (GitHub API, bridges to local tools).
-/// The system implementation uses the OS stack (Windows: WinHTTP, which
-/// brings TLS and the system proxy / certificate store). Platforms without
-/// an implementation return an explicit "unsupported" error.
+/// The system implementation is WinHTTP on Windows (TLS, the system proxy and
+/// certificate store) and the managed libcurl elsewhere when the build has it
+/// (-DERGO_WITH_CURL=ON: TLS from its backend with verification on, proxy
+/// from the environment). A build without one returns an explicit "not
+/// available in this build" error on every send.
 #include <memory>
 #include <string>
 #include <utility>
