@@ -41,8 +41,43 @@ jobs:
           path: build/deps-cache
           key: ergo-deps-${{ runner.os }}-${{ hashFiles('ergo-packages.json', 'third_party/dependencies.cmake') }}
 
+      # Lorica (private LUDIARS/Lorica) at the commit CMake pins (the same steps
+      # as ci.yml's build-and-test; spec/setup/hardening.md "CI").
+      - name: Lorica pin
+        id: lorica
+        shell: bash
+        run: |
+          sha=$(awk '/NAME[[:space:]]+lorica([[:space:]]|$)/ { found = 1 } found && /GIT_TAG/ { print $2; exit }' third_party/dependencies.cmake)
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Lorica pin::could not read Lorica's GIT_TAG (a 40-hex commit) from third_party/dependencies.cmake (got '${sha}')"
+            exit 1
+          fi
+          dir="$(pwd -W 2>/dev/null || pwd)/build/_lorica"
+          echo "Lorica ${sha} -> ${dir}"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+
+      - name: Require LUDIARS_REPO_TOKEN
+        shell: bash
+        env:
+          LUDIARS_REPO_TOKEN: ${{ secrets.LUDIARS_REPO_TOKEN }}
+        run: |
+          if [ -z "$LUDIARS_REPO_TOKEN" ]; then
+            echo "::error title=Lorica::LUDIARS_REPO_TOKEN が未設定 (または fork からの PR で secret が渡らない) なので、private の LUDIARS/Lorica を取得できない。Lorica なし (守りなし) では続けない。org の repo:read 相当の PAT を secret LUDIARS_REPO_TOKEN に設定すること。"
+            exit 1
+          fi
+
+      - name: Checkout Lorica
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: LUDIARS/Lorica
+          ref: ${{ steps.lorica.outputs.sha }}
+          path: build/_lorica
+          token: ${{ secrets.LUDIARS_REPO_TOKEN }}
+          persist-credentials: false
+
       - name: Configure
-        run: cmake --preset ci-packages -DERGO_DEPENDENCY_CACHE_DIR=build/deps-cache
+        run: cmake --preset ci-packages -DERGO_DEPENDENCY_CACHE_DIR=build/deps-cache "-DLORICA_SOURCE_DIR=${{ steps.lorica.outputs.dir }}" -DERGO_HARDENING=required
 
       - name: Build
         env:

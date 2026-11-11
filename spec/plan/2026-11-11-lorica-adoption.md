@@ -137,3 +137,11 @@ Linux (GCC 13.3、Ninja、Release、`ERGO_AUDIO_BACKEND=dummy`、`ERGO_BUILD_BEN
 
 測ったのは baseline (EXTENDED は描画・シミュレーションのライブラリには付けていない)。`_GLIBCXX_ASSERTIONS` と
 stack protector が主な候補だが、内訳は分けて測っていない。
+
+## 5. 追加: CI の Lorica の取得と「Lorica が掛かっているか」のテスト (2026-11-11、COMMON-4)
+
+- CI: `ci.yml` の `build-and-test` (windows-msvc・linux-clang・linux-asan) と `packages-integration.yml` の `ci-packages` が、`third_party/dependencies.cmake` の固定 SHA を読み、secret `LUDIARS_REPO_TOKEN` で `LUDIARS/Lorica` を `build/_lorica` に取得 (`persist-credentials: false`。secret が空なら `::error::` で失敗) し、`-DLORICA_SOURCE_DIR=… -DERGO_HARDENING=required` で構成する。CMake 3.20 のレグと macOS は取得しない (守りなし、テストは skip)。
+- テスト 6 本 (`cmake/ErgoHardeningChecks.cmake`、`tests/hardening/`): `test_lorica_applied` / `test_lorica_applied_extended` (翻訳単位の中から)、`test_lorica_compile_commands` (`compile_commands.json` の 431 単位)、`test_lorica_verify_binary_{ergo_studio,ergo_pkg_cli,test_lorica_applied}` (python3 があるときだけ)。手順は [../setup/hardening.md](../setup/hardening.md)。
+- わざと壊した確認: `test_json_min` に `-fno-stack-protector`、`test_lorica_applied` に `-U_GLIBCXX_ASSERTIONS` を足す → `test_lorica_compile_commands` が 2 単位を名指しして失敗、`test_lorica_applied` も失敗 (元に戻して全通過)。強制 include を外して手でコンパイルした probe は `UnsafeApiHeaderForceIncluded` で失敗。
+- 結果: GCC Release (`ERGO_BUILD_BENCHMARKS=ON`) で ctest 124/124 (118 + 6)。Windows・clang・ASan のレグとワークフローの実行はこの環境では未確認。
+

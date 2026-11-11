@@ -92,6 +92,37 @@ build/fuzz-clang/fuzz_studio_net -max_total_time=30 /tmp/corpus/studio_net
 `shuriken_prefab`。同じ入口を種 (`tests/<module>/fuzz_corpus/<name>/`) と端の入力で 1 回ずつ呼ぶ
 `fuzz_regress_<name>` は、どのコンパイラでも `ERGO_BUILD_TESTS` で作られ ctest に入る。
 
+## Lorica が掛かっているかのテスト (ctest、`cmake/ErgoHardeningChecks.cmake`)
+
+構成時の網羅の確認 (`ergo_hardening_verify`) はターゲットのプロパティしか見ない。ビルドの結果そのものを見る次の
+テストが ctest に入る (ラベル `hardening`)。取り込みが外れた・守りのフラグが落ちた・強制 include が効いていない、
+のどれでも ctest が落ちる。
+
+| テスト | 中身 |
+|---|---|
+| `test_lorica_applied` | `tests/hardening/test_lorica_applied.cpp` を他のターゲットと同じ `ergo_harden_targets()` の歩き方で作り、翻訳単位の中から確かめる: `<lorica/unsafe_api.hpp>` の強制 include (このヘッダは `#pragma once` で印のマクロを残さないので、C ライブラリのヘッダより前に `::strcpy` が宣言済みであることで見る)、`_GLIBCXX_ASSERTIONS` / libc++ の `_LIBCPP_HARDENING_MODE`、最適化ありの構成で `_FORTIFY_SOURCE` が 3 (コンパイラ 12 未満は 2)、`lorica::checked_add` の桁あふれが `nullopt`、`lorica::input_budget` が上限ちょうどを通し +1 を断る |
+| `test_lorica_applied_extended` | 同じソースを `ergo_hardening_mark_network()` で EXTENDED にしたもの。MSVC は `_MSVC_STL_HARDENING` / `_MSVC_STL_DESTRUCTOR_TOMBSTONES`、libc++ は EXTENSIVE。libstdc++ の EXTENDED (`-ftrivial-auto-var-init=zero`) は印のマクロが無いので次のテストで見る。EXTENDED が使えないツールチェインでは skip |
+| `test_lorica_compile_commands` | `tests/hardening/test_lorica_compile_commands.cmake` (`cmake -P`)。`compile_commands.json` (Ergo が最上位のときだけ `CMAKE_EXPORT_COMPILE_COMMANDS=ON`) の Ergo 自身のソース (ビルドツリーの取得物は除く) の全エントリに、Lorica の include の場所、`-fstack-protector-strong`・`-fstack-clash-protection`・`-fcf-protection=full` (AArch64 は `-mbranch-protection=standard`)・PIC/PIE、C++ には `-D_GLIBCXX_ASSERTIONS`・`-D_LIBCPP_HARDENING_MODE=…`・`-include …/unsafe_api.hpp`・`-Werror=deprecated-declarations`、最適化ありの構成で最後の `_FORTIFY_SOURCE` が `-D_FORTIFY_SOURCE=3`、EXTENDED のターゲットには `-ftrivial-auto-var-init=zero` があり、打ち消すフラグ (`-fno-stack-protector`・`-D_FORTIFY_SOURCE=0`・`-fcf-protection=none`・`-Wno-deprecated-declarations` など) が無いことを見る。欠けたエントリはファイル名とターゲット名を挙げて落ちる。C のソースは C に付くフラグだけ |
+| `test_lorica_verify_binary_<target>` | `python3` が見つかるときだけ登録 (無ければ configure の STATUS)。Lorica の `tools/verify_binary.py` を `ergo_studio`・`ergo_pkg_cli`・`test_lorica_applied` に掛ける (ELF: PIE・NX・full RELRO、PE: ASLR・NX・CFG) |
+
+skip になるとき (ctest は「通過」ではなく skip と数える): Lorica が掛からない構成 (macOS・CMake 3.20〜3.23 など。
+上の WARNING の構成) では全部、Visual Studio ジェネレータ (`compile_commands.json` を作らない) と MSVC では
+`test_lorica_compile_commands`。MSVC の baseline (`/GS /sdl /guard:cf`・`/we4996`) は翻訳単位の中から見える印が無いので、
+Windows では構成時の確認と `verify_binary.py` (PE のフラグ) が受け持つ。
+
+## CI での Lorica の取得
+
+`LUDIARS/Lorica` は private なので、CI は org の secret **`LUDIARS_REPO_TOKEN`** (repo:read 相当の PAT。LUDIARS の
+private リポを CI で読むときの決まり) で取得する。`ci.yml` の `build-and-test` (windows-msvc・linux-clang・linux-asan)
+と `packages-integration.yml` の `ci-packages` で:
+
+1. `Lorica pin`: `third_party/dependencies.cmake` の Lorica の `GIT_TAG` (40 桁) を読む (SHA を二重に書かない)。読めなければ失敗。
+2. `Require LUDIARS_REPO_TOKEN`: secret が空 (未設定、または fork からの PR) なら `::error::` で失敗。守りなしで続けない。
+3. `Checkout Lorica`: `actions/checkout` で `build/_lorica` に、その commit を。
+4. 構成に `-DLORICA_SOURCE_DIR=<その場所> -DERGO_HARDENING=required`。
+
+`linux-gcc-cmake320` (CMake 3.20) と macOS は Lorica が対応しないので取得しない (WARNING で守りなし、上のテストは skip)。
+
 ## 守りの確かめ方
 
 ```bash
