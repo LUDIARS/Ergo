@@ -145,3 +145,10 @@ stack protector が主な候補だが、内訳は分けて測っていない。
 - わざと壊した確認: `test_json_min` に `-fno-stack-protector`、`test_lorica_applied` に `-U_GLIBCXX_ASSERTIONS` を足す → `test_lorica_compile_commands` が 2 単位を名指しして失敗、`test_lorica_applied` も失敗 (元に戻して全通過)。強制 include を外して手でコンパイルした probe は `UnsafeApiHeaderForceIncluded` で失敗。
 - 結果: GCC Release (`ERGO_BUILD_BENCHMARKS=ON`) で ctest 124/124 (118 + 6)。Windows・clang・ASan のレグとワークフローの実行はこの環境では未確認。
 
+## 6. 追加: main (#95 授業連携プラグイン lesson) の取り込み (2026-11-11)
+
+- `origin/main` (`f0219fd`) を merge。衝突 2 か所: `CMakeLists.txt` の `ergo_studio` (main の `ergo_studio_views` のリンクと `ergo_hardening_mark_network(ergo_studio)` の両方を残す)、`spec/setup/third-party-deps.md` の依存表 (main の curl の行と lorica の行の両方、main の curl の説明文も残す)。
+- main で増えたターゲット 8 本 (+ この job の `test_studio_lesson_limits`) も `ergo_harden_targets()` を通る: 158 ターゲット (EXTENDED 8)、未適用 0、`test_lorica_compile_commands` は 457 単位で通過。unsafe API の拒否で落ちる呼び出しは無かった。lesson のコードは `ergo_studio_plugins` (EXTENDED)、実行ファイルは `ergo_studio` (EXTENDED) に入る。`ergo_studio_views` (UI) と例 `lesson_action_feel` (ergo_bind で手元の Studio に繋ぐだけ) は baseline。
+- 上限を入れた経路: odeum-lesson の応答 (`lesson_protocol`: 本文 1 MiB・値 16384・深さ 16・手順 256・features / demo.states 各 256・文字列 4096 バイト・保持する文字列の合計 256 KiB。それまでは JSON の既定 64 MiB / 値 1,048,576 だけ)、接続文字列 (`lesson_link`: 2048 バイト)、WinHTTP の応答本文 (64 MiB。libcurl 側は main で済み、WinHTTP は無制限だった)。境界テストは `tests/studio/test_studio_lesson_limits.cpp` (7 件)。
+- 既にあったもの (確認だけ): `/lesson/api/*` (Studio の HTTP の既存の上限 + `check_mutation`)、libcurl の応答 64 MiB と要求の検査 (`http_request_check`)、`poll_ms` の 1〜10 s への丸め、トークン 32 桁・エラーコード 40 文字。`studio_settings` はファイルを読まない (環境変数と引数だけ、`PORT` は範囲検査済み) ので変更なし。
+- 結果: GCC Release ctest 131/131。lesson まわり 5 本 (`test_studio_lesson`・`_game`・`_limits`・`test_studio_platform_http`・`test_studio_settings`) は clang TSan と GCC ASan + UBSan (RelWithDebInfo `-g1`) でそれぞれ 2 回ずつ通過。WinHTTP の変更は Windows でビルドしていない (未確認)。

@@ -1345,6 +1345,14 @@ if(ERGO_BUILD_STUDIO)
         endif()
         add_test(NAME test_studio_lesson COMMAND test_studio_lesson)
 
+        # Upper bounds of the pasted link and odeum-lesson's replies (spec/setup/hardening.md "入力の上限").
+        add_executable(test_studio_lesson_limits tests/studio/test_studio_lesson_limits.cpp)
+        target_link_libraries(test_studio_lesson_limits PRIVATE ergo_studio_plugins ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_lesson_limits PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_lesson_limits COMMAND test_studio_lesson_limits)
+
         # The presenter's demo switches against a real ergo_bind engine over the Studio's own loopback server.
         if(TARGET ergo_bind)
             add_executable(test_studio_lesson_game

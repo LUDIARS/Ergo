@@ -71,6 +71,9 @@ macOS (AppleClang / Xcode)、iOS、Android (NDK)、Emscripten、MinGW、CMake 3.
 | SVG のラスタ化 | 入力 16 MiB・1 辺 16384・ビットマップ 256 MiB (`checked_multiply`) | `include/ergo/ui/svg_raster.h` (`SvgRasterOptions`) |
 | SVG のパス | 入力 16 MiB・点 1,048,576 個・図形 65,536 個 (`input_budget`)。`std::regex` をやめた (長い属性でスタックが溢れた) | `include/ergo/vector/vector.h` (`SvgLimits`) |
 | Unity Shuriken の移行 | ファイル 512 MiB・GameObject の親子の深さ 1024 (`input_budget`) | `include/ergo/shuriken_migrator/migrator.h` |
+| 授業連携 (lesson) の接続文字列 | 貼り付けた文字列 2048 バイト (実物は 300 バイト未満。URL の一般的な上限) | `tools/studio/plugins/lesson/lesson_link.h` (`kMaxLinkText`) |
+| 授業連携 (lesson) の odeum-lesson の応答 | 本文 1 MiB・JSON の値 16384 個・深さ 16 (`ParseLimits`)・手順 256・features / demo.states 各 256・文字列 1 つ 4096 バイト・保持する文字列の合計 256 KiB (`input_budget`) | `tools/studio/plugins/lesson/lesson_protocol.h` (`kMax*`) |
+| Studio の外向き HTTP の応答 | 本文 64 MiB (libcurl は main 側で済み、WinHTTP にも同じ値を入れた) | `src/studio/platform/http_request_check.h` / `winhttp_client.cpp` |
 | WAV | チャンネル 1〜64・サンプルレート 1〜768000 Hz・float は 32 bit だけ、読む量は `checked_multiply` | `include/ergo/sound/types.h` |
 
 値の根拠は各ヘッダのコメントと [../plan/2026-11-11-lorica-adoption.md](../plan/2026-11-11-lorica-adoption.md)。
