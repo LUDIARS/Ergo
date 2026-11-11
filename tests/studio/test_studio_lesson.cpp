@@ -2,6 +2,7 @@
 #include "fake_ws.h"
 #include "lesson_variables.h"
 #include "plugins/lesson/lesson_plugin.h"
+#include "plugins/lesson/lesson_shown_json.h"
 #include "plugins/variable/variable_plugin.h"
 
 #include <gtest/gtest.h>
@@ -839,7 +840,7 @@ TEST(StudioLessonPlugin, HealthAndRejectedLinksBeforeAnyConnection) {
     LessonPlugin plugin(http, std::make_shared<FakeVars>(), [](const std::string&, const std::string&) {});
     EXPECT_EQ(plugin.info().id, std::string("lesson"));
     EXPECT_TRUE(host::is_valid_plugin_id(plugin.info().id));
-    EXPECT_TRUE(plugin.http() == nullptr);     // no routes on the Studio's own server
+    EXPECT_TRUE(plugin.http() != nullptr);     // /lesson/api/* (see StudioLessonRoutes)
     EXPECT_TRUE(plugin.socket() == nullptr);
 
     JsonValue h = plugin.snapshot();
@@ -898,5 +899,147 @@ TEST(StudioLessonPlugin, LinksOnTheWorkerAndKeepsSecretsOutOfHealthAndLogs) {
     for (const auto& line : log) {
         EXPECT_FALSE(contains(line, kToken));
         EXPECT_FALSE(contains(line, "7K2M9QX4TB"));
+    }
+}
+
+// ---- routes on the Studio's own server ---------------------------------------------------
+
+namespace {
+
+net::HttpRequest route_request(const char* method, const char* path, std::string body = {},
+                               std::map<std::string, std::string> headers = {{"host", "127.0.0.1:5170"},
+                                                                             {"content-type", "application/json"}}) {
+    net::HttpRequest r;
+    r.method  = method;
+    r.path    = std::string("/lesson") + path;
+    r.target  = r.path;
+    r.headers = std::move(headers);
+    r.body    = std::move(body);
+    return r;
+}
+
+/// The response body as JSON; an empty object when it is not JSON (then every field() below is null and fails).
+JsonValue parse_body(const net::HttpResponse& res) {
+    JsonValue v;
+    if (!ergo::common::jsonm::parse(res.body, v) || !v.is_object()) return JsonValue::make_object();
+    return v;
+}
+
+} // namespace
+
+TEST(StudioLessonRoutes, StateConnectAndDisconnectLikeTheTab) {
+    auto http = std::make_shared<FakeHttp>();
+    http->routes[kPairUrl]  = {200, pair_body("student")};
+    http->routes[kStateUrl] = {200, kStudentState};
+    std::vector<std::string> log;
+    std::mutex               log_mtx;
+    LessonPlugin plugin(http, std::make_shared<FakeVars>(), [&](const std::string& level, const std::string& msg) {
+        std::lock_guard<std::mutex> lk(log_mtx);
+        log.push_back(level + " " + msg);
+    });
+    host::IPluginHttp& routes = *plugin.http();
+    auto call = [&](const net::HttpRequest& r) { return routes.handle(r, r.path.substr(std::string("/lesson").size())); };
+
+    net::HttpResponse res = call(route_request("GET", "/api/state", {}, {{"host", "127.0.0.1:5170"}}));
+    EXPECT_EQ(res.status, 200);
+    JsonValue state = parse_body(res);
+    ASSERT_EQ(state.o->size(), 10u);
+    EXPECT_FALSE(field(state, "linked")->as_bool(true));
+    EXPECT_EQ(field(state, "role")->as_string(), std::string("none"));
+    EXPECT_EQ(field(state, "end")->as_string(), std::string("none"));
+    EXPECT_TRUE(field(state, "failure")->is_null());
+    EXPECT_TRUE(field(state, "assignment")->is_null());
+    EXPECT_TRUE(field(state, "demo")->is_array());
+
+    EXPECT_EQ(call(route_request("GET", "/api/connect")).status, 405);
+    EXPECT_EQ(call(route_request("POST", "/api/state", "{}")).status, 405);
+    EXPECT_EQ(call(route_request("POST", "/api/other", "{}")).status, 404);
+
+    // The mutation guard (ST-INV-03): loopback Host, same-origin Origin, JSON body.
+    const std::string body = std::string(R"({"link":")") + kLink + "\"}";
+    EXPECT_EQ(call(route_request("POST", "/api/connect", body, {{"host", "evil.example:5170"}, {"content-type", "application/json"}})).status, 403);
+    EXPECT_EQ(call(route_request("POST", "/api/connect", body, {{"host", "127.0.0.1:5170"}, {"content-type", "text/plain"}})).status, 403);
+    EXPECT_EQ(call(route_request("POST", "/api/connect", body,
+                                 {{"host", "127.0.0.1:5170"}, {"origin", "http://evil.example"}, {"content-type", "application/json"}}))
+                  .status,
+              403);
+    EXPECT_EQ(call(route_request("POST", "/api/disconnect", "{}", {{"host", "127.0.0.1:5170"}})).status, 403);
+    EXPECT_EQ(count(*http, kPairUrl), 0u);
+
+    EXPECT_EQ(call(route_request("POST", "/api/connect", "not json")).status, 400);
+    EXPECT_EQ(call(route_request("POST", "/api/connect", R"({"link":7})")).status, 400);
+    res = call(route_request("POST", "/api/connect", R"({"link":"http://127.0.0.1:4410/v1/tool#SECRETCODE"})"));
+    EXPECT_EQ(res.status, 400);
+    ASSERT_TRUE(field(parse_body(res), "error") != nullptr);
+    EXPECT_EQ(field(parse_body(res), "error")->as_string(), std::string("invalid_link"));
+    EXPECT_FALSE(contains(res.body, "SECRETCODE"));
+    EXPECT_FALSE(plugin.shown().link_error.empty());   // the tab says so too
+    EXPECT_EQ(count(*http, kPairUrl), 0u);
+
+    res = call(route_request("POST", "/api/connect", body,
+                             {{"host", "127.0.0.1:5170"}, {"origin", "http://127.0.0.1:5170"}, {"content-type", "application/json"}}));
+    EXPECT_EQ(res.status, 202);
+    EXPECT_FALSE(contains(res.body, "7K2M9QX4TB"));
+    ASSERT_TRUE(wait_until([&] { return plugin.shown().session.linked && plugin.shown().session.assignment.has_value(); }));
+    res = call(route_request("POST", "/api/connect", body));   // like the tab: disconnect first
+    EXPECT_EQ(res.status, 409);
+    EXPECT_EQ(count(*http, kPairUrl), 1u);
+
+    res   = call(route_request("GET", "/api/state", {}, {{"host", "localhost:5170"}}));
+    state = parse_body(res);
+    ASSERT_EQ(state.o->size(), 10u);
+    EXPECT_TRUE(field(state, "linked")->as_bool());
+    EXPECT_EQ(field(state, "role")->as_string(), std::string("student"));
+    EXPECT_EQ(field(state, "host")->as_string(), std::string("127.0.0.1"));
+    EXPECT_EQ(field(state, "class")->as_string(), std::string("Action"));
+    const JsonValue* steps = field(*field(state, "assignment"), "steps");
+    ASSERT_TRUE(steps && steps->is_array());
+    ASSERT_EQ(steps->a->size(), 3u);
+    EXPECT_TRUE(field((*steps->a)[1], "automatic")->as_bool());
+    EXPECT_TRUE(field((*steps->a)[2], "done")->as_bool());
+    EXPECT_FALSE(contains(res.body, kToken));
+    EXPECT_FALSE(contains(res.body, "7K2M9QX4TB"));
+    EXPECT_FALSE(contains(res.body, "4410"));   // the host only, as on the tab
+
+    EXPECT_EQ(call(route_request("POST", "/api/disconnect", "{}")).status, 200);
+    ASSERT_TRUE(wait_until([&] { return !plugin.shown().session.linked; }));
+    state = parse_body(call(route_request("GET", "/api/state", {}, {{"host", "127.0.0.1:5170"}})));
+    ASSERT_EQ(state.o->size(), 10u);
+    EXPECT_EQ(field(state, "end")->as_string(), std::string("disconnected"));
+
+    std::lock_guard<std::mutex> lk(log_mtx);
+    for (const auto& line : log) {
+        EXPECT_FALSE(contains(line, "7K2M9QX4TB"));
+        EXPECT_FALSE(contains(line, "SECRETCODE"));
+        EXPECT_FALSE(contains(line, kToken));
+    }
+}
+
+TEST(StudioLessonRoutes, PresenterStateNamesEveryDemoStatus) {
+    auto http = std::make_shared<FakeHttp>();
+    http->routes[kPairUrl]  = {200, pair_body("presenter")};
+    http->routes[kStateUrl] = {200, presenter_state(1, R"({"hit_stop":true,"slow_motion":false})")};
+    auto vars = std::make_shared<FakeVars>();
+    vars->vars["feel.hit_stop"] = var("bool", jbool(false));
+    LessonPlugin plugin(http, vars, [](const std::string&, const std::string&) {});
+    ASSERT_FALSE(plugin.connect(kLink).has_value());
+    ASSERT_TRUE(wait_until([&] { return plugin.shown().session.demo.size() == 3; }));
+    const net::HttpRequest r = route_request("GET", "/api/state", {}, {{"host", "127.0.0.1:5170"}});
+    const JsonValue state = parse_body(plugin.http()->handle(r, "/api/state"));
+    ASSERT_EQ(state.o->size(), 10u);
+    EXPECT_EQ(field(state, "role")->as_string(), std::string("presenter"));
+    EXPECT_TRUE(field(state, "assignment")->is_null());
+    const JsonValue& demo = *field(state, "demo");
+    ASSERT_EQ(demo.a->size(), 3u);
+    EXPECT_EQ(field((*demo.a)[0], "feature")->as_string(), std::string("hit_stop"));
+    EXPECT_EQ(field((*demo.a)[0], "variable")->as_string(), std::string("feel.hit_stop"));
+    EXPECT_TRUE(field((*demo.a)[0], "on")->as_bool());
+    EXPECT_EQ(field((*demo.a)[0], "status")->as_string(), std::string("requested"));
+    EXPECT_TRUE(field((*demo.a)[1], "on")->is_null());   // knockback: not cued
+    EXPECT_EQ(field((*demo.a)[1], "status")->as_string(), std::string("not_cued"));
+    EXPECT_EQ(field((*demo.a)[2], "status")->as_string(), std::string("no_variable"));
+    for (DemoStatus s : {DemoStatus::NotCued, DemoStatus::Applied, DemoStatus::Requested, DemoStatus::NotFollowing,
+                         DemoStatus::WaitingForGame, DemoStatus::NotBool, DemoStatus::NoVariable}) {
+        EXPECT_FALSE(std::string(demo_status_id(s)).empty());
     }
 }

@@ -1,5 +1,7 @@
 #include "lesson_plugin.h"
 
+#include "lesson_routes.h"
+
 #include <chrono>
 #include <exception>
 
@@ -80,8 +82,10 @@ LessonPlugin::~LessonPlugin() {
     worker_.join();
 }
 
-void LessonPlugin::connect(const std::string& link_text) {
+std::optional<std::string> LessonPlugin::connect(const std::string& link_text) {
     auto parsed = parse_lesson_link(link_text);
+    std::optional<std::string> rejected;
+    if (!parsed.link) rejected = parsed.error;
     {
         std::lock_guard<std::mutex> lk(mtx_);
         if (!parsed.link) {
@@ -95,6 +99,11 @@ void LessonPlugin::connect(const std::string& link_text) {
         ++revision_;
     }
     cv_.notify_all();
+    return rejected;
+}
+
+net::HttpResponse LessonPlugin::handle(const net::HttpRequest& req, const std::string& sub_path) {
+    return handle_lesson_route(*this, req, sub_path, log_);
 }
 
 void LessonPlugin::disconnect() {

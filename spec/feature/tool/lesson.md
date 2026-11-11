@@ -11,8 +11,9 @@
 
 ## 置き場所
 
-ネイティブ版 Ergo Studio (`tools/studio`) の組み込みプラグイン。Studio 自身のサーバには HTTP / WS の
-経路を足さない (`IPluginHealth` と `IPluginView` だけを持つ)。
+ネイティブ版 Ergo Studio (`tools/studio`) の組み込みプラグイン。`IPluginHealth` と `IPluginView` に加えて、
+Studio 自身の (loopback の) サーバに `/lesson/api/*` の 3 つの経路を持つ (窓の無い構成とスクリプト用、
+[LS-INV-06](#SPEC-ergo-lesson-routes))。WS の経路は持たない。
 
 | 層 | ファイル | 責務 |
 |---|---|---|
@@ -23,6 +24,9 @@
 | 実演 | `plugins/lesson/demo_apply` | ゲームが公開している値と授業の状態の突き合わせ、切り替えの依頼 |
 | 状態機械 | `plugins/lesson/lesson_session` | 「1 回ポーリングする」で進む。スレッドも時計も持たない |
 | プラグイン | `plugins/lesson/lesson_plugin` | ワーカースレッド、表示用の状態、health |
+| 経路 | `plugins/lesson/lesson_routes` | `/lesson/api/state` / `connect` / `disconnect` (変更系の防御付き) |
+| 表示用の状態の JSON | `plugins/lesson/lesson_shown_json` | タブと同じ内容を JSON に (token・コードは含まない) |
+| 変更系の防御 | `plugins/common/mutation_guard` | ST-INV-03 の検査 (`studio` プラグインと共用。`plugins/studio/` から移した) |
 | ゲームの変数 | `plugins/lesson/game_variables.h` | lesson が必要とする変数アクセスの interface (`IGameVariables`) |
 | 橋渡し | `tools/studio/lesson_variables` | `IGameVariables` を `variable` プラグインで実装する (組み立て側) |
 | 画面 | `tools/studio/views/lesson_view` | タブ「授業」 |
@@ -144,6 +148,22 @@ Ergo の WS クライアントに TLS が無いため。
 
 health (`/api/health` の `lesson`) は `{ok:true, linked, role:"none"|"student"|"presenter"}` だけ。
 
+## Studio のサーバの経路 {#SPEC-ergo-lesson-http}
+
+窓の無い Studio (`ergo_studio --headless`) にはタブも貼り付けも無いので、同じ操作を Studio 自身のサーバに置く。
+タブと同じことしかできない (接続文字列の受け渡し、切る、タブに出ている内容を読む)。
+
+| 経路 | 本文 | 応答 |
+|---|---|---|
+| `GET /lesson/api/state` | — | `200` タブと同じ内容: `{connecting, link_error, linked, role, host, class, end, failure, assignment, demo}` (`plugins/lesson/lesson_shown_json.h` に形)。token・接続コード・貼り付けた文字列・ポートは含まない |
+| `POST /lesson/api/connect` | `{"link":"<接続文字列>"}` | `202 {ok, connecting:true}` (つなぐのはワーカー。結果は state で見る) / `400 invalid_request` (JSON でない、`link` が文字列でない) / `400 invalid_link` (タブと同じ拒否理由。入力は含めない) / `409 already_linked` (接続中・接続済み。タブのボタンと同じく先に切る) |
+| `POST /lesson/api/disconnect` | `{}` | `200 {ok:true}` (= 切る) |
+
+- 失敗は `{error, message}`。方法違いは `405`、他の経路は `404`。
+- 選んだ理由: 環境変数で接続文字列を渡す方法は、接続コードがプロセスの環境 (他の利用者や子プロセスから見える) に
+  残り、LS-INV-05 (環境変数を持たない) とも合わない。経路なら Studio が既に持つ防御 (下の LS-INV-06) をそのまま使え、
+  接続を切る・状態を読むこともできる。
+
 ## 不変条件
 
 ### LS-INV-01 秘密はメモリだけ {#SPEC-ergo-lesson-secrets}
@@ -187,7 +207,15 @@ HTTP はワーカースレッド 1 本だけが行う。UI スレッドは指示
 
 ### LS-INV-05 接続先 {#SPEC-ergo-lesson-origin}
 
-接続先は貼り付けた接続文字列の origin だけ。設定・環境変数・ポート番号をコードに持たない。
+接続先は貼り付けた (または `/lesson/api/connect` に渡した) 接続文字列の origin だけ。設定・環境変数・ポート番号を
+コードに持たない。
+
+### LS-INV-06 経路の防御 {#SPEC-ergo-lesson-routes}
+
+`/lesson/api/*` は Studio のサーバ全体の検査 (`net/request_guard`: 信頼できる Host、別サイトの Origin を拒否) を
+通ったうえで、GET 以外は `studio` プラグインと同じ変更系の防御 (`plugins/common/mutation_guard`、ST-INV-03:
+loopback の Host、Origin を付けるなら同じ host:port、本文が JSON) を通る。別サイトのページから localhost へ POST して
+授業につながせる・切らせることはできない。接続文字列はログに出さない (ログは「経路から接続を始めた」の 1 行だけ)。
 
 ## 検証
 
@@ -207,20 +235,53 @@ HTTP はワーカースレッド 1 本だけが行う。UI スレッドは指示
   小さな listener での chunked / close 区切り / 壊れた chunked)。
 - `tests/studio/test_studio_lesson_view.cpp`: タブの文言 (未接続、貼り付けの拒否理由、生徒、実演、従わないゲーム、失敗の種類)
   と、画面に token・コード・貼り付けた文字列が出ないこと。
+- `tests/studio/test_studio_lesson.cpp` の `StudioLessonRoutes`: 経路の state / connect / disconnect、405 / 404、
+  防御 (別ホスト・JSON でない本文・別サイトの Origin は 403 で pair しない)、拒否理由に入力が出ないこと、409、
+  state とログに token・コード・ポートが出ないこと、実演の状態名。
+- `examples/lesson_action_feel/test_action_feel_sim.cpp` と `ergo_example_lesson_action_feel --check`: サンプルの観測値が
+  切り替えに従うこと (下の「サンプル」)。
+- 実際の odeum-lesson とのつなぎ (2026-11-11、この Linux、libcurl 版、`ergo_studio --headless` + サンプル +
+  `odeum-lesson`、`/lesson/api/connect` で接続文字列を渡す):
+  - 生徒: `--plain` で起動したサンプルに `/variable/ws` から `feel.hit_stop = true` を送ると、サンプルの次の当たりで
+    `feel.hit_stop_last_seconds` が 0.08 になり、授業のサーバが生徒のページに `add-hitstop` 済みの `progress` を送った。
+    `feel.knockback` でも同じく `add-knockback`。生徒の退出 (`student.eject`) で `tool_unlinked` → 切断。
+  - 実演: 実演用の接続文字列でつなぎ、`lesson.start` → `lesson.seek` で「すべて ON」の合図を越えると 3 つが ON に
+    なり、実演中にサンプルを `--plain` で起動し直すと次のポーリングで 3 つとも ON に戻った。「すべて OFF」「ヒット
+    ストップだけ ON」の合図、別の道具が値を変えたときの戻しも確認。
 - 確認していないこと (2026-11-11 時点):
-  - 実際の odeum-lesson との接続 (テストは `tests/studio/fake_http.h` の偽の HTTP だけ)。
+  - `https://` の授業サーバとの接続 (libcurl 版の TLS は loopback の自己署名サーバでの検証失敗と、proxy 越しの
+    公開ホストへの到達だけを確かめた)。
   - Windows でのビルドと動作。WinHTTP 経由の通信と `win_clipboard.cpp` は Linux ではコンパイルもしていない。
   - macOS での libcurl 版 (curl 8.19 は SecureTransport を持たないので、OpenSSL などの TLS backend が要る)。
   - 窓のある Studio での表示 (Pictor + Vulkan + GLFW が要る)。`✓` などの字がフォントにあるかも未確認。
-  - 実際のゲームの変数。**ActionGameSample の Ergo 版はまだ無い**。Odeum のサンプル講座が使う `feel.*`
-    (`feel.hit_stop`、`feel.hit_stop_last_seconds` など) は取り決めた名前であり、これから作るサンプルが
-    `ergo_bind` で同じ名前を公開する必要がある。
+  - 遊べるゲームでの確認。`examples/lesson_action_feel` は変数を公開するだけのシミュレーションで、
+    ActionGameSample の Ergo 版 (遊べるもの) はまだ無い。
+
+## サンプル (`examples/lesson_action_feel`) {#SPEC-ergo-lesson-sample}
+
+Odeum のサンプル講座 (`action-game`) が名前を出す変数を、実際の Ergo モジュールで公開する**ヘッドレスの例**。
+遊べるゲームではない: プレイヤーが一定の間隔 (世界時間 0.5 秒) で敵を叩き続ける決まったシミュレーションで、
+授業とのつながりを試すためのもの。
+
+| 変数 | 型 | 内容 |
+|---|---|---|
+| `feel.hit_stop` / `feel.knockback` / `feel.camera_shake` | bool (Studio から書ける) | 演出の ON / OFF。既定は ON、`--plain` で 3 つとも OFF (「演出を抜いた状態」) から始める |
+| `feel.hit_stop_last_seconds` | double (読み取り専用) | 最後に `ergo_world_time` が実際に止めた秒数 (0.08)。一度も止めていなければ 0 |
+| `feel.knockback_last_impulse` | double (読み取り専用) | 最後に敵へ実際に与えた撃力の大きさ (6)。一度も与えていなければ 0 |
+
+- 観測値はシミュレーションが実際にしたことから作る。`feel.hit_stop` が OFF の間は 0 のまま、Studio から ON にすると
+  次の当たりで > 0 になる (課題の `check` はこれを見る)。OFF に戻しても「最後の値」は残る。
+- 構成: `action_feel_sim` (1 フレーム進める純粋な単位。世界時間は渡された `ergo_world_time::Engine` で進め、
+  当たりで `hit_stop` を呼ぶ) と `main.cpp` (`ergo_bind` への公開、60 Hz の実時間ループ、ログ)。
+- 起動: `ergo_example_lesson_action_feel [--host H] [--port P] [--plain] [--seconds S] [--status-every S]`
+  (Studio の `variable` プラグイン `ws://H:P/variable/ws`、既定 `127.0.0.1:5170`)。切り替えのたびと接続の状態、
+  数秒ごとの状態を標準出力に 1 行ずつ出す。`--check` は Studio なしで観測値が切り替えに従うかを確かめる (ctest)。
 
 ## 未決・今後
 
 - 文字入力欄が UI に入ったら、接続文字列を欄に貼れるようにする (今はクリップボードのボタンだけ)。
 - 条件の判定はポーリングの時点の値で行う。ポーリングの間だけ満たされる値は見逃すので、サンプル側は
-  `..._last_seconds` のように残る値を公開する。
+  `..._last_seconds` のように残る値を公開する (`examples/lesson_action_feel` はそうしている)。
 - `int64` は JSON の数値として届くので、2^53 を超える値の比較は正確でない。
 - 読み取り専用 (`read_only`) の変数は「従っていない」として出る。読み取り専用だから、と理由までは区別しない
   (`IGameVariables` は kind と値だけを渡す)。

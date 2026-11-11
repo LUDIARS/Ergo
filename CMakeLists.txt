@@ -1184,13 +1184,16 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/common/json_pretty.cpp
         tools/studio/plugins/common/json_util.cpp
         tools/studio/plugins/common/latest_blob_plugin.cpp
+        tools/studio/plugins/common/mutation_guard.cpp
         tools/studio/plugins/common/safe_path.cpp
         tools/studio/plugins/lesson/demo_apply.cpp
         tools/studio/plugins/lesson/lesson_client.cpp
         tools/studio/plugins/lesson/lesson_link.cpp
         tools/studio/plugins/lesson/lesson_plugin.cpp
         tools/studio/plugins/lesson/lesson_protocol.cpp
+        tools/studio/plugins/lesson/lesson_routes.cpp
         tools/studio/plugins/lesson/lesson_session.cpp
+        tools/studio/plugins/lesson/lesson_shown_json.cpp
         tools/studio/plugins/lesson/step_check.cpp
         tools/studio/plugins/log/line_ring.cpp
         tools/studio/plugins/log/lines_query.cpp
@@ -1231,7 +1234,6 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/studio/delegation_request.cpp
         tools/studio/plugins/studio/endpoints.cpp
         tools/studio/plugins/studio/git_client.cpp
-        tools/studio/plugins/studio/mutation_guard.cpp
         tools/studio/plugins/studio/plugin_installer.cpp
         tools/studio/plugins/studio/plugin_ledger.cpp
         tools/studio/plugins/studio/plugin_source.cpp

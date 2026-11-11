@@ -18,6 +18,10 @@
       "layer": "application"
     },
     {
+      "glob": "examples/lesson_action_feel/*",
+      "layer": "application"
+    },
+    {
       "glob": "include/ergo/actor/*",
       "layer": "domain-logic"
     },
