@@ -1,5 +1,6 @@
 #include "builtin_plugins.h"
 
+#include "plugins/git/git_plugin.h"
 #include "plugins/log/log_plugin.h"
 #include "plugins/lookdev/lookdev_plugin.h"
 #include "plugins/musa_melpomene/melpomene_plugin.h"
@@ -11,7 +12,9 @@
 #include "plugins/render_pipeline/render_pipeline_plugin.h"
 #include "plugins/rive/rive_plugin.h"
 #include "plugins/scene_editor/scene_editor_plugin.h"
+#include "plugins/services/services_plugin.h"
 #include "plugins/studio/studio_plugin.h"
+#include "plugins/tuning/tuning_plugin.h"
 #include "plugins/ui_layout/ui_layout_plugin.h"
 #include "plugins/variable/variable_plugin.h"
 #include "plugins/vfx_breed/vfx_breed_plugin.h"
@@ -28,6 +31,16 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
     });
     f.push_back(&p::variable::make_variable_plugin);
     f.push_back([cfg = s.studio](const host::LogFn& log) { return p::lookdev::make_lookdev_plugin(cfg, log); });
+    // Game workspace operations (services, tuning versions, git), driven by the workspace profiles.
+    f.push_back([cfg = s.studio, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::services::make_services_plugin(cfg, dirs, log);
+    });
+    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::tuning::make_tuning_plugin(home, dirs, log);
+    });
+    f.push_back([cfg = s.studio, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::git::make_git_plugin(cfg.home, dirs, cfg.request_timeout_ms, log);
+    });
     f.push_back(&p::particle::make_particle_plugin);
     f.push_back(&p::scene_editor::make_scene_editor_plugin);
     f.push_back(&p::log::make_log_plugin);

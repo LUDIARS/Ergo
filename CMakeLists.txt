@@ -1216,6 +1216,12 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/studio/studio_routes_sources.cpp
         tools/studio/plugins/studio/studio_routes_tasks.cpp
         tools/studio/plugins/ui_layout/ui_layout_plugin.cpp
+        tools/studio/plugins/common/workspace_profiles.cpp
+        tools/studio/plugins/git/git_ops.cpp
+        tools/studio/plugins/git/git_plugin.cpp
+        tools/studio/plugins/services/services_plugin.cpp
+        tools/studio/plugins/tuning/tuning_plugin.cpp
+        tools/studio/plugins/tuning/tuning_store.cpp
         tools/studio/plugins/lookdev/lookdev_plugin.cpp
         tools/studio/plugins/lookdev/lookdev_post.cpp
         tools/studio/plugins/lookdev/lookdev_store.cpp
@@ -1259,6 +1265,7 @@ if(ERGO_BUILD_STUDIO)
             tests/studio/test_studio_studio_api.cpp
             tests/studio/test_studio_log.cpp
             tests/studio/test_studio_scene_editor.cpp
+            tests/studio/test_studio_game_ops.cpp
         )
         target_link_libraries(test_studio_plugins PRIVATE ergo_studio_plugins ergo_gtest_main)
         if(MSVC)
@@ -1272,6 +1279,9 @@ if(ERGO_BUILD_STUDIO)
         add_library(ergo_studio_views STATIC
             tools/studio/views/api_view.cpp
             tools/studio/views/explorer_view.cpp
+            tools/studio/views/git_view.cpp
+            tools/studio/views/services_view.cpp
+            tools/studio/views/tuning_view.cpp
             tools/studio/views/json_render.cpp
             tools/studio/views/log_view.cpp
             tools/studio/views/lookdev_view.cpp

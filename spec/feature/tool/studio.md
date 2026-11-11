@@ -67,6 +67,17 @@ Actio のタスクから実装させるときは `taskflow_reference = actio:<id
 git は `fetch` と「main の早送り」だけ。早送りは main にいて、変更が無く、
 手元だけのコミットが無く、遅れているときだけ (共有の作業ツリーを他の人の作業ごと動かさない)。判定は
 実行直前の状態で行う。push・PR 提出・マージはしない (Revisor の local PR と人間の判断が持つ)。
+この制限は studio プラグインの「ソース」タブ (Cc に登録された全プロジェクトの自動同期) に掛かる。
+人が選んで操作する git は ST-INV-10 の `git` プラグインが持つ。
+
+
+### ST-INV-10 ワークスペースの git {#SPEC-ergo-studio-workspace-git}
+
+`git` プラグインは、ワークスペースのプロフィール (`game-ops.md`) に書かれたリポジトリだけを扱う。
+画面はリポジトリを一覧の番号で指し、パスを渡さない。操作は人がボタンで選んだときだけ行う
+(状態・履歴・ブランチの作成と切り替え・全変更のコミット・pull (`--ff-only`)・push)。
+Revisor のワークフロー (local PR・審査・マージ) とは別物で、その経路では使わない。
+push は通常の `git push` で、そのリポジトリに入っている Revisor の push guard などのフックはそのまま効く。
 
 
 ### ST-INV-07 リソースの取得 {#SPEC-ergo-studio-resources}

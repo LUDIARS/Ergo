@@ -1,11 +1,14 @@
 #include "view_registry.h"
 
 #include "explorer_view.h"
+#include "git_view.h"
 #include "log_view.h"
 #include "lookdev_view.h"
 #include "musa_views.h"
+#include "services_view.h"
 #include "studio_view.h"
 #include "thaleia_view.h"
+#include "tuning_view.h"
 #include "vfx_suggest_view.h"
 
 namespace ergo::studio::views {
@@ -14,6 +17,9 @@ std::unique_ptr<host::IPluginView> make_view(host::IPlugin& plugin, const Plugin
     const std::string& id = plugin.info().id;
     if (id == "studio") return std::make_unique<StudioView>(plugin);
     if (id == "log") return std::make_unique<LogView>(plugin);
+    if (id == "services") return std::make_unique<ServicesView>(plugin);
+    if (id == "tuning") return std::make_unique<TuningView>(plugin, find ? find("variable") : nullptr);
+    if (id == "git") return std::make_unique<GitView>(plugin);
     if (id == "lookdev") return std::make_unique<LookdevView>(plugin, find ? find("variable") : nullptr);
     if (id == "musa_thaleia") return std::make_unique<ThaleiaView>(plugin);
     if (id == "musa_terpsichore") return std::make_unique<TerpsichoreView>(plugin);
