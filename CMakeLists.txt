@@ -797,6 +797,7 @@ if(ERGO_BUILD_CUSTOS)
         src/custos/custos_module.cpp
         src/custos/http_server.cpp
         src/custos/png_writer.cpp
+        src/custos/request_head.cpp
     )
     target_include_directories(ergo_custos PUBLIC include)
     target_include_directories(ergo_custos PRIVATE third_party)
@@ -812,7 +813,7 @@ if(ERGO_BUILD_CUSTOS)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME test_http_server test_custos_module)
+        foreach(NAME test_http_server test_custos_module test_request_head)
             add_executable(${NAME} tests/custos/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_custos ergo_gtest_main)
             if(MSVC)
@@ -1067,7 +1068,7 @@ if(ERGO_BUILD_STUDIO)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_studio_net tests/studio/test_studio_net.cpp)
+        add_executable(test_studio_net tests/studio/test_studio_net.cpp tests/studio/test_studio_net_limits.cpp)
         target_link_libraries(test_studio_net PRIVATE ergo_studio_net ergo_common_ws ergo_gtest_main)
         if(MSVC)
             target_compile_options(test_studio_net PRIVATE /utf-8)

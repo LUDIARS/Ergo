@@ -12,6 +12,9 @@ namespace ergo::studio::net {
 struct HttpLimits {
     std::size_t max_head = 64 * 1024;          // request line + headers
     std::size_t max_body = 32 * 1024 * 1024;   // same cap as WS payloads
+    /// Header lines + query parameters of one request (Node's http default
+    /// maxHeadersCount, the limit of the TS server this replaces). More is 431.
+    std::size_t max_fields = 2000;
 };
 
 enum class ParseState { NeedMore, Complete, Error };
@@ -26,6 +29,7 @@ public:
     /// Valid after Complete.
     const HttpRequest& request() const { return req_; }
     /// HTTP status to answer with after Error (400 / 413 / 431 / 501).
+    /// Content-Length must be decimal digits only; one over max_body is 413.
     int error_status() const { return error_status_; }
     /// Bytes received after the complete request (e.g. WS frames sent right
     /// after the upgrade request). Valid after Complete.
@@ -33,7 +37,8 @@ public:
 
 private:
     ParseState fail(int status);
-    bool       parse_head(const std::string& head);
+    /// 0 when the head is valid, else the HTTP status to answer with.
+    int        parse_head(const std::string& head);
 
     HttpLimits  limits_;
     std::string buf_;

@@ -1,6 +1,9 @@
 // AudioDecoder — WAVファイルデコーダ実装
 
 #include "ergo/sound/audio_decoder.h"
+
+#include <lorica/checked_size.hpp>
+
 #include <algorithm>
 #include <cstring>
 #include <cmath>
@@ -87,6 +90,7 @@ bool WavDecoder::parseHeader() {
 
     bool foundFmt = false;
     bool foundData = false;
+    uint32_t dataBytes = 0;
     WavFmtData fmtData{};
 
     while (stream_ && !foundData) {
@@ -104,10 +108,9 @@ bool WavDecoder::parseHeader() {
             }
             foundFmt = true;
         } else if (std::memcmp(sub.subchunkId, "data", 4) == 0) {
+            if (!foundFmt) return false;  // the frame size comes from "fmt "
             dataOffset_ = static_cast<size_t>(stream_.tellg());
-            uint32_t bytesPerFrame = fmtData.numChannels * (fmtData.bitsPerSample / 8);
-            if (bytesPerFrame == 0) return false;
-            totalFrames_ = sub.subchunkSize / bytesPerFrame;
+            dataBytes = sub.subchunkSize;
             foundData = true;
         } else {
             // 未知のチャンクをスキップ
@@ -119,6 +122,11 @@ bool WavDecoder::parseHeader() {
 
     // サポートされるフォーマットのみ
     if (fmtData.audioFormat != 1 && fmtData.audioFormat != 3) return false;
+    // 上限 (types.h の kMaxWavChannels / kMaxWavSampleRate)。 decode() の 1 フレームの
+    // 大きさと確保量がここで決まるので、 ファイルの宣言をそのまま信じない。
+    if (fmtData.numChannels == 0 || fmtData.numChannels > kMaxWavChannels) return false;
+    if (fmtData.sampleRate == 0 || fmtData.sampleRate > kMaxWavSampleRate) return false;
+    if (fmtData.audioFormat == 3 && fmtData.bitsPerSample != 32) return false;
 
     format_.sampleRate = fmtData.sampleRate;
     format_.channels = fmtData.numChannels;
@@ -133,6 +141,8 @@ bool WavDecoder::parseHeader() {
             default: return false;
         }
     }
+    // 宣言された data の長さを、 実際に読む形式のフレームの大きさで割る。
+    totalFrames_ = dataBytes / format_.bytesPerFrame();
 
     return true;
 }
@@ -144,7 +154,9 @@ size_t WavDecoder::decode(float* buffer, size_t maxFrames) {
     if (framesToRead == 0) return 0;
 
     size_t bytesPerFrame = format_.bytesPerFrame();
-    size_t bytesToRead = framesToRead * bytesPerFrame;
+    const auto checkedBytes = lorica::checked_multiply(framesToRead, bytesPerFrame);
+    if (!checkedBytes) return 0;
+    size_t bytesToRead = *checkedBytes;
     std::vector<uint8_t> rawData(bytesToRead);
 
     stream_.read(reinterpret_cast<char*>(rawData.data()), static_cast<std::streamsize>(bytesToRead));

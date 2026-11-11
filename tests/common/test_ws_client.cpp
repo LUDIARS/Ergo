@@ -412,6 +412,35 @@ TEST(WsClient, OversizedFrameDropsConnectionAndReconnects) {
     EXPECT_TRUE(wait_until([&] { return rec.opens.load() == 2; }));
 }
 
+// The 1 MiB frame cap: exactly 1 MiB is delivered, one byte more and a
+// 64-bit length of 2^64-1 drop the connection from the header alone.
+TEST(WsClient, FrameExactlyAtCapAndOneOver) {
+    LoopbackServer srv;
+    ASSERT_TRUE(srv.ok());
+    Client   client;
+    Recorder rec;
+    rec.attach(client);
+    client.start("127.0.0.1", srv.port(), "/ws");
+    ASSERT_TRUE(srv.accept_client());
+    ASSERT_TRUE(wait_until([&] { return rec.opens.load() == 1; }));
+
+    const std::string at_cap(std::size_t(1) << 20, 'x');
+    ASSERT_TRUE(srv.send_text(at_cap));
+    ASSERT_TRUE(wait_until([&] { return rec.text_count() == 1; }));
+    EXPECT_EQ(rec.text(0).size(), at_cap.size());
+
+    for (const uint64_t n : {(1ull << 20) + 1, ~0ull}) {
+        std::string hdr;
+        hdr.push_back(static_cast<char>(0x81));
+        hdr.push_back(static_cast<char>(127));
+        for (int i = 7; i >= 0; --i) hdr.push_back(static_cast<char>((n >> (i * 8)) & 0xFF));
+        ASSERT_TRUE(srv.send_raw(hdr));
+        EXPECT_TRUE(srv.peer_closed());
+        ASSERT_TRUE(srv.accept_client(kReconnectWait));
+    }
+    EXPECT_EQ(rec.text_count(), 1u);
+}
+
 TEST(WsClient, SendWhileDisconnectedIsDropped) {
     LoopbackServer srv;
     ASSERT_TRUE(srv.ok());

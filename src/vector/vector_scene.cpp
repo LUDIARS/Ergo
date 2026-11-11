@@ -36,7 +36,16 @@ std::vector<VectorPath> morph_blend(const std::vector<VectorPath>& a, const std:
 std::unique_ptr<VectorScene> VectorScene::load_svg_file(const std::string& path) {
   std::ifstream ifs(path, std::ios::binary);
   if (!ifs.good()) return {};
-  std::string s((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+  // Read at most SvgLimits::max_source_bytes + 1: a larger file is refused by
+  // parse_svg_data without being read whole.
+  const std::size_t limit = SvgLimits{}.max_source_bytes;
+  std::string s;
+  char chunk[64 * 1024];
+  while (ifs && s.size() <= limit) {
+    ifs.read(chunk, sizeof(chunk));
+    s.append(chunk, static_cast<std::size_t>(ifs.gcount()));
+  }
+  if (s.size() > limit) return {};
   return load_svg_data(s);
 }
 

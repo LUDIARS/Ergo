@@ -3,7 +3,8 @@
 ## 目的
 
 Ergo が自分でコンパイルするビルド単位 (ライブラリ・実行ファイル・テスト・ツール・ベンチマーク・例) の全部に
-LUDIARS の防御ライブラリ **Lorica** (`LUDIARS/Lorica`) を入れる。
+LUDIARS の防御ライブラリ **Lorica** (`LUDIARS/Lorica`) を入れる。あわせて、外から入る入力
+(ネットワークの受け口と、信頼できないファイルを読む parser) に上限の検査と境界テストを置く。
 Lorica は守りの層を足すもので、メモリ安全を保証するものではない。
 
 棚卸し・適用の状態・残りは [../plan/2026-11-11-lorica-adoption.md](../plan/2026-11-11-lorica-adoption.md)。
@@ -56,6 +57,23 @@ macOS (AppleClang / Xcode)、iOS、Android (NDK)、Emscripten、MinGW、CMake 3.
 - 守りはすべて Ergo のターゲットの `PRIVATE`。`Lorica::boundary` は `$<BUILD_INTERFACE:...>` なので、
   Ergo を静的にリンクするホストに伝わるのはリンクの順番だけ (インクルードパスも定義も伝わらない)。
 - Lorica は守りを入れたターゲットを PIC にする (`ERGO_POSITION_INDEPENDENT_CODE=OFF` は効かず、WARNING を出す)。
+
+## 入力の上限
+
+| 経路 | 上限 | 場所 |
+|---|---|---|
+| Studio の HTTP | ヘッダ 64 KiB・ヘッダ行 + クエリの数 2000 (`input_budget`)・本文 32 MiB・Content-Length は 10 進の数字だけ (`checked_*`) | `include/ergo/studio/net/http_parser.h` |
+| Studio の WebSocket | 1 メッセージ 32 MiB (断片の合計も)、長さの和は `checked_add` | `include/ergo/studio/net/ws_frame.h` |
+| Studio の同時接続 | 64 (超えると 503) | `ServerConfig::max_connections` |
+| Custos ブリッジ | ヘッダ 16 KiB (超えると 431)・本文 64 KiB (超えると 413)・Content-Length は 10 進の数字だけ・食い違う重複は 400 | `src/custos/request_head.h` |
+| WS クライアント | 1 フレーム 1 MiB (既存) + 長さの和を `checked_add` | `src/common/ws_client.cpp` |
+| JSON (`ergo::common::jsonm`) | 入力 64 MiB・値 1,048,576 個・深さ 64 (`input_budget`)、`\u` は 16 進 4 桁だけ | `include/ergo/common/json_min.h` (`ParseLimits`) |
+| SVG のラスタ化 | 入力 16 MiB・1 辺 16384・ビットマップ 256 MiB (`checked_multiply`) | `include/ergo/ui/svg_raster.h` (`SvgRasterOptions`) |
+| SVG のパス | 入力 16 MiB・点 1,048,576 個・図形 65,536 個 (`input_budget`)。`std::regex` をやめた (長い属性でスタックが溢れた) | `include/ergo/vector/vector.h` (`SvgLimits`) |
+| Unity Shuriken の移行 | ファイル 512 MiB・GameObject の親子の深さ 1024 (`input_budget`) | `include/ergo/shuriken_migrator/migrator.h` |
+| WAV | チャンネル 1〜64・サンプルレート 1〜768000 Hz・float は 32 bit だけ、読む量は `checked_multiply` | `include/ergo/sound/types.h` |
+
+値の根拠は各ヘッダのコメントと [../plan/2026-11-11-lorica-adoption.md](../plan/2026-11-11-lorica-adoption.md)。
 
 ## 守りの確かめ方
 
