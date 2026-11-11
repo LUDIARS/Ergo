@@ -9,6 +9,12 @@ else()
     set(_ergo_top OFF)
 endif()
 
+# compile_commands.json for test_lorica_compile_commands (cmake/ErgoHardeningChecks.cmake).
+# Top level only: a host decides for its own build.
+if(_ergo_top)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -2221,6 +2227,19 @@ if(TARGET ergo_shuriken_migrator)
 endif()
 
 # ---------------------------------------------------------------------------
+# "Is Lorica really on the build?" tests: the probe executables are defined
+# here so the walk below hardens them like any other target; the checks that
+# read the finished build come after it. See cmake/ErgoHardeningChecks.cmake.
+# ---------------------------------------------------------------------------
+include(ErgoHardeningChecks)
+if(ERGO_BUILD_TESTS)
+    ergo_hardening_add_probe_tests()
+endif()
+
+# ---------------------------------------------------------------------------
 # Lorica on every target compiled above (keep last). See cmake/ErgoHardening.cmake.
 # ---------------------------------------------------------------------------
 ergo_harden_targets()
+if(ERGO_BUILD_TESTS)
+    ergo_hardening_add_build_checks(${_ergo_top})
+endif()
