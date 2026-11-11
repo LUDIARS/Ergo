@@ -1,7 +1,7 @@
 ---
 title: Lorica の全面適用と入力経路の上限 (job cpp-lorica-20261111)
 type: plan
-status: in_progress
+status: done
 service: ergo
 domain: build-packages
 updated: 2026-11-11
@@ -107,4 +107,33 @@ Linux (GCC 13.3、Ninja、Release、`ERGO_AUDIO_BACKEND=dummy`、`ERGO_BUILD_BEN
 
 ## 4. 確かめたこと
 
-(報告 `/home/user/.cpp-deps/reports/Ergo-report.md` と同じ内容をここに残す。§4 は最終の結果で更新する。)
+環境: Linux x86_64、GCC 13.3 / Clang 18.1.3、CMake 3.28.3、Ninja。Lorica は `-DLORICA_SOURCE_DIR=/home/user/Lorica`
+(同じ commit)。固定 commit の取得 (GitHub) も一度通った。
+
+| 構成 | 結果 |
+|---|---|
+| 着手時の先頭 `06361bb` (Lorica 無し)、GCC Release | `visus_plugin.cpp` が `std::nan` で通らず (`<cmath>` の入れ忘れ)。ctest 111/112 (`test_studio_plugins` は Not Run) |
+| Lorica の適用のコミット、GCC Release | ビルド成功、ctest 112/112 |
+| 最終、GCC Release (`ERGO_BUILD_BENCHMARKS=ON`) | ビルド成功、ctest 118/118 (この job で 6 本追加) |
+| 最終、GCC ASan + UBSan (RelWithDebInfo `-g1`) | ctest 118/118 |
+| clang 18 ASan + UBSan + `ERGO_BUILD_FUZZERS` | ctest 117/118 → `tests/studio/test_studio_log.cpp` の一時オブジェクトの参照 2 か所を直した後、Studio のテスト 4/4 |
+| clang 18 TSan (Debug) | ctest 115/118 → `Server::stop()` と `accept_loop` の data race を直し、`test_studio_net` / `test_studio_plugins` は 3 回繰り返し通過。`ergo_sound` の `AudioEngine::setOutputCallback` と音声スレッドの data race (着手前から) は残り |
+| fuzz (clang、各 30 秒) | `studio_net` 842,992 回・`json_min` 797,419 回・`custos_request_head` 2,062,286 回・`vector_svg` 561,789 回・`shuriken_prefab` 84,144 回、いずれもクラッシュ無し |
+| `compile_commands.json` | Ergo の 429 翻訳単位すべてに `-fstack-protector-strong`、C の 1 本以外すべてに `unsafe_api.hpp`。打ち消す設定 (`-fno-stack-protector`、`-D_FORTIFY_SOURCE=0`、`execstack`、`-Wno-deprecated-declarations`) は無し |
+| `verify_binary.py` | `ergo_studio`・`ergo_pkg`・`ergo_package_viz`・`shuriken_migrator`・例・ベンチ・テストと fuzz の回帰 90 本: PIE / NX / full RELRO あり |
+| ホストに取り込まれたとき | ホストが先に Lorica を持つ / 持たない の 2 通りで構成・ビルド・実行でき、Ergo の 52 ターゲットに適用。ホストのターゲットには付かない |
+| オプションの組み合わせ (構成のみ) | `ERGO_CXX_BASELINE=ON`・`ERGO_BUILD_DUMMY=ON` (157)・`ERGO_HARDENING=required` + `ERGO_HARDENING_PROFILE=extended`・`baseline` (EXTENDED 0)・clang: 通る。不正な profile、`ERGO_FETCH_DEPENDENCIES=OFF` で取得元無し: 構成エラー (意図どおり) |
+
+### 4.1 速度への影響 (目安)
+
+機械は 7 担当で共有して混んでいた。`benchmarks/` の 2 本を 3 回ずつ、best の中央値:
+
+| ベンチマーク | Lorica 無し | baseline | 差 |
+|---|---:|---:|---:|
+| `curve.bake(4 keys)` | 132.9 ns | 196.4 ns | +48% |
+| `curve.evaluate(16 keys)` | 9.76 ns | 11.34 ns | +16% |
+| `minmax.evaluate(constants)` | 4.86 ns | 5.13 ns | +6% |
+| `particle_cpu.update(10000)` (1 個あたり) | 6.77 ns | 7.40 ns | +9% |
+
+測ったのは baseline (EXTENDED は描画・シミュレーションのライブラリには付けていない)。`_GLIBCXX_ASSERTIONS` と
+stack protector が主な候補だが、内訳は分けて測っていない。
