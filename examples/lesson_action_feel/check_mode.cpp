@@ -77,8 +77,8 @@ int run_check() {
     boss_rules.start_wave = FeelTuning{}.boss_every;
     GameSession    boss_fight({}, boss_rules);
     CombatSettings plain;
+    expect(boss_fight.game().boss() != nullptr, "the boss wave has the boss");
     run_for(boss_fight, 12.0f, toggles, plain, world);
-    expect(boss_fight.game().boss() != nullptr || boss_fight.game().defeated() > 0, "the boss wave has the boss");
     expect(effect_observation(Effect::BossBlur, boss_fight) > 0.0, "a boss blur after the boss roared or charged");
 
     std::printf("[lesson_action_feel] %s; hits=%lld defeated=%lld enemy flinches=%lld armor_absorbed=%lld "

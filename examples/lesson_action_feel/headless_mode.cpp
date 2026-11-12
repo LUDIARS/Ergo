@@ -19,6 +19,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <string>
+#include <string_view>
 
 namespace lesson_action_feel {
 
@@ -65,8 +66,10 @@ void report_status(const GameSession& session, const FeelToggles& t, const Comba
     std::string fx;
     for (const EffectInfo& i : effect_table()) {
         if (i.gameplay) continue;   // hit stop and knockback are on the first line
+        std::string_view label = i.observation;
+        if (label.substr(0, 5) == "feel.") label.remove_prefix(5);
         char      buf[96];
-        const int n = std::snprintf(buf, sizeof(buf), " %s=%.3f", std::string(i.observation).substr(5).c_str(),
+        const int n = std::snprintf(buf, sizeof(buf), " %s=%.3f", std::string(label).c_str(),
                                     effect_observation(i.id, session));
         if (n < 0 || n >= static_cast<int>(sizeof(buf))) continue;
         fx += buf;
