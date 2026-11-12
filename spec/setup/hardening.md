@@ -90,7 +90,7 @@ macOS (AppleClang / Xcode)、iOS、Android (NDK)、Emscripten、MinGW、CMake 3.
 ## sanitizer と fuzz
 
 ```bash
-# ASan + UBSan (既存の CI のレグと同じ)
+# ASan + UBSan (ci.md の linux-asan と同じ構成)
 cmake --preset ci-asan -DLORICA_SOURCE_DIR=<lorica> && cmake --build --preset ci-asan && ctest --preset ci-asan
 # ThreadSanitizer (手元)
 cmake --preset ci-tsan -DLORICA_SOURCE_DIR=<lorica> && cmake --build --preset ci-tsan && ctest --preset ci-tsan
@@ -123,19 +123,19 @@ skip になるとき (ctest は「通過」ではなく skip と数える): Lori
 `test_lorica_compile_commands`。MSVC の baseline (`/GS /sdl /guard:cf`・`/we4996`) は翻訳単位の中から見える印が無いので、
 Windows では構成時の確認と `verify_binary.py` (PE のフラグ) が受け持つ。
 
-## CI での Lorica の取得
+## 手元の検証での Lorica
 
-`LUDIARS/Lorica` は private なので、CI は org の secret **`LUDIARS_REPO_TOKEN`** (repo:read 相当の PAT。LUDIARS の
-private リポを CI で読むときの決まり) で取得する。`ci.yml` の `build-and-test` (windows-msvc・linux-clang・linux-asan)
-と `packages-integration.yml` の `ci-packages` で:
+GitHub Actions では Ergo のビルド・テストを走らせない (マージのゲートは Revisor のローカルレビュー。
+[ci.md](ci.md))。どの構成も Lorica のソースが要るので、`LUDIARS/Lorica` を `third_party/dependencies.cmake` の
+固定 commit で手元に用意し、構成に `-DLORICA_SOURCE_DIR=<checkout>` を足す (省くと同じ commit を取りに行く)。
 
-1. `Lorica pin`: `third_party/dependencies.cmake` の Lorica の `GIT_TAG` (40 桁) を読む (SHA を二重に書かない)。読めなければ失敗。
-2. `Require LUDIARS_REPO_TOKEN`: secret が空 (未設定、または fork からの PR) なら `::error::` で失敗。守りなしで続けない。
-3. `Checkout Lorica`: `actions/checkout` で `build/_lorica` に、その commit を。
-4. 構成に `-DLORICA_SOURCE_DIR=<その場所> -DERGO_HARDENING=required`。
+- 守りのプロファイルが使える構成 (CMake 3.24 以上の Linux GCC/Clang と Windows MSVC): `-DERGO_HARDENING=required` も足す。
+  守りが外れたら構成エラーになる。
+- CMake 3.20〜3.23 と macOS: `ERGO_HARDENING=required` は付けない (構成エラーになる)。Lorica の守りのフラグは付かず
+  WARNING。`Lorica::boundary` は入り、`test_lorica_*` は skip。
 
-`linux-gcc-cmake320` (CMake 3.20) と macOS も、ヘッダ (`Lorica::boundary`) が要るので同じ手順で取得し、
-`-DLORICA_SOURCE_DIR` だけを渡す (`ERGO_HARDENING=required` は付けない。Lorica の守りのフラグは付かず WARNING、フラグのテストは skip)。
+Revisor のローカルレビューが使うテストケースのコマンドは Revisor 側の登録にある。そこに `LORICA_SOURCE_DIR` を
+渡すのは運用側の設定。
 
 ## 守りの確かめ方
 

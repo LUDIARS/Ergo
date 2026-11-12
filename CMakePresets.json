@@ -38,7 +38,7 @@
     },
     {
       "name": "ci-packages",
-      "displayName": "CI: package hub fetch + STRICT (Pictor / Tela at the manifest pins)",
+      "displayName": "Check: package hub fetch + STRICT (Pictor / Tela at the manifest pins)",
       "description": "ERGO_PACKAGES=pictor;tela acquired by the hub (ERGO_PACKAGES_FETCH=ON) with every warning-level finding as an error (ERGO_PACKAGES_STRICT=ON). See spec/setup/packages.md.",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
@@ -52,7 +52,7 @@
     {
       "name": "ci-base",
       "hidden": true,
-      "description": "Shared base of the Linux CI legs (.github/workflows/ci.yml). See spec/setup/ci.md.",
+      "description": "Shared base of the local Linux verification configurations (the ci- prefix is historical). See spec/setup/ci.md.",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
@@ -63,7 +63,7 @@
     },
     {
       "name": "ci-linux-gcc",
-      "displayName": "CI: Linux GCC (Release)",
+      "displayName": "Check: Linux GCC (Release)",
       "inherits": "ci-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -72,7 +72,7 @@
     },
     {
       "name": "ci-linux-clang",
-      "displayName": "CI: Linux clang (Release, -Wall -Wextra)",
+      "displayName": "Check: Linux clang (Release, -Wall -Wextra)",
       "inherits": "ci-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -82,7 +82,7 @@
     },
     {
       "name": "ci-asan",
-      "displayName": "CI: Linux ASan + UBSan (Debug)",
+      "displayName": "Check: Linux ASan + UBSan (Debug)",
       "inherits": "ci-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",

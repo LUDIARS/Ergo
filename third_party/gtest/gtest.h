@@ -86,11 +86,15 @@ inline int runAllTests() {
 #define ASSERT_TRUE(c)  MINI_GTEST_ASSERT_IMPL((c), #c, true)
 #define ASSERT_FALSE(c) MINI_GTEST_ASSERT_IMPL(!(c), "!(" #c ")", true)
 
+// The operands are compared inside the one full-expression that evaluates them.
+// Binding them to references first (auto&& _a = (a)) dangles whenever an operand
+// is a reference into a temporary, e.g. opt_returning()->member or
+// std::get<T>(variant_returning()).member: the temporary dies at the end of the
+// declaration, before the comparison reads it.
 #define MINI_GTEST_COMPARE(a, b, op, opStr, fatal) \
     do { \
         testing::totalAssertions()++; \
-        auto&& _a = (a); auto&& _b = (b); \
-        if (!(_a op _b)) { \
+        if (!((a) op (b))) { \
             std::printf("  %s:%d: Failure\n  Expected: %s %s %s\n", \
                         __FILE__, __LINE__, #a, opStr, #b); \
             testing::failCount()++; \

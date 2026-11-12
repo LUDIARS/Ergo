@@ -132,7 +132,7 @@ ui.update(real_dt);
 他モジュール (input / actor / character / health / bind / audio) と組み合わせた
 フレーム内の呼び出し順と、real / world のどちらの dt を渡すかは
 [`spec/setup/integrate-modules.md`](../../setup/integrate-modules.md) にまとめてあり、
-`examples/compose_loop/main.cpp` が動く参照実装 (CI の `example_compose_loop`)。
+`examples/compose_loop/main.cpp` が動く参照実装 (ctest の `example_compose_loop`)。
 
 # テスト
 

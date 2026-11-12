@@ -501,7 +501,7 @@ Electron アプリとして起動した場合のみ、preload 経由で
 | `tests/plugins/scene_editor/` | シーンの解析・中継・回転の変換 |
 | `tests/plugins/log/` | リング・プロトコル・中継 |
 
-CI ではジョブ `tools-ergo` (`.github/workflows/ci.yml`) が Node 22 で
+まとめて確かめるときは Node 22 で
 `npm ci` → `npm run typecheck` → `npm run build` → `npm test` を実行する
-(submodule 込み、`ELECTRON_SKIP_BINARY_DOWNLOAD=1`)。手元での再現は
-[ci.md](../../setup/ci.md)。
+(submodule 込み、`ELECTRON_SKIP_BINARY_DOWNLOAD=1`)。手順は
+[ci.md](../../setup/ci.md) の「tools-ergo」。

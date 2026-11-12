@@ -171,7 +171,7 @@ CMake (`string(JSON)`)・C++ (`ergo_common` jsonm)・Node が同じファイル�
 | 環境 | 動き |
 |---|---|
 | オフライン | ホスト供給・ローカルソース・兄弟だけで閉じる。既定で取得 OFF なのでネットワークに出ない |
-| CI | プリセット `ci-packages` で `ERGO_PACKAGES_FETCH=ON` + `ERGO_PACKAGES_STRICT=ON`。キャッシュ共有可。pin が取得元の先端より後ろでも取れる (SHA pin は全履歴) |
+| 統合ビルド (手元・出荷) | プリセット `ci-packages` で `ERGO_PACKAGES_FETCH=ON` + `ERGO_PACKAGES_STRICT=ON`。キャッシュ共有可。pin が取得元の先端より後ろでも取れる (SHA pin は全履歴) |
 | worktree | `ERGO_PACKAGE_SOURCE_DIR_PICTOR=<worktree>`。SHA 不一致は非 STRICT で警告・記録、STRICT で停止。未コミット変更は `dirty` |
 | Emscripten | 同じ仕組み。`platforms` で `emscripten` を判定し、成り立たない機能を構成エラーにする。**実 wasm は未確認** (multi-RHI 待ち) |
 

@@ -9,8 +9,8 @@
 ここでは「組み合わせたときに決めること」だけを書く。
 
 参照実装は [`examples/compose_loop/main.cpp`](../../examples/compose_loop/main.cpp)。
-ループ内のコメント `1.` 〜 `10.` は下の表の番号と一致する。CI は
-`ctest` の `example_compose_loop` でこのファイルをビルド・実行し、
+ループ内のコメント `1.` 〜 `10.` は下の表の番号と一致する。
+`ctest` (Revisor のローカルレビューの `ctest` でも走る) の `example_compose_loop` でこのファイルをビルド・実行し、
 決まった終状態になることを確かめている (ゲーム固有の名前・アセットは無く、
 Pictor / Vulkan / ウィンドウも使わない)。
 

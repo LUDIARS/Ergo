@@ -25,14 +25,16 @@ schema / protocol の変更は **モジュール側ヘッダとツール側コ�
 
 ## 取り込みの流れ
 
-実際の取り込みは次の 2 通り。どちらも下の「CI ゲート」を通ってから main に入る。
+実際の取り込みは次の 2 通り。どちらも下の「マージのゲート」を通ってから main に入る。
 
 - **Revisor local PR** (AI の委託作業の通常経路): feat/* ブランチで作業し、
   base `main` の Revisor local PR として提出する。Revisor が審査し、現在の
-  main の上に squash したコミット (候補) を作り、その SHA の CI が緑になって
-  から main をその SHA へ進める (fast-forward)。GitHub PR は作らない。
-- **GitHub PR**: 下の手順で feat ブランチを push して `gh pr create`。CI は
-  pull_request で自動で走り、squash merge で main に入る。
+  main の上に squash したコミット (候補) を作り、その候補がローカルレビューを
+  通ってから main をその SHA へ進める (fast-forward)。GitHub PR は作らない。
+- **GitHub PR**: 下の手順で feat ブランチを push して `gh pr create`。
+  squash merge で main に入る。GitHub Actions で走るのは LUDIARS 共通の
+  harness (`.github/workflows/harness.yml`) だけで、Ergo のビルド・テストは
+  Revisor のローカルレビューで確かめる。
 
 ## 手順 (GitHub PR)
 
@@ -60,27 +62,26 @@ git reset --hard <prev>                # main を巻き戻し
 # → feat/<name> から PR を作る
 ```
 
-## CI ゲート
+## マージのゲート
 
-main に入る SHA は、入る前にその SHA 自体で CI が緑であること。レグの中身と
-手元での再現は [ci.md](ci.md)。
+main に入る SHA は、入る前にその SHA 自体で Revisor のローカルレビューを通っていること。
+検証の構成と手元での実行は [ci.md](ci.md)。
 
-- **必須チェック** (名前は完全一致):
-  `build-and-test (windows-msvc)` / `build-and-test (linux-gcc-cmake320)` /
-  `build-and-test (linux-clang)` / `build-and-test (linux-asan)` /
-  `tools-ergo` / `unity-package-core`。GitHub PR 経由なら `harness / harness` も。
+- **Revisor のローカルレビュー**: 登録されたテストケース `configure` / `build` /
+  `ctest` (CMake の構成・ビルドと ctest の全テスト)、Praesidium の事前検査、
+  Anatomia の検査、漏洩検査。テストケースのコマンドは運用者の Revisor に登録されている。
+- GitHub Actions は Ergo のビルド・テストを走らせない (以前のワークフローは廃止)。
+  GitHub PR 経由なら `harness / harness` (`.github/workflows/harness.yml`) も通す。
 - **候補 SHA は現在の main の上に載せてから検査する。** 古い main を土台に
-  緑になった SHA は数えない。main が先に進んだら rebase (squash し直し) して
-  新しい SHA で CI をやり直す。並行作業がそれぞれ古い土台で緑になり、main で
-  合わさって赤になるのを防ぐため。
-- PR を作らない候補 (Revisor local PR) は、候補コミットをブランチに push して
-  `gh workflow run ci.yml --ref <branch>` で CI を起動し、その SHA の必須
-  チェックがすべて success になるのを待ってから main を進める。
-- **main が赤の間は main に push しない。** 先に赤を直す変更を同じゲートで
-  通す。赤の上に別の変更を積むと原因の切り分けができなくなる。
-- 必須チェックの強制 (main のルールセット)・merge commit / rebase merge の
-  無効化・Revisor が候補 SHA の check-run を待つ設定は、リポジトリの外
-  (GitHub の管理設定と Revisor 側) で行う。
+  通った SHA は数えない。main が先に進んだら rebase (squash し直し) して
+  新しい SHA で検査をやり直す。並行作業がそれぞれ古い土台で通り、main で
+  合わさって壊れるのを防ぐため。
+- **main のテストが落ちている間は main に push しない。** 先に直す変更を同じゲートで
+  通す。壊れた上に別の変更を積むと原因の切り分けができなくなる。
+- Revisor 側の設定 (登録テストケース・自動マージの有無)・main の保護・merge commit / rebase merge の
+  無効化は、リポジトリの外 (Revisor と GitHub の管理設定) で行う。
+- 手元で追加の構成 (clang・サニタイザ・Windows・統合ビルド) を回すときのコマンドは
+  [ci.md](ci.md)。
 
 ## 注意点
 
