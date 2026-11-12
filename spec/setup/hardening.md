@@ -137,6 +137,16 @@ GitHub Actions では Ergo のビルド・テストを走らせない (マージ
 Revisor のローカルレビューが使うテストケースのコマンドは Revisor 側の登録にある。そこに `LORICA_SOURCE_DIR` を
 渡すのは運用側の設定。
 
+### Praesidium (Revisor の事前検査)
+
+`praesidium.json` で、Lorica のヘッダを include する翻訳単位 (入力の上限のコード・`tests/hardening/`・lesson の
+上限など) は `"packages": ["lorica"]` を持つ。main が curl を `"packages": ["curl"]` で表しているのと同じ仕組みで、
+Praesidium は検査するホストの `praesidium.host.json` の `includePackages` から include の場所を引く。
+**運用側のホスト設定に `"lorica": "<Lorica の checkout>/include"` の対応付けが要る** (無いと
+`header package not installed on inspection host`)。CMake が付ける強制 include (`lorica/unsafe_api.hpp`) と
+守りのフラグは `praesidium.json` の形 (`file` / `standard` / `includes` / `defines` / `packages`) では表せないので、
+登録していない (Praesidium の解析には要らない。確かめは ctest の `test_lorica_*`)。
+
 ## 守りの確かめ方
 
 ```bash

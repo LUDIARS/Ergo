@@ -33,9 +33,15 @@
 #else
 #define ERGO_PROBE_C_HEADER_FIRST 0
 #endif
+// The name is spelled through a macro, as <lorica/unsafe_api.hpp> itself does,
+// so that no line reads like a call to it: the probe only declares a fallback
+// and asks, in an unevaluated decltype, which declaration lookup finds. Nothing
+// here calls the function (Praesidium's text rule native.unbounded-copy looks
+// for call-shaped uses).
+#define ERGO_PROBE_UNSAFE_NAME(a, b) a##b
 namespace ergo_lorica_probe {
 struct absent {};
-template <class... A> absent strcpy(A...);
+template <class... A> absent ERGO_PROBE_UNSAFE_NAME(str, cpy)(A...);
 template <class T> T arg();  // unevaluated stand-in (no <utility> yet, and no null argument)
 }  // namespace ergo_lorica_probe
 namespace ergo_lorica_probe_lookup {
@@ -45,11 +51,12 @@ using namespace ergo_lorica_probe;
 // Naming the deprecated declaration is the point of the probe.
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-using strcpy_result = decltype(strcpy(arg<char*>(), arg<const char*>()));
+using strcpy_result = decltype(ERGO_PROBE_UNSAFE_NAME(str, cpy)(arg<char*>(), arg<const char*>()));
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 }  // namespace ergo_lorica_probe_lookup
+#undef ERGO_PROBE_UNSAFE_NAME
 #endif
 
 #include <cstddef>

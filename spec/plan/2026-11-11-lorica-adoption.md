@@ -159,3 +159,10 @@ stack protector が主な候補だが、内訳は分けて測っていない。
 - 直し (`cmake/ErgoHardening.cmake`): その構成でも `Lorica::boundary` を取得して全ターゲットに `PRIVATE $<BUILD_INTERFACE:...>` で渡す。外すのは `lorica_harden_target` / `lorica_deprecate_unsafe_apis` だけ。CMake 3.24 以上は Lorica の `CMakeLists.txt` をそのまま取り込む (保護ライブラリ・テスト・fuzz が OFF なら OS で FATAL になる箇所は無い)。3.24 未満はソースだけ (`LORICA_SOURCE_DIR` → `ERGO_SOURCE_DIR_LORICA` → 固定 commit、`ergo_populate_dependency`) を取り、include の場所と `cxx_std_17` だけの INTERFACE `lorica_boundary` / `Lorica::boundary` を作る。ホストが持っていればそれを使う。取得元が無い・ヘッダが無いときは構成エラー。
 - `test_lorica_applied*` は守りなしの構成でも `checked_add` / `input_budget` を実行してから skip。CI は macOS と `linux-gcc-cmake320` でも Lorica を取得する (`ERGO_HARDENING=required` は付けない)。
 - 確認: CMake 3.20.5 (CI の `linux-gcc-cmake320` と同じ構成) でビルドと ctest 128/128 (skip 3: `test_lorica_applied`・`_extended`・`test_lorica_compile_commands`。`verify_binary` は登録しない)。CMake 3.24 以上で OS が対応外の枝 (macOS) は記述を読んだだけで未実行。
+
+## 8. 追加: main (#97) の取り込みと Praesidium の登録 (2026-11-12)
+
+- main が GitHub のワークフロー (`ci.yml`・`packages-integration.yml`) を削除し、マージのゲートを Revisor のローカルレビューにした。§5 の CI の取得のステップも消えた。Lorica を使う構成のコマンド (`-DLORICA_SOURCE_DIR`、守りのプロファイルが使える構成だけ `-DERGO_HARDENING=required`、CMake 3.24 未満の扱い) は `spec/setup/ci.md` のローカルの手順に入れた。
+- `praesidium.json`: この PR が変えた翻訳単位 34 本のうち未登録の 27 本を main と同じ書き方で足し、Lorica のヘッダを include する 11 本 (既存 3 本を含む) に `"packages": ["lorica"]` を付けた。運用側の `praesidium.host.json` に `lorica` の対応付けが要る (`spec/setup/hardening.md`)。
+- Praesidium の事前検査 (Revisor の `scanRepository` を手元で直接呼んだ。clang 18、`praesidium.host.json` に `lorica` = Lorica の include) は `failed`。最初は文字列の規則 `native.unbounded-copy` が `tests/hardening/test_lorica_applied.cpp` の probe (strcpy の名前を未評価の decltype で引くだけで呼ばない) を 2 か所拾ったので、Lorica のヘッダと同じく名前をマクロで綴るよう直した (再実行で 0 件)。native 解析は 34 本中 32 本が passed。失敗は `src/studio/platform/winhttp_client.cpp` (Windows 専用。Linux のホストでは `windows.h` が無い) と `src/ui/svg_raster.cpp` (第三者の `third_party/nanosvg/nanosvg.h` の `nsvg__xformInverse` が特異行列のとき `inv` ではなく `t` を単位行列にして返し、`inv` が未初期化のまま読まれる、と解析器が報告。第三者のコードなので直していない。人間の判断が要る)。
+- 結果: CMake 3.28 + `ERGO_HARDENING=required` で ctest 131/131。
