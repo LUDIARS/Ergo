@@ -268,7 +268,7 @@ unity/com.ludiars.ergo.packages/
 |---|---|
 | 形式の一致 | Ergo の `tests/package_watch/fixtures/*.json` と Unity 側 Fixtures がバイト一致 (`cmake -P`、Unity 不要) |
 | Core の単体 | Core は `noEngineReferences` なので `dotnet test` で回せる。Unity 上では同じテストを EditMode で回す |
-| 構造 | `package.json` の必須キー、asmdef が Editor 専用、`Runtime/` が無い (CI で 1 ジョブ) |
+| 構造 | `package.json` の必須キー、asmdef が Editor 専用、`Runtime/` が無い (ctest の `test_unity_package_structure`) |
 | 手元確認 | UnityFoundation に git URL で入れ、窓が開く・報告が出る・pin の書き換え後に Resolve される。人の許可のもとで行い、未実施なら未実施と書く |
 
 ## 7. 段階表 (ハブ設計 §7 の S4 以降を差し替える)
@@ -304,7 +304,7 @@ W6 の Ergo 側 (P4 ホスト状態図) は `spec/tasks/2026-10-15-package-manag
 §2.1 の `use` / `optional` / `features` を構成の既定値として流す処理と Ergo 自身への PKG-04/05/07 (L1〜L3 の前提) は
 `spec/tasks/2026-10-15-package-manager-host-use.md` (`cmake/packages/ErgoPackageHostDefaults.cmake`・`ErgoPackageErgoPin.cmake`)。
 W7 は `spec/tasks/2026-10-15-package-manager-w7.md` (`unity/com.ludiars.ergo.packages`、UPM ホストの読み手 `package_watch/upm_dependency.h`、
-構造検査 `test_unity_package_structure`、Core の `dotnet test` は CI の `unity-package-core`)。
+構造検査 `test_unity_package_structure`、Core の `dotnet test` は手元の検証手順 `unity-package-core`、[ci.md](../setup/ci.md))。
 
 ### 受入条件 (機械で確かめる。テストはネットワークを使わない: git はテスト内の偽リポ、Revisor / Concordia は JSON 見本)
 

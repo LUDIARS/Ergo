@@ -1,7 +1,5 @@
 # Ergo
 
-[![CI](https://github.com/LUDIARS/Ergo/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LUDIARS/Ergo/actions/workflows/ci.yml)
-
 LUDIARS / AdventureCube などのアプリで共通利用する C++ モジュール群と、
 それらに付随する開発ツール群を集約するリポジトリ。モジュールは C++17 が基準で、
 `ergo_math` / `ergo_physics2d` と Tela / Pictor のアダプタ (`ergo_tela_graph_tela` /
@@ -13,7 +11,7 @@ LUDIARS / AdventureCube などのアプリで共通利用する C++ モジュー
 設定・ビルド手順は用途別に [`spec/setup/`](spec/setup/) にまとめてある:
 
 - **まず一周する**: [クイックスタート](spec/setup/quickstart.md) (clone → 例 `examples/compose_loop` のビルド → ブラウザで値を変えて反映)
-- [複数モジュールを自分のフレームループにつなぐ](spec/setup/integrate-modules.md) / [CI のレグと手元での再現](spec/setup/ci.md)
+- [複数モジュールを自分のフレームループにつなぐ](spec/setup/integrate-modules.md) / [検証の構成とローカルでの実行](spec/setup/ci.md)
 - [C++ モジュールをビルド](spec/setup/build-cpp.md) / [tools/ergo を起動](spec/setup/run-tools-ergo.md) / [外部プラグイン (ERGO_PLUGIN_DIR)](spec/setup/external-plugins.md) / [プラグインのデータルート](spec/setup/plugin-data-roots.md) / [ブランチ+PR 運用](spec/setup/branch-and-pr.md)
 - [サードパーティ・ライブラリ管理 (curl)](spec/setup/third-party-deps.md)
 - [LUDIARS パッケージ・ハブ (Pictor / Tela の版固定・取り込み・照合、`ergo-packages.json`)](spec/setup/packages.md)
@@ -43,7 +41,7 @@ ergo/
 ├── module_list.md         # モジュール一覧 (人間用)
 ├── module_list.yaml       # モジュール一覧 (機械処理用)
 ├── ergo-packages.json     # LUDIARS パッケージ (Pictor / Tela / Lapilli ...) の版と宣言
-├── CMakePresets.json      # CI と同じ構成のプリセット (ci-linux-gcc / ci-linux-clang / ci-asan / ci-packages)
+├── CMakePresets.json      # 手元の検証構成のプリセット (ci-linux-gcc / ci-linux-clang / ci-asan / ci-packages)
 ├── cmake/                 # モジュール前提の検査・ターゲットの仕上げ (Ergo:: ALIAS 等)・外部依存 (deps/)
 ├── cmake/packages/        # パッケージ・ハブ (マニフェスト・検査規則・6 経路の取り込み・記録、pictor/tela の結線、ブートストラップのひな形・事前取得)
 ├── spec/

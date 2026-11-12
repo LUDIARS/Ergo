@@ -82,9 +82,9 @@ npm run typecheck    # tsc -p tsconfig.test.json (src + tests, no output)
 ```
 
 Tests live under `tests/core/`, `tests/helpers/` and `tests/plugins/<id>/`
-and are hermetic (temp dirs, port 0, no network). CI runs the same steps in
-the `tools-ergo` job of `.github/workflows/ci.yml`
-([`spec/setup/ci.md`](../../spec/setup/ci.md)).
+and are hermetic (temp dirs, port 0, no network). The full local check
+(`npm ci` → `npm run typecheck` → `npm run build` → `npm test`) is listed
+under "tools-ergo" in [`spec/setup/ci.md`](../../spec/setup/ci.md).
 
 ## Why Electron (not Tauri)?
 
