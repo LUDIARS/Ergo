@@ -241,8 +241,8 @@ loopback の Host、Origin を付けるなら同じ host:port、本文が JSON) 
 - `tests/studio/test_studio_lesson.cpp` の `StudioLessonRoutes`: 経路の state / connect / disconnect、405 / 404、
   防御 (別ホスト・JSON でない本文・別サイトの Origin は 403 で pair しない)、拒否理由に入力が出ないこと、409、
   state とログに token・コード・ポートが出ないこと、実演の状態名。
-- `examples/lesson_action_feel/test_action_feel_sim.cpp` と `ergo_example_lesson_action_feel --check`: サンプルの観測値が
-  切り替えに従うこと (下の「サンプル」)。
+- `examples/lesson_action_feel/tests/` と `ergo_example_lesson_action_feel --check`: サンプルのゲームの規則と、観測値が
+  切り替えに従うこと (正本は [lesson-action-game.md](lesson-action-game.md) の「検証」)。
 - 実際の odeum-lesson とのつなぎ (2026-11-11、この Linux、libcurl 版、`ergo_studio --headless` + サンプル +
   `odeum-lesson`、`/lesson/api/connect` で接続文字列を渡す):
   - 生徒: `--plain` で起動したサンプルに `/variable/ws` から `feel.hit_stop = true` を送ると、サンプルの次の当たりで
@@ -257,30 +257,32 @@ loopback の Host、Origin を付けるなら同じ host:port、本文が JSON) 
   - Windows でのビルドと動作。WinHTTP 経由の通信と `win_clipboard.cpp` は Linux ではコンパイルもしていない。
   - macOS での libcurl 版 (curl 8.19 は SecureTransport を持たないので、OpenSSL などの TLS backend が要る)。
   - 窓のある Studio での表示 (Pictor + Vulkan + GLFW が要る)。`✓` などの字がフォントにあるかも未確認。
-  - 遊べるゲームでの確認。`examples/lesson_action_feel` は変数を公開するだけのシミュレーションで、
-    ActionGameSample の Ergo 版 (遊べるもの) はまだ無い。
+  - 上の 2 つの記録 (2026-11-11) は、サンプルが遊べるゲームになる前の、0.5 秒ごとに叩き続けるシミュレーションで取った。
+    遊べるゲームにしてからの授業との通しは [lesson-action-game.md](lesson-action-game.md) の「検証」。
 
 ## サンプル (`examples/lesson_action_feel`) {#SPEC-ergo-lesson-sample}
 
-Odeum のサンプル講座 (`action-game`) が名前を出す変数を、実際の Ergo モジュールで公開する**ヘッドレスの例**。
-遊べるゲームではない: プレイヤーが一定の間隔 (世界時間 0.5 秒) で敵を叩き続ける決まったシミュレーションで、
-授業とのつながりを試すためのもの。
+Odeum のサンプル講座 (`action-game`) が名前を出す変数を、実際の Ergo モジュールで公開する**遊べる小さなアクションゲーム**
+(壁に囲まれたアリーナで敵の波を倒す)。規則・操作・モード・変数の正本は [lesson-action-game.md](lesson-action-game.md)。
+授業との連携に関わる所だけここに書く。
 
 | 変数 | 型 | 内容 |
 |---|---|---|
-| `feel.hit_stop` / `feel.knockback` / `feel.camera_shake` | bool (Studio から書ける) | 演出の ON / OFF。既定は ON、`--plain` で 3 つとも OFF (「演出を抜いた状態」) から始める |
-| `feel.hit_stop_last_seconds` | double (読み取り専用) | 最後に `ergo_world_time` が実際に止めた秒数 (0.08)。一度も止めていなければ 0 |
-| `feel.knockback_last_impulse` | double (読み取り専用) | 最後に敵へ実際に与えた撃力の大きさ (6)。一度も与えていなければ 0 |
+| `feel.hit_stop` / `feel.knockback` / `feel.camera_shake` ほか `feel.<演出>` | bool (Studio から書ける) | 演出の一覧の 1 つずつの ON / OFF (一覧は lesson-action-game.md の「演出の一覧」、10 個)。既定は ON、`--plain` で全部 OFF (「演出を抜いた状態」) から始める |
+| `feel.all` | bool (Studio から書ける) | 読むと「一覧の全部が ON か」。false を書くと全部 OFF、true で全部 ON (授業の `effects`) |
+| `feel.super_armor` | bool (Studio から書ける) | 敵のスーパーアーマー (`combat.enemy.super_armor` の別名: true = off 以外。true を書くと off のときだけ attack にする) |
+| `combat.<side>.flinch` / `combat.<side>.motion_cancel` | bool (Studio から書ける) | 陣営 (`player` / `enemy`) ごとのひるみ・モーションキャンセル |
+| `feel.hit_stop_last_seconds` | double (読み取り専用) | 最後に `ergo_world_time` が実際に止めた秒数 (威力 ÷ 24。剣で 0.083)。一度も止めていなければ 0 |
+| `feel.knockback_last_impulse` | double (読み取り専用) | 最後に実際に与えた撃力 (威力 × 6。剣で 12)。一度も与えていなければ 0 |
+| `combat.<side>.armor_absorbed` ほか | int64 (読み取り専用) | スーパーアーマーで吸収した当たりの数など (全部は lesson-action-game.md の「何が起きたか」) |
 
-- 観測値はシミュレーションが実際にしたことから作る。`feel.hit_stop` が OFF の間は 0 のまま、Studio から ON にすると
-  次の当たりで > 0 になる (課題の `check` はこれを見る)。OFF に戻しても「最後の値」は残る。
-- 構成: `action_feel_sim` (1 フレーム進める純粋な単位。世界時間は渡された `ergo_world_time::Engine` で進め、
-  当たりで `hit_stop` を呼ぶ) と `main.cpp` (`ergo_bind` への公開、60 Hz の実時間ループ、ログ)。
-- 起動: `ergo_example_lesson_action_feel [--host H] [--port P] [--plain] [--seconds S] [--status-every S]`
-  (Studio の `variable` プラグイン `ws://H:P/variable/ws`、既定 `127.0.0.1:5170`)。切り替えのたびと接続の状態、
-  数秒ごとの状態を標準出力に 1 行ずつ出す。`--check` は Studio なしで観測値が切り替えに従うかを確かめる (ctest)。
-  `--help` / `-h` は使い方を標準出力に出して 0 で終わる。知らないオプション・範囲外の値・値の無い `--port` などは
-  そのオプションを名指しして 2 で終わる (何も始めない)。
+- 観測値はゲームが実際にしたことから作る。`feel.hit_stop` が OFF の間は 0 のまま、Studio から ON にすると次の当たりで > 0 に
+  なる (課題の `check` はこれを見る)。OFF に戻しても「最後の値」は残り、遊び直しでも戻さない。
+- 授業の実演は bool だけを切り替える (`DemoApplier`)。スーパーアーマーの 3 段階 (`off` / `attack` / `always`) を bool の実演で
+  切り替えられるよう `feel.super_armor` を置き、演出の一覧をまとめて切り替えられるよう `feel.all` を置いた。授業の `feature: "all"` は
+  `tool.features` の全部 (戦闘の決まりまで) を切り替えるので、「演出を全部抜く」には `feel.all` を指す機能を使う。
+- 起動: 既定 (`--auto`) は窓なしで台本の操作が遊び、Studio につないで数秒ごとに状態を出す。`--play` は端末で遊ぶ
+  (`--autopilot` で台本の操作が遊ぶ画面を出す。授業の実演用)。どちらも同じ変数を出す。`--check` は Studio なしの自己確認 (ctest)。
 
 ### 端末から使う (窓なし) {#SPEC-ergo-lesson-terminal}
 
@@ -289,7 +291,7 @@ Odeum のサンプル講座 (`action-game`) が名前を出す変数を、実際
 | 物 | 場所 |
 |---|---|
 | Studio | `<build>/studio/ergo_studio` (Windows は `ergo_studio.exe`。`studio/` は CMake が全構成で固定している) |
-| サンプル | `<build>/examples/ergo_example_lesson_action_feel` (Visual Studio などの複数構成の generator では構成名のフォルダが挟まる見込み。未確認) |
+| サンプルのゲーム | `<build>/examples/ergo_example_lesson_action_feel` (Visual Studio などの複数構成の generator では構成名のフォルダが挟まる見込み。未確認) |
 
 Pictor / Vulkan / GLFW の無い build の Studio は常に窓なし (configure で「building the headless server only」と出る)。
 窓のある build では `--headless` で窓を出さない。止めるのはどちらも Ctrl+C (SIGINT)。
@@ -366,9 +368,9 @@ $ ergo_studio --no-such-option; echo $?
    全 ui クライアントに `{"op":"value","name":"feel.hit_stop","value":true}` が届く。登録されていない名前の `set` は
    何も起こさない (返事も無い)。
 
-実際に行った手順と出力 (2026-11-11、この Linux、`cmake -G Ninja` の build、`NO_PROXY=127.0.0.1,localhost`、
+実際に行った手順と出力 (2026-11-12、この Linux、`cmake -G Ninja` の build、`NO_PROXY=127.0.0.1,localhost`、
 Node 22 の `WebSocket` で書いた使い捨てのクライアント `ws_switch.mjs`: hello を送り、`registry` が来たら `set` を送り、
-`value` が来たら閉じる):
+`value` が来たら閉じる。ゲームは自分の値が変わるたびに `value` を送るので、`set` の返事の前に観測値の `value` も届く):
 
 ```text
 $ PORT=5491 <build>/studio/ergo_studio --headless &
@@ -376,47 +378,80 @@ $ <build>/examples/ergo_example_lesson_action_feel --port 5491 --plain --status-
 $ node ws_switch.mjs ws://127.0.0.1:5491/variable/ws feel.hit_stop true
 > {"op":"hello","role":"ui"}
 < {"nodes":[],"op":"actors"}
-< {"op":"registry","vars":[{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.camera_shake","value":false},{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.hit_stop","value":false}, ...]}
+< {"op":"registry","vars":[{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.all","value":false},{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.boss_blur","value":false}, ... (46 in all)]}
 > {"op":"set","name":"feel.hit_stop","value":true}
+< {"name":"game.score","op":"value","value":98}
+< {"name":"game.player_hits","op":"value","value":4}
+< {"name":"combat.enemy.flinches","op":"value","value":4}
 < {"name":"feel.hit_stop","op":"value","value":true}
 ```
 
 そのときのサンプルの出力:
 
 ```text
-[lesson_action_feel] started (--plain): hit_stop=OFF knockback=OFF camera_shake=OFF, Studio ws://127.0.0.1:5491/variable/ws
+[lesson_action_feel] started (--plain): hit_stop=OFF knockback=OFF camera_shake=OFF hit_spark=OFF damage_numbers=OFF hp_gauge=OFF telegraph=OFF defeat_mark=OFF boss_blur=OFF motion_blur=OFF; enemy flinch=ON super_armor=off motion_cancel=OFF; player flinch=ON super_armor=off motion_cancel=ON
+[lesson_action_feel] Studio ws://127.0.0.1:5491/variable/ws
 [lesson_action_feel] waiting for the Studio (variable plugin)
 [lesson_action_feel] connected to the Studio
-[lesson_action_feel] world=1.0s hits=3 hit_stop=OFF knockback=OFF camera_shake=OFF hit_stop_last_seconds=0.000 knockback_last_impulse=0.000 enemy_offset=0.000 shake=0.000
+[lesson_action_feel] real=1.0s world=1.0s hits=0 defeated=0 wave=1 hp=100 hit_stop=OFF knockback=OFF camera_shake=OFF super_armor=off hit_stop_last_seconds=0.000 knockback_last_impulse=0.000 knockback_travel=0.00 shake=0.000
+[lesson_action_feel] combat enemy: flinches=0 interrupted=0 armor_absorbed=0 cancels=0 | player: flinches=0 interrupted=0 armor_absorbed=0 cancels=0
+[lesson_action_feel] fx all=OFF camera_shake_last_amplitude=0.000 hit_spark_count=0.000 damage_numbers_shown=0.000 hp_gauge_last_drain=0.000 telegraph_count=0.000 defeat_mark_count=0.000 boss_blur_last_peak=0.000 motion_blur_last_length=0.000 boss_hp=0
 [lesson_action_feel] feel.hit_stop: OFF -> ON
-[lesson_action_feel] world=2.0s hits=5 hit_stop=ON knockback=OFF camera_shake=OFF hit_stop_last_seconds=0.080 knockback_last_impulse=0.000 enemy_offset=0.000 shake=0.000
+[lesson_action_feel] real=2.0s world=1.9s hits=5 defeated=1 wave=1 hp=100 hit_stop=ON knockback=OFF camera_shake=OFF super_armor=off hit_stop_last_seconds=0.083 knockback_last_impulse=0.000 knockback_travel=0.00 shake=0.000
 ```
 
-`ergo_example_lesson_action_feel --help` の出力:
+`ergo_example_lesson_action_feel --help` の出力 (正本は `examples/lesson_action_feel/options.cpp` の `kUsage`):
 
 ```text
-usage: ergo_example_lesson_action_feel [--host H] [--port P] [--plain] [--seconds S] [--status-every S]
+usage: ergo_example_lesson_action_feel [--auto] [--status-every S] [common options]
+       ergo_example_lesson_action_feel --play [--endless | --autopilot] [--debug-vectors] [common options]
        ergo_example_lesson_action_feel --check
        ergo_example_lesson_action_feel --help | -h
 
-Headless sample for the Odeum lesson link (not a playable game): publishes feel.hit_stop,
-feel.knockback, feel.camera_shake (writable) and feel.hit_stop_last_seconds,
-feel.knockback_last_impulse (read-only) to the Studio's variable plugin at ws://H:P/variable/ws.
+Arena action game for the Odeum lesson. Publishes every effect switch (feel.<effect>, feel.all),
+feel.super_armor and the combat.* settings (writable) and what really happened
+(feel.hit_stop_last_seconds, feel.knockback_last_impulse, ..., combat.*.flinches, ...)
+to the Studio's variable plugin at ws://H:P/variable/ws.
 
+modes:
+  --auto             (default) headless: a scripted player fights endless waves; status lines on stdout
+  --play             play it in this terminal (POSIX terminals; keys are shown on screen)
+  --check            offline self-check without a Studio (exit 0 = the observations follow the switches)
+  --help, -h         print this text and exit
+
+common options:
   --host H           Studio host (default 127.0.0.1)
   --port P           Studio port, 1..65535 (default 5170; the Studio's PORT)
-  --plain            start with all three effects OFF
-  --seconds S        stop after S seconds of real time (default 0 = until Ctrl+C / SIGTERM)
-  --status-every S   status line every S seconds, 0.1..3600 (default 2)
-  --check            offline self-check without a Studio (exit 0 = the observations follow the toggles)
-  --help, -h         print this text and exit
+  --no-studio        do not connect to a Studio
+  --plain            start with every presentation effect OFF (the whole effect registry)
+  --all-effects      start with every effect ON (the default)
+  --effect NAME=on|off  one effect; NAME is hit_stop, knockback, camera_shake, hit_spark,
+                     damage_numbers, hp_gauge, telegraph, defeat_mark, boss_blur, motion_blur
+                     (applied after --plain / --all-effects; may be repeated)
+  --boss             start at the boss wave
+  --debug-vectors    --play: draw each object's motion vector (key V)
+  --endless          --play: waves never end (default: clear 3 waves to win)
+  --autopilot        --play: the scripted player plays endless waves on screen (for a demo);
+                     keys 1-9, P, R and Q still work
+  --seconds S        stop after S seconds of real time (default 0 = until stopped)
+  --status-every S   --auto: status lines every S seconds, 0.1..3600 (default 2)
+
+combat options (per side; the same switches as keys 4-9 and the combat.* variables):
+  --enemy-flinch on|off              default on
+  --enemy-super-armor off|attack|always   default off (attack = during wind-up and swing)
+  --super-armor                      same as --enemy-super-armor attack
+  --enemy-cancel on|off              motion cancel on hit, default off
+  --player-flinch on|off             default on
+  --player-super-armor off|attack|always  default off
+  --player-cancel on|off             default on
+  --knockback-dir away|backward      away from the attacker (default) or the target's backward direction
 ```
 
 ## 未決・今後
 
 - 文字入力欄が UI に入ったら、接続文字列を欄に貼れるようにする (今はクリップボードのボタンだけ)。
 - 条件の判定はポーリングの時点の値で行う。ポーリングの間だけ満たされる値は見逃すので、サンプル側は
-  `..._last_seconds` のように残る値を公開する (`examples/lesson_action_feel` はそうしている)。
+  `..._last_seconds` や数え上げ (`combat.enemy.armor_absorbed`) のように残る値を公開する (`examples/lesson_action_feel` はそうしている)。
 - `int64` は JSON の数値として届くので、2^53 を超える値の比較は正確でない。
 - 読み取り専用 (`read_only`) の変数は「従っていない」として出る。読み取り専用だから、と理由までは区別しない
   (`IGameVariables` は kind と値だけを渡す)。

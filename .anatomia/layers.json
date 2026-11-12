@@ -22,6 +22,18 @@
       "layer": "application"
     },
     {
+      "glob": "examples/lesson_action_feel/core/*",
+      "layer": "domain-logic"
+    },
+    {
+      "glob": "examples/lesson_action_feel/terminal/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "examples/lesson_action_feel/tests/*",
+      "layer": "shared"
+    },
+    {
       "glob": "include/ergo/actor/*",
       "layer": "domain-logic"
     },

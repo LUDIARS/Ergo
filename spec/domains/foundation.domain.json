@@ -9,6 +9,7 @@
     "spec/feature/module/common.md",
     "spec/setup/integrate-modules.md",
     "spec/setup/quickstart.md",
+    "spec/feature/tool/lesson-action-game.md",
     "spec/architecture/domains-and-ux.md"
   ],
   "membership": [
