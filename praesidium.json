@@ -347,21 +347,7 @@
       "packages": []
     },
     {
-      "file": "examples/lesson_action_feel/terminal/raw_terminal_posix.cpp",
-      "standard": "c++17",
-      "includes": [
-        "include",
-        "examples/lesson_action_feel",
-        "examples/lesson_action_feel/core"
-      ],
-      "defines": [
-        "NOMINMAX",
-        "WIN32_LEAN_AND_MEAN"
-      ],
-      "packages": []
-    },
-    {
-      "file": "examples/lesson_action_feel/terminal/raw_terminal_unsupported.cpp",
+      "file": "examples/lesson_action_feel/terminal/raw_terminal.cpp",
       "standard": "c++17",
       "includes": [
         "include",

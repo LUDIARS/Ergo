@@ -267,7 +267,8 @@ common options: --host H --port P --no-studio --plain --all-effects --effect NAM
   付けると、そう言って 2 で終わる。
 - **Windows**: 端末の front-end は作っていない (`ReadConsoleInput` と仮想端末の出力が要り、ここでは動かせないので)。configure が
   「--play (terminal front-end) is not available on Windows」と出し、`--play` は起動時にそう言って 2 で終わる
-  (`terminal/raw_terminal_unsupported.cpp`)。`--auto` と `--check` は Windows でも同じに動く見込み (未確認、コンパイルもしていない)。
+  (`terminal/raw_terminal.cpp` の `_WIN32` 側。POSIX 側と同じ 1 つの翻訳単位なので、Windows を対象にした Praesidium の静的解析はこちらを
+  読む)。`--auto` と `--check` は Windows でも同じに動く見込み (未確認、Windows ではビルドしていない)。
 
 ## 窓のある front-end の継ぎ目 {#SPEC-ergo-lesson-game-seam}
 
@@ -334,5 +335,5 @@ Pictor (Vulkan + GLFW) の窓で描く front-end はこの作業の範囲外 (�
   10 個がそろって切り替わり、敵のひるみ、スーパーアーマー、プレイヤーのキャンセル、カメラの節の揺れ・ボスのブラー・モーションブラーの
   合図がゲームの変数に反映された (`applied`)。
 - 確認していないこと: 人が実際に遊んだ手触り (擬似端末の操作役と画面の記録で見ただけ)、Windows (コンソールの front-end は無く、
-  `raw_terminal_unsupported.cpp` も `--auto` もコンパイルしていない)、macOS の端末、SSH 越しの描画の速さ、窓のある front-end と本物の
+  `raw_terminal.cpp` の Windows 側は mingw 向けの静的解析を通しただけで、Windows でのビルドも `--auto` も試していない)、macOS の端末、SSH 越しの描画の速さ、窓のある front-end と本物の
   ブラーの後処理、80 × 24 より小さい端末 (崩れる)。

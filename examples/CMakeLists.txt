@@ -86,11 +86,9 @@ else()
         PUBLIC ergo_world_time ergo_health ergo_score ergo_combo_counter)
 
     if(WIN32)
-        # The playable terminal front-end is POSIX only: --play stops with a message on Windows.
+        # The playable terminal front-end is POSIX only (terminal/raw_terminal.cpp picks the backend
+        # with _WIN32): --play stops with a message on Windows.
         message(STATUS "example lesson_action_feel: --play (terminal front-end) is not available on Windows")
-        set(_lf_console ${_lf}/terminal/raw_terminal_unsupported.cpp)
-    else()
-        set(_lf_console ${_lf}/terminal/raw_terminal_posix.cpp)
     endif()
     add_library(ergo_example_lesson_action_feel_terminal STATIC
         ${_lf}/terminal/ansi_frame.cpp
@@ -98,8 +96,8 @@ else()
         ${_lf}/terminal/key_decoder.cpp
         ${_lf}/terminal/move_latch.cpp
         ${_lf}/terminal/screen.cpp
-        ${_lf}/terminal/screen_effects.cpp
-        ${_lf_console})
+        ${_lf}/terminal/raw_terminal.cpp
+        ${_lf}/terminal/screen_effects.cpp)
     target_include_directories(ergo_example_lesson_action_feel_terminal PUBLIC ${_lf})
     target_link_libraries(ergo_example_lesson_action_feel_terminal PUBLIC ergo_example_lesson_action_feel_core)
 
