@@ -74,6 +74,7 @@ TEST(LessonTerminalScreen, WindUpIsTelegraphedAndHitsSpark) {
     v.fighters[1].phase  = AttackPhase::WindUp;
     v.fighters[1].reach  = 1.4f;
     v.fighters[1].arc_cos = 0.5f;
+    v.fighters[1].telegraph = true;   // the telegraph effect is on (Presentation sets this)
     auto rows = arena_rows(render_screen(v, HudState{}));
     EXPECT_EQ(rows[3], "  #  @>  ..!   #  ");   // the dots are the reach of the coming swing
     EXPECT_NE(rows[3].find('!'), std::string::npos);
@@ -99,7 +100,7 @@ TEST(LessonTerminalScreen, SuperArmorAndDefeatGlyphs) {
 
 TEST(LessonTerminalScreen, HudShowsSwitchesSidesAndProgress) {
     HudState h;
-    h.toggles.knockback             = false;
+    h.toggles[Effect::Knockback]    = false;
     h.settings.enemy.super_armor    = SuperArmor::Attack;
     h.observed.enemy.flinches       = 13;
     h.observed.enemy.armor_absorbed = 3;
@@ -115,7 +116,7 @@ TEST(LessonTerminalScreen, HudShowsSwitchesSidesAndProgress) {
     const std::vector<std::string> expected = {
         "HP 100/100 [##########]  SWORD dmg 20 pow 2  wave 1/3  KO 2",
         "score 340  combo 0  time 0.0s  world 0.0s  HIT STOP",
-        "effects [1]hit stop ON   [2]knockback off  [3]camera shake ON ",
+        "effects [1]hit stop ON  [2]knockback off [3]shake ON   [O]all 9/10 on [0]",
         "        flinch   super armor   motion cancel |flinched absorbed cancelled",
         "enemy   [4] ON   [5] attack    [6] off       |       13        3        0",
         "you     [7] ON   [8] off       [9] ON        |        0        0       21",

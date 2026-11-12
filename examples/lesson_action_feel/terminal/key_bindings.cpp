@@ -1,6 +1,22 @@
 #include "key_bindings.h"
 
+#include <string>
+
 namespace lesson_action_feel::terminal {
+
+namespace {
+
+/// Variable names live as long as the program (the registry's names are string literals).
+const char* variable_of(Effect e) {
+    static const auto names = [] {
+        std::array<std::string, kEffectCount> n;
+        for (const EffectInfo& i : effect_table()) n[static_cast<std::size_t>(i.id)] = "feel." + std::string(i.name);
+        return n;
+    }();
+    return names[static_cast<std::size_t>(e)].c_str();
+}
+
+} // namespace
 
 Command command_for(const Key& key) {
     switch (key.kind) {
@@ -21,12 +37,15 @@ Command command_for(const Key& key) {
     case '1': return Command::ToggleHitStop;
     case '2': return Command::ToggleKnockback;
     case '3': return Command::ToggleCameraShake;
+    case '0': return Command::ToggleAllEffects;
     case '4': return Command::ToggleEnemyFlinch;
     case '5': return Command::CycleEnemySuperArmor;
     case '6': return Command::ToggleEnemyCancel;
     case '7': return Command::TogglePlayerFlinch;
     case '8': return Command::CyclePlayerSuperArmor;
     case '9': return Command::TogglePlayerCancel;
+    case 'o': case 'O': return Command::EffectsScreen;
+    case 'v': case 'V': return Command::DebugVectors;
     case 'p': case 'P': return Command::Pause;
     case 'r': case 'R': return Command::Restart;
     case 'h': case 'H': case '?': return Command::Help;
@@ -34,6 +53,15 @@ Command command_for(const Key& key) {
     default: return Command::None;
     }
 }
+
+std::optional<Effect> effect_for_screen_key(const Key& key) {
+    if (key.kind != KeyKind::Char) return std::nullopt;
+    const char c = key.ch >= 'A' && key.ch <= 'Z' ? static_cast<char>(key.ch - 'A' + 'a') : key.ch;
+    if (c < 'a' || c >= static_cast<char>('a' + kEffectCount)) return std::nullopt;
+    return static_cast<Effect>(static_cast<std::size_t>(c - 'a'));
+}
+
+char screen_key_for(Effect e) { return static_cast<char>('a' + static_cast<int>(e)); }
 
 SuperArmor next_super_armor(SuperArmor a) {
     switch (a) {
@@ -44,11 +72,17 @@ SuperArmor next_super_armor(SuperArmor a) {
     return SuperArmor::Off;
 }
 
+const char* toggle_effect(Effect e, FeelToggles& toggles) {
+    toggles[e] = !toggles[e];
+    return variable_of(e);
+}
+
 const char* apply_setting(Command c, FeelToggles& toggles, CombatSettings& settings) {
     switch (c) {
-    case Command::ToggleHitStop: toggles.hit_stop = !toggles.hit_stop; return "feel.hit_stop";
-    case Command::ToggleKnockback: toggles.knockback = !toggles.knockback; return "feel.knockback";
-    case Command::ToggleCameraShake: toggles.camera_shake = !toggles.camera_shake; return "feel.camera_shake";
+    case Command::ToggleHitStop: return toggle_effect(Effect::HitStop, toggles);
+    case Command::ToggleKnockback: return toggle_effect(Effect::Knockback, toggles);
+    case Command::ToggleCameraShake: return toggle_effect(Effect::CameraShake, toggles);
+    case Command::ToggleAllEffects: toggles.set_all(!toggles.all_on()); return "feel.all";
     case Command::ToggleEnemyFlinch: settings.enemy.flinch = !settings.enemy.flinch; return "combat.enemy.flinch";
     case Command::CycleEnemySuperArmor:
         settings.enemy.super_armor = next_super_armor(settings.enemy.super_armor);
@@ -68,7 +102,7 @@ const char* apply_setting(Command c, FeelToggles& toggles, CombatSettings& setti
 }
 
 const char* key_help() {
-    return "move WASD/arrows  attack J/Space  weapon K  pause P  restart R  help H  quit Q";
+    return "WASD/arrows move  J/Space attack  K weapon  O effects  V vectors  P pause Q quit";
 }
 
 } // namespace lesson_action_feel::terminal

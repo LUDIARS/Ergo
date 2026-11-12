@@ -1,6 +1,7 @@
 #include "screen.h"
 
 #include "key_bindings.h"
+#include "screen_effects.h"
 
 #include <cmath>
 #include <cstdio>
@@ -103,13 +104,39 @@ char enemy_glyph(const FighterView& e) {
         break;
     case Action::Ready: break;
     }
+    if (e.boss) return 'B';
     return e.armored_now ? 'E' : 'e';
 }
 
+/// Put `ch` only on a background cell inside the arena (blur and trails never cover anything).
+void put_background(Canvas& cv, const Viewport& vp, const GameView& v, int col, int row, char ch) {
+    if (col <= vp.col(0.0f) - 1 || col >= vp.col(v.arena_width - 0.001f) + 1) return;
+    if (row <= vp.row(0.0f) - 1 || row >= vp.row(v.arena_height - 0.001f) + 1) return;
+    if (cv.at(col, row) == ' ') cv.put(col, row, ch);
+}
+
+void draw_boss_blur(Canvas& cv, const Viewport& vp, const GameView& v) {
+    if (v.blur.kind == BlurKind::None || v.blur.strength <= 0.0f) return;
+    const int cc = vp.col(v.blur.centre.x);
+    const int cr = vp.row(v.blur.centre.y);
+    for (int r = 0; r < static_cast<int>(cv.rows().size()); ++r)
+        for (int c = 0; c < cv.cols(); ++c)
+            if (const char g = boss_blur_glyph(c - cc, r - cr, v.blur.strength, v.blur.kind)) put_background(cv, vp, v, c, r, g);
+}
+
+void draw_cells(Canvas& cv, const Viewport& vp, const GameView& v, const FighterView& f,
+                const std::vector<GlyphCell>& cells) {
+    const int c = vp.col(f.pos.x);
+    const int r = vp.row(f.pos.y);
+    for (const GlyphCell& g : cells) put_background(cv, vp, v, c + g.dc, r + g.dr, g.ch);
+}
+
 void draw_fighters(Canvas& cv, const Viewport& vp, const GameView& v) {
+    for (const FighterView& f : v.fighters)
+        if (f.visible && !f.streak.is_zero()) draw_cells(cv, vp, v, f, trail_cells(f.streak));
     for (const FighterView& f : v.fighters) {
-        if (f.action != Action::Attack || f.side == Side::Player) continue;
-        if (f.phase == AttackPhase::WindUp) draw_swing(cv, vp, v, f, '.');
+        if (f.action != Action::Attack || f.side == Side::Player || f.roar) continue;
+        if (f.phase == AttackPhase::WindUp && f.telegraph) draw_swing(cv, vp, v, f, '.');
         else if (f.phase == AttackPhase::Active) draw_swing(cv, vp, v, f, ':');
     }
     if (!v.fighters.empty()) {
@@ -118,6 +145,7 @@ void draw_fighters(Canvas& cv, const Viewport& vp, const GameView& v) {
     }
     for (std::size_t i = 1; i < v.fighters.size(); ++i) {
         const FighterView& e = v.fighters[i];
+        if (!e.visible) continue;
         const int c = vp.col(e.pos.x);
         const int r = vp.row(e.pos.y);
         cv.put(c, r, enemy_glyph(e));
@@ -139,7 +167,7 @@ void draw_fighters(Canvas& cv, const Viewport& vp, const GameView& v) {
         }
     }
     for (const FighterView& f : v.fighters) {
-        if (!f.spark) continue;
+        if (!f.spark || !f.visible) continue;
         const int c = vp.col(f.pos.x);
         const int r = vp.row(f.pos.y);
         cv.put(c - 1, r, '*');
@@ -147,10 +175,29 @@ void draw_fighters(Canvas& cv, const Viewport& vp, const GameView& v) {
     }
 }
 
-std::string hp_bar(std::int32_t hp, std::int32_t max_hp) {
-    const int n = max_hp > 0 ? static_cast<int>((10 * hp + max_hp - 1) / max_hp) : 0;
+/// Damage numbers rise one row over their life.
+void draw_popups(Canvas& cv, const Viewport& vp, const GameView& v, float life) {
+    for (const DamagePopup& p : v.popups) {
+        const std::string text = "-" + std::to_string(p.amount);
+        const int rise = p.age >= life * 0.5f ? 2 : 1;
+        const int c0   = vp.col(p.pos.x) + 2;
+        const int r    = vp.row(p.pos.y) - rise;
+        for (std::size_t i = 0; i < text.size(); ++i) put_background(cv, vp, v, c0 + static_cast<int>(i), r, text[i]);
+    }
+}
+
+void draw_vectors(Canvas& cv, const Viewport& vp, const GameView& v) {
+    for (const FighterView& f : v.fighters)
+        if (f.visible && !f.motion.is_zero()) draw_cells(cv, vp, v, f, vector_cells(f.motion));
+}
+
+/// `#` the HP, `=` the part that is still draining (the HP gauge effect), `.` empty.
+std::string hp_bar(std::int32_t hp, std::int32_t trail, std::int32_t max_hp) {
+    const auto cells = [max_hp](std::int32_t v) { return max_hp > 0 ? static_cast<int>((10 * v + max_hp - 1) / max_hp) : 0; };
+    const int n = cells(hp);
+    const int t = cells(trail);
     std::string bar = "[";
-    for (int i = 0; i < 10; ++i) bar += i < n ? '#' : '.';
+    for (int i = 0; i < 10; ++i) bar += i < n ? '#' : (i < t ? '=' : '.');
     return bar + "]";
 }
 
@@ -172,7 +219,7 @@ std::string side_row(const char* who, const SideSettings& s, const SideCounters&
 
 void hud_top(std::vector<std::string>& out, const GameView& v, const HudState& h) {
     const FighterView* p = v.fighters.empty() ? nullptr : &v.fighters.front();
-    std::string l1 = p ? "HP " + pad(num(p->hp), 3) + "/" + num(p->max_hp) + " " + hp_bar(p->hp, p->max_hp)
+    std::string l1 = p ? "HP " + pad(num(p->hp), 3) + "/" + num(p->max_hp) + " " + hp_bar(p->hp, v.player_hp_trail, p->max_hp)
                        : std::string("HP -");
     if (p) {
         std::string weapon = p->weapon;
@@ -186,15 +233,42 @@ void hud_top(std::vector<std::string>& out, const GameView& v, const HudState& h
     std::string l2 = "score " + num(static_cast<double>(v.score)) + "  combo " + num(v.combo) + "  time " +
                      num(v.real_seconds, 1) + "s  world " + num(v.world_seconds, 1) + "s";
     if (v.frozen) l2 += "  HIT STOP";
+    for (const FighterView& f : v.fighters)
+        if (f.boss && f.action == Action::Attack && f.phase != AttackPhase::Recovery)
+            l2 += f.roar ? "  BOSS ROAR" : "  BOSS CHARGE";
+    if (v.blur.strength > 0.0f) l2 += "  blur " + num(v.blur.strength, 2);
     out.push_back(l2);
-    out.push_back(std::string("effects [1]hit stop ") + on_off(h.toggles.hit_stop) + "  [2]knockback " +
-                  on_off(h.toggles.knockback) + "  [3]camera shake " + on_off(h.toggles.camera_shake));
+    std::size_t on = 0;
+    for (const EffectInfo& i : effect_table()) on += h.toggles[i.id] ? 1 : 0;
+    out.push_back(std::string("effects [1]hit stop ") + on_off(h.toggles.hit_stop()) + " [2]knockback " +
+                  on_off(h.toggles.knockback()) + " [3]shake " + on_off(h.toggles.camera_shake()) + "  [O]all " +
+                  num(static_cast<double>(on)) + "/" + num(static_cast<double>(kEffectCount)) + " on [0]");
     out.push_back("        flinch   super armor   motion cancel |flinched absorbed cancelled");
     out.push_back(side_row("enemy", h.settings.enemy, h.observed.enemy, '4', '5', '6'));
     out.push_back(side_row("you", h.settings.player, h.observed.player, '7', '8', '9'));
 }
 
+/// The effects screen (O): every registry entry with its key and state, over the arena.
+void effects_screen(Canvas& cv, const HudState& h) {
+    const int left = kMarginCols + 3;
+    int       row  = kMarginRows + 1;
+    cv.text(left, row++, "EFFECTS (paused)  a-j toggle  0 all off/on  O close");
+    for (const EffectInfo& i : effect_table()) {
+        std::string line = std::string(1, screen_key_for(i.id)) + "  " + std::string(i.name);
+        line.resize(18, ' ');
+        line += h.toggles[i.id] ? "ON   " : "off  ";
+        line += i.gameplay ? "gameplay  " : "visual    ";
+        line += "feel." + std::string(i.name);
+        line.resize(56, ' ');
+        cv.text(left, row++, line);
+    }
+}
+
 void overlay(Canvas& cv, const GameView& v, const HudState& h) {
+    if (h.effects_screen) {
+        effects_screen(cv, h);
+        return;
+    }
     const int mid = kMarginRows + 1 + static_cast<int>(v.arena_height) / 2;
     if (v.status == GameStatus::Won) cv.centered(mid, "  YOU WIN - R to play again, Q to quit  ");
     else if (v.status == GameStatus::Lost) cv.centered(mid, "  GAME OVER - R to retry, Q to quit  ");
@@ -202,7 +276,20 @@ void overlay(Canvas& cv, const GameView& v, const HudState& h) {
     else if (v.between_waves) cv.centered(mid, "  WAVE " + num(v.wave) + " CLEARED  ");
 }
 
+std::string vec_text(Vec2 m) {
+    const auto sgn = [](float x) { return std::string(x < 0 ? "" : "+") + num(x, 2); };
+    return "(" + sgn(m.x) + "," + sgn(m.y) + ")";
+}
+
 } // namespace
+
+std::string vector_line(const GameView& v, int last_hit_id) {
+    std::string out = "motion u/frame: you" + (v.fighters.empty() ? std::string("-") : vec_text(v.fighters.front().motion));
+    for (const FighterView& f : v.fighters)
+        if (f.id == last_hit_id && f.side == Side::Enemy) out += "  hit#" + std::to_string(f.id) + vec_text(f.motion);
+    out += "  cam" + vec_text(v.camera_motion);
+    return out;
+}
 
 std::vector<std::string> render_screen(const GameView& view, const HudState& hud) {
     std::vector<std::string> out;
@@ -216,12 +303,16 @@ std::vector<std::string> render_screen(const GameView& view, const HudState& hud
     vp.oy = static_cast<int>(std::lround(view.camera_offset.y));
     draw_walls(cv, vp, view);
     draw_fighters(cv, vp, view);
+    draw_popups(cv, vp, view, hud.popup_seconds);
+    draw_boss_blur(cv, vp, view);   // last of the arena layers: it only fills what is still background
+    if (hud.debug_vectors) draw_vectors(cv, vp, view);
     overlay(cv, view, hud);
     for (std::string& r : cv.rows()) out.push_back(std::move(r));
 
     std::string msg = hud.link.empty() ? std::string() : "[" + hud.link + "] ";
     out.push_back(msg + hud.message);
-    if (hud.show_help) out.emplace_back(key_help());
+    if (hud.debug_vectors) out.push_back(vector_line(view, hud.last_hit_id));
+    else if (hud.show_help) out.emplace_back(key_help());
     for (std::string& r : out)
         if (r.size() > kMaxColumns) r.resize(kMaxColumns);   // a long message must not wrap and push the picture
     return out;

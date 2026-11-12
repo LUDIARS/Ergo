@@ -43,6 +43,32 @@
       "packages": []
     },
     {
+      "file": "examples/lesson_action_feel/core/boss_blur.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/boss_brain.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "examples/lesson_action_feel/core/combat_rules.cpp",
       "standard": "c++17",
       "includes": [
@@ -69,7 +95,72 @@
       "packages": []
     },
     {
+      "file": "examples/lesson_action_feel/core/effect_observations.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "examples/lesson_action_feel/core/enemy_brain.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/feel_effects.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/motion_blur.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/presentation.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/session.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -298,7 +389,35 @@
       "packages": []
     },
     {
+      "file": "examples/lesson_action_feel/terminal/screen_effects.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "examples/lesson_action_feel/tests/test_action_game.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_boss.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -327,6 +446,36 @@
     },
     {
       "file": "examples/lesson_action_feel/tests/test_options.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_presentation.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_terminal_effects.cpp",
       "standard": "c++17",
       "includes": [
         "include",

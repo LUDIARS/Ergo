@@ -6,15 +6,20 @@
 
 namespace lesson_action_feel {
 
+bool is_boss_wave(int wave, const FeelTuning& t) { return t.boss_every > 0 && wave > 0 && wave % t.boss_every == 0; }
+
 int wave_size(int wave, bool endless, const FeelTuning& t) {
     if (wave < 1) return 0;
-    if (endless) return std::min(wave + 1, t.endless_max_wave_size);
-    const std::size_t i = static_cast<std::size_t>(wave - 1);
+    if (!endless && wave > waves_to_win(false, t)) return 0;
+    if (is_boss_wave(wave, t)) return 1;
+    const int normal = wave - (t.boss_every > 0 ? wave / t.boss_every : 0);   // normal waves so far, this one included
+    if (endless) return std::min(normal + 1, t.endless_max_wave_size);
+    const std::size_t i = static_cast<std::size_t>(normal - 1);
     return i < t.waves.size() ? t.waves[i] : 0;
 }
 
 int waves_to_win(bool endless, const FeelTuning& t) {
-    return endless ? 0 : static_cast<int>(t.waves.size());
+    return endless ? 0 : static_cast<int>(t.waves.size()) + 1;   // the normal waves, then the boss
 }
 
 std::vector<Spawn> spawn_points(int count, Vec2 player, const FeelTuning& t) {

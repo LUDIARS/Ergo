@@ -9,17 +9,23 @@
 ///   1. damage always applies; HP 0 -> Dead (the action ends, nothing else matters);
 ///   2. super armor (if it applies at the moment of the hit) -> damage only:
 ///      no flinch, no interrupt, no knockback;
-///   3. otherwise, flinch ON -> the action is interrupted and the fighter flinches,
-///      whatever its motion-cancel setting; flinch OFF -> the action continues;
+///   3. otherwise, flinch ON and the hit's power >= the target's min_flinch_power (the boss's
+///      poise) -> the action is interrupted and the fighter flinches, whatever its
+///      motion-cancel setting; flinch OFF (or a weaker hit) -> the action continues;
 ///   4. knockback (feel.knockback ON and not absorbed) pushes the fighter.
-/// Hit stop and camera shake follow their feel switches on every hit, absorbed or not.
+/// Hit stop follows its feel switch on every hit, absorbed or not (presentation effects such as
+/// camera shake are not decided here: the Presentation reads the outcome's power).
+///
+/// A roar (Weapon::roar) does not hit: resolve_roar forces a flinch of Weapon::stagger seconds on
+/// whoever it reaches, whatever that side's flinch setting, unless super armor applies (absorbed).
+/// No damage, no knockback, no hit stop.
 #include "combat_settings.h"
 #include "combatant.h"
 #include "feel_tuning.h"
 
 namespace lesson_action_feel {
 
-/// Super armor protects the fighter right now.
+/// Super armor protects the fighter right now (its side's setting, or an armored technique being swung).
 bool armor_applies(const Combatant& c, const SideSettings& s);
 
 /// The fighter may leave its attack right now by motion cancel: in the recovery
@@ -45,11 +51,15 @@ struct HitOutcome {
     bool         interrupted      = false;   ///< an attack of the target was broken (by the flinch or the death)
     float        impulse          = 0.0f;    ///< knockback impulse applied (0 = none)
     float        hit_stop_seconds = 0.0f;    ///< to request from ergo_world_time (0 = none)
-    float        shake            = 0.0f;    ///< camera shake amplitude to add (0 = none)
+    float        power            = 0.0f;    ///< the weapon's power (presentation effects scale with it)
 };
 
 /// Resolve one hit of `attacker`'s weapon on `target` (whose side has `target_side`).
 HitOutcome resolve_hit(const Combatant& attacker, Combatant& target, const SideSettings& target_side,
                        const FeelToggles& toggles, const FeelTuning& t, SideCounters& target_counters);
+
+/// Resolve a roar of `roarer` reaching `target`.
+HitOutcome resolve_roar(const Combatant& roarer, Combatant& target, const SideSettings& target_side,
+                        SideCounters& target_counters);
 
 } // namespace lesson_action_feel

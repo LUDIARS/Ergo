@@ -70,9 +70,16 @@ else()
     add_library(ergo_example_lesson_action_feel_core STATIC
         ${_lf}/core/action_game.cpp
         ${_lf}/core/autopilot.cpp
+        ${_lf}/core/boss_blur.cpp
+        ${_lf}/core/boss_brain.cpp
         ${_lf}/core/combat_rules.cpp
         ${_lf}/core/combat_settings.cpp
+        ${_lf}/core/effect_observations.cpp
         ${_lf}/core/enemy_brain.cpp
+        ${_lf}/core/feel_effects.cpp
+        ${_lf}/core/motion_blur.cpp
+        ${_lf}/core/presentation.cpp
+        ${_lf}/core/session.cpp
         ${_lf}/core/wave_plan.cpp)
     target_include_directories(ergo_example_lesson_action_feel_core PUBLIC ${_lf}/core)
     target_link_libraries(ergo_example_lesson_action_feel_core
@@ -91,6 +98,7 @@ else()
         ${_lf}/terminal/key_decoder.cpp
         ${_lf}/terminal/move_latch.cpp
         ${_lf}/terminal/screen.cpp
+        ${_lf}/terminal/screen_effects.cpp
         ${_lf_console})
     target_include_directories(ergo_example_lesson_action_feel_terminal PUBLIC ${_lf})
     target_link_libraries(ergo_example_lesson_action_feel_terminal PUBLIC ergo_example_lesson_action_feel_core)
@@ -118,16 +126,19 @@ else()
 
     if(ERGO_BUILD_TESTS)
         add_executable(test_lesson_action_feel
-            ${_lf}/tests/test_combat_rules.cpp
             ${_lf}/tests/test_action_game.cpp
+            ${_lf}/tests/test_boss.cpp
+            ${_lf}/tests/test_combat_rules.cpp
+            ${_lf}/tests/test_presentation.cpp
             ${_lf}/tests/test_wave_plan.cpp)
         target_link_libraries(test_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_core ergo_gtest_main)
         add_test(NAME test_lesson_action_feel COMMAND test_lesson_action_feel)
 
         add_executable(test_lesson_action_feel_frontend
+            ${_lf}/tests/test_options.cpp
+            ${_lf}/tests/test_terminal_effects.cpp
             ${_lf}/tests/test_terminal_input.cpp
-            ${_lf}/tests/test_terminal_screen.cpp
-            ${_lf}/tests/test_options.cpp)
+            ${_lf}/tests/test_terminal_screen.cpp)
         target_link_libraries(test_lesson_action_feel_frontend PRIVATE ergo_example_lesson_action_feel_app ergo_gtest_main)
         add_test(NAME test_lesson_action_feel_frontend COMMAND test_lesson_action_feel_frontend)
 

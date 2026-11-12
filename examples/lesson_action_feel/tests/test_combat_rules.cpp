@@ -95,7 +95,7 @@ TEST(LessonCombatRules, AnEarlyAttackPressIsBufferedBriefly) {
     EXPECT_EQ(n.cancels, 0);   // the first attack ran to its end: no cancel
 }
 
-TEST(LessonCombatRules, DamageDrivesHpAndPowerDrivesImpulseStopAndShake) {
+TEST(LessonCombatRules, DamageDrivesHpAndPowerDrivesImpulseAndStop) {
     FeelToggles  on;
     SideCounters n;
     SideSettings s;
@@ -107,7 +107,7 @@ TEST(LessonCombatRules, DamageDrivesHpAndPowerDrivesImpulseStopAndShake) {
         EXPECT_EQ(e.health.hp(), 100 - wp.damage);
         EXPECT_FLOAT_EQ(hit.impulse, wp.power * kTuning.knockback_per_power);
         EXPECT_FLOAT_EQ(hit.hit_stop_seconds, wp.power / 24.0f);
-        EXPECT_FLOAT_EQ(hit.shake, std::min(wp.power * kTuning.shake_per_power, kTuning.shake_max));
+        EXPECT_FLOAT_EQ(hit.power, wp.power);   // the presentation scales the camera shake with it
         EXPECT_FLOAT_EQ(e.push_velocity.x, hit.impulse / kTuning.mass);
     }
     // The two weapons really differ in both numbers.
@@ -119,11 +119,10 @@ TEST(LessonCombatRules, FeelSwitchesOffLeaveOnlyTheDamage) {
     Combatant        p = player_with(1);
     Combatant        e = enemy_at({6, 5});
     SideCounters     n;
-    const HitOutcome hit = resolve_hit(p, e, SideSettings{}, FeelToggles{false, false, false}, kTuning, n);
+    const HitOutcome hit = resolve_hit(p, e, SideSettings{}, FeelToggles::all(false), kTuning, n);
     EXPECT_EQ(e.health.hp(), 65);
     EXPECT_TRUE(hit.impulse == 0.0f);
     EXPECT_TRUE(hit.hit_stop_seconds == 0.0f);
-    EXPECT_TRUE(hit.shake == 0.0f);
     EXPECT_TRUE(e.push_velocity.is_zero());
     EXPECT_TRUE(hit.flinched);   // flinch is a combat setting, not a feel effect
 }
@@ -209,7 +208,6 @@ TEST(LessonCombatRules, SuperArmorDuringAttackAbsorbsAWindUpHit) {
     EXPECT_TRUE(hit.impulse == 0.0f);         // and resists the push
     EXPECT_TRUE(e.push_velocity.is_zero());
     EXPECT_GT(hit.hit_stop_seconds, 0.0f);    // the hit stop still happens
-    EXPECT_GT(hit.shake, 0.0f);
     EXPECT_EQ(e.health.hp(), 65);             // and so does the damage
     EXPECT_EQ(e.action, Action::Attack);
     EXPECT_EQ(n.armor_absorbed, 1);

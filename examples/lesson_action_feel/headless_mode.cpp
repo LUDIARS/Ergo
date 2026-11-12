@@ -4,8 +4,9 @@
 // lines every --status-every seconds. A lost game is logged and restarted.
 #include "modes.h"
 
-#include "action_game.h"
 #include "autopilot.h"
+#include "effect_observations.h"
+#include "session.h"
 #include "frame_pacer.h"
 #include "lesson_bindings.h"
 #include "settings_watch.h"
@@ -17,6 +18,7 @@
 #include <csignal>
 #include <cstdarg>
 #include <cstdio>
+#include <string>
 
 namespace lesson_action_feel {
 
@@ -44,13 +46,14 @@ void say(const char* fmt, ...) {
 
 const char* on_off(bool b) { return b ? "ON" : "OFF"; }
 
-void report_status(const ActionGame& g, const FeelToggles& t, const CombatSettings& s) {
+void report_status(const GameSession& session, const FeelToggles& t, const CombatSettings& s) {
+    const ActionGame& g = session.game();
     say("real=%.1fs world=%.1fs hits=%lld defeated=%lld wave=%d hp=%d hit_stop=%s knockback=%s camera_shake=%s "
         "super_armor=%s hit_stop_last_seconds=%.3f knockback_last_impulse=%.3f knockback_travel=%.2f shake=%.3f",
         g.real_seconds(), g.world_seconds(), static_cast<long long>(g.player_hits()), static_cast<long long>(g.defeated()), g.wave(),
-        static_cast<int>(g.player().health.hp()), on_off(t.hit_stop), on_off(t.knockback), on_off(t.camera_shake),
+        static_cast<int>(g.player().health.hp()), on_off(t.hit_stop()), on_off(t.knockback()), on_off(t.camera_shake()),
         super_armor_name(s.enemy.super_armor), g.observed().hit_stop_last_seconds,
-        g.observed().knockback_last_impulse, g.knockback_travel(), static_cast<double>(g.shake()));
+        g.observed().knockback_last_impulse, g.knockback_travel(), static_cast<double>(session.fx().shake()));
     const SideCounters& e = g.combat().enemy;
     const SideCounters& p = g.combat().player;
     say("combat enemy: flinches=%lld interrupted=%lld armor_absorbed=%lld cancels=%lld | "
@@ -59,6 +62,17 @@ void report_status(const ActionGame& g, const FeelToggles& t, const CombatSettin
         static_cast<long long>(e.armor_absorbed), static_cast<long long>(e.cancels),
         static_cast<long long>(p.flinches), static_cast<long long>(p.interrupted),
         static_cast<long long>(p.armor_absorbed), static_cast<long long>(p.cancels));
+    std::string fx;
+    for (const EffectInfo& i : effect_table()) {
+        if (i.gameplay) continue;   // hit stop and knockback are on the first line
+        char      buf[96];
+        const int n = std::snprintf(buf, sizeof(buf), " %s=%.3f", std::string(i.observation).substr(5).c_str(),
+                                    effect_observation(i.id, session));
+        if (n < 0 || n >= static_cast<int>(sizeof(buf))) continue;
+        fx += buf;
+    }
+    const Combatant* boss = g.boss();
+    say("fx all=%s%s boss_hp=%d", on_off(t.all_on()), fx.c_str(), boss ? static_cast<int>(boss->health.hp()) : 0);
 }
 
 } // namespace
@@ -68,9 +82,7 @@ int run_headless(const Options& o) {
     auto&          bind     = ergo::bind::Engine::instance();
     FeelToggles    toggles  = initial_toggles(o);
     CombatSettings settings = o.combat;
-    GameRules      rules;
-    rules.endless = true;
-    ActionGame     game(initial_tuning(o), rules);
+    GameSession    game(initial_tuning(o), initial_rules(o, true));
     LessonBindings bindings(toggles, settings, game);
     bindings.bind_all(bind);
     bind.set_app_name("lesson_action_feel");
@@ -96,10 +108,12 @@ int run_headless(const Options& o) {
             say(seen_link ? "connected to the Studio" : "waiting for the Studio (variable plugin)");
         }
 
-        const ActionGame::Frame f = game.frame(pacer.step_seconds(), autopilot(game.view(settings)), toggles, settings, world);
-        if (f.wave_started) say("wave %d: %zu enemies", game.wave(), game.enemy_count());
-        if (game.status() == GameStatus::Lost) {
-            say("game over at wave %d (defeated %lld) -> restart", game.wave(), static_cast<long long>(game.defeated()));
+        const ActionGame::Frame f =
+            game.frame(pacer.step_seconds(), autopilot(game.view(settings, toggles)), toggles, settings, world);
+        const ActionGame& g = game.game();
+        if (f.wave_started) say("wave %d: %zu enemies%s", g.wave(), g.enemy_count(), g.boss() ? " (the boss)" : "");
+        if (g.status() == GameStatus::Lost) {
+            say("game over at wave %d (defeated %lld) -> restart", g.wave(), static_cast<long long>(g.defeated()));
             game.restart();
         }
         if (pacer.elapsed() >= next_status) {

@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <set>
 #include <string>
 
 using namespace lesson_action_feel;
@@ -62,6 +63,9 @@ TEST(LessonTerminalKeys, CommandTable) {
     EXPECT_EQ(command_for({KeyKind::Char, 'p'}), Command::Pause);
     EXPECT_EQ(command_for({KeyKind::Char, 'q'}), Command::Quit);
     EXPECT_EQ(command_for({KeyKind::CtrlC, 0}), Command::Quit);
+    EXPECT_EQ(command_for({KeyKind::Char, '0'}), Command::ToggleAllEffects);
+    EXPECT_EQ(command_for({KeyKind::Char, 'o'}), Command::EffectsScreen);
+    EXPECT_EQ(command_for({KeyKind::Char, 'v'}), Command::DebugVectors);
     EXPECT_EQ(command_for({KeyKind::Char, 'z'}), Command::None);
 }
 
@@ -69,9 +73,9 @@ TEST(LessonTerminalKeys, SettingsKeysChangeTheSameSwitchesAsTheStudio) {
     FeelToggles    t;
     CombatSettings s;
     EXPECT_EQ(std::string(apply_setting(Command::ToggleHitStop, t, s)), std::string("feel.hit_stop"));
-    EXPECT_FALSE(t.hit_stop);
+    EXPECT_FALSE(t.hit_stop());
     EXPECT_EQ(std::string(apply_setting(Command::ToggleCameraShake, t, s)), std::string("feel.camera_shake"));
-    EXPECT_FALSE(t.camera_shake);
+    EXPECT_FALSE(t.camera_shake());
     EXPECT_EQ(std::string(apply_setting(Command::CycleEnemySuperArmor, t, s)), std::string("combat.enemy.super_armor"));
     EXPECT_EQ(s.enemy.super_armor, SuperArmor::Attack);
     apply_setting(Command::CycleEnemySuperArmor, t, s);
@@ -83,6 +87,12 @@ TEST(LessonTerminalKeys, SettingsKeysChangeTheSameSwitchesAsTheStudio) {
     apply_setting(Command::TogglePlayerCancel, t, s);
     EXPECT_FALSE(s.player.motion_cancel);
     EXPECT_TRUE(apply_setting(Command::Attack, t, s) == nullptr);
+    // 0: all effects on (some were off), then all off.
+    EXPECT_EQ(std::string(apply_setting(Command::ToggleAllEffects, t, s)), std::string("feel.all"));
+    EXPECT_TRUE(t.all_on());
+    apply_setting(Command::ToggleAllEffects, t, s);
+    EXPECT_TRUE(t == FeelToggles::all(false));
+    EXPECT_FALSE(s.enemy.flinch);   // the combat rules are not effects: 0 leaves them alone
 }
 
 TEST(LessonTerminalMoveLatch, ATapWalksBrieflyAndRepeatsKeepWalking) {
@@ -107,4 +117,20 @@ TEST(LessonTerminalMoveLatch, AttackIsOneFrame) {
     latch.press(Command::Attack);
     EXPECT_TRUE(latch.take(1.0f / 60).attack);
     EXPECT_FALSE(latch.take(1.0f / 60).attack);
+}
+
+TEST(LessonTerminalKeys, TheEffectsScreenReachesEveryRegistryEntry) {
+    std::set<Effect> reached;
+    for (char c = 'a'; c < static_cast<char>('a' + kEffectCount); ++c) {
+        const auto e = effect_for_screen_key({KeyKind::Char, c});
+        ASSERT_TRUE(e.has_value());
+        EXPECT_EQ(screen_key_for(*e), c);
+        reached.insert(*e);
+    }
+    EXPECT_EQ(reached.size(), kEffectCount);
+    EXPECT_FALSE(effect_for_screen_key({KeyKind::Char, static_cast<char>('a' + kEffectCount)}).has_value());
+    EXPECT_FALSE(effect_for_screen_key({KeyKind::Up, 0}).has_value());
+    FeelToggles t;
+    EXPECT_EQ(std::string(toggle_effect(Effect::MotionBlur, t)), std::string("feel.motion_blur"));
+    EXPECT_FALSE(t[Effect::MotionBlur]);
 }

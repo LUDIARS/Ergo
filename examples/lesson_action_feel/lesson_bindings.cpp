@@ -1,5 +1,7 @@
 #include "lesson_bindings.h"
 
+#include "effect_observations.h"
+
 #include <cstdint>
 
 namespace lesson_action_feel {
@@ -34,13 +36,31 @@ VarMeta checked(const char* category, const char* unit = "") {
 
 } // namespace
 
-LessonBindings::LessonBindings(FeelToggles& toggles, CombatSettings& settings, const ActionGame& game)
-    : toggles_(toggles), settings_(settings), game_(game) {}
+LessonBindings::LessonBindings(FeelToggles& toggles, CombatSettings& settings, const GameSession& session)
+    : toggles_(toggles), settings_(settings), session_(session) {}
 
 void LessonBindings::bind_all(ergo::bind::Engine& engine) {
-    engine.bind("feel.hit_stop", &toggles_.hit_stop, writable("feel"));
-    engine.bind("feel.knockback", &toggles_.knockback, writable("feel"));
-    engine.bind("feel.camera_shake", &toggles_.camera_shake, writable("feel"));
+    const ActionGame& game = session_.game();
+    for (const EffectInfo& info : effect_table()) {
+        const Effect e = info.id;
+        engine.bind("feel." + std::string(info.name), &toggles_[e], writable("feel"));
+        const bool counted = e == Effect::HitSpark || e == Effect::DamageNumbers || e == Effect::Telegraph ||
+                             e == Effect::DefeatMark;
+        if (counted) {
+            engine.bind_accessor(
+                std::string(info.observation), VarKind::Int64,
+                [this, e] { return Value::of_int64(static_cast<std::int64_t>(effect_observation(e, session_))); }, {},
+                observed("feel"));
+        } else {
+            engine.bind_accessor(
+                std::string(info.observation), VarKind::Double,
+                [this, e] { return Value::of_double(effect_observation(e, session_)); }, {},
+                observed("feel", e == Effect::HitStop ? "s" : ""));
+        }
+    }
+    engine.bind_accessor(
+        "feel.all", VarKind::Bool, [this] { return Value::of_bool(toggles_.all_on()); },
+        [this](const Value& v) { toggles_.set_all(v.b); }, writable("feel"));
     engine.bind_accessor(
         "feel.super_armor", VarKind::Bool,
         [this] { return Value::of_bool(settings_.enemy.super_armor != SuperArmor::Off); },
@@ -50,27 +70,44 @@ void LessonBindings::bind_all(ergo::bind::Engine& engine) {
         },
         writable("feel"));
     engine.bind_accessor(
-        "feel.hit_stop_last_seconds", VarKind::Double,
-        [this] { return Value::of_double(game_.observed().hit_stop_last_seconds); }, {}, observed("feel", "s"));
+        "feel.motion_vector_player", VarKind::Vec3,
+        [this] {
+            const Vec2 m = session_.fx().motion_of(session_.game().player().id);
+            return Value::of_vec3(m.x, m.y, 0.0f);
+        },
+        {}, observed("feel", "units/frame"));
     engine.bind_accessor(
-        "feel.knockback_last_impulse", VarKind::Double,
-        [this] { return Value::of_double(game_.observed().knockback_last_impulse); }, {}, observed("feel"));
+        "feel.motion_vector_last_hit", VarKind::Vec3,
+        [this] {
+            const Vec2 m = session_.fx().motion_of(session_.fx().last_hit_target());
+            return Value::of_vec3(m.x, m.y, 0.0f);
+        },
+        {}, observed("feel", "units/frame"));
 
-    bind_side(engine, "player", settings_.player, game_.combat().player);
-    bind_side(engine, "enemy", settings_.enemy, game_.combat().enemy);
+    bind_side(engine, "player", settings_.player, game.combat().player);
+    bind_side(engine, "enemy", settings_.enemy, game.combat().enemy);
 
     engine.bind_accessor(
-        "game.wave", VarKind::Int32, [this] { return Value::of_int32(game_.wave()); }, {}, observed("game"));
+        "game.wave", VarKind::Int32, [this] { return Value::of_int32(session_.game().wave()); }, {}, observed("game"));
     engine.bind_accessor(
-        "game.player_hp", VarKind::Int32, [this] { return Value::of_int32(game_.player().health.hp()); }, {},
+        "game.player_hp", VarKind::Int32, [this] { return Value::of_int32(session_.game().player().health.hp()); }, {},
         observed("game"));
     engine.bind_accessor(
-        "game.defeated", VarKind::Int64, [this] { return Value::of_int64(game_.defeated()); }, {}, observed("game"));
+        "game.boss_hp", VarKind::Int32,
+        [this] {
+            const Combatant* b = session_.game().boss();
+            return Value::of_int32(b ? b->health.hp() : 0);
+        },
+        {}, observed("game"));
     engine.bind_accessor(
-        "game.player_hits", VarKind::Int64, [this] { return Value::of_int64(game_.player_hits()); }, {},
+        "game.defeated", VarKind::Int64, [this] { return Value::of_int64(session_.game().defeated()); }, {},
         observed("game"));
     engine.bind_accessor(
-        "game.score", VarKind::Int64, [this] { return Value::of_int64(game_.score()); }, {}, observed("game"));
+        "game.player_hits", VarKind::Int64, [this] { return Value::of_int64(session_.game().player_hits()); }, {},
+        observed("game"));
+    engine.bind_accessor(
+        "game.score", VarKind::Int64, [this] { return Value::of_int64(session_.game().score()); }, {},
+        observed("game"));
 }
 
 void LessonBindings::bind_side(ergo::bind::Engine& engine, const std::string& side, SideSettings& s,

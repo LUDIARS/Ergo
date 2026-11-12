@@ -65,7 +65,13 @@ PlayerCommand stand_and_swing(const GameView& v) {
     return cmd;
 }
 
-const FeelToggles kOff{false, false, false};
+const FeelToggles kOff = FeelToggles::all(false);
+
+FeelToggles only(Effect e) {
+    FeelToggles t = FeelToggles::all(false);
+    t[e]          = true;
+    return t;
+}
 
 } // namespace
 
@@ -78,7 +84,7 @@ TEST(LessonActionGame, StartsWithThePlayerAndTheFirstWave) {
     const GameView v = g.view(CombatSettings{});
     ASSERT_EQ(v.fighters.size(), 3u);
     EXPECT_EQ(v.fighters[0].side, Side::Player);
-    EXPECT_EQ(v.waves_to_win, 3);
+    EXPECT_EQ(v.waves_to_win, 4);   // three waves, then the boss
 }
 
 TEST(LessonActionGame, EffectsOffObservationsStayZeroAndTheWorldNeverFreezes) {
@@ -91,7 +97,6 @@ TEST(LessonActionGame, EffectsOffObservationsStayZeroAndTheWorldNeverFreezes) {
     EXPECT_TRUE(g.observed().hit_stop_last_seconds == 0.0);
     EXPECT_TRUE(g.observed().knockback_last_impulse == 0.0);
     EXPECT_TRUE(g.knockback_travel() == 0.0);
-    EXPECT_TRUE(g.shake() == 0.0f);
     EXPECT_DOUBLE_EQ(g.world_seconds(), g.real_seconds());
 }
 
@@ -99,7 +104,7 @@ TEST(LessonActionGame, HitStopFreezesTheWorldForPowerOver24Seconds) {
     auto&          w = fresh_world();
     ActionGame     g;
     CombatSettings s;
-    FeelToggles    t{true, false, false};
+    const FeelToggles t = only(Effect::HitStop);
     // Walk to the first enemy until the first hit lands.
     int guard = 0;
     while (g.player_hits() == 0 && guard++ < 600) g.frame(kDt, autopilot(g.view(s)), t, s, w);
@@ -120,7 +125,7 @@ TEST(LessonActionGame, TimersRunOnWorldTimeSoAHitStopHoldsAFlinch) {
     auto&          w = fresh_world();
     ActionGame     g;
     CombatSettings s;
-    FeelToggles    t{true, false, false};
+    const FeelToggles t = only(Effect::HitStop);
     int guard = 0;
     while (g.player_hits() == 0 && guard++ < 600) g.frame(kDt, autopilot(g.view(s)), t, s, w);
     ASSERT_TRUE(w.is_hit_stop());
@@ -133,33 +138,17 @@ TEST(LessonActionGame, TimersRunOnWorldTimeSoAHitStopHoldsAFlinch) {
     EXPECT_FLOAT_EQ(hit->flinch_left, left);
 }
 
-TEST(LessonActionGame, CameraShakeFadesOnRealTimeEvenDuringAHitStop) {
-    auto&          w = fresh_world();
-    ActionGame     g;
-    CombatSettings s;
-    FeelToggles    t{true, false, true};
-    int guard = 0;
-    while (g.player_hits() == 0 && guard++ < 600) g.frame(kDt, autopilot(g.view(s)), t, s, w);
-    ASSERT_TRUE(w.is_hit_stop());
-    const float shake = g.shake();
-    EXPECT_NEAR(shake, 0.3f, 1e-5f);   // sword power 2 x 0.15
-    const auto f = g.frame(kDt, PlayerCommand{}, t, s, w);
-    EXPECT_EQ(f.world_dt, 0.0f);
-    EXPECT_LT(g.shake(), shake);
-    EXPECT_FALSE(g.view(s).camera_offset.is_zero());
-}
-
 TEST(LessonActionGame, KnockbackPushesTheEnemyAwayAndIsObserved) {
     auto&          w = fresh_world();
     ActionGame     g;
     CombatSettings s;
-    FeelToggles    t{false, true, false};
+    const FeelToggles t = only(Effect::Knockback);
     int guard = 0;
     while (g.player_hits() == 0 && guard++ < 600) g.frame(kDt, autopilot(g.view(s)), t, s, w);
     ASSERT_EQ(g.player_hits(), 1);
-    EXPECT_DOUBLE_EQ(g.observed().knockback_last_impulse, 6.0);   // power 2 x 3
+    EXPECT_DOUBLE_EQ(g.observed().knockback_last_impulse, 12.0);   // power 2 x 6
     run(g, 0.5f, stand, t, s, w);
-    EXPECT_GT(g.knockback_travel(), 0.5);   // 6 / friction 7 ~ 0.86 units
+    EXPECT_GT(g.knockback_travel(), 1.0);   // 12 / friction 10 = 1.2 units
 }
 
 TEST(LessonActionGame, DefeatedEnemiesLeaveAndTheNextWaveComes) {
@@ -174,15 +163,15 @@ TEST(LessonActionGame, DefeatedEnemiesLeaveAndTheNextWaveComes) {
     EXPECT_GE(g.score(), 2 * 100);
 }
 
-TEST(LessonActionGame, TheScriptedPlayerClearsAllWavesAndWins) {
+TEST(LessonActionGame, TheScriptedPlayerClearsAllWavesAndTheBossAndWins) {
     auto&          w = fresh_world();
     ActionGame     g;
     CombatSettings s;
     int frames = 0;
-    while (g.status() == GameStatus::Playing && frames++ < 60 * 120) g.frame(kDt, autopilot(g.view(s)), FeelToggles{}, s, w);
+    while (g.status() == GameStatus::Playing && frames++ < 60 * 180) g.frame(kDt, autopilot(g.view(s)), FeelToggles{}, s, w);
     EXPECT_EQ(g.status(), GameStatus::Won);
-    EXPECT_EQ(g.defeated(), 2 + 3 + 4);
-    EXPECT_EQ(g.wave(), 3);
+    EXPECT_EQ(g.defeated(), 2 + 3 + 4 + 1);   // the waves and the boss
+    EXPECT_EQ(g.wave(), 4);
     EXPECT_GT(g.player().health.hp(), 0);
     // After the win nothing happens any more.
     const auto hits = g.player_hits();

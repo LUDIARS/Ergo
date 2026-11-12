@@ -38,9 +38,8 @@ std::string side_text(const char* who, const SideSettings& s) {
 
 std::vector<std::string> SettingsWatch::changes(const FeelToggles& t, const CombatSettings& s) {
     std::vector<std::string> out;
-    flag(out, "feel.hit_stop", toggles_.hit_stop, t.hit_stop);
-    flag(out, "feel.knockback", toggles_.knockback, t.knockback);
-    flag(out, "feel.camera_shake", toggles_.camera_shake, t.camera_shake);
+    for (const EffectInfo& i : effect_table())
+        flag(out, ("feel." + std::string(i.name)).c_str(), toggles_[i.id], t[i.id]);
     side(out, "combat.enemy.", settings_.enemy, s.enemy);
     side(out, "combat.player.", settings_.player, s.player);
     toggles_  = t;
@@ -49,9 +48,9 @@ std::vector<std::string> SettingsWatch::changes(const FeelToggles& t, const Comb
 }
 
 std::string describe_settings(const FeelToggles& t, const CombatSettings& s) {
-    return std::string("hit_stop=") + on_off(t.hit_stop) + " knockback=" + on_off(t.knockback) +
-           " camera_shake=" + on_off(t.camera_shake) + "; " + side_text("enemy", s.enemy) + "; " +
-           side_text("player", s.player);
+    std::string out;
+    for (const EffectInfo& i : effect_table()) out += std::string(out.empty() ? "" : " ") + std::string(i.name) + "=" + on_off(t[i.id]);
+    return out + "; " + side_text("enemy", s.enemy) + "; " + side_text("player", s.player);
 }
 
 } // namespace lesson_action_feel

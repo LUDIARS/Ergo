@@ -26,8 +26,7 @@ TEST(LessonOptions, DefaultsAreTheHeadlessFullFeelGame) {
     EXPECT_EQ(o.mode, Mode::Auto);
     EXPECT_EQ(o.port, 5170);
     EXPECT_TRUE(o.studio);
-    const FeelToggles t = initial_toggles(o);
-    EXPECT_TRUE(t.hit_stop && t.knockback && t.camera_shake);
+    EXPECT_TRUE(initial_toggles(o).all_on());   // every effect of the registry starts on
     EXPECT_TRUE(o.combat.player.flinch);
     EXPECT_TRUE(o.combat.player.motion_cancel);
     EXPECT_EQ(o.combat.player.super_armor, SuperArmor::Off);
@@ -40,7 +39,10 @@ TEST(LessonOptions, PlainTurnsTheThreeEffectsOff) {
     Options o;
     EXPECT_EQ(parse({"--plain", "--port", "5591"}, o), "");
     const FeelToggles t = initial_toggles(o);
-    EXPECT_FALSE(t.hit_stop || t.knockback || t.camera_shake);
+    for (const EffectInfo& e : effect_table()) EXPECT_FALSE(t[e.id]);   // literally every registry entry
+    // The combat rules are not effects: --plain leaves them at their defaults.
+    EXPECT_TRUE(o.combat.enemy.flinch);
+    EXPECT_TRUE(o.combat.player.motion_cancel);
     EXPECT_EQ(o.port, 5591);
 }
 
@@ -71,6 +73,29 @@ TEST(LessonOptions, EveryCombatSwitchAtStart) {
     EXPECT_EQ(s.combat.enemy.super_armor, SuperArmor::Attack);
 }
 
+TEST(LessonOptions, EffectsBossAndDebugAtStart) {
+    Options o;
+    EXPECT_EQ(parse({"--plain", "--effect", "motion_blur=on", "--effect", "boss_blur=on", "--boss"}, o), "");
+    FeelToggles t = initial_toggles(o);
+    for (const EffectInfo& e : effect_table())
+        EXPECT_EQ(t[e.id], e.id == Effect::MotionBlur || e.id == Effect::BossBlur);
+    EXPECT_EQ(initial_rules(o, false).start_wave, FeelTuning{}.boss_every);
+    EXPECT_FALSE(initial_rules(o, false).endless);
+    Options a;
+    EXPECT_EQ(parse({"--plain", "--all-effects", "--effect", "hit_stop=off"}, a), "");
+    t = initial_toggles(a);
+    EXPECT_FALSE(t[Effect::HitStop]);
+    EXPECT_TRUE(t[Effect::Knockback]);
+    Options d;
+    EXPECT_EQ(parse({"--play", "--debug-vectors"}, d), "");
+    EXPECT_TRUE(d.debug_vectors);
+    Options bad;
+    EXPECT_EQ(parse({"--effect", "glow=on"}, bad), "bad value for --effect: \"glow=on\"");
+    EXPECT_EQ(parse({"--effect", "hit_stop"}, bad), "bad value for --effect: \"hit_stop\"");
+    Options needs;
+    EXPECT_EQ(parse({"--debug-vectors"}, needs), "option --debug-vectors needs --play");
+}
+
 TEST(LessonOptions, ErrorsNameTheOption) {
     Options o;
     EXPECT_EQ(parse({"--nope"}, o), "unknown option \"--nope\"");
@@ -92,7 +117,7 @@ TEST(LessonSettingsWatch, WordsEveryChangeOnce) {
     CombatSettings s;
     SettingsWatch  w(t, s);
     EXPECT_TRUE(w.changes(t, s).empty());
-    t.hit_stop           = false;
+    t[Effect::HitStop]   = false;
     s.enemy.super_armor  = SuperArmor::Attack;
     s.player.flinch      = false;
     s.enemy.flinch_seconds = 0.2f;

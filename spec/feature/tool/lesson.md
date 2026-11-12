@@ -268,17 +268,19 @@ Odeum のサンプル講座 (`action-game`) が名前を出す変数を、実際
 
 | 変数 | 型 | 内容 |
 |---|---|---|
-| `feel.hit_stop` / `feel.knockback` / `feel.camera_shake` | bool (Studio から書ける) | 演出の ON / OFF。既定は ON、`--plain` で 3 つとも OFF (「演出を抜いた状態」) から始める |
+| `feel.hit_stop` / `feel.knockback` / `feel.camera_shake` ほか `feel.<演出>` | bool (Studio から書ける) | 演出の一覧の 1 つずつの ON / OFF (一覧は lesson-action-game.md の「演出の一覧」、10 個)。既定は ON、`--plain` で全部 OFF (「演出を抜いた状態」) から始める |
+| `feel.all` | bool (Studio から書ける) | 読むと「一覧の全部が ON か」。false を書くと全部 OFF、true で全部 ON (授業の `effects`) |
 | `feel.super_armor` | bool (Studio から書ける) | 敵のスーパーアーマー (`combat.enemy.super_armor` の別名: true = off 以外。true を書くと off のときだけ attack にする) |
 | `combat.<side>.flinch` / `combat.<side>.motion_cancel` | bool (Studio から書ける) | 陣営 (`player` / `enemy`) ごとのひるみ・モーションキャンセル |
 | `feel.hit_stop_last_seconds` | double (読み取り専用) | 最後に `ergo_world_time` が実際に止めた秒数 (威力 ÷ 24。剣で 0.083)。一度も止めていなければ 0 |
-| `feel.knockback_last_impulse` | double (読み取り専用) | 最後に実際に与えた撃力 (威力 × 3。剣で 6)。一度も与えていなければ 0 |
+| `feel.knockback_last_impulse` | double (読み取り専用) | 最後に実際に与えた撃力 (威力 × 6。剣で 12)。一度も与えていなければ 0 |
 | `combat.<side>.armor_absorbed` ほか | int64 (読み取り専用) | スーパーアーマーで吸収した当たりの数など (全部は lesson-action-game.md の「何が起きたか」) |
 
 - 観測値はゲームが実際にしたことから作る。`feel.hit_stop` が OFF の間は 0 のまま、Studio から ON にすると次の当たりで > 0 に
   なる (課題の `check` はこれを見る)。OFF に戻しても「最後の値」は残り、遊び直しでも戻さない。
 - 授業の実演は bool だけを切り替える (`DemoApplier`)。スーパーアーマーの 3 段階 (`off` / `attack` / `always`) を bool の実演で
-  切り替えられるよう `feel.super_armor` を置いた。
+  切り替えられるよう `feel.super_armor` を置き、演出の一覧をまとめて切り替えられるよう `feel.all` を置いた。授業の `feature: "all"` は
+  `tool.features` の全部 (戦闘の決まりまで) を切り替えるので、「演出を全部抜く」には `feel.all` を指す機能を使う。
 - 起動: 既定 (`--auto`) は窓なしで台本の操作が遊び、Studio につないで数秒ごとに状態を出す。`--play` は端末で遊ぶ
   (`--autopilot` で台本の操作が遊ぶ画面を出す。授業の実演用)。どちらも同じ変数を出す。`--check` は Studio なしの自己確認 (ctest)。
 
@@ -376,7 +378,7 @@ $ <build>/examples/ergo_example_lesson_action_feel --port 5491 --plain --status-
 $ node ws_switch.mjs ws://127.0.0.1:5491/variable/ws feel.hit_stop true
 > {"op":"hello","role":"ui"}
 < {"nodes":[],"op":"actors"}
-< {"op":"registry","vars":[{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.camera_shake","value":false},{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.hit_stop","value":false}, ... (27 in all)]}
+< {"op":"registry","vars":[{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.all","value":false},{"app":"lesson_action_feel","kind":"bool","meta":{"category":"feel"},"name":"feel.boss_blur","value":false}, ... (46 in all)]}
 > {"op":"set","name":"feel.hit_stop","value":true}
 < {"name":"game.score","op":"value","value":98}
 < {"name":"game.player_hits","op":"value","value":4}
@@ -387,30 +389,28 @@ $ node ws_switch.mjs ws://127.0.0.1:5491/variable/ws feel.hit_stop true
 そのときのサンプルの出力:
 
 ```text
-[lesson_action_feel] started (--plain): hit_stop=OFF knockback=OFF camera_shake=OFF; enemy flinch=ON super_armor=off motion_cancel=OFF; player flinch=ON super_armor=off motion_cancel=ON
+[lesson_action_feel] started (--plain): hit_stop=OFF knockback=OFF camera_shake=OFF hit_spark=OFF damage_numbers=OFF hp_gauge=OFF telegraph=OFF defeat_mark=OFF boss_blur=OFF motion_blur=OFF; enemy flinch=ON super_armor=off motion_cancel=OFF; player flinch=ON super_armor=off motion_cancel=ON
 [lesson_action_feel] Studio ws://127.0.0.1:5491/variable/ws
 [lesson_action_feel] waiting for the Studio (variable plugin)
 [lesson_action_feel] connected to the Studio
 [lesson_action_feel] real=1.0s world=1.0s hits=0 defeated=0 wave=1 hp=100 hit_stop=OFF knockback=OFF camera_shake=OFF super_armor=off hit_stop_last_seconds=0.000 knockback_last_impulse=0.000 knockback_travel=0.00 shake=0.000
 [lesson_action_feel] combat enemy: flinches=0 interrupted=0 armor_absorbed=0 cancels=0 | player: flinches=0 interrupted=0 armor_absorbed=0 cancels=0
+[lesson_action_feel] fx all=OFF camera_shake_last_amplitude=0.000 hit_spark_count=0.000 damage_numbers_shown=0.000 hp_gauge_last_drain=0.000 telegraph_count=0.000 defeat_mark_count=0.000 boss_blur_last_peak=0.000 motion_blur_last_length=0.000 boss_hp=0
 [lesson_action_feel] feel.hit_stop: OFF -> ON
 [lesson_action_feel] real=2.0s world=1.9s hits=5 defeated=1 wave=1 hp=100 hit_stop=ON knockback=OFF camera_shake=OFF super_armor=off hit_stop_last_seconds=0.083 knockback_last_impulse=0.000 knockback_travel=0.00 shake=0.000
-[lesson_action_feel] combat enemy: flinches=4 interrupted=1 armor_absorbed=0 cancels=0 | player: flinches=0 interrupted=0 armor_absorbed=0 cancels=5
 ```
 
 `ergo_example_lesson_action_feel --help` の出力 (正本は `examples/lesson_action_feel/options.cpp` の `kUsage`):
 
 ```text
-usage: ergo_example_lesson_action_feel [--auto] [--host H] [--port P] [--no-studio] [--plain]
-                                       [--seconds S] [--status-every S] [combat options]
-       ergo_example_lesson_action_feel --play [--endless | --autopilot] [--host H] [--port P] [--no-studio] [--plain]
-                                       [--seconds S] [combat options]
+usage: ergo_example_lesson_action_feel [--auto] [--status-every S] [common options]
+       ergo_example_lesson_action_feel --play [--endless | --autopilot] [--debug-vectors] [common options]
        ergo_example_lesson_action_feel --check
        ergo_example_lesson_action_feel --help | -h
 
-Arena action game for the Odeum lesson. Publishes feel.hit_stop, feel.knockback,
-feel.camera_shake, feel.super_armor and the combat.* settings (writable) and what really
-happened (feel.hit_stop_last_seconds, feel.knockback_last_impulse, combat.*.flinches, ...)
+Arena action game for the Odeum lesson. Publishes every effect switch (feel.<effect>, feel.all),
+feel.super_armor and the combat.* settings (writable) and what really happened
+(feel.hit_stop_last_seconds, feel.knockback_last_impulse, ..., combat.*.flinches, ...)
 to the Studio's variable plugin at ws://H:P/variable/ws.
 
 modes:
@@ -419,11 +419,17 @@ modes:
   --check            offline self-check without a Studio (exit 0 = the observations follow the switches)
   --help, -h         print this text and exit
 
-options:
+common options:
   --host H           Studio host (default 127.0.0.1)
   --port P           Studio port, 1..65535 (default 5170; the Studio's PORT)
   --no-studio        do not connect to a Studio
-  --plain            start with hit stop, knockback and camera shake OFF
+  --plain            start with every presentation effect OFF (the whole effect registry)
+  --all-effects      start with every effect ON (the default)
+  --effect NAME=on|off  one effect; NAME is hit_stop, knockback, camera_shake, hit_spark,
+                     damage_numbers, hp_gauge, telegraph, defeat_mark, boss_blur, motion_blur
+                     (applied after --plain / --all-effects; may be repeated)
+  --boss             start at the boss wave
+  --debug-vectors    --play: draw each object's motion vector (key V)
   --endless          --play: waves never end (default: clear 3 waves to win)
   --autopilot        --play: the scripted player plays endless waves on screen (for a demo);
                      keys 1-9, P, R and Q still work

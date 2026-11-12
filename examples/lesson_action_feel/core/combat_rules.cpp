@@ -19,6 +19,7 @@ Combatant make_combatant(int id, Side side, Vec2 pos, const Weapon& weapon, std:
 }
 
 bool armor_applies(const Combatant& c, const SideSettings& s) {
+    if (c.is_swinging() && c.weapon.armored) return true;   // an armored technique (the boss's roar)
     switch (s.super_armor) {
     case SuperArmor::Off: return false;
     case SuperArmor::Always: return c.is_alive();
@@ -34,6 +35,8 @@ bool can_cancel(const Combatant& c, const SideSettings& s) {
 namespace {
 
 void start_attack(Combatant& c, const Intent& in) {
+    if (in.technique >= 0 && static_cast<std::size_t>(in.technique) < c.techniques.size())
+        c.weapon = c.techniques[static_cast<std::size_t>(in.technique)];
     const Vec2 dir = !in.aim.is_zero() ? in.aim.normalized() : in.move.normalized();
     if (!dir.is_zero()) c.facing = dir;
     c.action        = Action::Attack;
@@ -124,8 +127,8 @@ HitOutcome resolve_hit(const Combatant& attacker, Combatant& target, const SideS
     const bool    was_attacking = target.action == Action::Attack;
 
     out.damage = w.damage;
+    out.power  = w.power;
     target.health.apply_damage(w.damage);
-    target.hit_flash = t.hit_flash_seconds;
 
     if (target.health.is_dead()) {
         out.killed      = true;
@@ -135,7 +138,7 @@ HitOutcome resolve_hit(const Combatant& attacker, Combatant& target, const SideS
     } else if (armored) {
         out.absorbed = true;
         ++target_counters.armor_absorbed;
-    } else if (target_side.flinch) {
+    } else if (target_side.flinch && w.power >= target.min_flinch_power) {
         out.flinched    = true;
         out.interrupted = was_attacking;
         ++target_counters.flinches;
@@ -146,12 +149,31 @@ HitOutcome resolve_hit(const Combatant& attacker, Combatant& target, const SideS
         target.struck.clear();
     }
 
-    if (toggles.knockback && !armored) {
+    if (toggles.knockback() && !armored) {
         out.impulse = w.power * t.knockback_per_power;
-        target.push_velocity += knockback_direction(attacker, target, t.knockback_direction) * (out.impulse / t.mass);
+        target.push_velocity += knockback_direction(attacker, target, t.knockback_direction) * (out.impulse / target.mass);
     }
-    if (toggles.hit_stop) out.hit_stop_seconds = w.power * t.hit_stop_per_power;
-    if (toggles.camera_shake) out.shake = std::min(w.power * t.shake_per_power, t.shake_max);
+    if (toggles.hit_stop()) out.hit_stop_seconds = w.power * t.hit_stop_per_power;
+    return out;
+}
+
+HitOutcome resolve_roar(const Combatant& roarer, Combatant& target, const SideSettings& target_side,
+                        SideCounters& target_counters) {
+    HitOutcome out;
+    const bool was_attacking = target.action == Action::Attack;
+    if (armor_applies(target, target_side)) {
+        out.absorbed = true;
+        ++target_counters.armor_absorbed;
+        return out;
+    }
+    out.flinched    = true;   // a forced stagger: whatever the side's flinch setting
+    out.interrupted = was_attacking;
+    ++target_counters.flinches;
+    if (was_attacking) ++target_counters.interrupted;
+    target.action      = Action::Flinch;
+    target.flinch_left = std::max(target.flinch_left, roarer.weapon.stagger);
+    target.buffer_left = 0.0f;
+    target.struck.clear();
     return out;
 }
 

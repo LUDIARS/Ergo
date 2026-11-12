@@ -6,16 +6,14 @@
 namespace lesson_action_feel {
 
 const char* const kUsage =
-    "usage: ergo_example_lesson_action_feel [--auto] [--host H] [--port P] [--no-studio] [--plain]\n"
-    "                                       [--seconds S] [--status-every S] [combat options]\n"
-    "       ergo_example_lesson_action_feel --play [--endless | --autopilot] [--host H] [--port P] [--no-studio] [--plain]\n"
-    "                                       [--seconds S] [combat options]\n"
+    "usage: ergo_example_lesson_action_feel [--auto] [--status-every S] [common options]\n"
+    "       ergo_example_lesson_action_feel --play [--endless | --autopilot] [--debug-vectors] [common options]\n"
     "       ergo_example_lesson_action_feel --check\n"
     "       ergo_example_lesson_action_feel --help | -h\n"
     "\n"
-    "Arena action game for the Odeum lesson. Publishes feel.hit_stop, feel.knockback,\n"
-    "feel.camera_shake, feel.super_armor and the combat.* settings (writable) and what really\n"
-    "happened (feel.hit_stop_last_seconds, feel.knockback_last_impulse, combat.*.flinches, ...)\n"
+    "Arena action game for the Odeum lesson. Publishes every effect switch (feel.<effect>, feel.all),\n"
+    "feel.super_armor and the combat.* settings (writable) and what really happened\n"
+    "(feel.hit_stop_last_seconds, feel.knockback_last_impulse, ..., combat.*.flinches, ...)\n"
     "to the Studio's variable plugin at ws://H:P/variable/ws.\n"
     "\n"
     "modes:\n"
@@ -24,11 +22,17 @@ const char* const kUsage =
     "  --check            offline self-check without a Studio (exit 0 = the observations follow the switches)\n"
     "  --help, -h         print this text and exit\n"
     "\n"
-    "options:\n"
+    "common options:\n"
     "  --host H           Studio host (default 127.0.0.1)\n"
     "  --port P           Studio port, 1..65535 (default 5170; the Studio's PORT)\n"
     "  --no-studio        do not connect to a Studio\n"
-    "  --plain            start with hit stop, knockback and camera shake OFF\n"
+    "  --plain            start with every presentation effect OFF (the whole effect registry)\n"
+    "  --all-effects      start with every effect ON (the default)\n"
+    "  --effect NAME=on|off  one effect; NAME is hit_stop, knockback, camera_shake, hit_spark,\n"
+    "                     damage_numbers, hp_gauge, telegraph, defeat_mark, boss_blur, motion_blur\n"
+    "                     (applied after --plain / --all-effects; may be repeated)\n"
+    "  --boss             start at the boss wave\n"
+    "  --debug-vectors    --play: draw each object's motion vector (key V)\n"
     "  --endless          --play: waves never end (default: clear 3 waves to win)\n"
     "  --autopilot        --play: the scripted player plays endless waves on screen (for a demo);\n"
     "                     keys 1-9, P, R and Q still work\n"
@@ -78,7 +82,7 @@ bool parse_direction(const char* s, KnockbackDirection& out) {
 }
 
 bool takes_value(const std::string& a) {
-    static const char* const kWithValue[] = {"--host", "--port", "--seconds", "--status-every", "--enemy-flinch",
+    static const char* const kWithValue[] = {"--host", "--port", "--seconds", "--status-every", "--effect", "--enemy-flinch",
                                              "--enemy-super-armor", "--enemy-cancel", "--player-flinch",
                                              "--player-super-armor", "--player-cancel", "--knockback-dir"};
     for (const char* o : kWithValue)
@@ -107,6 +111,16 @@ bool parse_value(const std::string& a, const char* v, Options& o) {
     if (a == "--enemy-super-armor") return parse_armor(v, o.combat.enemy.super_armor);
     if (a == "--player-super-armor") return parse_armor(v, o.combat.player.super_armor);
     if (a == "--knockback-dir") return parse_direction(v, o.knockback_direction);
+    if (a == "--effect") {
+        const std::string spec = v;
+        const auto        eq   = spec.find('=');
+        if (eq == std::string::npos) return false;
+        const auto e  = effect_by_name(std::string_view(spec).substr(0, eq));
+        bool       on = false;
+        if (!e || !parse_on_off(spec.c_str() + eq + 1, on)) return false;
+        o.effects.emplace_back(*e, on);
+        return true;
+    }
     return false;
 }
 
@@ -130,6 +144,9 @@ std::string parse_options(int argc, char** argv, Options& o) {
         else if (a == "--play") err = set_mode(o, Mode::Play, mode_given, a);
         else if (a == "--auto") err = set_mode(o, Mode::Auto, mode_given, a);
         else if (a == "--plain") o.plain = true;
+        else if (a == "--all-effects") o.plain = false;
+        else if (a == "--boss") o.boss = true;
+        else if (a == "--debug-vectors") o.debug_vectors = true;
         else if (a == "--endless") o.endless = true;
         else if (a == "--autopilot") o.autopilot = true;
         else if (a == "--no-studio") o.studio = false;
@@ -144,12 +161,22 @@ std::string parse_options(int argc, char** argv, Options& o) {
         if (!err.empty()) return err;
     }
     if (o.autopilot && o.mode != Mode::Play) return "option --autopilot needs --play";
+    if (o.debug_vectors && o.mode != Mode::Play) return "option --debug-vectors needs --play";
     if (help) o.mode = Mode::Help;
     return {};
 }
 
 FeelToggles initial_toggles(const Options& o) {
-    return o.plain ? FeelToggles{false, false, false} : FeelToggles{};
+    FeelToggles t = FeelToggles::all(!o.plain);
+    for (const auto& [effect, on] : o.effects) t[effect] = on;
+    return t;
+}
+
+GameRules initial_rules(const Options& o, bool endless) {
+    GameRules r;
+    r.endless = endless;
+    if (o.boss) r.start_wave = FeelTuning{}.boss_every;
+    return r;
 }
 
 FeelTuning initial_tuning(const Options& o) {
