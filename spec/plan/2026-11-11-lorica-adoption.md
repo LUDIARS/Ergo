@@ -166,3 +166,9 @@ stack protector が主な候補だが、内訳は分けて測っていない。
 - `praesidium.json`: この PR が変えた翻訳単位 34 本のうち未登録の 27 本を main と同じ書き方で足し、Lorica のヘッダを include する 11 本 (既存 3 本を含む) に `"packages": ["lorica"]` を付けた。運用側の `praesidium.host.json` に `lorica` の対応付けが要る (`spec/setup/hardening.md`)。
 - Praesidium の事前検査 (Revisor の `scanRepository` を手元で直接呼んだ。clang 18、`praesidium.host.json` に `lorica` = Lorica の include) は `failed`。最初は文字列の規則 `native.unbounded-copy` が `tests/hardening/test_lorica_applied.cpp` の probe (strcpy の名前を未評価の decltype で引くだけで呼ばない) を 2 か所拾ったので、Lorica のヘッダと同じく名前をマクロで綴るよう直した (再実行で 0 件)。native 解析は 34 本中 32 本が passed。失敗は `src/studio/platform/winhttp_client.cpp` (Windows 専用。Linux のホストでは `windows.h` が無い) と `src/ui/svg_raster.cpp` (第三者の `third_party/nanosvg/nanosvg.h` の `nsvg__xformInverse` が特異行列のとき `inv` ではなく `t` を単位行列にして返し、`inv` が未初期化のまま読まれる、と解析器が報告。第三者のコードなので直していない。人間の判断が要る)。
 - 結果: CMake 3.28 + `ERGO_HARDENING=required` で ctest 131/131。
+
+## 9. 追加: main (#98 授業のサンプルをアクションゲームに) の取り込み (2026-11-12)
+
+- 文字の上の衝突は無し。`lesson_action_feel` のターゲットは 3 本 (sim・実行ファイル・テスト) → 6 本 (core / terminal / app のライブラリ・実行ファイル・テスト 2 本) になり、全部 `ergo_harden_targets()` を通る (全 159 ターゲット、未適用 0、`test_lorica_compile_commands` は 489 単位で通過)。unsafe API の拒否で落ちる呼び出しは無く、置き換えは無し。サンプルは毎フレームのゲームで、Studio へは ergo_bind で手元から繋ぐだけなので baseline のまま。
+- 外から入る入力: Studio から ergo_bind で届く書き込みは、ergo_bind の WS クライアントの上限 (1 フレーム 1 MiB) を通り、`lesson_bindings` が型と範囲 (bool、super_armor 0..2、flinch_seconds 0..5) を検査し、断った書き込みの記録は毎フレーム取り出される。上限の無いネットワークの経路は無し。引数 (`options.cpp`: 数値は範囲つき) は §3 の「残り」(引数・環境変数) に入る。ファイルの読み込みは無い。
+- 結果: CMake 3.28 + `ERGO_HARDENING=required` で ctest 132/132、CMake 3.20.5 で 129/129 (skip 3)。
