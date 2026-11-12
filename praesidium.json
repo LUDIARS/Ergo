@@ -2,24 +2,12 @@
   "version": 1,
   "native": [
     {
-      "file": "examples/lesson_action_feel/action_feel_sim.cpp",
+      "file": "examples/lesson_action_feel/check_mode.cpp",
       "standard": "c++17",
       "includes": [
         "include",
-        "examples/lesson_action_feel"
-      ],
-      "defines": [
-        "NOMINMAX",
-        "WIN32_LEAN_AND_MEAN"
-      ],
-      "packages": []
-    },
-    {
-      "file": "examples/lesson_action_feel/main.cpp",
-      "standard": "c++17",
-      "includes": [
-        "include",
-        "examples/lesson_action_feel"
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
       ],
       "defines": [
         "NOMINMAX",
@@ -29,12 +17,369 @@
       "packages": []
     },
     {
-      "file": "examples/lesson_action_feel/test_action_feel_sim.cpp",
+      "file": "examples/lesson_action_feel/core/action_game.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/autopilot.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/combat_rules.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/combat_settings.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/enemy_brain.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/core/wave_plan.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/frame_pacer.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/headless_mode.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/lesson_bindings.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/main.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/options.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/play_mode.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/settings_watch.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/ansi_frame.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/key_bindings.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/key_decoder.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/move_latch.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/raw_terminal_posix.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/raw_terminal_unsupported.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/terminal/screen.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_action_game.cpp",
       "standard": "c++17",
       "includes": [
         "include",
         "third_party",
-        "examples/lesson_action_feel"
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_combat_rules.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_options.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_terminal_input.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_terminal_screen.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel",
+        "examples/lesson_action_feel/core"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_BIND_ENABLED=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_wave_plan.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "examples/lesson_action_feel/core"
       ],
       "defines": [
         "NOMINMAX",

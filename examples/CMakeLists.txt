@@ -50,9 +50,11 @@ else()
     endif()
 endif()
 
-# lesson_action_feel — headless sample for the Odeum lesson link (spec/feature/tool/lesson.md, "サンプル"):
-# a simulated player hitting an enemy, publishing feel.* through ergo_bind; hit stop through ergo_world_time.
-set(_lesson_feel_needs ergo_bind ergo_world_time)
+# lesson_action_feel — the Odeum lesson's sample game (spec/feature/tool/lesson-action-game.md):
+# core/ = the pure arena game (hit stop through ergo_world_time, HP through ergo_health, score / combo through
+# ergo_score / ergo_combo_counter), terminal/ = the playable terminal front-end, the rest = the executable
+# (headless --auto with the Studio link through ergo_bind, --play, --check).
+set(_lesson_feel_needs ergo_bind ergo_world_time ergo_health ergo_score ergo_combo_counter)
 set(_lesson_feel_missing "")
 foreach(_tgt IN LISTS _lesson_feel_needs)
     if(NOT TARGET ${_tgt})
@@ -64,21 +66,71 @@ if(_lesson_feel_missing)
     list(JOIN _lesson_feel_missing ", " _lesson_feel_missing_str)
     message(STATUS "skip example lesson_action_feel: needs ${_lesson_feel_missing_str}")
 else()
-    add_library(ergo_example_lesson_action_feel_sim STATIC lesson_action_feel/action_feel_sim.cpp)
-    target_include_directories(ergo_example_lesson_action_feel_sim PUBLIC lesson_action_feel)
-    target_link_libraries(ergo_example_lesson_action_feel_sim PUBLIC ergo_world_time)
+    set(_lf lesson_action_feel)
+    add_library(ergo_example_lesson_action_feel_core STATIC
+        ${_lf}/core/action_game.cpp
+        ${_lf}/core/autopilot.cpp
+        ${_lf}/core/combat_rules.cpp
+        ${_lf}/core/combat_settings.cpp
+        ${_lf}/core/enemy_brain.cpp
+        ${_lf}/core/wave_plan.cpp)
+    target_include_directories(ergo_example_lesson_action_feel_core PUBLIC ${_lf}/core)
+    target_link_libraries(ergo_example_lesson_action_feel_core
+        PUBLIC ergo_world_time ergo_health ergo_score ergo_combo_counter)
 
-    add_executable(ergo_example_lesson_action_feel lesson_action_feel/main.cpp)
-    target_link_libraries(ergo_example_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_sim ergo_bind)
+    if(WIN32)
+        # The playable terminal front-end is POSIX only: --play stops with a message on Windows.
+        message(STATUS "example lesson_action_feel: --play (terminal front-end) is not available on Windows")
+        set(_lf_console ${_lf}/terminal/raw_terminal_unsupported.cpp)
+    else()
+        set(_lf_console ${_lf}/terminal/raw_terminal_posix.cpp)
+    endif()
+    add_library(ergo_example_lesson_action_feel_terminal STATIC
+        ${_lf}/terminal/ansi_frame.cpp
+        ${_lf}/terminal/key_bindings.cpp
+        ${_lf}/terminal/key_decoder.cpp
+        ${_lf}/terminal/move_latch.cpp
+        ${_lf}/terminal/screen.cpp
+        ${_lf_console})
+    target_include_directories(ergo_example_lesson_action_feel_terminal PUBLIC ${_lf})
+    target_link_libraries(ergo_example_lesson_action_feel_terminal PUBLIC ergo_example_lesson_action_feel_core)
+
+    add_library(ergo_example_lesson_action_feel_app STATIC
+        ${_lf}/check_mode.cpp
+        ${_lf}/frame_pacer.cpp
+        ${_lf}/headless_mode.cpp
+        ${_lf}/lesson_bindings.cpp
+        ${_lf}/options.cpp
+        ${_lf}/play_mode.cpp
+        ${_lf}/settings_watch.cpp)
+    target_include_directories(ergo_example_lesson_action_feel_app PUBLIC ${_lf})
+    target_link_libraries(ergo_example_lesson_action_feel_app
+        PUBLIC ergo_example_lesson_action_feel_core ergo_example_lesson_action_feel_terminal ergo_bind)
+
+    add_executable(ergo_example_lesson_action_feel ${_lf}/main.cpp)
+    target_link_libraries(ergo_example_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_app)
     if(MSVC)
-        target_compile_options(ergo_example_lesson_action_feel_sim PRIVATE /utf-8)
-        target_compile_options(ergo_example_lesson_action_feel PRIVATE /utf-8)
+        foreach(_t ergo_example_lesson_action_feel_core ergo_example_lesson_action_feel_terminal
+                   ergo_example_lesson_action_feel_app ergo_example_lesson_action_feel)
+            target_compile_options(${_t} PRIVATE /utf-8)
+        endforeach()
     endif()
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_lesson_action_feel lesson_action_feel/test_action_feel_sim.cpp)
-        target_link_libraries(test_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_sim ergo_gtest_main)
+        add_executable(test_lesson_action_feel
+            ${_lf}/tests/test_combat_rules.cpp
+            ${_lf}/tests/test_action_game.cpp
+            ${_lf}/tests/test_wave_plan.cpp)
+        target_link_libraries(test_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_core ergo_gtest_main)
         add_test(NAME test_lesson_action_feel COMMAND test_lesson_action_feel)
+
+        add_executable(test_lesson_action_feel_frontend
+            ${_lf}/tests/test_terminal_input.cpp
+            ${_lf}/tests/test_terminal_screen.cpp
+            ${_lf}/tests/test_options.cpp)
+        target_link_libraries(test_lesson_action_feel_frontend PRIVATE ergo_example_lesson_action_feel_app ergo_gtest_main)
+        add_test(NAME test_lesson_action_feel_frontend COMMAND test_lesson_action_feel_frontend)
+
         add_test(NAME example_lesson_action_feel COMMAND ergo_example_lesson_action_feel --check)
     endif()
 endif()
