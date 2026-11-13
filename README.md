@@ -100,6 +100,7 @@ ergo/
 | `ergo_log` | 4-level ロガー (Error/Warn/Info/Debug)、フレーム番号を行頭に埋め込む。出力先はシンクで差し替え | `log` (任意ターゲット `ergo_log_live` が送る) |
 | `ergo_frame` | アプリ起動からの累計フレーム数 + rolling FPS + HUD 文字列 | — |
 | `ergo_profile` | 性能タイムライン (マーカー注入 → Chrome Trace) | `profile` (トレースファイルを読む) |
+| `ergo_perf` | フレーム統計 (移動平均・p50/p95/p99・最悪値)、フレーム予算に合わせて段の品質を上げ下げする governor、PC スペックからの初期品質推定 | — |
 | `ergo_bind` | 任意ホスト変数を WS で外部エディタに公開 (`BIND_VAR`) | `variable` |
 | `ergo_custos` | 遠隔テストランナー Custos と話す in-process HTTP ブリッジ (`/health` `/screenshot` `/key`) | (外部: `LUDIARS/Custos`) |
 

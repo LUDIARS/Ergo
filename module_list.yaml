@@ -185,6 +185,19 @@ modules:
     tool_plugins: [profile]
     status: preview
 
+  - name: ergo_perf
+    summary: "フレーム統計 (移動平均・パーセンタイル・最悪値) と、フレーム予算に合わせて段ごとの品質を上げ下げする governor、PC スペックからの初期品質推定。グラフィクス API 非依存 (段の名前と ms を受け取る)"
+    category: システム
+    domain: observability
+    header_dir: include/ergo/perf/
+    source_dir: src/perf/
+    test_dir:   tests/perf/
+    spec:       spec/feature/module/perf.md
+    cmake_option: ERGO_BUILD_PERF
+    depends:    []
+    tool_plugins: []
+    status: preview
+
   - name: ergo_log
     summary: "4-level ロガー (Error/Warn/Info/Debug)、先頭にフレーム番号。出力先はシンクで差し替え、時刻源は注入可能。log プラグインへ流す LiveSink は別ターゲット ergo_log_live"
     category: システム

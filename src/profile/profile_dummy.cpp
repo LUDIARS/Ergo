@@ -30,6 +30,8 @@ void record_instant(const char*) {}
 void record_counter(const char*, double) {}
 void record_complete(const char*, int64_t, int64_t) {}
 void set_thread_name(const char*) {}
+uint64_t register_lane(const char*) { return 0; }
+void record_complete_on(uint64_t, const char*, int64_t, int64_t) {}
 
 void        set_sink(MarkerSink*) {}
 MarkerSink& default_sink() { return g_null_sink; }

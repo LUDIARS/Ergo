@@ -35,6 +35,7 @@ option(ERGO_BUILD_ACTOR        "Build ergo_actor"        ON)
 option(ERGO_BUILD_SOUND        "Build ergo_sound"        ON)
 option(ERGO_BUILD_FRAME        "Build ergo_frame"        ON)
 option(ERGO_BUILD_PROFILE      "Build ergo_profile (performance timeline)" ON)
+option(ERGO_BUILD_PERF         "Build ergo_perf (frame statistics, quality governor, spec estimate)" ON)
 option(ERGO_BUILD_LOG          "Build ergo_log"          ON)
 option(ERGO_BUILD_IO           "Build ergo_io"           ON)
 option(ERGO_BUILD_AUDIO        "Build ergo_audio"        ON)
@@ -550,6 +551,28 @@ if(ERGO_BUILD_PROFILE)
         target_link_libraries(test_profile PRIVATE ergo_profile ergo_gtest_main)
         target_link_libraries(test_profile PRIVATE Threads::Threads)
         add_test(NAME test_profile COMMAND test_profile)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# ergo_perf — frame statistics, frame-budget quality governor, spec estimate
+# ---------------------------------------------------------------------------
+if(ERGO_BUILD_PERF)
+    add_library(ergo_perf STATIC
+        src/perf/rolling_series.cpp
+        src/perf/frame_stats.cpp
+        src/perf/perf_report.cpp
+        src/perf/quality_ladder.cpp
+        src/perf/quality_governor.cpp
+        src/perf/spec_estimate.cpp)
+    target_include_directories(ergo_perf PUBLIC include)
+
+    if(ERGO_BUILD_TESTS)
+        foreach(NAME test_frame_stats test_quality_governor test_spec_estimate)
+            add_executable(${NAME} tests/perf/${NAME}.cpp)
+            target_link_libraries(${NAME} PRIVATE ergo_perf ergo_gtest_main)
+            add_test(NAME ${NAME} COMMAND ${NAME})
+        endforeach()
     endif()
 endif()
 

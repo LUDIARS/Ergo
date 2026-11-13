@@ -57,6 +57,16 @@ void   record_complete(const char* name, int64_t begin_us, int64_t dur_us);
 /// Give the calling thread a display name for the timeline lane.
 void   set_thread_name(const char* name);
 
+/// A named timeline lane for work no CPU thread records itself (a GPU queue's
+/// passes, timed with timestamp queries and read back later). Returns the
+/// lane's id; registering the same name again returns the same id. `name`
+/// must outlive the session, like marker names.
+uint64_t register_lane(const char* name);
+/// Record a 'complete' event on `lane` (from register_lane). `begin_us` is on
+/// the session clock (now_us()): the caller maps its own clock onto it, e.g.
+/// by laying a frame's GPU passes end to end from the frame's CPU start.
+void   record_complete_on(uint64_t lane, const char* name, int64_t begin_us, int64_t dur_us);
+
 /// Microseconds elapsed since the session epoch.
 int64_t now_us();
 /// Current process resident set size in bytes (0 when unavailable).

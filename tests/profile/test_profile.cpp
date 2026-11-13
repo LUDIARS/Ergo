@@ -126,3 +126,28 @@ TEST(Profile, CustomSinkReceivesMarkers) {
     ERGO_PROFILE_MARK("back");
     EXPECT_EQ(event_count(), 1u);
 }
+
+TEST(Profile, LaneEventsExportOnTheirOwnNamedLane) {
+    begin_session();
+    const uint64_t gpu = register_lane("GPU");
+    EXPECT_EQ(register_lane("GPU"), gpu);  // the same name, the same lane
+    EXPECT_NE(register_lane("GPU copy"), gpu);
+    record_complete_on(gpu, "lighting", 100, 5400);
+    record_complete_on(gpu, "fog", 5500, 3700);
+    EXPECT_EQ(event_count(), 2u);
+    const std::string json = export_chrome_trace();
+    const std::string lane = "\"tid\":" + std::to_string(gpu);
+    EXPECT_TRUE(json.find("\"name\":\"fog\"") != std::string::npos);
+    EXPECT_TRUE(json.find(lane + ",\"ts\":5500,\"ph\":\"X\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"dur\":3700") != std::string::npos);
+    EXPECT_TRUE(json.find(lane + ",\"args\":{\"name\":\"GPU\"}") != std::string::npos);
+}
+
+TEST(Profile, LaneEventsStopWhenDisabled) {
+    begin_session();
+    const uint64_t gpu = register_lane("GPU");
+    set_enabled(false);
+    record_complete_on(gpu, "fog", 0, 10);
+    set_enabled(true);
+    EXPECT_EQ(event_count(), 0u);
+}

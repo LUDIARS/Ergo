@@ -67,6 +67,10 @@ C++ に言語機能としての AOP は無いため、 RAII スコープガー�
 - `set_sink(MarkerSink*)` / `default_sink()` — マーカー出力先の差し替え (下記)
 - `export_chrome_trace() -> std::string` — 蓄積イベントを JSON 文字列に
 - `dump(const std::string& path)` — `export_chrome_trace()` をファイルに書く
+- `register_lane(name) -> lane` / `record_complete_on(lane, name, begin_us, dur_us)` —
+  CPU のスレッドが自分で記録しない仕事 (GPU のパスなど、 後から読み出した時間) を、
+  名前付きの lane に complete event として置く。 同じ名前は同じ lane。 `begin_us` は
+  セッションの時計 (`now_us()`) に呼び出し側が合わせる。 GPU 段の統計は `ergo_perf` (`perf.md`)
 
 各 event は記録時に `pid` (プロセス) と `tid` (スレッド) を自動付与する。
 
@@ -174,3 +178,5 @@ C++ 側 trace 形式とプラグインは同一 PR で更新する (横断変更
 - `aspect()` が callable の戻り値を素通しし、 かつ計測する
 - カスタム `MarkerSink` を `set_sink` で差すと `record_*` がそちらへ流れ、
   `set_sink(nullptr)` 復帰で内蔵コレクタへ戻る
+- `register_lane` の lane に置いた event が lane の tid・名前付きで export され、
+  `set_enabled(false)` の間は記録されない

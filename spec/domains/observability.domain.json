@@ -7,6 +7,7 @@
     "spec/feature/module/log.md",
     "spec/feature/module/frame.md",
     "spec/feature/module/profile.md",
+    "spec/feature/module/perf.md",
     "spec/feature/module/bind.md",
     "spec/feature/module/custos.md",
     "spec/architecture/domains-and-ux.md"
@@ -38,6 +39,15 @@
     },
     {
       "pathPattern": "(^|/)tests/profile/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/perf/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)include/ergo/perf/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)tests/perf/(?:.*/)?[^/]+$"
     },
     {
       "pathPattern": "(^|/)src/bind/(?:.*/)?[^/]+$"

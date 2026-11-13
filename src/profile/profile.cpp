@@ -186,6 +186,22 @@ void set_thread_name(const char* name) {
         ->on_thread_name(current_tid(), name);
 }
 
+uint64_t register_lane(const char* name) {
+    // Lane ids carry the top bit, clear of the hashed thread ids' usual range;
+    // the id is the name's hash so the same name always lands on one lane.
+    const char* label = (name != nullptr) ? name : "";
+    const uint64_t id =
+        (static_cast<uint64_t>(std::hash<std::string>{}(label)) >> 1) | (uint64_t{1} << 63);
+    g_sink.load(std::memory_order_relaxed)->on_thread_name(id, label);
+    return id;
+}
+
+void record_complete_on(uint64_t lane, const char* name, int64_t begin_us, int64_t dur_us) {
+    if (!is_enabled()) return;
+    g_sink.load(std::memory_order_relaxed)
+        ->on_event(Event{name, Phase::complete, begin_us, dur_us, lane, 0.0});
+}
+
 uint64_t process_rss_bytes() {
 #if defined(_WIN32)
     PROCESS_MEMORY_COUNTERS pmc{};
