@@ -1,5 +1,7 @@
 #include "ergo/common/ws_client.h"
 
+#include <lorica/checked_size.hpp>
+
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -411,7 +413,11 @@ int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint
         for (int i = 0; i < 4; ++i) mask[i] = uint8_t(rx[header + i]);
         header += 4;
     }
-    if (!try_recv(header + static_cast<std::size_t>(plen))) return need_more();
+    // plen <= 1 MiB here, so the sum cannot wrap even with a 32-bit size_t;
+    // checked anyway so the bound does not depend on the cap's value.
+    const auto frame_len = lorica::checked_add(header, static_cast<std::size_t>(plen));
+    if (!frame_len) return -1;
+    if (!try_recv(*frame_len)) return need_more();
 
     payload.resize(static_cast<std::size_t>(plen));
     for (uint64_t i = 0; i < plen; ++i) {
@@ -419,7 +425,7 @@ int Client::read_one_frame(int sock, std::string& rx, std::string& payload, uint
         if (masked) b ^= mask[i & 3];
         payload[static_cast<std::size_t>(i)] = static_cast<char>(b);
     }
-    rx.erase(0, header + static_cast<std::size_t>(plen));
+    rx.erase(0, *frame_len);
     return 1;
 }
 

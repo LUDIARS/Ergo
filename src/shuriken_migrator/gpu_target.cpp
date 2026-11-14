@@ -383,14 +383,10 @@ std::string EmitterDescriptorToJson(const ergo::gpu_particle::EmitterDescriptor&
 }
 
 std::string MigrateFileToGpuJson(const std::string& path, MigrationReport& report) {
-    std::ifstream f(path);
-    if (!f) {
-        report.Warn("file open failed: " + path);
-        return {};
-    }
-    std::stringstream ss; ss << f.rdbuf();
+    std::string yaml;
+    if (!ReadPrefabText(path, yaml, report)) return {};
     std::vector<ShurikenSource> systems;
-    if (!ParsePrefabYaml(ss.str(), systems, report)) return {};
+    if (!ParsePrefabYaml(yaml, systems, report)) return {};
 
     std::ostringstream out;
     out << "[";
@@ -405,14 +401,10 @@ std::string MigrateFileToGpuJson(const std::string& path, MigrationReport& repor
 }
 
 std::string MigrateFileToGpuTreeJson(const std::string& path, MigrationReport& report) {
-    std::ifstream f(path);
-    if (!f) {
-        report.Warn("file open failed: " + path);
-        return {};
-    }
-    std::stringstream ss; ss << f.rdbuf();
+    std::string yaml;
+    if (!ReadPrefabText(path, yaml, report)) return {};
     ShurikenNode root;
-    if (!ParsePrefabTree(ss.str(), root, report)) return {};
+    if (!ParsePrefabTree(yaml, root, report)) return {};
 
     std::vector<GpuEmitterNode> nodes;
     ConvertTreeToGpuEmitters(root, nodes, report);

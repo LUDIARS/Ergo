@@ -536,6 +536,103 @@
       "packages": []
     },
     {
+      "file": "src/common/json_min.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
+      "file": "src/common/ws_client.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
+      "file": "src/custos/http_server.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/custos/request_head.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
+      "file": "src/shuriken_migrator/gpu_target.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/shuriken_migrator/migrator.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
+      "file": "src/sound/audio_decoder.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "_USE_MATH_DEFINES"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
       "file": "src/studio/host/abi_plugin.cpp",
       "standard": "c++17",
       "includes": [
@@ -665,7 +762,9 @@
         "NOMINMAX",
         "WIN32_LEAN_AND_MEAN"
       ],
-      "packages": []
+      "packages": [
+        "lorica"
+      ]
     },
     {
       "file": "src/studio/net/request_guard.cpp",
@@ -713,7 +812,9 @@
         "NOMINMAX",
         "WIN32_LEAN_AND_MEAN"
       ],
-      "packages": []
+      "packages": [
+        "lorica"
+      ]
     },
     {
       "file": "src/studio/platform/curl_http_client.cpp",
@@ -947,6 +1048,21 @@
       "packages": []
     },
     {
+      "file": "src/ui/svg_raster.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
       "file": "src/ui_kit/ui_kit.cpp",
       "standard": "c++17",
       "includes": [
@@ -959,12 +1075,198 @@
       "packages": []
     },
     {
+      "file": "src/vector/svg_parser.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
+      "file": "src/vector/vector_scene.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/common/fuzz_json_min.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/common/test_json_min.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/common/test_ws_client.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/custos/fuzz_request_head.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/custos/test_custos_module.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/custos/test_request_head.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/fuzz_main.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/hardening/test_lorica_applied.cpp",
+      "standard": "c++17",
+      "includes": [
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_LORICA_ACTIVE=1",
+        "ERGO_LORICA_EXPECT_EXTENDED=0",
+        "ERGO_LORICA_EXPECT_UNSAFE_API=1",
+        "ERGO_LORICA_EXTENDED_UNAVAILABLE=0",
+        "ERGO_LORICA_OPTIMIZED_CONFIG=1"
+      ],
+      "packages": [
+        "lorica"
+      ]
+    },
+    {
+      "file": "tests/shuriken_migrator/fuzz_prefab_yaml.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/shuriken_migrator/test_shuriken_migrator.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/sound/test_audio_decoder.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "_USE_MATH_DEFINES"
+      ],
+      "packages": []
+    },
+    {
       "file": "tests/studio/fixtures/echo_pack.c",
       "standard": "c17",
       "includes": [
         "include",
         "third_party",
         "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/fuzz_studio_net.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
       ],
       "defines": [
         "NOMINMAX",
@@ -1044,6 +1346,20 @@
       "packages": []
     },
     {
+      "file": "tests/studio/test_studio_lesson_limits.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "tests/studio/test_studio_lesson_view.cpp",
       "standard": "c++17",
       "includes": [
@@ -1092,6 +1408,19 @@
         "include",
         "third_party",
         "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_net_limits.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
       ],
       "defines": [
         "NOMINMAX",
@@ -1294,6 +1623,44 @@
         "include",
         "third_party",
         "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/ui/test_svg_raster.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/vector/fuzz_svg_parser.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/vector/test_svg_parser.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party"
       ],
       "defines": [
         "NOMINMAX",
@@ -1507,7 +1874,9 @@
         "NOMINMAX",
         "WIN32_LEAN_AND_MEAN"
       ],
-      "packages": []
+      "packages": [
+        "lorica"
+      ]
     },
     {
       "file": "tools/studio/plugins/lesson/lesson_routes.cpp",

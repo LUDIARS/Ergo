@@ -426,6 +426,10 @@
       "layer": "shared"
     },
     {
+      "glob": "tests/hardening/*",
+      "layer": "shared"
+    },
+    {
       "glob": "tests/graph_layout/*",
       "layer": "shared"
     },

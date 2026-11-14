@@ -23,6 +23,18 @@ ergo_declare_dependency(
     HOMEPAGE   https://curl.se
     SUMMARY    "Client-side URL transfer library (HTTP/HTTPS/...)")
 
+# Lorica: header-only boundary checks + the build hardening functions, applied to
+# every Ergo target by cmake/ErgoHardening.cmake (not an ERGO_WITH_ switch: it is
+# acquired whenever the toolchain is one Lorica supports). LORICA_SOURCE_DIR or
+# ERGO_SOURCE_DIR_LORICA selects a local checkout instead of the fetch.
+ergo_declare_dependency(
+    NAME       lorica
+    GIT_REPOSITORY https://github.com/LUDIARS/Lorica.git
+    GIT_TAG    5e8281b0e60fa16f814e16eaa620715937e8618d
+    LICENSE    "LUDIARS (no license file in the repository)"
+    HOMEPAGE   https://github.com/LUDIARS/Lorica
+    SUMMARY    "LUDIARS security library: checked boundaries and build hardening (2026-11-11 main)")
+
 # --- Opt-in build switches -------------------------------------------------
 # Default OFF: these pull (and, for curl, compile) source from the network, so a
 # plain Ergo build stays light and offline-friendly. Turn on the ones a module

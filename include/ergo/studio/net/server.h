@@ -8,6 +8,7 @@
 #include "ergo/studio/net/http_message.h"
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -54,6 +55,11 @@ public:
 struct ServerConfig {
     std::string bind_host = "127.0.0.1";
     uint16_t    port      = 5170;   // 0 = pick a free port (tests)
+    /// Connections served at once (each is a thread holding up to one request
+    /// head + body or one WS message, 32 MiB). The Studio's own clients (a
+    /// browser, a few engine links per plugin) stay far below; more are
+    /// answered 503 and closed.
+    std::size_t max_connections = 64;
 };
 
 using LogFn = std::function<void(const std::string& level, const std::string& msg)>;
@@ -72,7 +78,7 @@ public:
     uint16_t port() const { return bound_port_; }
 
 private:
-    void accept_loop();
+    void accept_loop(std::intptr_t listener);
     void serve_connection(std::intptr_t sock);
 
     ServerConfig                cfg_;

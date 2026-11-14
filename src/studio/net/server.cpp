@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <string>
 
 namespace ergo::studio::net {
 namespace {
@@ -81,7 +82,9 @@ bool Server::start(std::string& err) {
     listen_sock_ = sock::listen_tcp(cfg_.bind_host, cfg_.port, bound_port_, err);
     if (listen_sock_ == sock::kInvalid) return false;
     running_ = true;
-    accept_thread_ = std::thread([this] { accept_loop(); });
+    // The thread gets its own copy of the listening socket: stop() resets the
+    // member while the loop may still be reading it (TSan data race).
+    accept_thread_ = std::thread([this, listener = listen_sock_] { accept_loop(listener); });
     return true;
 }
 
@@ -100,9 +103,9 @@ void Server::stop() {
     for (auto& t : threads) if (t.thread.joinable()) t.thread.join();
 }
 
-void Server::accept_loop() {
+void Server::accept_loop(std::intptr_t listener) {
     while (running_) {
-        const auto c = sock::accept_one(listen_sock_);
+        const auto c = sock::accept_one(listener);
         if (c == sock::kInvalid) {
             if (!running_) break;
             continue;
@@ -116,6 +119,14 @@ void Server::accept_loop() {
             } else {
                 ++it;
             }
+        }
+        if (conn_threads_.size() >= cfg_.max_connections) {
+            static const std::string busy =
+                "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+            sock::send_all(c, busy.data(), busy.size());
+            sock::close(c);
+            log_("warn", "[ergo] refused a connection: " + std::to_string(cfg_.max_connections) + " already open");
+            continue;
         }
         open_socks_.push_back(c);
         auto done = std::make_shared<std::atomic<bool>>(false);

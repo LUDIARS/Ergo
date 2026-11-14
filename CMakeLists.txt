@@ -9,6 +9,12 @@ else()
     set(_ergo_top OFF)
 endif()
 
+# compile_commands.json for test_lorica_compile_commands (cmake/ErgoHardeningChecks.cmake).
+# Top level only: a host decides for its own build.
+if(_ergo_top)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -112,6 +118,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ${ERGO_POSITION_INDEPENDENT_CODE})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
+# Lorica hardening options and ergo_hardening_mark_network(); applied to every
+# target by ergo_harden_targets() at the end of this file (spec/setup/hardening.md).
+include(ErgoHardening)
+
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
@@ -126,6 +136,7 @@ target_link_libraries(ergo_common_ws PUBLIC Threads::Threads)
 if(WIN32)
     target_link_libraries(ergo_common_ws PUBLIC ws2_32)
 endif()
+ergo_hardening_mark_network(ergo_common_ws)
 
 # ---------------------------------------------------------------------------
 # Shared mini-gtest (header-only), bound into one static lib used by all tests
@@ -159,6 +170,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/third_party/dependencies.cmake")
 # <build>/ergo-packages.resolved.json. See spec/setup/packages.md.
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/packages/ErgoPackages.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/ErgoModuleRequirements.cmake")
+# Lorica: after the package hub, which may bring it in with a package.
+ergo_hardening_setup()
 
 # ---------------------------------------------------------------------------
 # ergo_http — libcurl-backed synchronous HTTP client. The public header hides
@@ -176,6 +189,7 @@ if(ERGO_BUILD_HTTP)
         src/http/curl_global.cpp)
     target_include_directories(ergo_http PUBLIC include)
     target_link_libraries(ergo_http PRIVATE CURL::libcurl)
+    ergo_hardening_mark_network(ergo_http)
 
     if(ERGO_BUILD_TESTS)
         add_executable(test_http_client tests/http/test_http_client.cpp)
@@ -812,10 +826,12 @@ if(ERGO_BUILD_CUSTOS)
         src/custos/custos_module.cpp
         src/custos/http_server.cpp
         src/custos/png_writer.cpp
+        src/custos/request_head.cpp
     )
     target_include_directories(ergo_custos PUBLIC include)
     target_include_directories(ergo_custos PRIVATE third_party)
     target_link_libraries(ergo_custos PUBLIC Threads::Threads)
+    ergo_hardening_mark_network(ergo_custos)
     if(WIN32)
         target_link_libraries(ergo_custos PRIVATE ws2_32)
     endif()
@@ -826,7 +842,7 @@ if(ERGO_BUILD_CUSTOS)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        foreach(NAME test_http_server test_custos_module)
+        foreach(NAME test_http_server test_custos_module test_request_head)
             add_executable(${NAME} tests/custos/${NAME}.cpp)
             target_link_libraries(${NAME} PRIVATE ergo_custos ergo_gtest_main)
             if(MSVC)
@@ -1072,6 +1088,7 @@ if(ERGO_BUILD_STUDIO)
     )
     target_include_directories(ergo_studio_net PUBLIC include)
     target_link_libraries(ergo_studio_net PUBLIC Threads::Threads)
+    ergo_hardening_mark_network(ergo_studio_net)
     if(WIN32)
         target_link_libraries(ergo_studio_net PUBLIC ws2_32)
     endif()
@@ -1080,7 +1097,7 @@ if(ERGO_BUILD_STUDIO)
     endif()
 
     if(ERGO_BUILD_TESTS)
-        add_executable(test_studio_net tests/studio/test_studio_net.cpp)
+        add_executable(test_studio_net tests/studio/test_studio_net.cpp tests/studio/test_studio_net_limits.cpp)
         target_link_libraries(test_studio_net PRIVATE ergo_studio_net ergo_common_ws ergo_gtest_main)
         if(MSVC)
             target_compile_options(test_studio_net PRIVATE /utf-8)
@@ -1101,6 +1118,7 @@ if(ERGO_BUILD_STUDIO)
     )
     target_include_directories(ergo_studio_host PUBLIC include)
     target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common)
+    ergo_hardening_mark_network(ergo_studio_host)
     if(MSVC)
         target_compile_options(ergo_studio_host PRIVATE /utf-8)
     endif()
@@ -1196,6 +1214,7 @@ if(ERGO_BUILD_STUDIO)
         endif()
     endif()
     target_include_directories(ergo_studio_platform PUBLIC include)
+    ergo_hardening_mark_network(ergo_studio_platform)
     if(MSVC)
         target_compile_options(ergo_studio_platform PRIVATE /utf-8)
     endif()
@@ -1293,6 +1312,7 @@ if(ERGO_BUILD_STUDIO)
     include(cmake/ErgoEmbedText.cmake)
     ergo_embed_text(ergo_studio_plugins ergo_vfx_catalog_json tools/studio/plugins/vfx_suggest/catalog.json)
     target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform)
+    ergo_hardening_mark_network(ergo_studio_plugins)
     if(MSVC)
         target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
     endif()
@@ -1347,6 +1367,14 @@ if(ERGO_BUILD_STUDIO)
             target_compile_options(test_studio_lesson PRIVATE /utf-8)
         endif()
         add_test(NAME test_studio_lesson COMMAND test_studio_lesson)
+
+        # Upper bounds of the pasted link and odeum-lesson's replies (spec/setup/hardening.md "入力の上限").
+        add_executable(test_studio_lesson_limits tests/studio/test_studio_lesson_limits.cpp)
+        target_link_libraries(test_studio_lesson_limits PRIVATE ergo_studio_plugins ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_lesson_limits PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_lesson_limits COMMAND test_studio_lesson_limits)
 
         # The presenter's demo switches against a real ergo_bind engine over the Studio's own loopback server.
         if(TARGET ergo_bind)
@@ -2260,6 +2288,7 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
     )
     target_include_directories(ergo_studio PRIVATE tools/studio)
     target_link_libraries(ergo_studio PRIVATE ergo_studio_views ergo_studio_plugins ergo_studio_host ergo_studio_net)
+    ergo_hardening_mark_network(ergo_studio)
     if(_ergo_studio_shell)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
@@ -2291,4 +2320,47 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
         RUNTIME_OUTPUT_DIRECTORY_DEBUG "${ERGO_STUDIO_OUT}"
         RUNTIME_OUTPUT_DIRECTORY_RELEASE "${ERGO_STUDIO_OUT}"
         RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${ERGO_STUDIO_OUT}")
+endif()
+
+# ---------------------------------------------------------------------------
+# Fuzz entry points of the parsers that read untrusted bytes: fixed-input
+# regression tests always (with ERGO_BUILD_TESTS), libFuzzer binaries with
+# ERGO_BUILD_FUZZERS=ON (Clang). See cmake/ErgoFuzz.cmake.
+# ---------------------------------------------------------------------------
+include(ErgoFuzz)
+if(TARGET ergo_studio_net)
+    ergo_add_fuzz_entry(studio_net SOURCE tests/studio/fuzz_studio_net.cpp LIBS ergo_studio_net
+        CORPUS tests/studio/fuzz_corpus/studio_net)
+endif()
+ergo_add_fuzz_entry(json_min SOURCE tests/common/fuzz_json_min.cpp LIBS ergo_common
+    CORPUS tests/common/fuzz_corpus/json_min)
+if(TARGET ergo_custos)
+    ergo_add_fuzz_entry(custos_request_head SOURCE tests/custos/fuzz_request_head.cpp LIBS ergo_custos
+        CORPUS tests/custos/fuzz_corpus/request_head)
+endif()
+if(TARGET ergo_vector)
+    ergo_add_fuzz_entry(vector_svg SOURCE tests/vector/fuzz_svg_parser.cpp LIBS ergo_vector
+        CORPUS tests/vector/fuzz_corpus/svg_parser)
+endif()
+if(TARGET ergo_shuriken_migrator)
+    ergo_add_fuzz_entry(shuriken_prefab SOURCE tests/shuriken_migrator/fuzz_prefab_yaml.cpp LIBS ergo_shuriken_migrator
+        CORPUS tests/shuriken_migrator/fuzz_corpus/prefab_yaml)
+endif()
+
+# ---------------------------------------------------------------------------
+# "Is Lorica really on the build?" tests: the probe executables are defined
+# here so the walk below hardens them like any other target; the checks that
+# read the finished build come after it. See cmake/ErgoHardeningChecks.cmake.
+# ---------------------------------------------------------------------------
+include(ErgoHardeningChecks)
+if(ERGO_BUILD_TESTS)
+    ergo_hardening_add_probe_tests()
+endif()
+
+# ---------------------------------------------------------------------------
+# Lorica on every target compiled above (keep last). See cmake/ErgoHardening.cmake.
+# ---------------------------------------------------------------------------
+ergo_harden_targets()
+if(ERGO_BUILD_TESTS)
+    ergo_hardening_add_build_checks(${_ergo_top})
 endif()

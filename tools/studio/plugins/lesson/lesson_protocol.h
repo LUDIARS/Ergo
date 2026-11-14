@@ -18,6 +18,19 @@ enum class Role { None, Student, Presenter };
 /// "none" / "student" / "presenter"
 const char* role_name(Role r);
 
+/// Upper bounds of an odeum-lesson reply (pair / state / progress / an error
+/// body), checked before and while it is parsed. A lesson state is a class title,
+/// a few dozen steps and features: kilobytes. The reply is polled every 1-10 s,
+/// so the HTTP client's 64 MiB cap is far too much to accept per poll.
+/// (spec/setup/hardening.md "入力の上限")
+constexpr std::size_t kMaxReplyBytes    = 1024u * 1024u;   ///< body (~1000x a real state)
+constexpr std::size_t kMaxReplyValues   = 16384;           ///< JSON values of any kind
+constexpr std::size_t kMaxReplyDepth    = 16;              ///< nesting (a state uses 5)
+constexpr std::size_t kMaxSteps         = 256;             ///< assignment.steps
+constexpr std::size_t kMaxFeatures      = 256;             ///< features / demo.states entries, each
+constexpr std::size_t kMaxText          = 4096;            ///< bytes of one string (title, label, id, name)
+constexpr std::size_t kMaxReplyTextSum  = 256u * 1024u;    ///< bytes of all kept strings together
+
 constexpr int kMinPollMs = 1000;
 constexpr int kMaxPollMs = 10000;
 /// The server's poll_ms clamped to kMinPollMs..kMaxPollMs.

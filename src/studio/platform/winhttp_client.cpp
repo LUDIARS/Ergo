@@ -12,6 +12,10 @@
 namespace ergo::studio::platform {
 namespace {
 
+/// Upper bound of a response body, the same as the libcurl backend's
+/// (http_request_check.h kMaxResponseBytes): a larger body is an error, not memory.
+constexpr std::size_t kMaxResponseBytes = 64u * 1024u * 1024u;
+
 std::wstring widen(const std::string& s) {
     if (s.empty()) return {};
     const int n = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
@@ -84,6 +88,10 @@ public:
             if (!WinHttpQueryDataAvailable(r.h, &avail)) { out.error = last_error("read"); return out; }
             if (avail == 0) break;
             const std::size_t at = out.body.size();
+            if (avail > kMaxResponseBytes || at > kMaxResponseBytes - avail) {
+                out.error = "response body larger than " + std::to_string(kMaxResponseBytes) + " bytes";
+                return out;
+            }
             out.body.resize(at + avail);
             DWORD got = 0;
             if (!WinHttpReadData(r.h, &out.body[at], avail, &got)) { out.error = last_error("read"); return out; }
