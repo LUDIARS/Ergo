@@ -30,6 +30,18 @@
       "layer": "presentation"
     },
     {
+      "glob": "examples/lesson_action_feel/windows/*",
+      "layer": "presentation"
+    },
+    {
+      "glob": "examples/lesson_action_feel/runtime/*",
+      "layer": "infrastructure"
+    },
+    {
+      "glob": "examples/lesson_action_feel/live_rules/*",
+      "layer": "domain-logic"
+    },
+    {
       "glob": "examples/lesson_action_feel/tests/*",
       "layer": "shared"
     },

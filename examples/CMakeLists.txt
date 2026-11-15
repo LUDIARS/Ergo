@@ -86,9 +86,10 @@ else()
         PUBLIC ergo_world_time ergo_health ergo_score ergo_combo_counter)
 
     if(WIN32)
-        # The playable terminal front-end is POSIX only (terminal/raw_terminal.cpp picks the backend
-        # with _WIN32): --play stops with a message on Windows.
-        message(STATUS "example lesson_action_feel: --play (terminal front-end) is not available on Windows")
+        set(_lesson_play ${_lf}/graphical_mode.cpp ${_lf}/windows/arena_renderer.cpp ${_lf}/windows/arena_window.cpp
+            ${_lf}/experiment_controls.cpp ${_lf}/runtime/rule_module.cpp)
+    else()
+        set(_lesson_play ${_lf}/play_mode.cpp)
     endif()
     add_library(ergo_example_lesson_action_feel_terminal STATIC
         ${_lf}/terminal/ansi_frame.cpp
@@ -107,14 +108,25 @@ else()
         ${_lf}/headless_mode.cpp
         ${_lf}/lesson_bindings.cpp
         ${_lf}/options.cpp
-        ${_lf}/play_mode.cpp
+        ${_lf}/experiment_presets.cpp
+        ${_lesson_play}
         ${_lf}/settings_watch.cpp)
     target_include_directories(ergo_example_lesson_action_feel_app PUBLIC ${_lf})
     target_link_libraries(ergo_example_lesson_action_feel_app
         PUBLIC ergo_example_lesson_action_feel_core ergo_example_lesson_action_feel_terminal ergo_bind)
+    if(WIN32)
+        target_compile_definitions(ergo_example_lesson_action_feel_app PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+        target_link_libraries(ergo_example_lesson_action_feel_app PRIVATE gdiplus user32 gdi32)
+    endif()
 
     add_executable(ergo_example_lesson_action_feel ${_lf}/main.cpp)
     target_link_libraries(ergo_example_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_app)
+    if(WIN32)
+        add_library(lesson_rules SHARED ${_lf}/live_rules/lesson_rules.cpp)
+        target_compile_definitions(lesson_rules PRIVATE NOMINMAX)
+        target_compile_options(lesson_rules PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+        add_dependencies(ergo_example_lesson_action_feel lesson_rules)
+    endif()
     if(MSVC)
         foreach(_t ergo_example_lesson_action_feel_core ergo_example_lesson_action_feel_terminal
                    ergo_example_lesson_action_feel_app ergo_example_lesson_action_feel)
@@ -127,6 +139,7 @@ else()
             ${_lf}/tests/test_action_game.cpp
             ${_lf}/tests/test_boss.cpp
             ${_lf}/tests/test_combat_rules.cpp
+            ${_lf}/tests/test_rule_policy.cpp
             ${_lf}/tests/test_presentation.cpp
             ${_lf}/tests/test_wave_plan.cpp)
         target_link_libraries(test_lesson_action_feel PRIVATE ergo_example_lesson_action_feel_core ergo_gtest_main)
@@ -134,6 +147,7 @@ else()
 
         add_executable(test_lesson_action_feel_frontend
             ${_lf}/tests/test_options.cpp
+            ${_lf}/tests/test_experiment_presets.cpp
             ${_lf}/tests/test_terminal_effects.cpp
             ${_lf}/tests/test_terminal_input.cpp
             ${_lf}/tests/test_terminal_screen.cpp)

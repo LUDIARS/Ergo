@@ -9,6 +9,7 @@
 /// hit-stop length (power x hit_stop_per_power, the reference sample's
 /// power / 24 s) and the camera shake (power x shake_per_power).
 #include "feel_effects.h"
+#include "rule_policy.h"
 
 #include <array>
 #include <cstdint>
@@ -45,6 +46,7 @@ struct Weapon {
 };
 
 struct FeelTuning {
+    RuleFunction rule; ///< absent = baseline; supplied only by an explicit local experiment
     // --- the gameplay effects --------------------------------------------
     float hit_stop_per_power  = 1.0f / 24.0f;   ///< s of freeze per power point (ActionGameSample: power / 24 s)
     float knockback_per_power = 6.0f;           ///< impulse per power point (units / s for mass 1)

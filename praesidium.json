@@ -2,6 +2,65 @@
   "version": 1,
   "native": [
     {
+      "file": "examples/lesson_action_feel/graphical_mode.cpp",
+      "standard": "c++17",
+      "includes": ["include", "examples/lesson_action_feel", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN", "UNICODE", "_UNICODE", "ERGO_BIND_ENABLED=1"],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/windows/arena_renderer.cpp",
+      "standard": "c++17",
+      "includes": ["include", "examples/lesson_action_feel", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN", "UNICODE", "_UNICODE"],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/windows/arena_window.cpp",
+      "standard": "c++17",
+      "includes": ["include", "examples/lesson_action_feel", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN", "UNICODE", "_UNICODE"],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/experiment_controls.cpp",
+      "standard": "c++17",
+      "includes": ["include", "examples/lesson_action_feel", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN", "ERGO_BIND_ENABLED=1"],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/experiment_presets.cpp",
+      "standard": "c++17",
+      "includes": ["include", "examples/lesson_action_feel", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN"],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/runtime/rule_module.cpp",
+      "standard": "c++17",
+      "includes": ["include", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN", "UNICODE", "_UNICODE"],
+      "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/live_rules/lesson_rules.cpp",
+      "standard": "c++17",
+      "includes": [], "defines": ["NOMINMAX"], "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_rule_policy.cpp",
+      "standard": "c++17",
+      "includes": ["include", "third_party", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN"], "packages": []
+    },
+    {
+      "file": "examples/lesson_action_feel/tests/test_experiment_presets.cpp",
+      "standard": "c++17",
+      "includes": ["include", "third_party", "examples/lesson_action_feel", "examples/lesson_action_feel/core"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN"], "packages": []
+    },
+    {
       "file": "examples/lesson_action_feel/check_mode.cpp",
       "standard": "c++17",
       "includes": [

@@ -17,6 +17,9 @@ HPBarEffect)、`HitCtrl.cs` はダメージで体力を減らし、威力でノ�
 
 ## 構成 {#SPEC-ergo-lesson-game-layout}
 
+Windowsの `--play` は[ゲーム画面と比較実験](lesson-graphical-experiments.md)を使う。
+POSIXでは従来の端末画面を使う。Windowsからの起動にWSLは不要。
+
 1 つのゲームの中身 (core) と、それを使う front-end の組。2 つの別々のサンプルにはしない。
 
 | 置き場所 | 責務 | 層 (`.anatomia/layers.json`) |

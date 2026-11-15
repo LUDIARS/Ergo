@@ -8,6 +8,8 @@ LUDIARS / AdventureCube などのアプリで共通利用する C++ モジュー
 
 ## セットアップ
 
+Odeum用の[アクションゲーム教材](spec/feature/tool/lesson-graphical-experiments.md)は、Windowsのゲーム画面で効果の比較とC++ルールの再読み込みに対応します。起動は本体フォルダのExcubitor登録 `ergo-lesson-game` を使います。
+
 設定・ビルド手順は用途別に [`spec/setup/`](spec/setup/) にまとめてある:
 
 - **まず一周する**: [クイックスタート](spec/setup/quickstart.md) (clone → 例 `examples/compose_loop` のビルド → ブラウザで値を変えて反映)

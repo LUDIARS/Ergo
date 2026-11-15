@@ -5,6 +5,25 @@
 # electron/main.cjs は tsc の出力 dist/ を読むので、 deploy (update) 時は build_command で
 # dist を作り直す。 GUI なので自動起動・自動 respawn はしない。
 services:
+  - code: ergo-lesson-game
+    name: Ergo Action Lab
+    description: Odeum action-game lesson with graphical play and local C++ experiments
+    tier: local-app
+    project_code: Eg
+    component: lesson-game
+    repo: LUDIARS/Ergo
+    runtime: app
+    app_kind: native
+    cwd: ${ARS_ROOT}/Ergo
+    exec: ${ARS_ROOT}/Ergo/build/lesson/examples/Release/ergo_example_lesson_action_feel.exe
+    exec_args:
+      - --play
+      - --no-studio
+    build_command: cmake -P cmake/BuildLesson.cmake
+    autostart: false
+    restart_policy: 'no'
+    health:
+      type: process
   - code: ergo-studio
     name: Ergo Studio (統合環境アプリ)
     description: LUDIARS のサービスと連携してゲームを AI と作る Ergo のデスクトップアプリ (Electron)。

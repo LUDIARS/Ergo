@@ -18,7 +18,7 @@ const char* const kUsage =
     "\n"
     "modes:\n"
     "  --auto             (default) headless: a scripted player fights endless waves; status lines on stdout\n"
-    "  --play             play it in this terminal (POSIX terminals; keys are shown on screen)\n"
+    "  --play             Windows: graphical arena; POSIX: terminal arena (keys shown on screen)\n"
     "  --check            offline self-check without a Studio (exit 0 = the observations follow the switches)\n"
     "  --help, -h         print this text and exit\n"
     "\n"

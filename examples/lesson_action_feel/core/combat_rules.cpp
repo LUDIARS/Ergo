@@ -150,10 +150,11 @@ HitOutcome resolve_hit(const Combatant& attacker, Combatant& target, const SideS
     }
 
     if (toggles.knockback() && !armored) {
-        out.impulse = w.power * t.knockback_per_power;
+        out.impulse = evaluate_rule(t.rule, RuleKind::Knockback, w.power, w.power * t.knockback_per_power);
         target.push_velocity += knockback_direction(attacker, target, t.knockback_direction) * (out.impulse / target.mass);
     }
-    if (toggles.hit_stop()) out.hit_stop_seconds = w.power * t.hit_stop_per_power;
+    if (toggles.hit_stop())
+        out.hit_stop_seconds = evaluate_rule(t.rule, RuleKind::HitStop, w.power, w.power * t.hit_stop_per_power);
     return out;
 }
 
