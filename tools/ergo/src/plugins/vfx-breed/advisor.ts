@@ -31,7 +31,7 @@ export function unavailableAdvisor(backend: string, reason: string): DirectionAd
 
 export function makeAdvisor(env: NodeJS.ProcessEnv = process.env): DirectionAdvisor {
     const backend = (env["ERGO_VFX_BACKEND"] ?? "cli").toLowerCase();
-    const model   =  env["ERGO_VFX_MODEL"]   ?? (backend === "cli" ? "haiku" : "claude-haiku-4-5");
+    const model   =  env["ERGO_VFX_MODEL"]   ?? "haiku";
     try {
         if (backend === "cli") return makeCliAdvisor(model, env);
         if (backend === "sdk") return makeSdkAdvisor(model, env);

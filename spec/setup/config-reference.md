@@ -169,7 +169,7 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 | `ERGO_PICTOR_PROFILE_DIR` | `../../../Pictor/profiles` → `./profiles` (cwd 相対) | `render_pipeline` | `*.profile.json` の場所 ([plugin-data-roots.md](plugin-data-roots.md)) | `tools/ergo/src/plugins/render_pipeline/profile_store.ts:31` |
 | `VISUS_PROJECT_ROOTS` | `process.cwd()` | `visus` | 描画定義のプロジェクトルート。`;` 区切りで複数可 | `tools/ergo/src/plugins/visus/index.ts:48` |
 | `ERGO_VFX_BACKEND` | `cli` | `vfx-suggest` / `vfx-breed` | LLM の呼び方: `cli` (Claude CLI) / `sdk` (Anthropic SDK)。それ以外はエラー | `tools/ergo/src/plugins/vfx-suggest/generator.ts:24` / `tools/ergo/src/plugins/vfx-breed/advisor.ts:33` |
-| `ERGO_VFX_MODEL` | `haiku` (`cli`) / `claude-haiku-4-5` (`sdk`) | `vfx-suggest` / `vfx-breed` | 使うモデル | `tools/ergo/src/plugins/vfx-suggest/generator.ts:25` / `tools/ergo/src/plugins/vfx-breed/advisor.ts:34` |
+| `ERGO_VFX_MODEL` | `haiku` | `vfx-suggest` / `vfx-breed` | Claude の役割名または明示モデル ID。SDK は役割名を Concordia の対応表から解決する | `tools/ergo/src/plugins/vfx-suggest/generator.ts:25` / `tools/ergo/src/plugins/vfx-breed/advisor.ts:34` |
 | `CLAUDE_BIN` | `claude` | `vfx-suggest` / `vfx-breed` (`cli`) | Claude CLI の実行ファイル | `tools/ergo/src/plugins/vfx-suggest/generator-cli.ts:13` / `tools/ergo/src/plugins/vfx-breed/advisor-cli.ts:11` |
 | `ANTHROPIC_API_KEY` | (なし) | `vfx-suggest` / `vfx-breed` (`sdk`) | **秘密情報**。シェルの環境変数でだけ渡す (ファイル・設定に書かない、コミットしない) | `tools/ergo/src/plugins/vfx-suggest/generator-sdk.ts:13` / `tools/ergo/src/plugins/vfx-breed/advisor-sdk.ts:10` |
 

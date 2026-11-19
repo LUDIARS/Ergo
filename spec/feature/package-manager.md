@@ -293,6 +293,13 @@ S4 (観測 P3) は並行で実装中。W は S4 が触るファイル (`package_
 モジュールの向き: `ergo_package_watch → ergo_package_manager → (ergo_common)`、`ergo_package_viz → ergo_package_model`、
 `tools/package_cli → package_manager / package_watch / package_viz`。git プロセスと HTTP は `tools/package_cli/` のアダプタに置き、
 ライブラリは `IRefSource` / `IReviewSource` / `IRunSource` だけを持つ (テストは偽ソース)。HTTP は既存の `ergo_http`。
+
+CLI は Git と CMake を引数ベクトルから直接起動する。Windows は `CreateProcessW` と Windows CRT の引用規則、
+POSIX は `posix_spawnp` を使う。Windows の実行ファイルは明示パスまたは `PATH` 上の `.exe` / `.com` に限る。
+`capture` は標準出力だけを取り込み、`status` は両出力を破棄し、`run` は両出力を継承する。
+公開 API の入力検査を維持し、引数境界を保てない埋め込み NUL も拒否する。
+関連タスク `actio:128c4441-bd0e-41c7-b904-30a364460a53`。
+
 新しいトップレベル (`unity/`) と新モジュールは同じ PR で `spec/domains` と `.anatomia/layers.json` を更新する。
 
 実装状況: W1 は `spec/tasks/2026-10-14-package-manager-w1.md`、W2 は `spec/tasks/2026-10-15-package-manager-w2.md` (モジュール `spec/module/package_manager.md`)。

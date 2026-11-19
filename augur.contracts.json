@@ -21,6 +21,24 @@
       "module": "tests/custos/contracts/content-length.contract.mjs",
       "mode": "observe",
       "sample": 1
+    },
+    {
+      "id": "C-3",
+      "criterion": "C-3 captureSdkModels(expectedModel): 両 VFX プラグインの SDK リクエストが既定の haiku を解決し、明示モデル ID をそのまま送る",
+      "symbol": "captureSdkModels",
+      "file": "tests/vfx/verify_vfx_model_roles.mjs",
+      "module": "tests/vfx/contracts/model-roles.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-4",
+      "criterion": "C-4 verifyPackageCliProcess(executable, child): 子プロセスに空白・引用符・シェル特殊文字を含む引数がそのまま届き、公開 API の入力検査・出力・終了コードの契約を維持する",
+      "symbol": "verifyPackageCliProcess",
+      "file": "tests/packages/verify_package_cli_process.mjs",
+      "module": "tests/packages/contracts/package-cli-process.contract.mjs",
+      "mode": "observe",
+      "sample": 1
     }
   ]
 }

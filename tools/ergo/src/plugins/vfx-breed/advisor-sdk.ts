@@ -2,6 +2,7 @@
 /// ANTHROPIC_API_KEY from env only).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { resolveClaudeSdkModel } from "../../core/claude-sdk-model.js";
 import type { ParticleEffectConfig } from "../particle/schema.js";
 import type { DirectionAdvisor } from "./advisor.js";
 import { buildDirectionPrompt, parseWeights, type DirectionWeights } from "./direction.js";
@@ -18,7 +19,7 @@ export function makeSdkAdvisor(model: string, env: NodeJS.ProcessEnv): Direction
         async suggest(direction: string, current: ParticleEffectConfig): Promise<DirectionWeights> {
             if (!client) throw new Error("ANTHROPIC_API_KEY is not set — cannot use sdk backend");
             const response = await client.messages.create({
-                model,
+                model: resolveClaudeSdkModel(model, env),
                 max_tokens: 1024,
                 messages: [{ role: "user", content: buildDirectionPrompt(direction, current) }],
             });

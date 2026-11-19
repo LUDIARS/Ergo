@@ -10,7 +10,7 @@ import {
 
 const project: CcProject = { code: "KS", project: "KuzuSurvivors", repo_path: "D:/LUDIARS/KuzuSurvivors" };
 const template: CcTemplate = {
-    call_name: "opus-5-5", title: "実装委託", description: null, target_provider: "claude", model: "claude-opus-5-5",
+    call_name: "opus-5-5", title: "実装委託", description: null, target_provider: "claude", model: "opus",
     is_active: 1,
     input_schema: [
         { name: "task", type: "string", required: true },

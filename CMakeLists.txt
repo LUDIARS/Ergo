@@ -1885,6 +1885,7 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
         tools/package_cli/cli_args.cpp
         tools/package_cli/file_io.cpp
         tools/package_cli/process.cpp
+        tools/package_cli/windows_command_line.cpp
         tools/package_cli/host_context.cpp
         tools/package_cli/upm_host.cpp
         tools/package_cli/cmd_init.cpp
@@ -1899,6 +1900,13 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
         tools/package_cli/status_inputs.cpp
         tools/package_cli/cmd_status.cpp
     )
+    # 子プロセスはシェルを通さず argv のまま起動する (Windows: CreateProcessW、 POSIX: posix_spawnp)。
+    if(WIN32)
+        set(ERGO_PKG_CLI_LAUNCH_SOURCE tools/package_cli/process_launch_win.cpp)
+    else()
+        set(ERGO_PKG_CLI_LAUNCH_SOURCE tools/package_cli/process_launch_posix.cpp)
+    endif()
+    target_sources(ergo_pkg_cli PRIVATE ${ERGO_PKG_CLI_LAUNCH_SOURCE})
     set_target_properties(ergo_pkg_cli PROPERTIES OUTPUT_NAME ergo_pkg)
     target_link_libraries(ergo_pkg_cli PRIVATE ergo_package_manager)
     # 既定の Ergo / cmake はこのビルドのもの (--ergo / --cmake で上書き)。 バイナリにだけ入り、 リポには書かない。
@@ -1906,6 +1914,21 @@ if(ERGO_BUILD_PACKAGE_CLI AND TARGET ergo_package_manager)
         ERGO_PKG_CLI_DEFAULT_ERGO_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
         ERGO_PKG_CLI_DEFAULT_CMAKE="${CMAKE_COMMAND}")
     if(ERGO_BUILD_TESTS)
+        # 引数がシェル解釈されずに 1 個ずつ届くこと・終了コード・出力のつなぎ方 (process.cpp)。
+        add_executable(test_package_cli_echo_args tests/packages/package_cli_echo_args.cpp)
+        add_executable(test_package_cli_process
+            tests/packages/test_package_cli_process.cpp
+            tools/package_cli/process.cpp
+            tools/package_cli/windows_command_line.cpp
+            ${ERGO_PKG_CLI_LAUNCH_SOURCE})
+        target_include_directories(test_package_cli_process PRIVATE tools/package_cli)
+        add_dependencies(test_package_cli_process test_package_cli_echo_args)
+        if(MSVC)
+            target_compile_options(test_package_cli_process PRIVATE /utf-8)
+            target_compile_options(test_package_cli_echo_args PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_package_cli_process
+            COMMAND test_package_cli_process $<TARGET_FILE:test_package_cli_echo_args>)
         find_package(Git QUIET)
         if(GIT_EXECUTABLE)
             add_test(NAME test_package_cli

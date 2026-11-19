@@ -2680,6 +2680,48 @@
       "packages": []
     },
     {
+      "file": "tools/package_cli/process.cpp",
+      "standard": "c++17",
+      "includes": ["tools/package_cli"],
+      "defines": [],
+      "packages": []
+    },
+    {
+      "file": "tools/package_cli/process_launch_posix.cpp",
+      "standard": "c++17",
+      "includes": ["tools/package_cli"],
+      "defines": [],
+      "packages": []
+    },
+    {
+      "file": "tools/package_cli/process_launch_win.cpp",
+      "standard": "c++17",
+      "includes": ["tools/package_cli"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN"],
+      "packages": []
+    },
+    {
+      "file": "tools/package_cli/windows_command_line.cpp",
+      "standard": "c++17",
+      "includes": ["tools/package_cli"],
+      "defines": [],
+      "packages": []
+    },
+    {
+      "file": "tests/packages/package_cli_echo_args.cpp",
+      "standard": "c++17",
+      "includes": [],
+      "defines": [],
+      "packages": []
+    },
+    {
+      "file": "tests/packages/test_package_cli_process.cpp",
+      "standard": "c++17",
+      "includes": ["tools/package_cli"],
+      "defines": [],
+      "packages": []
+    },
+    {
       "file": "tests/profile/test_profile.cpp",
       "standard": "c++17",
       "includes": [

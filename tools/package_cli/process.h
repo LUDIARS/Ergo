@@ -1,13 +1,14 @@
 #pragma once
 
-// ergo_pkg の外部プロセス起動 (git と cmake だけ)。 シェルを経由するので、 渡す値は quote_safe で確かめる。
+// ergo_pkg の外部プロセス起動 (git と cmake だけ)。 argv を分けたまま直接起動し、 シェルは経由しない
+// (process_launch.h)。 値は念のため quote_safe でも確かめる (多層の防御)。
 
 #include <string>
 #include <vector>
 
 namespace ergo::package_cli {
 
-/// 二重引用符で包んでも壊れない値か (引用符・改行・% ` $ を含まない、 空でない)。
+/// 子へ渡してよい値か (NUL・二重引用符・改行・% ` $ を含まない、空でない)。
 bool quote_safe(const std::string& value);
 
 /// 標準出力を out に取る (標準エラーは捨てる)。 終了コードが 0 でなければ false。

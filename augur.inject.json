@@ -1,5 +1,5 @@
 {
   "service": "ergo",
-  "include": ["tests/packages/verify_git_remote_source.mjs"],
+  "include": ["tests/packages/verify_git_remote_source.mjs", "tests/packages/verify_package_cli_process.mjs"],
   "rules": { "contract-wrap": true }
 }

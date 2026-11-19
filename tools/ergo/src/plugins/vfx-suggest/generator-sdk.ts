@@ -3,6 +3,7 @@
 /// Secrets must NOT be hardcoded — env only (feedback_config_and_secrets).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { resolveClaudeSdkModel } from "../../core/claude-sdk-model.js";
 import type { VfxGenerator, VfxGeneratorHealth } from "./generator.js";
 import type { GenRequest, VfxPreset } from "./schema.js";
 import { OUTPUT_SCHEMA } from "./schema.js";
@@ -27,7 +28,7 @@ export function makeSdkGenerator(model: string): VfxGenerator {
             }
 
             const response = await client.messages.create({
-                model,
+                model: resolveClaudeSdkModel(model),
                 max_tokens: 4096,
                 system: buildSystemPrompt(req.game),
                 messages: [{ role: "user", content: buildUserContent(req, count) }],
