@@ -19,6 +19,7 @@ Ergo は **C++17 モジュール群** (`ergo_<domain>`、`ergo_math` / `ergo_phy
 | 開発者ツール `tools/ergo` を起動する | [run-tools-ergo.md](run-tools-ergo.md) | `npm start` (Electron) / `npm run dev` / `PORT` |
 | 複数モジュールを自分のフレームループにつなぐ (呼び出し順・dt・型変換) | [integrate-modules.md](integrate-modules.md) | `examples/compose_loop` / `ERGO_BUILD_EXAMPLES` |
 | 授業 (odeum-lesson) と Studio をつなぐ / 授業のサンプルのゲームを遊ぶ・変数を出す | [../feature/tool/lesson.md](../feature/tool/lesson.md) / [../feature/tool/lesson-action-game.md](../feature/tool/lesson-action-game.md) | `examples/lesson_action_feel` / `ERGO_WITH_CURL` (Windows 以外) / `POST /lesson/api/connect` |
+| ゲームの音を LUDIARS Sonus で鳴らす / Studio からミキサー・プロファイラ・録画を使う | [../module/audio_sonus.md](../module/audio_sonus.md) / [../feature/tool/sonus.md](../feature/tool/sonus.md) | `ERGO_AUDIO_BACKEND=sonus` / `ERGO_SONUS_DIR` / `ERGO_WITH_SONUS` / `ERGO_SONUS_HOST` / `ERGO_SONUS_PORT` |
 | ゲーム固有エディタを plugin pack として読み込む | [external-plugins.md](external-plugins.md) | `ERGO_PLUGIN_DIR` |
 | 組み込みプラグイン (render_pipeline / visus) にホスト資産を見せる | [plugin-data-roots.md](plugin-data-roots.md) | `ERGO_PICTOR_PROFILE_DIR` / `VISUS_PROJECT_ROOTS` |
 | 変更を main に入れる (ブランチ + PR 運用) | [branch-and-pr.md](branch-and-pr.md) | feat ブランチ + PR (main 直 push 禁止) |

@@ -49,6 +49,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_BUILD_SOUND` | ON | `ergo_sound` | — | — |
 | `ERGO_BUILD_FRAME` | ON | `ergo_frame` | — | — |
 | `ERGO_BUILD_PROFILE` | ON | `ergo_profile` | — | — |
+| `ERGO_BUILD_PERF` | ON | `ergo_perf` (フレーム統計・品質の governor・スペックの初期推定) | — | — |
 | `ERGO_BUILD_LOG` | ON | `ergo_log` | — | — |
 | `ERGO_BUILD_IO` | ON | `ergo_io` | — | — |
 | `ERGO_BUILD_AUDIO` | ON | `ergo_audio` (バックエンドは `ERGO_AUDIO_BACKEND`) | — | — |
@@ -85,7 +86,9 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_BUILD_LOG_LIVE` | ON | `ergo_log_live` (`LiveSink`: `ergo_log` の行を `log` プラグインへ WS で送る) と `test_live_sink` | `LOG` | 宣言されない |
 | `ERGO_BUILD_PACKAGE_CLI` | ON | CLI `ergo_pkg` (ターゲット `ergo_pkg_cli`): `init` / `list` / `doctor` / `fetch` / `add` / `remove` / `update` / `status`。`outdated` / `watch` は `PACKAGE_WATCH`、Revisor / Concordia の読み手は `HTTP` があるときだけ | `PACKAGE_MANAGER` | スキップ (STATUS) |
 | **モジュール固有ノブ** | | | | |
-| `ERGO_AUDIO_BACKEND` | `auto` | `ergo_audio` のバックエンド: `auto` (FMOD を探し、無ければ dummy) / `fmod` (SDK 必須) / `dummy` (no-op 強制)。FMOD の場所は `FMOD_SDK_DIR` | `AUDIO` | `fmod` で SDK が無ければ構成エラー、`auto` は dummy (STATUS) |
+| `ERGO_AUDIO_BACKEND` | `auto` | `ergo_audio` のバックエンド: `auto` (FMOD を探し、無ければ dummy) / `fmod` (SDK 必須) / `dummy` (no-op 強制) / `sonus` (LUDIARS Sonus、`ERGO_SONUS_DIR` 必須。`auto` は選ばない)。FMOD の場所は `FMOD_SDK_DIR`。Sonus 版は [../module/audio_sonus.md](../module/audio_sonus.md) | `AUDIO` | `fmod` で SDK が無ければ構成エラー、`auto` は dummy (STATUS)。他の値は構成エラー |
+| `ERGO_SONUS_DIR` | (空) | Sonus のソースのチェックアウト。`add_subdirectory` で読む (同梱・取得はしない、`cmake/ErgoSonus.cmake`) | `ERGO_AUDIO_BACKEND=sonus` か `ERGO_WITH_SONUS` のときだけ使う。CMake 3.24 以上、gcc / clang / MinGW | 空・Sonus でない・CMake が古い・MSVC (cl / clang-cl) は構成エラー |
+| `ERGO_WITH_SONUS` | OFF | `ergo_audio` が別のバックエンドでも Sonus を取り込む (Studio の `sonus` プラグインだけ欲しいとき)。Sonus を取り込んだ構成で `ERGO_BUILD_STUDIO` なら `sonus` プラグイン ([../feature/tool/sonus.md](../feature/tool/sonus.md)) とそのテストを作る | `ERGO_SONUS_DIR` | 上と同じ |
 | `ERGO_PARTICLE_HAS_RENDERER` | OFF | `ergo_particle` の Vulkan ビルボード描画 (`ERGO_PARTICLE_HAS_RENDERER=1`) | `PARTICLE`、`pictor` ターゲット + Vulkan SDK | Vulkan が無ければ STATUS (`renderer requested but Vulkan not found`)。`pictor` が無ければ何も出さずに描画なし |
 | `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON | `ergo_gpu_particle` の compute シェーダを `glslc` で SPIR-V に bake | `GPU_PARTICLE`、`glslc` | スキップ (STATUS `glslc not found — SPIR-V bake skipped`) |
 | `ERGO_RENDER_REQUIRE_REAL` | OFF | 実描画経路 (`pictor` + Vulkan) を確保できないデスクトップ構成を構成エラーにする | `RENDER` | OFF のデスクトップは WARNING (`Vulkan-free build only`)。Android / iOS はこのノブに関係なく構成エラー |
@@ -125,7 +128,8 @@ Ergo の中では `BUILD_SHARED_LIBS` を無視し、モジュールは常に ST
 |---|---|
 | `ERGO_RENDER_HAS_VULKAN=1` | `pictor` が `PICTOR_HAS_VULKAN` を公開し、`ErgoRenderBackend.cmake` が対象 platform の実描画経路を解決したとき |
 | `ERGO_RENDER_PLATFORM_DESKTOP=1` / `ANDROID=1` / `IOS=1` | `ErgoRenderBackend.cmake` が解決した platform に対応する 1 つを定義 |
-| `ERGO_AUDIO_BACKEND_FMOD=1` / `ERGO_AUDIO_BACKEND_DUMMY=1` | `ergo_audio` が実際に選んだバックエンド |
+| `ERGO_AUDIO_BACKEND_FMOD=1` / `ERGO_AUDIO_BACKEND_DUMMY=1` / `ERGO_AUDIO_BACKEND_SONUS=1` | `ergo_audio` が実際に選んだバックエンド (`SONUS` のときだけ `ergo/audio/sonus_options.h` の関数がある) |
+| `ERGO_STUDIO_HAS_SONUS=1` | `ergo_studio` に `sonus` プラグインが入ったとき (Sonus を取り込み、`ergo_studio_ui` があるとき) |
 | `ERGO_TELA_GRAPH_HAS_TELA=1` / `ERGO_RENDER_VIZ_HAS_PICTOR=1` | `ergo_tela_graph_tela` / `ergo_render_viz_pictor` が作られたとき |
 
 CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C++17

@@ -226,14 +226,14 @@ modules:
     status: stable
 
   - name: ergo_audio
-    summary: "ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。ergo_sound とは独立・横並び"
+    summary: "ゲーム SE/BGM の SDK ファサード (FMOD Core 既定 + Dummy 自動フォールバック、明示で LUDIARS Sonus)。ergo_sound とは独立・横並び"
     category: システム
     domain: audio
     header_dir: include/ergo/audio/
     source_dir: src/audio/
     test_dir:   tests/audio/
     spec:       spec/feature/module/audio.md
-    cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/dummy)
+    cmake_option: ERGO_BUILD_AUDIO   # backend は ERGO_AUDIO_BACKEND (auto/fmod/dummy/sonus)。Sonus 版は spec/module/audio_sonus.md
     depends:    []
     tool_plugins: []
     status: preview

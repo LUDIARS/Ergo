@@ -75,6 +75,9 @@ StudioSettings read_settings(const EnvFn& env, const std::filesystem::path& exe_
     s.shader_dir = utf8(exe_dir / "shaders");
     s.sdk_dir    = utf8(exe_dir / "sdk");
     s.studio     = plugins::studio::load_studio_config(env, s.user_home);
+    std::string sonus_error;
+    s.sonus = plugins::sonus::load_sonus_config(env, sonus_error);
+    if (s.error.empty() && !sonus_error.empty()) s.error = sonus_error;
     return s;
 }
 
@@ -115,6 +118,13 @@ std::string studio_usage() {
            "  CLAUDE_BIN               claude CLI to run (default claude)\n"
            "  ERGO_STUDIO_FONT         window font (default <WINDIR>\\Fonts\\meiryo.ttc when WINDIR is set)\n"
            "  WINDIR                   Windows directory, for the default font\n"
+           "  ERGO_SONUS_HOST          sonus plugin (builds with Sonus): the game's live link address (default 127.0.0.1)\n"
+           "  ERGO_SONUS_PORT          sonus plugin: the game's live link port, 1..65535 (default " +
+           std::to_string(plugins::sonus::kSonusDefaultPort) + ", Sonus' default)\n"
+           "  ERGO_SONUS_PROJECT       sonus plugin: the Sonus project directory (bus names for the mixer)\n"
+           "  ERGO_SONUS_BUILD_DIR     sonus plugin: build the project there for its build hash (unset = load only)\n"
+           "  ERGO_SONUS_RECORDING_DIR sonus plugin: where recordings are saved (unset = saving is off)\n"
+           "  ERGO_SONUS_TICK_MS       sonus plugin: how often the live link is polled, 10..1000 ms (default 50)\n"
 #ifdef _WIN32
            "  USERPROFILE              home directory (melpomene / terpsichore / thaleia, studio home)\n"
 #else

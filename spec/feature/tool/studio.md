@@ -122,6 +122,7 @@ Studio を中心に Excubitor / Cc / Actio / Br / Curare / Revisor / Cernere を
 
 下表は Electron 版の変数。ネイティブ版 (`ergo_studio`) が読む変数とオプションは `ergo_studio --help` が全部出す
 (正本 `tools/studio/studio_settings.cpp`、出力は [lesson.md の「端末から使う」](lesson.md#SPEC-ergo-lesson-terminal))。
+Sonus を取り込んだビルドだけにある `sonus` プラグインの `ERGO_SONUS_*` は [sonus.md](sonus.md#SPEC-ergo-sonus-target)。
 
 | 変数 | 既定 | 内容 |
 |---|---|---|

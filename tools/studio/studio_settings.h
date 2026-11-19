@@ -2,6 +2,7 @@
 /// Everything ergo_studio.exe reads from its environment, in one place. The
 /// built-in plugins get their settings from here (they never read the
 /// environment themselves), so a missing setting is visible in one list.
+#include "plugins/sonus/sonus_config.h"
 #include "plugins/studio/studio_config.h"
 
 #include <cstdint>
@@ -32,6 +33,7 @@ struct StudioSettings {
     std::string shader_dir;                ///< <exe dir>/shaders
     std::string sdk_dir;                   ///< <exe dir>/sdk (plugin_abi.h for building packs)
     plugins::studio::StudioConfig studio;  ///< the studio plugin's settings (ERGO_STUDIO_HOME, LUDIARS_ROOT, ...)
+    plugins::sonus::SonusConfig   sonus;   ///< the sonus plugin's settings (ERGO_SONUS_*; the plugin exists in Sonus builds only)
     bool        headless  = false;         ///< --headless: server only, no window
     bool        show_help = false;         ///< --help / -h: print studio_usage() and start nothing
     std::string error;                     ///< an argument or setting that cannot be used (e.g. --foo, PORT=abc)

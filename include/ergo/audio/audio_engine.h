@@ -5,7 +5,9 @@
 /// Default backend: **FMOD Core** (auto-detected at CMake configure time
 /// via `FMOD_SDK_DIR`). When FMOD is unavailable the build falls back
 /// transparently to a **Dummy** backend that just logs what would have
-/// played — hosts don't need any #ifdefs.
+/// played — hosts don't need any #ifdefs. **Sonus** is used only when the
+/// build selects it explicitly (`ERGO_AUDIO_BACKEND=sonus`); the contract
+/// below is the same for every backend.
 ///
 /// Only one-shot playback is exposed right now. Streams / 3D / DSP
 /// chains / FMOD Studio events are intentionally left for later
@@ -25,6 +27,8 @@ constexpr SoundHandle INVALID_SOUND = 0;
 enum class Backend : uint8_t {
     Dummy = 0,   ///< No real playback, logs events. Always available.
     FMOD  = 1,   ///< FMOD Core 2.x (requires FMOD_SDK_DIR on the build).
+    Sonus = 2,   ///< LUDIARS Sonus (ERGO_AUDIO_BACKEND=sonus + ERGO_SONUS_DIR). WAV only;
+                 ///< settings in ergo/audio/sonus_options.h (spec/module/audio_sonus.md).
 };
 
 class Engine {

@@ -142,7 +142,7 @@ ergo/
 | 名前 | 概要 | ツール |
 |---|---|---|
 | **`ergo_sound`** ⭐ | **コア音響エンジン** (自前 WAV デコーダ + ストリーミング + ミキサ + DSP + BPM クォンタイズ)。WAV のみで、圧縮フォーマットは未対応。rendering と並ぶ主要実装 | — |
-| `ergo_audio` | ゲーム SE/BGM ファサード (FMOD Core 既定 + Dummy 自動フォールバック)。`ergo_sound` とは独立・横並び | — |
+| `ergo_audio` | ゲーム SE/BGM ファサード (FMOD Core 既定 + Dummy 自動フォールバック、明示で LUDIARS Sonus: [Sonus 版](spec/module/audio_sonus.md)、Ergo Studio の [`sonus` プラグイン](spec/feature/tool/sonus.md) がライブリンクでつながる)。`ergo_sound` とは独立・横並び | — |
 
 ### rendering
 

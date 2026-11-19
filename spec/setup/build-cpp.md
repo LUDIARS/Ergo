@@ -67,7 +67,7 @@
 
 | キー | 既定 | 役割 |
 |---|---|---|
-| `ERGO_AUDIO_BACKEND`              | `auto` | `ergo_audio` のバックエンド。`auto` (FMOD 検出 → 無ければ dummy) / `fmod` (SDK 必須・無ければエラー) / `dummy` (no-op 強制) |
+| `ERGO_AUDIO_BACKEND`              | `auto` | `ergo_audio` のバックエンド。`auto` (FMOD 検出 → 無ければ dummy) / `fmod` (SDK 必須・無ければエラー) / `dummy` (no-op 強制) / `sonus` (LUDIARS Sonus。`ERGO_SONUS_DIR` 必須、CMake 3.24 以上、gcc / clang / MinGW。[../module/audio_sonus.md](../module/audio_sonus.md)) |
 | `ERGO_PARTICLE_HAS_RENDERER`      | OFF    | `ergo_particle` の Vulkan ビルボード描画を有効化。`pictor` ターゲット + Vulkan SDK が必要 |
 | `ERGO_GPU_PARTICLE_COMPILE_SHADERS` | ON   | `ergo_gpu_particle` の GLSL compute を `glslc` で SPIR-V に bake する |
 | `ERGO_RENDER_REQUIRE_REAL`        | OFF    | `ergo_render` の実描画経路を確保できないデスクトップ構成を構成エラーにする。Android / iOS は常に必須なのでこのノブに関係なくエラー |
