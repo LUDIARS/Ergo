@@ -26,6 +26,18 @@
 **用途で棲み分ける** — 音楽ゲーム / BPM 同期 / DSP 研究は `ergo_sound`、
 ゲーム SE / BGM / FMOD イベントバンクは `ergo_audio`。
 
+### バックエンド
+
+| `ERGO_AUDIO_BACKEND` | バックエンド | 仕様 |
+|---|---|---|
+| `auto` (既定) | FMOD (見つかれば) / Dummy | この文書 |
+| `fmod` | FMOD Core (SDK 必須) | この文書 |
+| `dummy` | Dummy (no-op) | この文書 |
+| `sonus` | LUDIARS Sonus (`ERGO_SONUS_DIR` のソースを取り込む。WAV のみ。明示したときだけ) | [`../../module/audio_sonus.md`](../../module/audio_sonus.md) |
+
+どのバックエンドでも `Engine` の契約 (引数・戻り値・失敗のしかた) は同じ。Sonus 版に固有の設定は
+`ergo/audio/sonus_options.h` (Sonus 版でだけ定義)。
+
 ## カテゴリ
 システム
 

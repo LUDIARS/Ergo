@@ -15,6 +15,7 @@
     "spec/feature/tool/scene_editor.md",
     "spec/feature/tool/log.md",
     "spec/feature/tool/lesson.md",
+    "spec/feature/tool/sonus.md",
     "spec/setup/plugin-data-roots.md",
     "spec/setup/ci.md",
     "spec/architecture/domains-and-ux.md"

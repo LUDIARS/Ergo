@@ -84,9 +84,31 @@ option(ERGO_GPU_PARTICLE_COMPILE_SHADERS "ergo_gpu_particle: bake GLSL compute s
 
 # ergo_audio backend selector. "auto" probes for FMOD via the bundled
 # FindFMOD.cmake and falls back to dummy; "dummy" forces no-op; "fmod"
-# hard-requires the SDK and errors if not found.
-set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / dummy")
-set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy)
+# hard-requires the SDK and errors if not found; "sonus" uses LUDIARS Sonus
+# from ERGO_SONUS_DIR (never auto-selected; see cmake/ErgoSonus.cmake).
+set(ERGO_AUDIO_BACKEND "auto" CACHE STRING "ergo_audio backend: auto / fmod / dummy / sonus")
+set_property(CACHE ERGO_AUDIO_BACKEND PROPERTY STRINGS auto fmod dummy sonus)
+if(NOT ERGO_AUDIO_BACKEND MATCHES "^(auto|fmod|dummy|sonus)$")
+    message(FATAL_ERROR "ergo_audio: ERGO_AUDIO_BACKEND='${ERGO_AUDIO_BACKEND}' is not one of auto / fmod / dummy / sonus")
+endif()
+# Sonus (C++20 sound runtime) as a subproject: the ergo_audio backend above, and/or
+# Ergo Studio's sonus plugin. Only a build that asks for it needs Sonus, CMake 3.24
+# and gcc / clang / MinGW; every other build is unchanged.
+set(ERGO_SONUS_DIR "" CACHE PATH "Sonus source checkout taken in with add_subdirectory (never fetched or bundled)")
+option(ERGO_WITH_SONUS "Add Sonus (ERGO_SONUS_DIR) to the build even when ergo_audio uses another backend (Studio sonus plugin)" OFF)
+set(_ergo_with_sonus OFF)
+if(ERGO_AUDIO_BACKEND STREQUAL "sonus" OR ERGO_WITH_SONUS)
+    set(_ergo_with_sonus ON)
+endif()
+# The Studio's sonus plugin is built whenever Sonus is in the build with the Studio.
+set(_ergo_studio_sonus OFF)
+if(_ergo_with_sonus AND ERGO_BUILD_STUDIO)
+    set(_ergo_studio_sonus ON)
+endif()
+if(_ergo_with_sonus)
+    include(cmake/ErgoSonus.cmake)
+    ergo_sonus_add(TOOL_CORE ${_ergo_studio_sonus})
+endif()
 
 # As a subproject Ergo keeps its targets out of the host's `all`: only what the
 # host links is built. Never while ERGO_BUILD_TESTS is ON, so registered tests
@@ -644,7 +666,7 @@ endif()
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_AUDIO)
     set(_ERGO_AUDIO_USE_FMOD OFF)
-    if(NOT ERGO_AUDIO_BACKEND STREQUAL "dummy")
+    if(NOT ERGO_AUDIO_BACKEND STREQUAL "dummy" AND NOT ERGO_AUDIO_BACKEND STREQUAL "sonus")
         if(ERGO_AUDIO_BACKEND STREQUAL "fmod")
             find_package(FMOD REQUIRED)
         else()
@@ -655,7 +677,30 @@ if(ERGO_BUILD_AUDIO)
         endif()
     endif()
 
-    if(_ERGO_AUDIO_USE_FMOD)
+    if(ERGO_AUDIO_BACKEND STREQUAL "sonus")
+        # Sonus' C API only (Sonus::sonus): ergo_audio stays C++17 and its public
+        # header names no Sonus type (spec/module/audio_sonus.md).
+        add_library(ergo_audio
+            src/audio/audio_engine_sonus.cpp
+            src/audio/sonus/play_buffers.cpp
+            src/audio/sonus/result_text.cpp
+            src/audio/sonus/silent_output_device.cpp
+            src/audio/sonus/sonus_options.cpp
+            src/audio/wav_pcm.cpp
+        )
+        target_link_libraries(ergo_audio PUBLIC Threads::Threads PRIVATE Sonus::sonus)
+        target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_SONUS=1)
+        if(ERGO_SONUS_LIVELINK)
+            target_compile_definitions(ergo_audio PRIVATE ERGO_AUDIO_SONUS_LIVELINK=1)
+        endif()
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(ergo_audio PRIVATE -Wall -Wextra)
+        endif()
+        # Sonus is static and its OS libraries (ALSA / WASAPI / Core Audio) are system
+        # ones: nothing to stage next to the executable.
+        set_property(TARGET ergo_audio PROPERTY ERGO_AUDIO_BACKEND sonus)
+        message(STATUS "ergo_audio: backend = Sonus (${ERGO_SONUS_DIR})")
+    elseif(_ERGO_AUDIO_USE_FMOD)
         add_library(ergo_audio src/audio/audio_engine_fmod.cpp)
         target_link_libraries(ergo_audio PUBLIC FMOD::FMOD Threads::Threads)
         target_compile_definitions(ergo_audio PUBLIC ERGO_AUDIO_BACKEND_FMOD=1)
@@ -686,6 +731,21 @@ if(ERGO_BUILD_AUDIO)
         add_executable(test_ergo_audio tests/audio/test_ergo_audio.cpp)
         target_link_libraries(test_ergo_audio PRIVATE ergo_audio ergo_gtest_main)
         add_test(NAME test_ergo_audio COMMAND test_ergo_audio)
+        if(ERGO_AUDIO_BACKEND STREQUAL "sonus")
+            # The Sonus backend itself: silent output device, WAV decoding, volume / pitch,
+            # buffer reclaim, the live link. Hermetic (generated WAV, no sound card).
+            add_executable(test_ergo_audio_sonus tests/audio/test_ergo_audio_sonus.cpp)
+            target_include_directories(test_ergo_audio_sonus PRIVATE src/audio)
+            target_link_libraries(test_ergo_audio_sonus PRIVATE ergo_audio ergo_gtest_main)
+            if(ERGO_SONUS_LIVELINK)
+                target_compile_definitions(test_ergo_audio_sonus PRIVATE ERGO_AUDIO_SONUS_TEST_LIVELINK=1)
+            endif()
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(test_ergo_audio_sonus PRIVATE -Wall -Wextra)
+            endif()
+            add_test(NAME test_ergo_audio_sonus COMMAND test_ergo_audio_sonus)
+            set_tests_properties(test_ergo_audio_sonus PROPERTIES TIMEOUT 300)
+        endif()
         # ergo_audio_stage_runtime() called from a host's scope against a fake
         # FMOD SDK (configures + builds a small host project).
         add_test(NAME test_audio_stage_runtime
@@ -710,6 +770,7 @@ endif()
 # ergo_audio's target properties: a function sees its caller's variables, and
 # the caller is the host, not Ergo's directory.
 #   Dummy backend          -> nothing to stage, returns quietly
+#   Sonus backend          -> nothing to stage (static; ALSA / WASAPI / Core Audio are system libraries)
 #   FMOD + runtime found   -> POST_BUILD copy next to TARGET
 #   FMOD + runtime missing -> WARNING (never silent on the FMOD backend)
 #
@@ -727,7 +788,8 @@ function(ergo_audio_stage_runtime TARGET)
             "(ERGO_BUILD_AUDIO=OFF). Set ERGO_BUILD_AUDIO=ON or drop the call.")
     endif()
     get_target_property(_backend ergo_audio ERGO_AUDIO_BACKEND)
-    if(_backend STREQUAL "dummy")
+    if(_backend STREQUAL "dummy" OR _backend STREQUAL "sonus")
+        # Sonus: static libraries + system audio libraries, nothing to stage.
         return()
     endif()
     get_target_property(_runtime ergo_audio ERGO_RUNTIME_FILES)
@@ -1250,6 +1312,7 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/scene_editor/parse_scene.cpp
         tools/studio/plugins/scene_editor/scene_editor_plugin.cpp
         tools/studio/plugins/scene_editor/scene_info.cpp
+        tools/studio/plugins/sonus/sonus_config.cpp
         tools/studio/plugins/studio/actio_client.cpp
         tools/studio/plugins/studio/breviarium_client.cpp
         tools/studio/plugins/studio/concordia_client.cpp
@@ -1360,6 +1423,59 @@ if(ERGO_BUILD_STUDIO)
                 target_compile_options(test_studio_lesson_game PRIVATE /utf-8)
             endif()
             add_test(NAME test_studio_lesson_game COMMAND test_studio_lesson_game)
+        endif()
+    endif()
+
+    # "sonus" plugin (spec/feature/tool/sonus.md): only in builds with Sonus (cmake/ErgoSonus.cmake).
+    #   ergo_studio_sonus_link : the one C++20 file (snd::tool::Session, Sonus::tool_core PRIVATE)
+    #   ergo_studio_sonus      : plugin / routes / JSON (C++17; cxx_std_20 does not travel past the link target)
+    #   ergo_studio_sonus_view : the tab (ui_kit, C++17)
+    if(_ergo_studio_sonus)
+        add_library(ergo_studio_sonus_link STATIC
+            tools/studio/plugins/sonus/sonus_link.cpp
+            tools/studio/plugins/sonus/sonus_shown.cpp
+        )
+        target_include_directories(ergo_studio_sonus_link PUBLIC tools/studio)
+        target_link_libraries(ergo_studio_sonus_link PRIVATE Sonus::tool_core)
+        add_library(ergo_studio_sonus STATIC
+            tools/studio/plugins/sonus/recording_path.cpp
+            tools/studio/plugins/sonus/sonus_plugin.cpp
+            tools/studio/plugins/sonus/sonus_routes.cpp
+            tools/studio/plugins/sonus/sonus_shown_json.cpp
+        )
+        target_link_libraries(ergo_studio_sonus PUBLIC ergo_studio_plugins ergo_studio_sonus_link)
+        set(_ergo_studio_sonus_targets ergo_studio_sonus_link ergo_studio_sonus)
+        if(TARGET ergo_studio_ui)
+            add_library(ergo_studio_sonus_view STATIC tools/studio/views/sonus_view.cpp)
+            target_link_libraries(ergo_studio_sonus_view PUBLIC ergo_studio_sonus ergo_studio_ui)
+            list(APPEND _ergo_studio_sonus_targets ergo_studio_sonus_view)
+        endif()
+        foreach(_t IN LISTS _ergo_studio_sonus_targets)
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(${_t} PRIVATE -Wall -Wextra)
+            endif()
+        endforeach()
+
+        if(ERGO_BUILD_TESTS AND NOT ERGO_SONUS_LIVELINK)
+            message(WARNING "ergo: test_studio_sonus is not registered: the Sonus game needs its live link (SND_LIVELINK=ON)")
+        elseif(ERGO_BUILD_TESTS)
+            # A Sonus game in the same process (C API, silent device, live link on a loopback
+            # port) and the plugin connected to it. The test itself builds the game's bank with
+            # the tool's project model, so it is C++20 (Sonus::tool_core).
+            add_executable(test_studio_sonus
+                tests/studio/test_studio_sonus.cpp
+                tests/studio/sonus_test_game.cpp
+            )
+            target_link_libraries(test_studio_sonus PRIVATE ergo_studio_sonus Sonus::sonus Sonus::tool_core ergo_gtest_main)
+            if(TARGET ergo_studio_sonus_view)
+                target_sources(test_studio_sonus PRIVATE tests/studio/test_studio_sonus_view.cpp)
+                target_link_libraries(test_studio_sonus PRIVATE ergo_studio_sonus_view)
+            endif()
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(test_studio_sonus PRIVATE -Wall -Wextra)
+            endif()
+            add_test(NAME test_studio_sonus COMMAND test_studio_sonus)
+            set_tests_properties(test_studio_sonus PROPERTIES TIMEOUT 600)
         endif()
     endif()
 endif()
@@ -2260,6 +2376,10 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
     )
     target_include_directories(ergo_studio PRIVATE tools/studio)
     target_link_libraries(ergo_studio PRIVATE ergo_studio_views ergo_studio_plugins ergo_studio_host ergo_studio_net)
+    if(TARGET ergo_studio_sonus_view)
+        target_link_libraries(ergo_studio PRIVATE ergo_studio_sonus_view)
+        target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SONUS=1)
+    endif()
     if(_ergo_studio_shell)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)

@@ -19,6 +19,10 @@
 #include "plugins/vfx_suggest/vfx_suggest_plugin.h"
 #include "plugins/visus/visus_plugin.h"
 #include "views/lesson_view.h"
+#if defined(ERGO_STUDIO_HAS_SONUS)
+#include "plugins/sonus/sonus_plugin.h"
+#include "views/sonus_view.h"
+#endif
 
 #include "ergo/studio/platform/clipboard.h"
 
@@ -64,6 +68,14 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
         plugin->attach_view(std::make_shared<views::LessonView>(*plugin, platform::make_system_clipboard()));
         return plugin;
     });
+#if defined(ERGO_STUDIO_HAS_SONUS)
+    // Only in builds with Sonus (CMake: Sonus + ERGO_BUILD_STUDIO); otherwise no "sonus" plugin exists.
+    f.push_back([cfg = s.sonus](const host::LogFn& log) -> std::unique_ptr<host::IPlugin> {
+        auto plugin = p::sonus::make_sonus_plugin(cfg, log);
+        plugin->attach_view(std::make_shared<views::SonusView>(*plugin));
+        return plugin;
+    });
+#endif
     return f;
 }
 

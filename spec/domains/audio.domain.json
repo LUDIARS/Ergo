@@ -5,6 +5,7 @@
   "templateRules": [],
   "specRefs": [
     "spec/feature/module/audio.md",
+    "spec/module/audio_sonus.md",
     "spec/feature/module/sound.md",
     "spec/architecture/domains-and-ux.md"
   ],

@@ -4,9 +4,18 @@
 
 using namespace ergo::audio;
 
+#if defined(ERGO_AUDIO_BACKEND_SONUS)
+#include "ergo/audio/sonus_options.h"
+namespace {
+// The Sonus backend opens the OS device unless told otherwise; these contract tests
+// must run on machines without a sound card, so they use its silent output.
+const bool kSilentOutput = ergo::audio::sonus::configure({ergo::audio::sonus::Output::Silent});
+} // namespace
+#endif
+
 /// Tests run against whichever backend is linked in. Dummy is always
 /// present (fallback when FMOD SDK isn't installed) so the tests are
-/// valid on a stock build. When FMOD is available, the same tests
+/// valid on a stock build. When FMOD (or Sonus) is linked, the same tests
 /// stress the real pipeline — a missing-file load_sound will fail
 /// gracefully and return 0.
 
@@ -18,7 +27,11 @@ TEST(AudioEngine, BackendNameIsKnown) {
     const char* n = Engine::instance().backend_name();
     ASSERT_NE(n, nullptr);
     const std::string s = n;
-    EXPECT_TRUE(s == "Dummy" || s == "FMOD");
+    EXPECT_TRUE(s == "Dummy" || s == "FMOD" || s == "Sonus");
+#if defined(ERGO_AUDIO_BACKEND_SONUS)
+    EXPECT_TRUE(kSilentOutput);
+    EXPECT_TRUE(Engine::instance().backend() == Backend::Sonus);
+#endif
 }
 
 TEST(AudioEngine, InitializeAndShutdownIdempotent) {
