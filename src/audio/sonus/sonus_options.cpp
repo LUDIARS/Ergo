@@ -26,12 +26,12 @@ bool configure(const Options& o) {
         std::fprintf(stderr, "[audio:sonus] configure() ignored: call it before initialize() (or after shutdown())\n");
         return false;
     }
-    if (o.max_concurrent_plays < 1 || o.max_concurrent_plays > 4096) {
-        std::fprintf(stderr, "[audio:sonus] configure(): max_concurrent_plays must be 1..4096 (got %u)\n",
-                     static_cast<unsigned>(o.max_concurrent_plays));
+    if (o.max_loaded_sounds < 1 || o.max_loaded_sounds > 4096) {
+        std::fprintf(stderr, "[audio:sonus] configure(): max_loaded_sounds must be 1..4096 (got %u)\n",
+                     static_cast<unsigned>(o.max_loaded_sounds));
         return false;
     }
-    if (o.output != Output::Platform && o.output != Output::Silent) {
+    if (o.output != Output::Platform && o.output != Output::Silent && o.output != Output::Manual) {
         std::fprintf(stderr, "[audio:sonus] configure(): unknown output %u\n", static_cast<unsigned>(o.output));
         return false;
     }

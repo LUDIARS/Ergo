@@ -1,7 +1,7 @@
 // ergo_audio's Sonus backend (spec/module/audio_sonus.md). Hermetic: the WAV
 // files are generated here into a private temp directory, the output is Sonus'
-// silent device of the backend (no sound card), and the live link listens on a
-// loopback port picked per process.
+// manual device (no sound card; the test advances it), and the live link listens
+// on a loopback port picked per process.
 #include "gtest/gtest.h"
 
 #include "ergo/audio/audio_engine.h"
@@ -107,36 +107,48 @@ private:
     fs::path dir_;
 };
 
-sonus::Options silent_options() {
+/// Sonus' manual output: the test plays the device itself (advance_output), so a
+/// play's length is exact in blocks and no time passes in between.
+sonus::Options manual_options() {
     sonus::Options o;
-    o.output = sonus::Output::Silent;
+    o.output = sonus::Output::Manual;
     return o;
 }
 
-/// update() every millisecond until pred() or `seconds`.
-template <class Pred>
-bool pump_until(Pred pred, double seconds = 30.0) {
-    const auto end = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
-    for (;;) {
-        Engine::instance().update();
-        if (pred()) return true;
-        if (std::chrono::steady_clock::now() > end) return false;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
+/// One game frame: update(), then one device period.
+void frame() {
+    Engine::instance().update();
+    sonus::advance_output(1);
 }
 
-/// Plays `h` and returns the largest output sample until the play is reclaimed, or -1
-/// when the play did not start or did not end within the time limit.
-float play_and_measure(SoundHandle h, float volume, float pitch, uint64_t* blocks = nullptr) {
-    pump_until([] { return sonus::stats().plays_held == 0; });
+/// frame() until pred() (at most `frames`).
+template <class Pred>
+bool run_until(Pred pred, int frames = 20000) {
+    for (int i = 0; i < frames; ++i) {
+        frame();
+        if (pred()) return true;
+    }
+    return false;
+}
+
+/// Plays `h` and returns the largest output sample until the play ends, or -1 when the
+/// play did not start or did not end. `periods`: device periods it lasted.
+float play_and_measure(SoundHandle h, float volume, float pitch, int* periods = nullptr) {
+    run_until([] { return sonus::stats().plays_active == 0; });
     sonus::reset_output_peak();
-    const uint64_t start = sonus::stats().blocks_rendered;
     Engine::instance().play(h, volume, pitch);
     Engine::instance().update();   // starts the queued play
-    if (sonus::stats().plays_held != 1u) return -1.0f;
-    if (!pump_until([] { return sonus::stats().plays_held == 0; })) return -1.0f;
-    if (blocks) *blocks = sonus::stats().blocks_rendered - start;
+    if (sonus::stats().plays_active != 1u) return -1.0f;
+    int n = 0;
+    if (!run_until([&] { ++n; return sonus::stats().plays_active == 0; })) return -1.0f;
+    if (periods) *periods = n;
     return sonus::stats().output_peak;
+}
+
+/// The engine up with `o` (configure + initialize).
+bool start(const sonus::Options& o = manual_options()) {
+    Engine::instance().shutdown();
+    return sonus::configure(o) && Engine::instance().initialize();
 }
 
 } // namespace
@@ -215,40 +227,57 @@ TEST(SonusWav, RejectsWhatItCannotPlay) {
 TEST(SonusEngine, OptionsAreCheckedAndOnlyTakenBeforeInitialize) {
     auto& e = Engine::instance();
     e.shutdown();
-    sonus::Options bad = silent_options();
-    bad.max_concurrent_plays = 0;
+    sonus::Options bad = manual_options();
+    bad.max_loaded_sounds = 0;
     EXPECT_FALSE(sonus::configure(bad));
-    bad.max_concurrent_plays = 5000;
+    bad.max_loaded_sounds = 5000;
     EXPECT_FALSE(sonus::configure(bad));
-    ASSERT_TRUE(sonus::configure(silent_options()));
-    EXPECT_TRUE(sonus::options().output == sonus::Output::Silent);
+    bad.max_loaded_sounds = 256;
+    bad.output            = static_cast<sonus::Output>(9);
+    EXPECT_FALSE(sonus::configure(bad));
+    ASSERT_TRUE(sonus::configure(manual_options()));
+    EXPECT_TRUE(sonus::options().output == sonus::Output::Manual);
 
     ASSERT_TRUE(e.initialize());
     EXPECT_TRUE(e.backend() == Backend::Sonus);
     EXPECT_EQ(std::string(e.backend_name()), "Sonus");
     EXPECT_TRUE(sonus::stats().running);
     EXPECT_EQ(sonus::stats().live_link_port, 0u);
-    sonus::Options other = silent_options();
-    other.max_concurrent_plays = 7;
+    sonus::Options other = manual_options();
+    other.max_loaded_sounds = 7;
     EXPECT_FALSE(sonus::configure(other));          // refused while initialized
-    EXPECT_EQ(sonus::options().max_concurrent_plays, 128u);
+    EXPECT_EQ(sonus::options().max_loaded_sounds, 256u);
     e.shutdown();
     EXPECT_FALSE(sonus::stats().running);
+    EXPECT_FALSE(sonus::advance_output(1));          // not running
+}
+
+TEST(SonusEngine, SilentOutputRunsInRealTime) {
+    ASSERT_TRUE(start(sonus::Options{sonus::Output::Silent}));
+    const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (sonus::stats().blocks_rendered < 8 && std::chrono::steady_clock::now() < end) {
+        Engine::instance().update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    EXPECT_GE(sonus::stats().blocks_rendered, 8u);   // Sonus' own timer drives it
+    EXPECT_FALSE(sonus::advance_output(1));          // only the manual device is advanced by hand
+    Engine::instance().shutdown();
 }
 
 // ---- playback ------------------------------------------------------------------------
-TEST(SonusEngine, PlaysThroughTheSilentDeviceWithVolume) {
+TEST(SonusEngine, PlaysWithVolumeWithoutCopying) {
     TempDir tmp;
     const std::string dc = tmp.write("dc.wav", dc_wav(0.5f, 4800));
+    ASSERT_TRUE(start());
     auto& e = Engine::instance();
-    e.shutdown();
-    ASSERT_TRUE(sonus::configure(silent_options()));
-    ASSERT_TRUE(e.initialize());
-    ASSERT_TRUE(pump_until([] { return sonus::stats().blocks_rendered > 4; }));   // the device runs
-    EXPECT_FLOAT_EQ(sonus::stats().output_peak, 0.0f);                           // nothing played yet
+    ASSERT_TRUE(run_until([] { return sonus::stats().blocks_rendered > 4; }));
+    EXPECT_FLOAT_EQ(sonus::stats().output_peak, 0.0f);   // nothing played yet
 
     const SoundHandle h = e.load_sound(dc);
     ASSERT_NE(h, INVALID_SOUND);
+    EXPECT_EQ(sonus::stats().sounds_held, 0u);   // as of the last update
+    e.update();
+    EXPECT_EQ(sonus::stats().sounds_held, 1u);   // one buffer for the sound
     const float full = play_and_measure(h, 1.0f, 1.0f);
     EXPECT_GT(full, 0.1f);
     const float half = play_and_measure(h, 0.5f, 1.0f);
@@ -257,91 +286,118 @@ TEST(SonusEngine, PlaysThroughTheSilentDeviceWithVolume) {
     EXPECT_NEAR(play_and_measure(h, 7.0f, 1.0f), full, full * 0.01f);
     EXPECT_FLOAT_EQ(play_and_measure(h, -3.0f, 1.0f), 0.0f);
 
-    // A play keeps its samples when its sound is unloaded meanwhile.
-    e.play(h, 1.0f, 1.0f);
-    e.unload_sound(h);
+    // Three plays of one sound at once share its buffer and add up.
+    run_until([] { return sonus::stats().plays_active == 0; });
+    sonus::reset_output_peak();
+    for (int i = 0; i < 3; ++i) e.play(h, 0.25f, 1.0f);
     e.update();
-    EXPECT_EQ(sonus::stats().plays_held, 1u);
-    ASSERT_TRUE(pump_until([] { return sonus::stats().plays_held == 0; }));
+    EXPECT_EQ(sonus::stats().plays_active, 3u);
+    EXPECT_EQ(sonus::stats().sounds_held, 1u);
+    ASSERT_TRUE(run_until([] { return sonus::stats().plays_active == 0; }));
+    EXPECT_NEAR(sonus::stats().output_peak, full * 0.75f, full * 0.01f);
+
+    // Unloading stops the plays of the sound (like FMOD's Sound::release) and frees the buffer.
+    e.play(h, 1.0f, 1.0f);
+    e.update();
+    EXPECT_EQ(sonus::stats().plays_active, 1u);
+    e.unload_sound(h);
+    ASSERT_TRUE(run_until([] { return sonus::stats().plays_active == 0 && sonus::stats().sounds_held == 0; }, 200));
     e.play(h, 1.0f, 1.0f);   // unloaded: nothing queued
     e.update();
-    EXPECT_EQ(sonus::stats().plays_held, 0u);
+    EXPECT_EQ(sonus::stats().plays_active, 0u);
     e.shutdown();
 }
 
 TEST(SonusEngine, PitchChangesTheLengthOfAPlay) {
     TempDir tmp;
     const std::string dc = tmp.write("dc.wav", dc_wav(0.5f, 24000));   // 0.5 s at 48 kHz
+    ASSERT_TRUE(start());
     auto& e = Engine::instance();
-    e.shutdown();
-    ASSERT_TRUE(sonus::configure(silent_options()));
-    ASSERT_TRUE(e.initialize());
     const SoundHandle h = e.load_sound(dc);
     ASSERT_NE(h, INVALID_SOUND);
-    uint64_t normal = 0, fast = 0, slow = 0;
+    int normal = 0, fast = 0, slow = 0, low = 0;
     EXPECT_GT(play_and_measure(h, 1.0f, 1.0f, &normal), 0.0f);
     EXPECT_GT(play_and_measure(h, 1.0f, 2.0f, &fast), 0.0f);
     EXPECT_GT(play_and_measure(h, 1.0f, 0.5f, &slow), 0.0f);
-    // 24000 frames = 93.75 blocks of 256; reclaiming adds a few blocks to each.
-    EXPECT_GT(normal, 90u);
-    EXPECT_LT(normal, 130u);
-    EXPECT_NEAR(static_cast<double>(fast), static_cast<double>(normal) / 2.0, 20.0);
-    EXPECT_NEAR(static_cast<double>(slow), static_cast<double>(normal) * 2.0, 25.0);
+    // 24000 frames = 93.75 periods of 256; the render-ahead adds a few to each.
+    EXPECT_GT(normal, 90);
+    EXPECT_LT(normal, 110);
+    EXPECT_NEAR(static_cast<double>(fast), static_cast<double>(normal) / 2.0, 8.0);
+    EXPECT_NEAR(static_cast<double>(slow), static_cast<double>(normal) * 2.0, 8.0);
+    // Below Sonus' range (1/16) the pitch is clamped to it and said so: 16 times as long.
+    const SoundHandle short_dc = e.load_sound(tmp.write("short.wav", dc_wav(0.5f, 2400)));
+    int base = 0;
+    EXPECT_GT(play_and_measure(short_dc, 1.0f, 1.0f, &base), 0.0f);
+    EXPECT_GT(play_and_measure(short_dc, 1.0f, 0.01f, &low), 0.0f);
+    EXPECT_NEAR(static_cast<double>(low), (static_cast<double>(base) - 4.0) * 16.0 + 4.0, 24.0);
     e.shutdown();
 }
 
 TEST(SonusEngine, FailuresAreValuesNotCrashes) {
     TempDir tmp;
     const std::string ogg = tmp.write("music.ogg", {'O', 'g', 'g', 'S', 0, 2, 0, 0, 0, 0, 0, 0, 0, 0});
-    const std::string dc  = tmp.write("dc.wav", dc_wav(0.5f, 48000));
+    const std::string dc  = tmp.write("dc.wav", dc_wav(0.5f, 4800));
     auto& e = Engine::instance();
     e.shutdown();
     EXPECT_EQ(e.load_sound(dc), INVALID_SOUND);   // not initialized
 
-    sonus::Options o = silent_options();
-    o.max_concurrent_plays = 2;
-    ASSERT_TRUE(sonus::configure(o));
-    ASSERT_TRUE(e.initialize());
+    sonus::Options o = manual_options();
+    o.max_loaded_sounds = 2;
+    ASSERT_TRUE(start(o));
     EXPECT_EQ(e.load_sound(ogg), INVALID_SOUND);   // not WAV: an explicit failure
     EXPECT_EQ(e.load_sound(tmp.write("missing-dir/none.wav", {})), INVALID_SOUND);
     EXPECT_EQ(e.load_sound("/nonexistent/ergo.wav"), INVALID_SOUND);
-    const SoundHandle h = e.load_sound(dc);
-    ASSERT_NE(h, INVALID_SOUND);
+    // Room for two sounds: the third load fails (and is logged).
+    const SoundHandle a = e.load_sound(dc);
+    const SoundHandle b = e.load_sound(dc);
+    ASSERT_NE(a, INVALID_SOUND);
+    ASSERT_NE(b, INVALID_SOUND);
+    EXPECT_EQ(e.load_sound(dc), INVALID_SOUND);
+    // A released buffer counts until Sonus gives it back; then the room is there again.
+    e.unload_sound(a);
+    ASSERT_TRUE(run_until([] { return sonus::stats().sounds_held == 1; }, 200));
+    EXPECT_NE(e.load_sound(dc), INVALID_SOUND);
 
-    // Five plays at once with room for two: three are dropped (and logged).
-    for (int i = 0; i < 5; ++i) e.play(h);
+    // Plays are not limited by the sounds: five plays of one sound start.
+    for (int i = 0; i < 5; ++i) e.play(b);
     e.update();
-    EXPECT_EQ(sonus::stats().plays_held, 2u);
-    EXPECT_EQ(sonus::stats().dropped_plays, 3u);
+    EXPECT_EQ(sonus::stats().plays_active, 5u);
+    EXPECT_EQ(sonus::stats().dropped_plays, 0u);
     e.play(9999);            // unknown handle
     e.play(INVALID_SOUND);
     e.unload_sound(9999);
     e.update();
-    EXPECT_EQ(sonus::stats().plays_held, 2u);
-    e.shutdown();            // frees the plays still sounding
-    EXPECT_EQ(sonus::stats().plays_held, 0u);
-    ASSERT_TRUE(sonus::configure(silent_options()));
+    EXPECT_EQ(sonus::stats().plays_active, 5u);
+    e.shutdown();            // stops the plays, frees the buffers
+    EXPECT_EQ(sonus::stats().plays_active, 0u);
+    EXPECT_EQ(sonus::stats().sounds_held, 0u);
 }
 
-TEST(SonusEngine, UpdateFromAnotherThreadIsRefused) {
+TEST(SonusEngine, OtherThreadsLoadAndPlayTheOwnerUpdates) {
     TempDir tmp;
     const std::string dc = tmp.write("dc.wav", dc_wav(0.5f, 4800));
+    ASSERT_TRUE(start());
     auto& e = Engine::instance();
-    e.shutdown();
-    ASSERT_TRUE(sonus::configure(silent_options()));
-    ASSERT_TRUE(e.initialize());
-    const SoundHandle h = e.load_sound(dc);
-    // play() is fine from any thread; update() only on the initializing thread.
+    SoundHandle h = INVALID_SOUND;
+    // load_sound() and play() work from any thread; update() / shutdown() / advance_output()
+    // only on the initializing thread.
     std::thread other([&] {
+        h = e.load_sound(dc);   // the buffer is made by the owner's next update()
         e.play(h);
-        e.update();   // logged and ignored
-        e.shutdown(); // logged and ignored
+        e.update();             // logged and ignored
+        e.shutdown();           // logged and ignored
+        EXPECT_FALSE(sonus::advance_output(1));
     });
     other.join();
+    ASSERT_NE(h, INVALID_SOUND);
     EXPECT_TRUE(e.is_initialized());
-    EXPECT_EQ(sonus::stats().plays_held, 0u);   // the other thread's update() started nothing
+    EXPECT_EQ(sonus::stats().plays_active, 0u);   // the other thread's update() started nothing
     e.update();
-    EXPECT_EQ(sonus::stats().plays_held, 1u);
+    EXPECT_EQ(sonus::stats().sounds_held, 1u);
+    EXPECT_EQ(sonus::stats().plays_active, 1u);
+    std::thread unloader([&] { e.unload_sound(h); });
+    unloader.join();
+    ASSERT_TRUE(run_until([] { return sonus::stats().sounds_held == 0 && sonus::stats().plays_active == 0; }, 200));
     e.shutdown();
     EXPECT_FALSE(e.is_initialized());
 }
@@ -350,7 +406,7 @@ TEST(SonusEngine, UpdateFromAnotherThreadIsRefused) {
 TEST(SonusEngine, LiveLinkListensOnTheConfiguredPort) {
     auto& e = Engine::instance();
     e.shutdown();
-    sonus::Options o = silent_options();
+    sonus::Options o = manual_options();
     o.live_link = true;
     bool up = false;
     uint16_t port = 0;
@@ -372,6 +428,6 @@ TEST(SonusEngine, LiveLinkListensOnTheConfiguredPort) {
     EXPECT_EQ(::connect(fd, reinterpret_cast<const sockaddr*>(&a), sizeof a), 0);
     ::close(fd);
     e.shutdown();
-    ASSERT_TRUE(sonus::configure(silent_options()));
+    ASSERT_TRUE(sonus::configure(manual_options()));
 }
 #endif

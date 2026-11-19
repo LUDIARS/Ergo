@@ -66,43 +66,6 @@ std::string event_json(unsigned g, const char* name, const char* bus, int loops)
            bus + "\", \"tracks\": [{\"clips\": [{\"asset\": \"dc\", \"loopCount\": " + std::to_string(loops) + "}]}]}";
 }
 
-// ---- the null device (snd/ext.h table), pumped by Game::step -------------------------
-struct NullDevice {
-    snd_device_callback cb       = nullptr;
-    void*               cb_user  = nullptr;
-    uint32_t            rate     = 48000, channels = 2, period = 256;
-    bool                started  = false;
-    std::vector<float>  buffer;
-    float               last_peak = 0.0f;
-};
-
-int32_t SND_CALL dev_open(void* u, const snd_device_desc* d, snd_device_callback cb, void* cb_user) {
-    auto* n = static_cast<NullDevice*>(u);
-    if (cb == nullptr) return 0;
-    if (d->sample_rate != 0u) n->rate = d->sample_rate;
-    if (d->channels != 0u) n->channels = d->channels;
-    if (d->period_frames != 0u) n->period = d->period_frames;
-    n->cb      = cb;
-    n->cb_user = cb_user;
-    n->buffer.assign(static_cast<std::size_t>(n->period) * n->channels, 0.0f);
-    return 1;
-}
-int32_t SND_CALL dev_start(void* u) {
-    static_cast<NullDevice*>(u)->started = true;
-    return 1;
-}
-void SND_CALL dev_stop(void* u) { static_cast<NullDevice*>(u)->started = false; }
-void SND_CALL dev_close(void* u) {
-    auto* n    = static_cast<NullDevice*>(u);
-    n->started = false;
-    n->cb      = nullptr;
-}
-uint32_t SND_CALL dev_period(void* u) { return static_cast<NullDevice*>(u)->period; }
-uint32_t SND_CALL dev_rate(void* u) { return static_cast<NullDevice*>(u)->rate; }
-uint32_t SND_CALL dev_channels(void* u) { return static_cast<NullDevice*>(u)->channels; }
-double SND_CALL   dev_latency(void*) { return 0.0; }
-void SND_CALL     dev_listener(void*, snd_device_event_fn, void*) {}
-
 } // namespace
 
 void write_mix_project(const std::string& dir) {
@@ -135,10 +98,11 @@ std::string build_project(const std::string& dir, const std::string& out, std::s
 }
 
 struct Game::Impl {
-    NullDevice        device;
-    snd_output_device table{};
-    snd_system*       sys = nullptr;
-    snd_result        bank_result = SND_OK;
+    snd_system*        sys = nullptr;
+    snd_result         bank_result = SND_OK;
+    std::string        root;            // the file system root (kept alive for the config)
+    std::vector<float> period;          // one device period, interleaved
+    float              last_peak = 0.0f;
 };
 
 namespace {
@@ -154,23 +118,18 @@ Game::~Game() {
 }
 
 std::unique_ptr<Game> Game::start(const std::string& bank, uint16_t port, std::string& error) {
-    auto impl                        = std::make_unique<Impl>();
-    impl->table.user                 = &impl->device;
-    impl->table.open                 = &dev_open;
-    impl->table.start                = &dev_start;
-    impl->table.stop                 = &dev_stop;
-    impl->table.close                = &dev_close;
-    impl->table.period_frames        = &dev_period;
-    impl->table.sample_rate          = &dev_rate;
-    impl->table.channels             = &dev_channels;
-    impl->table.output_latency_seconds = &dev_latency;
-    impl->table.set_event_listener   = &dev_listener;
+    auto impl = std::make_unique<Impl>();
+    // Sonus' built-in file system rooted at the bank's directory (D-103): the bank is
+    // loaded by its name relative to that root.
+    const fs::path bank_path = fs::path(bank);
+    impl->root               = bank_path.parent_path().string();
 
     snd_config cfg;
     snd_config_init(&cfg);
-    cfg.output.device        = &impl->table;
-    cfg.livelink.enabled     = 1;
-    cfg.livelink.port        = port;
+    cfg.output_kind            = SND_OUTPUT_MANUAL;   // Sonus' manual device (D-102): step() advances it
+    cfg.file_system_root       = impl->root.c_str();
+    cfg.livelink.enabled       = 1;
+    cfg.livelink.port          = port;
     cfg.tuning.lod_down_blocks = 0;   // no load LOD: a busy test machine must not change the mix
     const snd_result r = snd_create(&cfg, nullptr, nullptr, &impl->sys);
     if (r != SND_OK) {
@@ -178,33 +137,24 @@ std::unique_ptr<Game> Game::start(const std::string& bank, uint16_t port, std::s
         error     = "snd_create failed: " + std::to_string(r);
         return nullptr;
     }
+    impl->period.assign(static_cast<std::size_t>(cfg.block_size) * (cfg.output_channels ? cfg.output_channels : 2u), 0.0f);
     snd_callbacks cb{};
     cb.user           = impl.get();
     cb.on_bank_loaded = &on_bank_loaded;
     snd_set_callbacks(impl->sys, &cb);
     std::unique_ptr<Game> g(new Game(std::move(impl)));
-    // snd_create's default file system is rooted at the working directory and takes
-    // '/'-separated relative paths only.
-    std::error_code   ec;
-    const std::string rel = fs::relative(fs::path(bank), fs::current_path(ec), ec).generic_string();
-    if (ec || rel.empty() || rel.rfind("..", 0) == 0) {
-        error = "the bank " + bank + " is not under the working directory";
-        return nullptr;
-    }
-    const snd_bank_handle b = snd_load_bank_async(g->impl_->sys, rel.c_str());
-    const auto            end = std::chrono::steady_clock::now() + std::chrono::seconds(30);
-    for (;;) {
+    const std::string     name = bank_path.filename().generic_string();
+    const snd_bank_handle b    = snd_load_bank_async(g->impl_->sys, name.c_str());
+    for (int i = 0; i < 20000; ++i) {
         g->step();
         const snd_bank_state st = snd_get_bank_state(g->impl_->sys, b);
-        if (st == SND_BANK_STATE_LOADED) break;
-        if (st == SND_BANK_STATE_FAILED || std::chrono::steady_clock::now() > end) {
-            error = "the bank did not load (state " + std::to_string(st) + ", result " +
-                    std::to_string(g->impl_->bank_result) + ")";
-            return nullptr;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        if (st == SND_BANK_STATE_LOADED) return g;
+        if (st == SND_BANK_STATE_FAILED) break;
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
     }
-    return g;
+    error = "the bank did not load (state " + std::to_string(snd_get_bank_state(g->impl_->sys, b)) + ", result " +
+            std::to_string(g->impl_->bank_result) + ")";
+    return nullptr;
 }
 
 bool Game::play(const char* event) {
@@ -214,12 +164,11 @@ bool Game::play(const char* event) {
 
 void Game::step() {
     snd_update(impl_->sys);
-    NullDevice& d = impl_->device;
-    if (!d.started || d.cb == nullptr) return;
-    d.cb(d.cb_user, d.buffer.data(), d.period, d.channels);
+    const uint32_t frames = static_cast<uint32_t>(impl_->period.size() / 2u);
+    if (snd_advance_output(impl_->sys, 1, impl_->period.data(), frames) != SND_OK) return;
     float peak = 0.0f;
-    for (float v : d.buffer) peak = std::fmax(peak, std::fabs(v));
-    d.last_peak = peak;
+    for (float v : impl_->period) peak = std::fmax(peak, std::fabs(v));
+    impl_->last_peak = peak;
 }
 
 float Game::master_peak() const {
@@ -230,7 +179,7 @@ float Game::master_peak() const {
     return peak;
 }
 
-float Game::device_peak() const { return impl_->device.last_peak; }
+float Game::device_peak() const { return impl_->last_peak; }
 
 uint16_t candidate_port(int attempt) {
     return static_cast<uint16_t>(30000 + (SONUS_TEST_GETPID() * 7 + attempt * 101 + 50) % 20000);
@@ -239,9 +188,7 @@ uint16_t candidate_port(int attempt) {
 TempDir::TempDir(const std::string& name) {
     static int      counter = 0;
     std::error_code ec;
-    // Under the working directory, not the system temp: Sonus' default file system reads
-    // banks by paths relative to it and refuses absolute ones (Game::start).
-    const fs::path  p = fs::current_path(ec) /
+    const fs::path  p = fs::temp_directory_path(ec) /
                        ("ergo-studio-sonus-" + name + "-" + std::to_string(SONUS_TEST_GETPID()) + "-" + std::to_string(++counter));
     fs::remove_all(p, ec);
     fs::create_directories(p, ec);

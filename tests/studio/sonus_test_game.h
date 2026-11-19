@@ -1,7 +1,8 @@
 #pragma once
 // A Sonus game for the sonus plugin's tests, in the test's own process: Sonus' C API
-// only (what an engine links), a null output device pumped from the test's loop, the
-// live link on a loopback port, one bank loaded from disk. Plus the Sonus project the
+// only (what an engine links), Sonus' manual output device advanced by the test's loop,
+// the live link on a loopback port, one bank loaded through Sonus' file system rooted at
+// the bank's directory. Plus the Sonus project the
 // game's bank is built from (written by the test, built with the tool's project model).
 #include <cstdint>
 #include <memory>
@@ -34,7 +35,7 @@ public:
     float master_peak() const;       ///< the master meter (largest channel), as of the last step
     float device_peak() const;       ///< largest |sample| of the last period the device played
 
-    struct Impl;
+    struct Impl;   ///< public for the callbacks in the .cpp
 
 private:
     explicit Game(std::unique_ptr<Impl> impl);
@@ -44,7 +45,7 @@ private:
 /// A candidate port near a per-process base (attempt 0, 1, ...).
 uint16_t candidate_port(int attempt);
 
-/// A fresh, empty directory under the working directory (removed by the destructor).
+/// A fresh, empty directory under the system temp directory (removed by the destructor).
 class TempDir {
 public:
     explicit TempDir(const std::string& name);

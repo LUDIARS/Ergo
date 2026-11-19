@@ -682,10 +682,9 @@ if(ERGO_BUILD_AUDIO)
         # header names no Sonus type (spec/module/audio_sonus.md).
         add_library(ergo_audio
             src/audio/audio_engine_sonus.cpp
-            src/audio/sonus/play_buffers.cpp
             src/audio/sonus/result_text.cpp
-            src/audio/sonus/silent_output_device.cpp
             src/audio/sonus/sonus_options.cpp
+            src/audio/sonus/sound_buffers.cpp
             src/audio/wav_pcm.cpp
         )
         target_link_libraries(ergo_audio PUBLIC Threads::Threads PRIVATE Sonus::sonus)
@@ -732,8 +731,8 @@ if(ERGO_BUILD_AUDIO)
         target_link_libraries(test_ergo_audio PRIVATE ergo_audio ergo_gtest_main)
         add_test(NAME test_ergo_audio COMMAND test_ergo_audio)
         if(ERGO_AUDIO_BACKEND STREQUAL "sonus")
-            # The Sonus backend itself: silent output device, WAV decoding, volume / pitch,
-            # buffer reclaim, the live link. Hermetic (generated WAV, no sound card).
+            # The Sonus backend itself: WAV decoding, volume / pitch, buffer release, the live
+            # link. Hermetic (generated WAV, Sonus' manual output device: no sound card).
             add_executable(test_ergo_audio_sonus tests/audio/test_ergo_audio_sonus.cpp)
             target_include_directories(test_ergo_audio_sonus PRIVATE src/audio)
             target_link_libraries(test_ergo_audio_sonus PRIVATE ergo_audio ergo_gtest_main)
