@@ -64,6 +64,7 @@ bool is_port(const std::string& p) {
 } // namespace
 
 LinkParse parse_lesson_link(const std::string& text) {
+    if (text.size() > kMaxLinkText) return reject("接続文字列が長すぎます (2048 バイトまで)");
     const std::string s = trimmed(text);
     if (s.empty()) return reject("接続文字列が空です");
     for (char c : s) {

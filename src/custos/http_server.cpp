@@ -1,8 +1,10 @@
 #include "http_server.h"
+#include "request_head.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <stdexcept>
+#include <optional>
 
 #if defined(_WIN32)
 #  define WIN32_LEAN_AND_MEAN
@@ -41,87 +43,39 @@ struct WsaScope {
 static WsaScope g_wsa;     // プロセス寿命
 #endif
 
-/// 文字列 比較 (大文字小文字無視)。
-bool iequals(const std::string& a, const char* b) {
-    if (a.size() != std::strlen(b)) return false;
-    for (std::size_t i = 0; i < a.size(); ++i) {
-        char x = a[i] >= 'a' && a[i] <= 'z' ? char(a[i] - 32) : a[i];
-        char y = b[i] >= 'a' && b[i] <= 'z' ? char(b[i] - 32) : b[i];
-        if (x != y) return false;
-    }
-    return true;
-}
-
-/// HTTP/1.0 リクエストをパースする。Content-Length までを最低限読む。
-bool read_request(socket_t fd, HttpRequest& out) {
-    constexpr std::size_t MAX_HEADER = 16 * 1024;
+/// HTTP/1.0 リクエストを受信する。ヘッダを request_head.h の上限で検査してから、
+/// 宣言された長さ (上限内) だけ本文を読む。戻り値は HeadStatus (Ok 以外は応答の
+/// ステータス)。接続が途中で切れたら nullopt。
+std::optional<HeadStatus> read_request(socket_t fd, HttpRequest& out) {
+    const RequestLimits limits;
     std::string buf;
     buf.reserve(2048);
 
-    // ヘッダ終端 (\r\n\r\n) を見つけるまで読む。
-    while (buf.size() < MAX_HEADER) {
+    // ヘッダ終端 (\r\n\r\n) か上限まで読む。上限を超えて受け取らない。
+    while (buf.find("\r\n\r\n") == std::string::npos && buf.size() < limits.max_head) {
         char tmp[1024];
-        int n = ::recv(fd, tmp, sizeof(tmp), 0);
-        if (n <= 0) return false;
+        const std::size_t want = std::min(sizeof(tmp), limits.max_head - buf.size());
+        int n = ::recv(fd, tmp, int(want), 0);
+        if (n <= 0) return std::nullopt;
         buf.append(tmp, std::size_t(n));
-        if (buf.find("\r\n\r\n") != std::string::npos) break;
     }
-    auto header_end = buf.find("\r\n\r\n");
-    if (header_end == std::string::npos) return false;
-
-    // Request line
-    auto first_eol = buf.find("\r\n");
-    if (first_eol == std::string::npos) return false;
-    {
-        std::string line = buf.substr(0, first_eol);
-        auto sp1 = line.find(' ');
-        if (sp1 == std::string::npos) return false;
-        auto sp2 = line.find(' ', sp1 + 1);
-        if (sp2 == std::string::npos) return false;
-        out.method = line.substr(0, sp1);
-        out.path   = line.substr(sp1 + 1, sp2 - sp1 - 1);
-    }
-
-    // Content-Length
     std::size_t content_length = 0;
-    {
-        std::size_t pos = first_eol + 2;
-        while (pos < header_end) {
-            auto eol = buf.find("\r\n", pos);
-            if (eol == std::string::npos || eol > header_end) break;
-            std::string line = buf.substr(pos, eol - pos);
-            auto colon = line.find(':');
-            if (colon != std::string::npos) {
-                std::string name = line.substr(0, colon);
-                std::string val  = line.substr(colon + 1);
-                while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) val.erase(0, 1);
-                if (iequals(name, "Content-Length")) {
-                    try {
-                        content_length = std::stoul(val);
-                    } catch (const std::invalid_argument&) {
-                        // Invalid lengths use the existing bad-request path.
-                        return false;
-                    } catch (const std::out_of_range&) {
-                        return false;
-                    }
-                }
-            }
-            pos = eol + 2;
-        }
-    }
+    const HeadStatus status = parse_request_head(buf, limits, out, content_length);
+    if (status != HeadStatus::Ok) return status;
 
-    // Body をヘッダ後ろに残っている分 + 必要に応じて追加 recv
-    std::size_t body_start = header_end + 4;
+    // Body をヘッダ後ろに残っている分 + 必要に応じて追加 recv (宣言された長さまで)
+    const std::size_t body_start = buf.find("\r\n\r\n") + 4;
     std::string body = buf.substr(body_start);
+    if (body.size() > content_length) body.resize(content_length);
     while (body.size() < content_length) {
         char tmp[2048];
-        int  n = ::recv(fd, tmp, int(sizeof(tmp)), 0);
-        if (n <= 0) return false;
+        const std::size_t want = std::min(sizeof(tmp), content_length - body.size());
+        int  n = ::recv(fd, tmp, int(want), 0);
+        if (n <= 0) return std::nullopt;
         body.append(tmp, std::size_t(n));
     }
-    if (body.size() > content_length) body.resize(content_length);
     out.body = std::move(body);
-    return true;
+    return HeadStatus::Ok;
 }
 
 void write_all(socket_t fd, const char* data, std::size_t len) {
@@ -139,6 +93,8 @@ const char* status_text(int code) {
         case 204: return "No Content";
         case 400: return "Bad Request";
         case 404: return "Not Found";
+        case 413: return "Payload Too Large";
+        case 431: return "Request Header Fields Too Large";
         case 500: return "Internal Server Error";
         case 501: return "Not Implemented";
         case 503: return "Service Unavailable";
@@ -297,9 +253,11 @@ void HttpServer::accept_loop() {
 
 void HttpServer::handle_connection(int client_fd) {
     HttpRequest req;
-    if (!read_request(socket_t(client_fd), req)) {
-        auto r = HttpResponse::text(400, "bad request");
-        write_response(socket_t(client_fd), r);
+    const auto status = read_request(socket_t(client_fd), req);
+    if (!status) return;  // 相手が途中で切った: 返す先が無い
+    if (*status != HeadStatus::Ok) {
+        const int code = static_cast<int>(*status);
+        write_response(socket_t(client_fd), HttpResponse::text(code, code == 400 ? "bad request" : status_text(code)));
         return;
     }
     HttpResponse res;

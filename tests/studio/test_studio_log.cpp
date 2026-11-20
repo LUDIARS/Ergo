@@ -98,7 +98,11 @@ TEST(StudioLogApps, SuffixesLiveNamesAndTakesOverDeadOnes) {
     EXPECT_TRUE(apps.release("game", 1));
     EXPECT_FALSE(apps.release("game", 1));
     EXPECT_EQ(apps.claim("game", 4), "game");   // restarted engine continues its ring
-    EXPECT_EQ(apps.query("game")->last_seq, 1u);
+    // Kept in a local: EXPECT_EQ binds its operands by reference, and a member
+    // of the temporary optional dies before the comparison (ASan, clang).
+    const auto game = apps.query("game");
+    ASSERT_TRUE(game.has_value());
+    EXPECT_EQ(game->last_seq, 1u);
 }
 
 TEST(StudioLogApps, EvictsOldestDisconnectedApp) {
@@ -119,7 +123,8 @@ TEST(StudioLogQuery, ParsesParameters) {
     EXPECT_EQ(q.filter.levels->size(), 2u);
     EXPECT_EQ(*q.filter.since, 5.0);
     EXPECT_EQ(q.limit, kRingCapacity);
-    EXPECT_EQ(std::get<LinesQuery>(parse_lines_query({})).limit, kDefaultLinesLimit);
+    const auto defaults = parse_lines_query({});  // a local: EXPECT_EQ binds by reference
+    EXPECT_EQ(std::get<LinesQuery>(defaults).limit, kDefaultLinesLimit);
     EXPECT_TRUE(std::holds_alternative<std::string>(parse_lines_query({{"level", "ERR,NOPE"}})));
     EXPECT_TRUE(std::holds_alternative<std::string>(parse_lines_query({{"since", "abc"}})));
     EXPECT_TRUE(std::holds_alternative<std::string>(parse_lines_query({{"limit", "1.5"}})));

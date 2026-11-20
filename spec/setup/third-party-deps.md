@@ -46,6 +46,7 @@ curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を�
 | 名前 | pin | TLS / 備考 | consume |
 |---|---|---|---|
 | curl | tag `curl-8_19_0` | static libcurl のみ (CLI/docs/test/install 無効、関数スコープの通常変数で指定)。Windows は Schannel、Linux は OpenSSL | `target_link_libraries(<t> PRIVATE CURL::libcurl)` / `#include <curl/curl.h>` |
+| lorica | commit `5e8281b0e60fa16f814e16eaa620715937e8618d` (LUDIARS/Lorica、2026-11-11 の main) | `WITH` 系のスイッチではなく、Lorica が対応するツールチェインでは常に取り込む (`cmake/ErgoHardening.cmake`)。使うのはヘッダだけの `Lorica::boundary` と守りの CMake 関数で、`LORICA_BUILD_PROTECTION` / `LORICA_BUILD_TESTS` は関数スコープの通常変数で OFF。`LORICA_SOURCE_DIR` か `ERGO_SOURCE_DIR_LORICA` でローカルのチェックアウトを使う。ホストがすでに Lorica を持っていればそれを使う | 全ターゲットに自動 (`spec/setup/hardening.md`)。ヘッダは `#include <lorica/checked_size.hpp>` など |
 
 curl を使っているもの: `ergo_http` (`ERGO_BUILD_HTTP=ON` で curl を強制 ON)、`ergo_studio_platform` の Windows 以外の
 HTTP(S) (`src/studio/platform/curl_http_client.cpp`。`CURL::libcurl` があるときだけ。無ければ「この build には HTTP が

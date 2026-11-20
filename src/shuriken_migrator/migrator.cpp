@@ -1,5 +1,8 @@
 #include "ergo/shuriken_migrator/migrator.h"
 
+#include <lorica/input_budget.hpp>
+
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -638,9 +641,16 @@ bool ParsePrefabTree(const std::string& yamlText,
         else             childrenGo[parent].push_back(go);
     }
 
-    // GO anchor → ShurikenNode を再帰構築する。
-    std::function<ShurikenNode(long long)> build = [&](long long go) -> ShurikenNode {
+    // GO anchor → ShurikenNode を再帰構築する。 深さは kMaxHierarchyDepth まで、
+    // ノード数は GameObject の数まで (goOrder は重複を持たないので正しい木なら超えない)。
+    lorica::input_budget budget({0, goOrder.size(), 0, kMaxHierarchyDepth});
+    bool over_budget = false;
+    std::function<ShurikenNode(long long, std::size_t)> build = [&](long long go, std::size_t depth) -> ShurikenNode {
         ShurikenNode n;
+        if (over_budget || !budget.permits_depth(depth) || !budget.consume(0, 1, 0)) {
+            over_budget = true;
+            return n;
+        }
         auto nameIt = goName.find(go);
         n.name = (nameIt != goName.end()) ? nameIt->second : "GameObject";
         auto trIt = goToTransform.find(go);
@@ -653,17 +663,17 @@ bool ParsePrefabTree(const std::string& yamlText,
         }
         auto chIt = childrenGo.find(go);
         if (chIt != childrenGo.end())
-            for (long long c : chIt->second) n.children.push_back(build(c));
+            for (long long c : chIt->second) n.children.push_back(build(c, depth + 1));
         return n;
     };
 
     if (roots.size() == 1) {
-        outRoot = build(roots[0]);
+        outRoot = build(roots[0], 0);
     } else if (roots.size() > 1) {
         // ルートが複数 — 合成ルートでまとめる。
         outRoot = ShurikenNode{};
         outRoot.name = "(prefab root)";
-        for (long long r : roots) outRoot.children.push_back(build(r));
+        for (long long r : roots) outRoot.children.push_back(build(r, 1));
     } else {
         // Transform 階層を復元できなかった — emitter を flat にぶら下げる。
         report.Warn("Transform 階層を復元できず — emitter をフラット展開");
@@ -678,6 +688,11 @@ bool ParsePrefabTree(const std::string& yamlText,
             n.emitter.name = n.name;
             outRoot.children.push_back(std::move(n));
         }
+    }
+    if (over_budget) {
+        report.Warn("GameObject 階層が深さ " + std::to_string(kMaxHierarchyDepth) + " を超える — 復元を中止");
+        outRoot = ShurikenNode{};
+        return false;
     }
     return true;
 }
@@ -823,15 +838,31 @@ std::string SerializeConfigJson(const ergo::particle::ParticleEffectConfig& c) {
 
 }  // namespace
 
-std::string MigrateFileToJson(const std::string& prefabPath, MigrationReport& report) {
-    std::ifstream f(prefabPath);
+bool ReadPrefabText(const std::string& prefabPath, std::string& out, MigrationReport& report,
+                    std::size_t max_bytes) {
+    std::ifstream f(prefabPath);  // text mode, as before (CRLF prefabs on Windows)
     if (!f) {
         report.Warn("file open failed: " + prefabPath);
-        return "";
+        return false;
     }
-    std::stringstream buf;
-    buf << f.rdbuf();
-    std::string yaml = buf.str();
+    out.clear();
+    char chunk[64 * 1024];
+    while (f) {
+        f.read(chunk, sizeof(chunk));
+        const auto got = static_cast<std::size_t>(f.gcount());
+        if (got > max_bytes - out.size()) {
+            report.Warn("file larger than " + std::to_string(max_bytes) + " bytes: " + prefabPath);
+            out.clear();
+            return false;
+        }
+        out.append(chunk, got);
+    }
+    return true;
+}
+
+std::string MigrateFileToJson(const std::string& prefabPath, MigrationReport& report) {
+    std::string yaml;
+    if (!ReadPrefabText(prefabPath, yaml, report)) return "";
 
     std::vector<ShurikenSource> systems;
     if (!ParsePrefabYaml(yaml, systems, report)) {

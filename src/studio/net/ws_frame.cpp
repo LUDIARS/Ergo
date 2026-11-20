@@ -1,5 +1,9 @@
 #include "ergo/studio/net/ws_frame.h"
 
+#include <lorica/checked_size.hpp>
+
+#include <optional>
+
 namespace ergo::studio::net {
 
 std::string encode_ws_frame(WsOpcode op, const std::string& payload) {
@@ -53,13 +57,21 @@ WsDecodeResult WsFrameDecoder::next(WsMessage& out) {
         }
         const bool control = (static_cast<uint8_t>(op) & 0x08) != 0;
         if (control && (len > 125 || !fin)) return WsDecodeResult::ProtocolError;
-        if (len > max_payload_ || (!control && frag_payload_.size() + len > max_payload_)) return WsDecodeResult::TooBig;
-        if (buf_.size() < off + 4 + len) return WsDecodeResult::NeedMore;
+        // The 64-bit wire length is compared before it becomes a size_t, and
+        // every sum is checked: a 32-bit size_t never wraps either.
+        if (len > max_payload_) return WsDecodeResult::TooBig;
+        const auto payload_len = static_cast<std::size_t>(len);
+        const auto message_len = control ? std::optional<std::size_t>(payload_len)
+                                         : lorica::checked_add(frag_payload_.size(), payload_len);
+        if (!message_len || *message_len > max_payload_) return WsDecodeResult::TooBig;
+        const auto frame_len = lorica::checked_add(off + 4, payload_len);
+        if (!frame_len) return WsDecodeResult::TooBig;
+        if (!lorica::contains_range(buf_.size(), 0, *frame_len)) return WsDecodeResult::NeedMore;
 
         const char* mask = buf_.data() + off;
-        std::string payload = buf_.substr(off + 4, static_cast<std::size_t>(len));
+        std::string payload = buf_.substr(off + 4, payload_len);
         for (std::size_t i = 0; i < payload.size(); ++i) payload[i] = static_cast<char>(payload[i] ^ mask[i % 4]);
-        buf_.erase(0, off + 4 + static_cast<std::size_t>(len));
+        buf_.erase(0, *frame_len);
 
         if (control) {
             out.opcode  = op;

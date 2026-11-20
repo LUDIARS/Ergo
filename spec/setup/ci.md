@@ -37,6 +37,14 @@ main に入れるまでの運用は [branch-and-pr.md](branch-and-pr.md) 「マ�
   `module_list.{md,yaml}`・README・[config-reference.md](config-reference.md)・
   `tools/ergo` のプラグイン一覧・`spec/domains` とコードの食い違い、壊れた相対リンクを
   検出する。単体では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
+- **Lorica**: どの構成も Lorica のソースが要る (parser が `Lorica::boundary` のヘッダを使う)。
+  private の `LUDIARS/Lorica` を `third_party/dependencies.cmake` の固定 commit で手元に用意し、
+  構成に `-DLORICA_SOURCE_DIR=<Lorica の checkout>` を足す (無ければ同じ commit を取りに行く。
+  `ERGO_FETCH_DEPENDENCIES=OFF` で手元のソースも無ければ構成エラー)。守りのプロファイルが使える構成
+  (windows-msvc・linux-clang・linux-asan・packages-integration、CMake 3.24 以上の Linux GCC/Clang と Windows MSVC) には
+  `-DERGO_HARDENING=required` も足す (守りが外れたら構成エラーにする)。linux-gcc-cmake320 と macos は
+  守りのフラグが付かない構成 (WARNING) なので付けない。そこでも `Lorica::boundary` は入り、`test_lorica_*` は
+  skip になる。詳しくは [hardening.md](hardening.md)。
 - CMake プリセットの名前の `ci-` は以前の GitHub Actions のレグに由来する。
   ドキュメントと手元の手順が参照しているので名前は変えていない。中身は手元の検証構成。
 - Linux / macOS では ccache を使うと再ビルドが速くなる。構成の前に
@@ -52,7 +60,7 @@ main に入れるまでの運用は [branch-and-pr.md](branch-and-pr.md) 「マ�
 ### windows-msvc
 
 ```powershell
-cmake -B build -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+cmake -B build -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy -DLORICA_SOURCE_DIR=<lorica> -DERGO_HARDENING=required
 $env:CL = "/MP"
 cmake --build build --config Release --parallel
 ctest --test-dir build --build-config Release --parallel 4 --output-on-failure
@@ -76,16 +84,22 @@ python3 -m venv /tmp/cmake320
 /tmp/cmake320/bin/pip install cmake==3.20.5 ninja
 export PATH=/tmp/cmake320/bin:$PATH
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ \
-      -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+      -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy -DLORICA_SOURCE_DIR=<lorica>
 cmake --build build --parallel
 ctest --test-dir build --parallel 4 --output-on-failure
 ```
 
+CMake 3.24 未満では Lorica の守りのフラグが付かない (configure の WARNING)。Lorica の `CMakeLists.txt` は
+取り込めないので、Ergo が `LORICA_SOURCE_DIR` のヘッダだけを `Lorica::boundary` にする。
+`ERGO_HARDENING=required` は付けない (付けると構成エラー)。`test_lorica_applied`・`test_lorica_applied_extended`
+(boundary の実行の確認の後)・`test_lorica_compile_commands` は skip、`test_lorica_verify_binary_*` は登録されない。
+
 ### linux-clang / linux-asan (プリセット)
 
 ```bash
-cmake --preset ci-linux-clang && cmake --build --preset ci-linux-clang && ctest --preset ci-linux-clang
-cmake --preset ci-asan        && cmake --build --preset ci-asan        && ctest --preset ci-asan
+L="-DLORICA_SOURCE_DIR=<lorica> -DERGO_HARDENING=required"
+cmake --preset ci-linux-clang $L && cmake --build --preset ci-linux-clang && ctest --preset ci-linux-clang
+cmake --preset ci-asan        $L && cmake --build --preset ci-asan        && ctest --preset ci-asan
 ```
 
 - ビルドディレクトリは `build/<プリセット名>`。テストプリセットは
@@ -97,7 +111,7 @@ cmake --preset ci-asan        && cmake --build --preset ci-asan        && ctest 
 ### macos
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DERGO_BUILD_TESTS=ON -DERGO_AUDIO_BACKEND=dummy -DLORICA_SOURCE_DIR=<lorica>
 cmake --build build --parallel
 ctest --test-dir build --parallel 4 --output-on-failure
 ```
@@ -130,7 +144,7 @@ Windows で、サブモジュールを初期化してから:
 
 ```powershell
 git submodule update --init --recursive
-cmake --preset ci-packages -DERGO_DEPENDENCY_CACHE_DIR=build/deps-cache
+cmake --preset ci-packages -DERGO_DEPENDENCY_CACHE_DIR=build/deps-cache -DLORICA_SOURCE_DIR=<lorica> -DERGO_HARDENING=required
 cmake --build --preset ci-packages --parallel
 ctest --preset ci-packages
 ```
@@ -166,9 +180,11 @@ ctest --preset ci-packages
   オブジェクトを足すときも同じく「到達可能なまま残す」形にし、
   サプレッションで隠さない。
 
-### TSan (未整備)
+### TSan
 
-ThreadSanitizer の構成はまだ無い。スレッドを立てるテスト
+`ci-tsan` プリセット (clang、Debug) が手元用にある (`cmake --preset ci-tsan -DLORICA_SOURCE_DIR=<lorica>`、
+[hardening.md](hardening.md) の「sanitizer と fuzz」)。Studio のサーバと lesson のテストは TSan で通る。
+`ctest -L threads` でまとめる仕組み (下記の予定) はまだ無い。スレッドを立てるテスト
 (`test_profile` / `test_polling_thread` / `test_double_buffer` / `test_log` /
 `test_custos_module` / `test_http_server` / `test_screenshot_bridge` /
 `test_particle_system` / `test_audio_engine`) を `-fsanitize=thread` で

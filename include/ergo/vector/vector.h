@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -50,6 +51,16 @@ struct Transform { Vec3 translate{}; Vec3 rotate{}; Vec3 scale{1.0f, 1.0f, 1.0f}
 struct MaterialParams { Rgba color{}; float opacity = 1.0f; };
 
 VectorMesh build_mesh(const std::vector<VectorPath>& paths, const TessOptions& tess, const ExtrudeOptions& ext);
+/// Limits of one SVG document (a lorica::input_budget per parse). Vector art is
+/// kilobytes; the defaults keep a hostile file from building an unbounded mesh.
+struct SvgLimits {
+  std::size_t max_source_bytes = 16u * 1024 * 1024;  // same as ergo::ui::SvgRasterOptions
+  std::size_t max_points       = 1u << 20;           // path points over all shapes (1,048,576)
+  std::size_t max_shapes       = 1u << 16;           // shapes with points (65,536)
+};
+/// False (and `out` empty) when the document exceeds `limits`.
+bool parse_svg_data(std::string_view svg, const SvgLimits& limits, std::vector<VectorPath>& out);
+/// Default SvgLimits; empty when the document exceeds them.
 std::vector<VectorPath> parse_svg_data(std::string_view svg);
 
 class VectorScene {

@@ -13,6 +13,7 @@
 /// `ergo::inspector::jsonm` / `ergo::bind::jsonm` via namespace aliases so
 /// existing callers compile unchanged.
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -59,7 +60,20 @@ struct JsonValue {
     bool        as_bool(bool fallback = false) const       { return is_bool() ? b : fallback; }
 };
 
+/// Limits of one parse (a lorica::input_budget per call). The defaults bound a
+/// hostile 32 MiB WebSocket message (the largest input Ergo's tools accept) to
+/// about 150 MB of parsed values instead of letting "[0,0,0,...]" expand to
+/// ~16 M values (over 1 GB).
+struct ParseLimits {
+    std::size_t max_input_bytes = 64 * 1024 * 1024;  // source text
+    std::size_t max_values      = 1u << 20;          // values of any kind (1,048,576)
+    std::size_t max_depth       = 64;                // nested arrays / objects
+};
+
+/// Parse with the default ParseLimits. False on malformed input, an invalid
+/// \u escape, trailing bytes, or any limit exceeded.
 bool        parse(const std::string& src, JsonValue& out);
+bool        parse(const std::string& src, JsonValue& out, const ParseLimits& limits);
 std::string serialize(const JsonValue& v);
 
 } // namespace ergo::common::jsonm

@@ -15,6 +15,7 @@
 #include "ergo/gpu_particle/emitter_descriptor.h"
 
 #include <cstdint>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -236,6 +237,17 @@ bool ConvertTreeToGpuEmitters(const ShurikenNode& root,
 /// EmitterDescriptor を JSON 文字列にシリアライズする (ホストが
 /// 後で逆方向にロードして create_emitter する想定)。
 std::string EmitterDescriptorToJson(const ergo::gpu_particle::EmitterDescriptor& desc);
+
+/// 入力の上限。 Unity の .prefab / .unity は大きなシーンでも数十 MB なので、
+/// ファイルは 512 MiB まで (超えると読まずに失敗)。 GameObject の親子の深さは
+/// 1024 まで (ツリーの復元は再帰なので、 深すぎる鎖でスタックを溢れさせない)。
+constexpr std::size_t kMaxPrefabBytes     = std::size_t(512) * 1024 * 1024;
+constexpr std::size_t kMaxHierarchyDepth  = 1024;
+
+/// prefab / scene ファイルを `max_bytes` まで読む。 開けない・上限を超えるときは
+/// report に理由を残して false。 MigrateFileTo* はこれで読む。
+bool ReadPrefabText(const std::string& prefabPath, std::string& out, MigrationReport& report,
+                    std::size_t max_bytes = kMaxPrefabBytes);
 
 /// 1 ファイルを読み、 含まれる全 ParticleSystem を 2D config の JSON に変換した
 /// 配列文字列を返す。 失敗時は空文字列。

@@ -17,6 +17,11 @@ enum class SampleFormat : uint8_t {
     Float32     // 32bit浮動小数点
 };
 
+/// WAV ヘッダの上限 (WavDecoder は超えるファイルを開かない)。 64 ch は 7 次の
+/// Ambisonics (64 ch) まで、 768 kHz は市販の録音機材の最高のサンプルレート。
+constexpr uint16_t kMaxWavChannels   = 64;
+constexpr uint32_t kMaxWavSampleRate = 768000;
+
 // =====================================================================
 // オーディオフォーマット
 // =====================================================================

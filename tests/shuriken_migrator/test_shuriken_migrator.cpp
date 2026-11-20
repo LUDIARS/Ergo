@@ -2,7 +2,10 @@
 
 #include "gtest/gtest.h"
 
+#include <filesystem>
+#include <fstream>
 #include <string>
+#include <vector>
 
 using namespace ergo::shuriken_migrator;
 
@@ -250,4 +253,84 @@ TEST(ShurikenMigrator, NoSystemsWhenNoBlock) {
     ASSERT_TRUE(ParsePrefabYaml("%YAML 1.1\n--- !u!1 &1\nGameObject:\n  m_Name: x\n", systems, report));
     EXPECT_TRUE(systems.empty());
     EXPECT_EQ(report.extractedSystems, 0);
+}
+
+// --- Input limits (kMaxHierarchyDepth / ReadPrefabText) ---------------------
+
+namespace {
+/// A single chain of `count` GameObjects, each Transform the child of the previous.
+std::string chain_yaml(std::size_t count) {
+    std::string y = "%YAML 1.1\n";
+    for (std::size_t i = 0; i < count; ++i) {
+        const long long go = 1000 + 2 * static_cast<long long>(i);
+        const long long tr = go + 1;
+        const long long father = i == 0 ? 0 : tr - 2;
+        y += "--- !u!1 &" + std::to_string(go) + "\nGameObject:\n  m_Name: n" + std::to_string(i) + "\n";
+        y += "--- !u!4 &" + std::to_string(tr) + "\nTransform:\n  m_GameObject: {fileID: " + std::to_string(go)
+           + "}\n  m_Father: {fileID: " + std::to_string(father) + "}\n";
+    }
+    return y;
+}
+std::size_t chain_depth(const ShurikenNode& n) {
+    std::size_t d = 0;
+    const ShurikenNode* cur = &n;
+    while (!cur->children.empty()) { cur = &cur->children.front(); ++d; }
+    return d;
+}
+} // namespace
+
+TEST(ShurikenMigratorLimits, HierarchyDepthExactlyAtLimitAndOneOver) {
+    ShurikenNode root;
+    MigrationReport report;
+    // count GameObjects in a chain: the deepest sits at depth count - 1.
+    ASSERT_TRUE(ParsePrefabTree(chain_yaml(kMaxHierarchyDepth + 1), root, report));
+    EXPECT_EQ(chain_depth(root), kMaxHierarchyDepth);
+    MigrationReport over_report;
+    EXPECT_FALSE(ParsePrefabTree(chain_yaml(kMaxHierarchyDepth + 2), root, over_report));
+    EXPECT_FALSE(over_report.warnings.empty());
+}
+
+TEST(ShurikenMigratorLimits, CyclicAndSelfParentedTransformsTerminate) {
+    // Two Transforms naming each other as father, and one naming itself: none
+    // is a root, so nothing is built from them and the parse ends.
+    const std::string y =
+        "--- !u!1 &10\nGameObject:\n  m_Name: a\n"
+        "--- !u!4 &11\nTransform:\n  m_GameObject: {fileID: 10}\n  m_Father: {fileID: 13}\n"
+        "--- !u!1 &12\nGameObject:\n  m_Name: b\n"
+        "--- !u!4 &13\nTransform:\n  m_GameObject: {fileID: 12}\n  m_Father: {fileID: 11}\n"
+        "--- !u!1 &14\nGameObject:\n  m_Name: c\n"
+        "--- !u!4 &15\nTransform:\n  m_GameObject: {fileID: 14}\n  m_Father: {fileID: 15}\n";
+    ShurikenNode root;
+    MigrationReport report;
+    (void)ParsePrefabTree(y, root, report);
+    EXPECT_TRUE(root.children.empty());
+}
+
+TEST(ShurikenMigratorLimits, FileSizeExactlyAtLimitAndOneOver) {
+    const auto path = std::filesystem::temp_directory_path() / "ergo_test_shuriken_limit.prefab";
+    const std::string body = chain_yaml(3);
+    {
+        std::ofstream out(path, std::ios::binary);
+        out << body;
+    }
+    std::string text;
+    MigrationReport report;
+    EXPECT_TRUE(ReadPrefabText(path.string(), text, report, body.size()));
+    EXPECT_EQ(text, body);
+    EXPECT_FALSE(ReadPrefabText(path.string(), text, report, body.size() - 1));
+    EXPECT_TRUE(text.empty());
+    EXPECT_FALSE(ReadPrefabText(path.string() + ".missing", text, report));
+    std::filesystem::remove(path);
+}
+
+TEST(ShurikenMigratorLimits, MalformedYamlDoesNotCrash) {
+    for (const char* bad : {"--- !u!", "--- !u!198 &", "--- !u!198 &99999999999999999999999\nParticleSystem:\n",
+                            "--- !u!4 &1\nTransform:\n  m_Father: {fileID:\n", "\x01\x02--- !u!1"}) {
+        std::vector<ShurikenSource> systems;
+        ShurikenNode root;
+        MigrationReport report;
+        (void)ParsePrefabYaml(bad, systems, report);
+        (void)ParsePrefabTree(bad, root, report);
+    }
+    EXPECT_TRUE(true);
 }

@@ -198,3 +198,38 @@ TEST(CustosModule, content_length_valid_preserves_body_and_zero_length) {
     EXPECT_NE(zero.find("HTTP/1.0 200 OK"), std::string::npos);
     ergo::custos::shutdown();
 }
+
+// 本文の上限 (64 KiB、src/custos/request_head.h) ちょうどは通り、+1 は本文を
+// 受け取る前に 413 で断る。ヘッダの上限 (16 KiB) を超えるものは 431。
+TEST(CustosModule, body_and_head_limits_over_the_socket) {
+    const auto port = start_and_get_port();
+    ASSERT_NE(port, 0);
+    std::atomic<int> calls{0};
+    ergo::custos::set_key_handler([&](int, bool) { ++calls; });
+
+    std::string body = R"({"code":87,"down":true})";
+    body.append(64 * 1024 - body.size(), ' ');
+    const auto at_limit = http_request(port,
+        "POST /key HTTP/1.0\r\nContent-Length: " + std::to_string(body.size()) + "\r\n\r\n" + body);
+    EXPECT_NE(at_limit.find("HTTP/1.0 204"), std::string::npos);
+    EXPECT_EQ(calls.load(), 1);
+
+    const auto over = http_request(port,
+        "POST /key HTTP/1.0\r\nContent-Length: " + std::to_string(64 * 1024 + 1) + "\r\n\r\n");
+    EXPECT_NE(over.find("HTTP/1.0 413"), std::string::npos);
+    EXPECT_EQ(calls.load(), 1);
+
+    const auto huge = http_request(port,
+        "POST /key HTTP/1.0\r\nContent-Length: 18446744073709551615\r\n\r\n");
+    EXPECT_NE(huge.find("HTTP/1.0 413"), std::string::npos);
+
+    // 終端の無いちょうど 16 KiB (サーバが全部読み切るので RST にならない)。
+    std::string head = "GET /health HTTP/1.0\r\nX-Pad: ";
+    head.append(16 * 1024 - head.size(), 'a');
+    const auto big_head = http_request(port, head);
+    EXPECT_NE(big_head.find("HTTP/1.0 431"), std::string::npos);
+
+    const auto subsequent = http_request(port, "GET /health HTTP/1.0\r\n\r\n");
+    EXPECT_NE(subsequent.find("HTTP/1.0 200 OK"), std::string::npos);
+    ergo::custos::shutdown();
+}

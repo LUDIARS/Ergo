@@ -1,0 +1,19 @@
+%YAML 1.1
+--- !u!1 &100
+GameObject:
+  m_Name: root
+--- !u!4 &101
+Transform:
+  m_GameObject: {fileID: 100}
+  m_Father: {fileID: 0}
+--- !u!1 &102
+GameObject:
+  m_Name: child
+--- !u!4 &103
+Transform:
+  m_GameObject: {fileID: 102}
+  m_Father: {fileID: 101}
+--- !u!198 &104
+ParticleSystem:
+  m_GameObject: {fileID: 102}
+  lengthInSec: 5

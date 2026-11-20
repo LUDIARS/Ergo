@@ -6,6 +6,8 @@
 #include <cstring>
 #include <cmath>
 #include <filesystem>
+#include <string>
+#include <vector>
 
 using namespace ergo::sound;
 
@@ -225,4 +227,81 @@ TEST(DecoderFactoryTest, CreateDecoder) {
 
     EXPECT_EQ(IAudioDecoder::create("test.ogg"), nullptr);
     EXPECT_EQ(IAudioDecoder::create("test.mp3"), nullptr);
+}
+
+// --- WAV header limits (kMaxWavChannels / kMaxWavSampleRate) ---------------
+
+namespace {
+/// A WAV whose fmt chunk says `channels` / `rate` / `bits` / `format`, with `frames` frames of data.
+std::string writeWav(const std::string& path, uint16_t channels, uint32_t rate, uint16_t bits,
+                     uint16_t format, uint32_t frames, uint32_t declaredData = 0xFFFFFFFFu) {
+    std::ofstream file(path, std::ios::binary);
+    const uint32_t bytes = frames * channels * (bits / 8);
+    const uint32_t dataSize = declaredData == 0xFFFFFFFFu ? bytes : declaredData;
+    const uint32_t riffSize = 36 + bytes;
+    const uint32_t fmtSize = 16;
+    const uint32_t byteRate = rate * channels * (bits / 8);
+    const uint16_t blockAlign = static_cast<uint16_t>(channels * (bits / 8));
+    file.write("RIFF", 4); file.write(reinterpret_cast<const char*>(&riffSize), 4); file.write("WAVE", 4);
+    file.write("fmt ", 4); file.write(reinterpret_cast<const char*>(&fmtSize), 4);
+    file.write(reinterpret_cast<const char*>(&format), 2);
+    file.write(reinterpret_cast<const char*>(&channels), 2);
+    file.write(reinterpret_cast<const char*>(&rate), 4);
+    file.write(reinterpret_cast<const char*>(&byteRate), 4);
+    file.write(reinterpret_cast<const char*>(&blockAlign), 2);
+    file.write(reinterpret_cast<const char*>(&bits), 2);
+    file.write("data", 4); file.write(reinterpret_cast<const char*>(&dataSize), 4);
+    const std::string zeros(bytes, '\0');
+    file.write(zeros.data(), static_cast<std::streamsize>(zeros.size()));
+    return path;
+}
+bool opens(const std::string& path) {
+    WavDecoder d;
+    const bool ok = d.open(path);
+    std::filesystem::remove(path);
+    return ok;
+}
+} // namespace
+
+TEST(WavDecoderLimits, ChannelsExactlyAtLimitAndOneOver) {
+    EXPECT_TRUE(opens(writeWav(tmpPath("ergo_wav_ch_at.wav"), kMaxWavChannels, 48000, 16, 1, 4)));
+    EXPECT_FALSE(opens(writeWav(tmpPath("ergo_wav_ch_over.wav"), kMaxWavChannels + 1, 48000, 16, 1, 4)));
+    EXPECT_FALSE(opens(writeWav(tmpPath("ergo_wav_ch_zero.wav"), 0, 48000, 16, 1, 4)));
+}
+
+TEST(WavDecoderLimits, SampleRateExactlyAtLimitAndOneOver) {
+    EXPECT_TRUE(opens(writeWav(tmpPath("ergo_wav_sr_at.wav"), 2, kMaxWavSampleRate, 16, 1, 4)));
+    EXPECT_FALSE(opens(writeWav(tmpPath("ergo_wav_sr_over.wav"), 2, kMaxWavSampleRate + 1, 16, 1, 4)));
+    EXPECT_FALSE(opens(writeWav(tmpPath("ergo_wav_sr_zero.wav"), 2, 0, 16, 1, 4)));
+}
+
+TEST(WavDecoderLimits, MalformedHeadersAreRejected) {
+    // IEEE float must be 32 bit; 8 bit PCM is unsupported.
+    EXPECT_FALSE(opens(writeWav(tmpPath("ergo_wav_f16.wav"), 1, 48000, 16, 3, 4)));
+    EXPECT_FALSE(opens(writeWav(tmpPath("ergo_wav_pcm8.wav"), 1, 48000, 8, 1, 4)));
+    // A data chunk before fmt.
+    const auto path = tmpPath("ergo_wav_data_first.wav");
+    {
+        std::ofstream f(path, std::ios::binary);
+        const uint32_t size = 4;
+        f.write("RIFF", 4); f.write(reinterpret_cast<const char*>(&size), 4); f.write("WAVE", 4);
+        f.write("data", 4); f.write(reinterpret_cast<const char*>(&size), 4); f.write("\0\0\0\0", 4);
+    }
+    EXPECT_FALSE(opens(path));
+    // Truncated in the RIFF header.
+    const auto cut = tmpPath("ergo_wav_cut.wav");
+    { std::ofstream f(cut, std::ios::binary); f.write("RIFF\x04\0", 6); }
+    EXPECT_FALSE(opens(cut));
+}
+
+TEST(WavDecoderLimits, HugeDeclaredDataReadsOnlyWhatIsThere) {
+    const auto path = writeWav(tmpPath("ergo_wav_huge.wav"), 2, 48000, 16, 1, 8, 0xFFFFFFF0u);
+    WavDecoder d;
+    ASSERT_TRUE(d.open(path));
+    EXPECT_EQ(d.getTotalFrames(), 0xFFFFFFF0u / 4);
+    std::vector<float> buf(2 * 64);
+    EXPECT_EQ(d.decode(buf.data(), 64), 8u);
+    EXPECT_EQ(d.decode(buf.data(), 64), 0u);
+    d.close();
+    std::filesystem::remove(path);
 }

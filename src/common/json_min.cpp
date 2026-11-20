@@ -1,5 +1,7 @@
 #include "ergo/common/json_min.h"
 
+#include <lorica/input_budget.hpp>
+
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -36,9 +38,17 @@ const JsonValue* JsonValue::find(const std::string& key) const {
 namespace {
 
 struct Cursor {
-    const std::string& src;
-    std::size_t        i   = 0;
-    bool               err = false;
+    const std::string&     src;
+    lorica::input_budget&  budget;  // values (elements), containers (allocations), string bytes
+    std::size_t            i   = 0;
+    bool                   err = false;
+
+    /// Charge one parsed value before building it.
+    bool charge(std::size_t bytes, std::size_t containers) {
+        if (budget.consume(bytes, 1, containers)) return true;
+        err = true;
+        return false;
+    }
 
     void skip_ws() {
         while (i < src.size()) {
@@ -52,11 +62,18 @@ struct Cursor {
     bool match(char c) { skip_ws(); if (eof() || peek() != c) return false; ++i; return true; }
 };
 
-// Cap recursion; a hostile payload with thousands of nested brackets would
-// otherwise blow the thread stack.
-constexpr int kMaxDepth = 64;
+// Recursion is capped by ParseLimits::max_depth (budget.permits_depth); a
+// hostile payload with thousands of nested brackets would otherwise blow the
+// thread stack.
+bool parse_value(Cursor& c, JsonValue& out, std::size_t depth);
 
-bool parse_value(Cursor& c, JsonValue& out, int depth);
+bool is_hex4(const std::string& s, std::size_t at) {
+    if (s.size() < at || s.size() - at < 4) return false;
+    for (std::size_t k = at; k < at + 4; ++k) {
+        if (!std::isxdigit(static_cast<unsigned char>(s[k]))) return false;
+    }
+    return true;
+}
 
 bool parse_string(Cursor& c, std::string& out) {
     if (!c.match('"')) { c.err = true; return false; }
@@ -77,7 +94,7 @@ bool parse_string(Cursor& c, std::string& out) {
                 case 'r': out.push_back('\r'); break;
                 case 't': out.push_back('\t'); break;
                 case 'u': {
-                    if (c.src.size() - c.i < 4) { c.err = true; return false; }
+                    if (!is_hex4(c.src, c.i)) { c.err = true; return false; }
                     char hex[5] = {c.src[c.i], c.src[c.i+1], c.src[c.i+2], c.src[c.i+3], 0};
                     c.i += 4;
                     unsigned long cp = std::strtoul(hex, nullptr, 16);
@@ -85,7 +102,7 @@ bool parse_string(Cursor& c, std::string& out) {
                     // code point so non-BMP characters decode to 4-byte UTF-8.
                     // A lone surrogate is kept as-is (3-byte form).
                     if (cp >= 0xD800 && cp <= 0xDBFF && c.src.size() - c.i >= 6 &&
-                        c.src[c.i] == '\\' && c.src[c.i + 1] == 'u') {
+                        c.src[c.i] == '\\' && c.src[c.i + 1] == 'u' && is_hex4(c.src, c.i + 2)) {
                         char lo_hex[5] = {c.src[c.i+2], c.src[c.i+3], c.src[c.i+4], c.src[c.i+5], 0};
                         unsigned long lo = std::strtoul(lo_hex, nullptr, 16);
                         if (lo >= 0xDC00 && lo <= 0xDFFF) {
@@ -131,7 +148,7 @@ bool parse_number(Cursor& c, double& out) {
     return true;
 }
 
-bool parse_array(Cursor& c, JsonValue& out, int depth) {
+bool parse_array(Cursor& c, JsonValue& out, std::size_t depth) {
     out = JsonValue::make_array();
     if (c.match(']')) return true;
     while (true) {
@@ -145,7 +162,7 @@ bool parse_array(Cursor& c, JsonValue& out, int depth) {
     }
 }
 
-bool parse_object(Cursor& c, JsonValue& out, int depth) {
+bool parse_object(Cursor& c, JsonValue& out, std::size_t depth) {
     out = JsonValue::make_object();
     if (c.match('}')) return true;
     while (true) {
@@ -163,19 +180,21 @@ bool parse_object(Cursor& c, JsonValue& out, int depth) {
     }
 }
 
-bool parse_value(Cursor& c, JsonValue& out, int depth) {
-    if (depth > kMaxDepth) { c.err = true; return false; }
+bool parse_value(Cursor& c, JsonValue& out, std::size_t depth) {
+    if (!c.budget.permits_depth(depth)) { c.err = true; return false; }
     c.skip_ws();
     if (c.eof()) { c.err = true; return false; }
     char ch = c.peek();
     if (ch == '"') {
         std::string s;
         if (!parse_string(c, s)) return false;
+        if (!c.charge(s.size(), 0)) return false;
         out = JsonValue::make_string(std::move(s));
         return true;
     }
-    if (ch == '{') { ++c.i; return parse_object(c, out, depth + 1); }
-    if (ch == '[') { ++c.i; return parse_array(c, out, depth + 1); }
+    if (ch == '{') { if (!c.charge(0, 1)) return false; ++c.i; return parse_object(c, out, depth + 1); }
+    if (ch == '[') { if (!c.charge(0, 1)) return false; ++c.i; return parse_array(c, out, depth + 1); }
+    if (!c.charge(0, 0)) return false;
     if (ch == 't') {
         if (c.src.compare(c.i, 4, "true") != 0) { c.err = true; return false; }
         c.i += 4; out = JsonValue::make_bool(true); return true;
@@ -251,7 +270,14 @@ void write_value(const JsonValue& v, std::string& out) {
 } // namespace
 
 bool parse(const std::string& src, JsonValue& out) {
-    Cursor c{src};
+    return parse(src, out, ParseLimits{});
+}
+
+bool parse(const std::string& src, JsonValue& out, const ParseLimits& limits) {
+    if (src.size() > limits.max_input_bytes) return false;
+    // Depth 0 is the top-level value; containers nest from there.
+    lorica::input_budget budget({limits.max_input_bytes, limits.max_values, limits.max_values, limits.max_depth});
+    Cursor c{src, budget};
     if (!parse_value(c, out, 0)) return false;
     c.skip_ws();
     if (c.err) return false;
