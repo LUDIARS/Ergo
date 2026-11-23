@@ -21,12 +21,13 @@ cmake_minimum_required(VERSION 3.20)
 #       third_party/dependencies.cmake, the bootstrap template and examples/ is
 #       named in spec/setup/config-reference.md, and that table names no option
 #       that is not declared
-#   C6  tools/ergo: every registry.ts plugin id has a plugin dir whose index.ts
-#       declares that id, a row in spec/feature/tool/ergo.md's plugin matrix, a
-#       "### `<id>`" section there or its own spec/feature/tool/<id>.md, and a
-#       URL in tools/ergo/README.md; no plugin dir or matrix row is unregistered
+#   C6  tools/studio: every plugin dir included by builtin_plugins.cpp declares
+#       an id (its PluginInfo), which has a row in spec/feature/tool/ergo.md's
+#       plugin matrix, a "### `<id>`" section there or its own
+#       spec/feature/tool/<id>.md, and a URL in tools/studio/README.md; no
+#       plugin dir (except common/) or matrix row is unregistered
 #   C7  relative markdown links in README.md, module_list.md,
-#       tools/ergo/README.md and spec/{setup,feature,module,domains,
+#       tools/studio/README.md and spec/{setup,feature,module,domains,
 #       architecture,data} resolve (code fences, inline code, URLs, #anchors
 #       and targets outside the repository are skipped; spec/plan and
 #       spec/tasks are history and not checked), and every
@@ -108,7 +109,7 @@ endfunction()
 
 foreach(_required module_list.yaml module_list.md README.md CMakeLists.txt
         spec/setup/config-reference.md spec/feature/tool/ergo.md
-        tools/ergo/README.md tools/ergo/src/core/registry.ts)
+        tools/studio/README.md tools/studio/builtin_plugins.cpp)
     if(NOT EXISTS "${R}/${_required}")
         message(FATAL_ERROR "test_module_catalog: ${R}/${_required} is missing "
             "(is ERGO_SOURCE_DIR an Ergo checkout?)")
@@ -230,21 +231,35 @@ foreach(_e IN LISTS _excluded)
 endforeach()
 
 # ===========================================================================
-# tools/ergo registry (used by C2 and C6)
+# tools/studio registry (used by C2 and C6): the plugin dirs builtin_plugins.cpp
+# includes, and the id each declares in its PluginInfo ({"<id>", "<title>", ...}).
 # ===========================================================================
-set(_registry_file "tools/ergo/src/core/registry.ts")
+set(_registry_file "tools/studio/builtin_plugins.cpp")
 file(READ "${R}/${_registry_file}" _registry)
-_section(_factories "${_registry}" "PLUGIN_FACTORIES" "];")
-string(REGEX MATCHALL "import[ \t]+[A-Za-z0-9_]+[ \t]+from[ \t]+\"\\.\\./plugins/[^/\"]+/index\\.js\"" _imports "${_registry}")
+string(REGEX MATCHALL "#include \"plugins/[a-z0-9_]+/" _incs "${_registry}")
 set(_plugin_ids "")
-foreach(_imp IN LISTS _imports)
-    string(REGEX MATCH "import[ \t]+([A-Za-z0-9_]+)[ \t]+from[ \t]+\"\\.\\./plugins/([^/\"]+)/" _x "${_imp}")
-    set(_fn "${CMAKE_MATCH_1}")
-    set(_id "${CMAKE_MATCH_2}")
-    if(NOT _factories MATCHES "[^A-Za-z0-9_]${_fn}[^A-Za-z0-9_]")
-        _fail("${_registry_file}" "${_fn} (plugins/${_id}) is imported but not listed in PLUGIN_FACTORIES")
+set(_plugin_dir_names "")
+foreach(_inc IN LISTS _incs)
+    string(REGEX MATCH "plugins/([a-z0-9_]+)/" _x "${_inc}")
+    set(_d "${CMAKE_MATCH_1}")
+    if(_d IN_LIST _plugin_dir_names)
+        continue()
+    endif()
+    list(APPEND _plugin_dir_names "${_d}")
+    file(GLOB _srcs "${R}/tools/studio/plugins/${_d}/*.cpp")
+    set(_found "")
+    foreach(_src IN LISTS _srcs)
+        file(READ "${_src}" _c)
+        if(_c MATCHES "info_?[ \t]*=?[ \t\r\n]*\\{[ \t\r\n]*\"([a-z0-9][a-z0-9_-]*)\"")
+            set(_found "${CMAKE_MATCH_1}")
+            break()
+        endif()
+    endforeach()
+    if(_found STREQUAL "")
+        _fail("tools/studio/plugins/${_d}/" "no PluginInfo id found (info_{\"<id>\", ...} / s.info = {\"<id>\", ...})")
     else()
-        list(APPEND _plugin_ids "${_id}")
+        list(APPEND _plugin_ids "${_found}")
+        set(_plugin_dir_of_${_found} "${_d}")
     endif()
 endforeach()
 list(LENGTH _plugin_ids _nplug)
@@ -397,9 +412,6 @@ foreach(_n IN LISTS _modules _shared)
     # tool plugins are registered built-ins
     _flow_items(_tp "${_y_${_n}_tool_plugins}")
     foreach(_p IN LISTS _tp)
-        if(NOT IS_DIRECTORY "${R}/tools/ergo/src/plugins/${_p}")
-            _fail("${_where}" "${_n}.tool_plugins: tools/ergo/src/plugins/${_p}/ does not exist")
-        endif()
         if(NOT _p IN_LIST _plugin_ids)
             _fail("${_where}" "${_n}.tool_plugins: '${_p}' is not registered in ${_registry_file}")
         endif()
@@ -548,26 +560,17 @@ foreach(_r IN LISTS _rows)
 endforeach()
 
 # ===========================================================================
-# C6  tools/ergo plugins
+# C6  tools/studio plugins
 # ===========================================================================
 set(_ergo_md_file "spec/feature/tool/ergo.md")
 file(READ "${R}/${_ergo_md_file}" _ergo_md)
 string(REPLACE "\r" "" _ergo_md "${_ergo_md}")
-file(READ "${R}/tools/ergo/README.md" _tools_readme)
+file(READ "${R}/tools/studio/README.md" _tools_readme)
 _section(_matrix "${_ergo_md}" "<!-- plugin-matrix:begin -->" "<!-- plugin-matrix:end -->")
 if(_matrix STREQUAL "")
     _fail("${_ergo_md_file}" "no <!-- plugin-matrix:begin --> ... <!-- plugin-matrix:end --> table")
 endif()
 foreach(_id IN LISTS _plugin_ids)
-    set(_dir "tools/ergo/src/plugins/${_id}")
-    if(NOT EXISTS "${R}/${_dir}/index.ts")
-        _fail("${_registry_file}" "plugin '${_id}': ${_dir}/index.ts does not exist")
-    else()
-        file(READ "${R}/${_dir}/index.ts" _idx)
-        if(NOT _idx MATCHES "id:[ \t]*\"${_id}\"")
-            _fail("${_dir}/index.ts" "does not declare id: \"${_id}\" (the registry imports it as '${_id}')")
-        endif()
-    endif()
     string(FIND "${_matrix}" "\n| `${_id}` |" _p)
     if(_p LESS 0)
         _fail("${_ergo_md_file}" "plugin '${_id}' has no row in the plugin matrix")
@@ -578,7 +581,7 @@ foreach(_id IN LISTS _plugin_ids)
     endif()
     string(FIND "${_tools_readme}" "/${_id}/" _p)
     if(_p LESS 0)
-        _fail("tools/ergo/README.md" "plugin '${_id}' (/${_id}/) is not mentioned")
+        _fail("tools/studio/README.md" "plugin '${_id}' (/${_id}/) is not mentioned")
     endif()
 endforeach()
 string(REGEX MATCHALL "\n\\| `[a-z0-9_-]+` \\|" _rows "${_matrix}")
@@ -589,10 +592,10 @@ foreach(_r IN LISTS _rows)
         _fail("${_ergo_md_file}:${_ln}" "matrix row '${CMAKE_MATCH_1}' is not registered in ${_registry_file}")
     endif()
 endforeach()
-file(GLOB _plugin_dirs LIST_DIRECTORIES true RELATIVE "${R}/tools/ergo/src/plugins" "${R}/tools/ergo/src/plugins/*")
+file(GLOB _plugin_dirs LIST_DIRECTORIES true RELATIVE "${R}/tools/studio/plugins" "${R}/tools/studio/plugins/*")
 foreach(_d IN LISTS _plugin_dirs)
-    if(IS_DIRECTORY "${R}/tools/ergo/src/plugins/${_d}" AND NOT _d IN_LIST _plugin_ids)
-        _fail("tools/ergo/src/plugins/${_d}/" "not registered in ${_registry_file}")
+    if(IS_DIRECTORY "${R}/tools/studio/plugins/${_d}" AND NOT _d STREQUAL "common" AND NOT _d IN_LIST _plugin_dir_names)
+        _fail("tools/studio/plugins/${_d}/" "not included by ${_registry_file}")
     endif()
 endforeach()
 
@@ -600,7 +603,7 @@ endforeach()
 # C7  links
 # ===========================================================================
 file(GLOB _md_files RELATIVE "${R}"
-    "${R}/README.md" "${R}/module_list.md" "${R}/tools/ergo/README.md"
+    "${R}/README.md" "${R}/module_list.md" "${R}/tools/studio/README.md"
     "${R}/spec/setup/*.md" "${R}/spec/module/*.md" "${R}/spec/domains/*.md"
     "${R}/spec/architecture/*.md" "${R}/spec/data/*.md")
 file(GLOB_RECURSE _md_feature RELATIVE "${R}" "${R}/spec/feature/*.md")
@@ -656,8 +659,7 @@ file(GLOB_RECURSE _code_files RELATIVE "${R}"
     "${R}/tools/package_viz/*.cpp" "${R}/tools/package_viz/*.h"
     "${R}/tools/render_viz/*.cpp"
     "${R}/tools/shuriken_migrator/*.cpp"
-    "${R}/tools/ergo/src/*.ts" "${R}/tools/ergo/src/*.js"
-    "${R}/tools/ergo/public/*.js" "${R}/tools/ergo/electron/*.cjs")
+    "${R}/tools/studio/*.cpp" "${R}/tools/studio/*.h")
 foreach(_f IN LISTS _code_files)
     file(READ "${R}/${_f}" _c)
     string(REGEX MATCHALL "spec/(module|feature/module|feature/tool|tool)/[a-z0-9_-]+\\.md" _refs "${_c}")
@@ -678,7 +680,7 @@ list(LENGTH _md_files _nf)
 if(_problem_count GREATER 0)
     message(FATAL_ERROR "test_module_catalog: ${_problem_count} problem(s) in ${R}:${_problems}\n"
         "The catalogs (module_list.yaml / module_list.md / README.md / "
-        "spec/setup/config-reference.md / spec/feature/tool/ergo.md / tools/ergo/README.md / "
+        "spec/setup/config-reference.md / spec/feature/tool/ergo.md / tools/studio/README.md / "
         "spec/domains) must describe the code.")
 endif()
 message(STATUS "test_module_catalog: OK (${_nm} modules, ${_np} plugins, ${_no} options, ${_nf} markdown files)")

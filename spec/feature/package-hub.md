@@ -48,7 +48,7 @@
 | link の付属物 | パッケージ同梱のシェーダ・既定プロファイル・web-mesh 出力 | パッケージの版に従う (別に固定しない)。`exports` で名前付きパス (`PICTOR_SHADER_DIR` / `PICTOR_PROFILE_DIR`) として公開 |
 | Ergo 自身 | Ergo のモジュール | ホストが Ergo の SHA を固定 (入口そのもの) |
 | 第三者ライブラリ | kazmath / curl など | 既存 `third_party/dependencies.cmake` のまま。図には出す |
-| **tool** (取得するがリンクしない) | Lapilli (`lib/lapilli`、`tools/ergo` が `@ludiars/one-shot` を使う) | 既存 submodule を維持。gitlink SHA を記録して図に出す |
+| **tool** (取得するがリンクしない) | Lapilli (`lib/lapilli`。旧 `tools/ergo` が `@ludiars/one-shot` を使っていた。2026-11-06 のネイティブ化後は Ergo 内に利用者が無い) | 既存 submodule を維持。gitlink SHA を記録して図に出す |
 | **observe** (読み取りのみ) | MUSA 系 (Clio / Thaleia / Terpsichore / Ars-Musa)、関連 (Curare: `ergo_resource` とタグ語彙を共有) | 版と使用関係を読んで図にする。固定も検査もしない |
 | 対象外 | サービスの稼働中の版・サービス間呼び出し・LUDIARS 全リポの俯瞰 | Revisor / Anatomia / Concordia の領分 (N1) |
 
@@ -59,7 +59,7 @@ MUSA は「ゲームを支える外側の道具群」として観測図に 1 グ
 ## 2. マニフェスト `ergo-packages.json`
 
 置き場所: リポ直下。スキーマ説明は `spec/data/ergo-packages.md`、ホスト向け手順は `spec/setup/packages.md`。
-CMake (`string(JSON)`)・C++ (`ergo_common` jsonm)・Node が同じファイルを読む。`cmake_minimum_required` を 3.16 → 3.20 に上げる
+CMake (`string(JSON)`)・C++ (`ergo_common` jsonm) が同じファイルを読む (旧 Node ツールも読んでいた)。`cmake_minimum_required` を 3.16 → 3.20 に上げる
 (Pictor / Tela が既に 3.20)。
 
 ```json
@@ -231,7 +231,7 @@ PKG-17 だけは構成時に判定しない (File API の返答は generate の�
 |---|---|---|---|
 | **P1 パッケージ版一覧** `packages` | パッケージ (link・tool・第三者・observe・host・Ergo)。札: 名前 (コード) / 版の札 (`2.2.0+12`・出所付き) / SHA7 / 選んだ機能 / 印 (`★drift` `dirty` `上書き` `宣言漏れ` `未観測`) | Ergo / 描画 / 可視化 / 第三者 / 観測: MUSA / 観測: 関連 / host | `requires`・帰属で畳んだ実リンク (実線)、`ported_from` / `shares-vocabulary` (破線) |
 | **P2 ターゲットのリンク図** `targets` | ターゲット | `.anatomia/layers.json` の 5 層 + 外部パッケージ + 第三者 | 直接の `dependencies` (実線)。循環は `cycle` グループへ移して見せる (構成は止めない) |
-| **P3 使用関係図** `usage` | MUSA 系・関連・Lapilli・Ergo の該当モジュール・tools/ergo | MUSA / 関連 / 共有 TS / Ergo / ツール / 未観測 | submodule・`file:` 依存 (実線)、移植・語彙共有 (破線) |
+| **P3 使用関係図** `usage` | MUSA 系・関連・Lapilli・Ergo の該当モジュール・Ergo の tool パッケージ (旧 tools/ergo) | MUSA / 関連 / 共有 TS / Ergo / ツール / 未観測 | submodule・`file:` 依存 (実線)、移植・語彙共有 (破線) |
 
 上限 (8 グループ / 128 ノード / 256 辺) に収める手順 (決定的、収まった所で止める):
 既定除外 → 推移簡約 (消した本数を題に添える) → 焦点と畳み込み (既定は「host と Ergo を展開、他パッケージは 1 ノードに畳む」、
@@ -284,7 +284,7 @@ spec/data/ergo-packages.md  spec/setup/packages.md  spec/module/{graph_layout,pa
 - `ergo_render` / `cmake/ErgoRenderBackend.cmake` は変えない。変わるのは「`pictor` ターゲットを作る主体がホストからハブへ移り得る」ことだけ。
 - ドメイン: `graph_layout` / `package_model` / `package_scan` / `package_viz` は `observability`、`cmake/packages/` と `ergo-packages.json` は `foundation`。
   同じ PR で `spec/domains/*.domain.json` と `.anatomia/layers.json` を更新。`module_list.md` / `.yaml` / `README.md` に行を足す。
-- `tools/ergo` (Web) は触らない。版一覧の Web プラグインは resolved.json を読むだけの任意の後段 (U6)。
+- 開発者ツール (旧 `tools/ergo`、現 `ergo_studio`) は触らない。版一覧のプラグインは resolved.json を読むだけの任意の後段 (U6)。
 
 ### 移行モード
 
@@ -317,7 +317,7 @@ spec/data/ergo-packages.md  spec/setup/packages.md  spec/module/{graph_layout,pa
 | **S4 観測 P3** | `scan` (package.json / .gitmodules / `ported_from` / `relations`)、MUSA 図 | 見本ディレクトリからの辺抽出、根拠の付与、根拠の無い辺を作らない、範囲外を読まない、未観測の残し方 | 実際の Clio / Thaleia / Terpsichore / Lapilli のチェックアウトで図が出る (手元確認) |
 | **S5 ホスト移行** (ホストごとに 1 PR、Ergo 外) | M1 → M2 | 各ホストの CI | 各ホストの実ビルド・起動 (ホスト側の許可に従う) |
 | **S6 互換の既定変更** (S5 後) | M0 で警告を出す既定へ | 警告テスト | — |
-| **S7 任意** | `revisor version show` 注釈、`tools/ergo` 版一覧プラグイン、`render_pipeline` の `PICTOR_PROFILE_DIR` 参照、Pictor 方式 feature の `reserved` 解除 (multi-RHI の段階に追随) | 各々 | — |
+| **S7 任意** | `revisor version show` 注釈、`ergo_studio` 版一覧プラグイン (旧 `tools/ergo`)、`render_pipeline` の `PICTOR_PROFILE_DIR` 参照、Pictor 方式 feature の `reserved` 解除 (multi-RHI の段階に追随) | 各々 | — |
 
 ## 8. リスク
 
@@ -349,4 +349,4 @@ spec/data/ergo-packages.md  spec/setup/packages.md  spec/module/{graph_layout,pa
 
 設計側で推奨どおり進めるもの: U1 マニフェストは JSON、U2 Tela の `TARGET pictor` 分岐は Tela の判断、U3 `find_package` 経路は STRICT で使わない
 (LUDIARS で `<Name>_GIT_SHA` の慣習を決めるまで)、U4 ソースレベルの使用関係は Anatomia の出力を読む形で後から、U5 `ported_from` の版ずれ判定は後回し、
-U6 `tools/ergo` プラグインは低優先、U7 `ergo_render_viz` の配置は寄せない。
+U6 `ergo_studio` 版一覧プラグイン (旧 `tools/ergo`) は低優先、U7 `ergo_render_viz` の配置は寄せない。

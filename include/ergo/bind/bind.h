@@ -1,7 +1,7 @@
 #pragma once
 
 /// ergo::bind — bind any host variable for live editing from the unified
-/// ergo tool (tools/ergo/, `variable` plugin).
+/// ergo tool (ergo_studio, tools/studio/, `variable` plugin).
 ///
 /// Hosts call `bind()` (or the `BIND_VAR` macro) on debug code paths. The
 /// engine connects outbound to the tool's variable plugin (default

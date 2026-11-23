@@ -1,7 +1,7 @@
 #pragma once
 
 /// EditorLink — engine-side feeder for the unified ergo tool's `particle`
-/// plugin (tools/ergo/src/plugins/particle/). Target `ergo_particle_link`.
+/// plugin (ergo_studio, tools/studio/plugins/particle/). Target `ergo_particle_link`.
 ///
 /// Connects out to `ws://host:5170/particle/ws` over the shared transport
 /// (`ergo_common_ws`), receives the plugin's `state` frames and hands the

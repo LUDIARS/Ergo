@@ -1,5 +1,13 @@
 # render_pipeline plugin — Phase 3 (系統B 解体・単一グラフエディタ化)
 
+> **履歴注記 (2026-11-06)**: 本書の `tools/ergo/src/plugins/render_pipeline/*.ts` と
+> `ui/*.js` (vis-network) は Node / Electron 版 `tools/ergo` の構成で、同日に削除された。
+> 現行の実装は C++ の `tools/studio/plugins/render_pipeline/` (`profile_schema` /
+> `profile_fields` / `profile_store` / `render_pipeline_plugin`)、テストは
+> `tests/studio/test_studio_render_pipeline.cpp`、グラフの表示はアプリのウィンドウのタブ。
+> schema v2・エンドポイント・WS 経路の設計は現行でも同じなので、以下は設計記録として残す
+> (書き換えない)。現行の仕様は [render_pipeline.md](render_pipeline.md)。
+
 設計書 — 2026-05-23 起草。Pictor 側 `spec/pipeline-system-b-config.md` (Phase 3) の Ergo plugin 側対応。
 
 Phase 3 で Pictor 系統B (実 `VkRenderPass` チェーン) を解体し JSON 駆動にする。**ハードコード描画パスは存在しなくなる** ので、Phase 2 まであった Scanner モード (Pictor C++ ソースを Python regex でスキャン) は **撤去**。`*.profile.json` が **唯一の真理** になる。

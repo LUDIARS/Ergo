@@ -1,7 +1,13 @@
 # acstage — AdventureCube stage editor
 
-Ergo の統一開発者ツール (`tools/ergo`) にホストされるプラグインの
-1 つ。URL は `http://localhost:5170/acstage/`。
+Ergo の統一開発者ツール (`ergo_studio`) にホストされる外部プラグインの
+1 つ。ルートは `http://localhost:5170/acstage/api/*`。
+
+> 2026-11-06: ホスト側の `tools/ergo` (Node / Electron) は削除され、C++ ネイティブの
+> `ergo_studio` に置き換わった。外部 plugin pack は C ABI の共有ライブラリ
+> (`include/ergo/studio/plugin_abi.h`) として `ERGO_PLUGIN_DIR` から読み込む
+> ([external-plugins.md](../../setup/external-plugins.md))。AdventureCube 側の
+> TypeScript pack は C ABI への作り直しが要る。
 
 `placer` と違って **AdventureCube 専用** (=AC のステージ JSON スキーマに
 密着した dedicated エディタ)。AC の `data/master_data/stages/<id>.json` を

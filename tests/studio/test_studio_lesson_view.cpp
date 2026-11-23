@@ -64,9 +64,11 @@ Built build(views::LessonView& view) {
     ergo::ui_kit::Node      root;
     ui::FixedAdvanceMeasure measure;
     ui::Theme               theme;
-    ui::ViewBuilder         b(root, "Root", measure, theme, out.clicks);
+    ui::Bindings            bindings;
+    ui::ViewBuilder         b(root, "Root", measure, theme, bindings);
     view.build(b);
     collect(root, out.texts);
+    out.clicks = bindings.clicks;
     return out;
 }
 

@@ -1,8 +1,12 @@
 #include "builtin_plugins.h"
 
+#include "plugins/assets/assets_plugin.h"
+#include "plugins/git/git_plugin.h"
+#include "plugins/web/web_plugin.h"
 #include "lesson_variables.h"
 #include "plugins/lesson/lesson_plugin.h"
 #include "plugins/log/log_plugin.h"
+#include "plugins/lookdev/lookdev_plugin.h"
 #include "plugins/musa_melpomene/melpomene_plugin.h"
 #include "plugins/musa_terpsichore/terpsichore_plugin.h"
 #include "plugins/musa_thaleia/thaleia_plugin.h"
@@ -12,7 +16,9 @@
 #include "plugins/render_pipeline/render_pipeline_plugin.h"
 #include "plugins/rive/rive_plugin.h"
 #include "plugins/scene_editor/scene_editor_plugin.h"
+#include "plugins/services/services_plugin.h"
 #include "plugins/studio/studio_plugin.h"
+#include "plugins/tuning/tuning_plugin.h"
 #include "plugins/ui_layout/ui_layout_plugin.h"
 #include "plugins/variable/variable_plugin.h"
 #include "plugins/vfx_breed/vfx_breed_plugin.h"
@@ -33,6 +39,24 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
         return p::studio::make_studio_plugin(s.studio, std::filesystem::u8path(s.sdk_dir), log);
     });
     f.push_back([game_variables](const host::LogFn& log) { return make_bridged_variable_plugin(game_variables, log); });
+    f.push_back([cfg = s.studio](const host::LogFn& log) { return p::lookdev::make_lookdev_plugin(cfg, log); });
+    // Game workspace operations (services, tuning versions, git), driven by the workspace profiles.
+    f.push_back([cfg = s.studio, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::services::make_services_plugin(cfg, dirs, log);
+    });
+    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::tuning::make_tuning_plugin(home, dirs, log);
+    });
+    f.push_back([cfg = s.studio, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::git::make_git_plugin(cfg.home, dirs, cfg.request_timeout_ms, log);
+    });
+    // The Studio in a browser (spec/feature/tool/web.md) and the asset list it shows.
+    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::assets::make_assets_plugin(home, dirs, log);
+    });
+    f.push_back([cfg = p::web::WebConfig{s.play_url, s.public_hosts}](const host::LogFn& log) {
+        return p::web::make_web_plugin(cfg, log);
+    });
     f.push_back(&p::particle::make_particle_plugin);
     f.push_back(&p::scene_editor::make_scene_editor_plugin);
     f.push_back(&p::log::make_log_plugin);

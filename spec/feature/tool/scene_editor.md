@@ -2,8 +2,8 @@
 
 ## 概要
 
-Ergo 統合開発者ツール (`tools/ergo`) の組み込みプラグインの 1 つ。
-エンジン (ホストアプリ) が publish した `ergo_scene` のシーンをブラウザに
+Ergo 統合開発者ツール (`ergo_studio`、 `tools/studio`) の組み込みプラグインの 1 つ。
+エンジン (ホストアプリ) が publish した `ergo_scene` のシーンを Studio のタブに
 シーンツリーとして表示し、 選んだアクターのフィールドをインスペクタで編集
 する。 編集はフィールド単位の `patch` として **シーンを publish した
 エンジンにだけ**中継され、 エンジンが適用して publish し直した結果が UI に
@@ -16,21 +16,20 @@ Ergo 統合開発者ツール (`tools/ergo`) の組み込みプラグインの 1
 
 ## 設置場所
 
-- 実装: `tools/ergo/src/plugins/scene_editor/`
-  - `index.ts` — plugin definition (Hono routes + WS 中継)
-  - `protocol.ts` — wire protocol の型
-  - `parse_scene.ts` — エンジンの `Scene::to_json()` → UI 用 `SceneInfo` 変換 (純関数)
-  - `ui/index.html` / `ui/styles.css` / `ui/app.js` — UI 本体 (ES module)
-  - `ui/rotation.js` — オイラー角 (度) ↔ クォータニオン変換
-- 登録: `tools/ergo/src/core/registry.ts` の `PLUGIN_FACTORIES`
-- テスト: `tools/ergo/tests/plugins/scene_editor/`
-  (`parse_scene` / `relay` / `rotation`)
+- 実装: `tools/studio/plugins/scene_editor/`
+  - `scene_editor_plugin.{h,cpp}` — プラグイン本体 (HTTP ルート + WS 中継)。
+    タブ用の in-process API (`scenes()` / `patch()` / `revision()`) も持つ
+  - `scene_info.{h,cpp}` — wire protocol の型 (`SceneInfo`)
+  - `parse_scene.{h,cpp}` — エンジンの `Scene::to_json()` → UI 用 `SceneInfo` 変換 (純関数)
+- 登録: `tools/studio/builtin_plugins.cpp`
+- テスト: `tests/studio/test_studio_scene_editor.cpp` (ctest)
+- 旧 `tools/ergo/src/plugins/scene_editor/` (TypeScript + ブラウザ UI) は 2026-11-06 に削除
 
 ## URL
 
 | URL | 役割 |
 |---|---|
-| `http://localhost:5170/scene_editor/` | UI |
+| (Studio の `scene_editor` タブ) | UI |
 | `http://localhost:5170/scene_editor/api/scenes` | 現在保持しているシーン (`SceneInfo[]`) |
 | `http://localhost:5170/scene_editor/api/health` | プラグインヘルス (`scenes` / `clients`) |
 | `ws://localhost:5170/scene_editor/ws` | エンジン / UI 共通の WS 入口 |
@@ -84,7 +83,7 @@ Ergo 統合開発者ツール (`tools/ergo`) の組み込みプラグインの 1
 { "op": "scene_removed", "id": "stage_01" }
 ```
 
-`SceneInfo` は `protocol.ts` の型。 アクターごとに `id` / `name` / `type` /
+`SceneInfo` は `scene_info.h` の型。 アクターごとに `id` / `name` / `type` /
 `parent` (ルートは `""`) / `transform` (`pos` / `rot` = `[x, y, z, w]` /
 `scale`) / `visual` / `instanceOf` / `overrides` / `vars` / `components` を
 持つ。 `vars[].value`・`overrides[].value`・`components[].props` の値は
@@ -120,7 +119,7 @@ UI の `patch` を、 `scene_id` のシーンを publish したエンジン接�
 
 1. エンジンが接続して `hello` (role `engine`) を送り、 続けて publish 済みの
    全シーンを `scene` で送る。 `ergo_scene_link` は **接続が確立するたびに**
-   これを自動で行うので、 `tools/ergo` を再起動してもホスト側の作業は不要
+   これを自動で行うので、 `ergo_studio` を再起動してもホスト側の作業は不要
 2. UI が接続して `hello` (role `ui`) を送ると、 保持中の全シーンを `scenes`
    で受け取る。 以後 `scene_update` / `scene_removed` を受け取る
 3. UI の `patch` は所有エンジンへ転送される。 `ergo_scene_link` はそれを

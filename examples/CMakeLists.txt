@@ -36,7 +36,7 @@ else()
         add_test(NAME example_compose_loop COMMAND ergo_example_compose_loop --check)
         # The trace run writes compose_loop.trace.json; the follow-up test
         # parses it (string(JSON), no Python) so CI proves it is valid JSON
-        # with a traceEvents array the tools/ergo profile plugin can load.
+        # with a traceEvents array the ergo_studio profile plugin can load.
         set(_compose_loop_trace ${CMAKE_CURRENT_BINARY_DIR}/compose_loop.trace.json)
         add_test(NAME example_compose_loop_trace
                  COMMAND ergo_example_compose_loop --check --trace ${_compose_loop_trace})

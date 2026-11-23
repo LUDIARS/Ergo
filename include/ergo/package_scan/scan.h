@@ -6,7 +6,7 @@
 ///   * 観測対象: `<root>/<observe.path_hint>` の `package.json`、 `.gitmodules`、
 ///     `.git/index` (`.git` がそのチェックアウトの中のディレクトリのときだけ、 gitlink の SHA)。
 ///   * Ergo: マニフェストのあるディレクトリ (`ergo_root`) の `.gitmodules` と `.git/index`、
-///     `ergo_paths` (既定 `tools/ergo`) の `package.json`、 マニフェストそのもの。
+///     `ergo_paths` (既定 `tools/ergo`。 旧 Node ツールの置き場で、 無ければ読み飛ばす) の `package.json`、 マニフェストそのもの。
 /// `path_hint` が範囲外 (絶対・".."・':') のもの、 `root` 未指定、 チェックアウトが無いものは
 /// 「未観測」ノードとして理由付きで残す。 辺は根拠 (ファイル・行・キー) のあるものだけ。
 /// 情報源は兄弟チェックアウト (統合設計 N8)。 Concordia / Revisor への問い合わせはしない。

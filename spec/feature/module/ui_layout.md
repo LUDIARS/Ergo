@@ -1,7 +1,7 @@
 # ergo_ui_layout — データ駆動 UI レイアウト基盤 + UI エディタ (設計書)
 
 > 状態: 設計 (2026-06-01)。実装は Codex 委託予定。
-> 区分: 新規 Ergo モジュール `ergo_ui_layout` + tools/ergo UI エディタプラグイン。
+> 区分: 新規 Ergo モジュール `ergo_ui_layout` + ergo_studio UI エディタプラグイン (旧 tools/ergo は 2026-11-06 にネイティブ化)。
 > 関連: [vector.md](./vector.md) (vector ノードのバックエンド), [ui.md](./ui.md) / ergo_ui_kit (既存プリミティブ描画), [custos.md](./custos.md) (ライブ調整トランスポート), PrivateGame HUD (最初の consumer)。
 
 ## 0. 背景・目的
@@ -11,7 +11,7 @@
 「Pictor/Ergo 上で」= 特定ゲーム非依存の **Ergo モジュール**として作り、全ゲームで再利用 (PrivateGame は最初の consumer)。
 
 ### スコープ
-- **やる**: UI レイアウトの宣言的データモデル (JSON) + ランタイム (ロード/構築/レイアウト解決/描画委譲/データバインド/ヒットテスト) + tools/ergo の Figma 的 UI エディタプラグイン + ergo_custos 経由のライブ往復編集。
+- **やる**: UI レイアウトの宣言的データモデル (JSON) + ランタイム (ロード/構築/レイアウト解決/描画委譲/データバインド/ヒットテスト) + ergo_studio の Figma 的 UI エディタプラグイン + ergo_custos 経由のライブ往復編集。
 - **やらない**: 新規描画ラスタライザ (描画は Pictor UIRenderer + ergo_vector に委譲)、複雑なアニメーションタイムライン編集 (ノードのトゥイーン/状態遷移は最小限。本格アニメは vector ノード=Lottie 側)。
 
 ## 1. アーキテクチャ
@@ -26,7 +26,7 @@
                                 └─ vector ノード       → ergo_vector (SVG → ポリゴン化 → extrude 体積 3D メッシュ) → Pictor 3D 描画
         ▲                                   │
         │ read/write JSON                   │ live patch (JSON-merge)
-   tools/ergo UI エディタ ◀── ergo_custos bridge (HTTP/WS) ──▶ 実行中ゲーム
+   ergo_studio UI エディタ ◀── ergo_custos bridge (HTTP/WS) ──▶ 実行中ゲーム
 ```
 
 - **描画は再実装しない**。プリミティブは ergo_ui_kit + Pictor UIRenderer、文字は Pictor のベクターテキスト経路、ベクターアセットは ergo_vector。ergo_ui_layout は「データ→これらへの描画コマンド生成 + レイアウト計算 + バインド」を担う中間層。
@@ -42,7 +42,7 @@
 | test_dir | `tests/ui_layout/` |
 | spec | `spec/feature/module/ui_layout.md` (本書) |
 | cmake_option | `ERGO_BUILD_UI_LAYOUT` |
-| tool_plugin | `ui_layout` (tools/ergo プラグイン id) |
+| tool_plugin | `ui_layout` (ergo_studio プラグイン id) |
 | status | preview |
 
 `module_list.yaml`/`.md` 追記。SRP でファイル分割 (model / parser / layout solver / binding / renderer-adapter / hittest を別ファイル)。God Class 禁止。
@@ -141,9 +141,9 @@ struct RenderAdapter {
 
 - consumer (PrivateGame) が Pictor 実装の `RenderAdapter` を提供 (UIRenderer + TextSvgRenderer + ergo_vector を束ねる)。ergo_ui_layout 本体は Pictor 非依存に保つ。
 
-## 5. UI エディタ (tools/ergo プラグイン `ui_layout`)
+## 5. UI エディタ (ergo_studio プラグイン `ui_layout`)
 
-- tools/ergo (Electron + プラグインホスト、既存) に **UI レイアウトエディタプラグイン**を追加。[[feedback_ergo_editor_plugin_pack]] の一般則どおり tools/ergo プラグインとして実装 (PrivateGame 専用 fork はしない)。
+- ergo_studio (C++ ネイティブのプラグインホスト、`tools/studio/plugins/ui_layout/`) に **UI レイアウトエディタプラグイン**を置く。[[feedback_ergo_editor_plugin_pack]] の一般則どおり ergo_studio のプラグインとして実装 (PrivateGame 専用 fork はしない)。ファイルの読み書きは `ERGO_UI_LAYOUT_ROOT` の中だけ。
 - 機能 (Figma 的):
   - キャンバスに uilayout を描画 (Web 側は SVG/Canvas で同等プレビュー、真実はゲーム側描画)、ノード選択/移動/リサイズ/階層編集。
   - プロパティパネル: rect/anchor/stretch/flex、ノード型別プロパティ、binds 編集。
@@ -168,7 +168,7 @@ struct RenderAdapter {
 ## 8. 受け入れ基準
 1. `ERGO_BUILD_UI_LAYOUT=ON` で Release ビルド green、tests/ui_layout green (Vulkan 非依存)。
 2. サンプル uilayout を load→update(bind)→emit(モック) が通る。
-3. tools/ergo に `ui_layout` プラグインが立ち上がり、JSON の open/save/ノード編集ができる。
+3. ergo_studio に `ui_layout` プラグインが立ち上がり、JSON の open/save/ノード編集ができる。
 4. ergo_custos 経由のライブ patch 往復が動く (最小: 1 ノードの rect/色をエディタ→実機反映)。
 5. module_list 反映、spec 同期。PrivateGame HUD 置換は別 PR。
 
@@ -176,7 +176,7 @@ struct RenderAdapter {
 1. データモデル + parser + レイアウト解決 (absolute+anchor) + RenderAdapter IF + モックテスト。← まず「粗く動く」
 2. プリミティブ (rect/nine_slice/image/text) を Pictor RenderAdapter で実描画 (PrivateGame 側最小consumer で1枚出す)。
 3. vector ノード (ergo_vector 連携) + binds。
-4. tools/ergo `ui_layout` プラグイン (編集 + save)。
+4. ergo_studio `ui_layout` プラグイン (編集 + save)。
 5. ergo_custos ライブ往復。
 6. flex/応用レイアウト、PrivateGame HUD 全面移植 (別 PR)。
 

@@ -1,7 +1,7 @@
 # Bind モジュール定義
 
 ## 概要
-任意のホスト変数を **`BIND_VAR()` / `bind()`** で外部の unified ergo tool (`tools/ergo/`, `variable` plugin) (Web ツール)
+任意のホスト変数を **`BIND_VAR()` / `bind()`** で外部の unified ergo tool (`ergo_studio`, `variable` plugin) (開発者ツール)
 へエクスポートし、ブラウザ UI からのライブ編集を受け取る Ergo モジュール。
 
 ホスト側はアウトバウンドでエディタサーバ (`ws://host:5170/variable/ws`) へ接続するため、
@@ -22,8 +22,8 @@ Win32 サーバ実装に依存しない。
 - 変数登録要求 (名前, 型, 値ポインタ or getter/setter, メタデータ)
 - メタデータ (min/max/step/category/unit/read_only)
 - 接続先 (host, port, path)
-- アプリ識別子 (unified ergo tool (`tools/ergo/`, `variable` plugin) が複数 engine を区別するため)
-- unified ergo tool (`tools/ergo/`, `variable` plugin) 側 wire protocol (engine ↔ server, ui ↔ server)
+- アプリ識別子 (unified ergo tool (`ergo_studio`, `variable` plugin) が複数 engine を区別するため)
+- unified ergo tool (`ergo_studio`, `variable` plugin) 側 wire protocol (engine ↔ server, ui ↔ server)
 
 ## 依存
 - C++17 標準ライブラリ
@@ -47,10 +47,10 @@ Win32 サーバ実装に依存しない。
 - ホストからの `bind(name, ptr, meta)` 呼び出し / `BIND_VAR(name, lvalue, meta)` マクロ
 - ホストからの `unbind(handle)` 呼び出し
 - ホストからの `apply_pending_writes()` 呼び出し
-- unified ergo tool (`tools/ergo/`, `variable` plugin) からの `set` メッセージ
+- unified ergo tool (`ergo_studio`, `variable` plugin) からの `set` メッセージ
 
 ### 出力
-- unified ergo tool (`tools/ergo/`, `variable` plugin) への `bind` (登録時), `value` (変化時), `unbind` (解除時) メッセージ
+- unified ergo tool (`ergo_studio`, `variable` plugin) への `bind` (登録時), `value` (変化時), `unbind` (解除時) メッセージ
 - ホスト変数の更新 (登録時に渡された setter 経由)
 
 ### タスク

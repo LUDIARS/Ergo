@@ -134,4 +134,42 @@ std::optional<std::string> ws_handshake_problem(const std::optional<std::string>
     return cross_site_problem(host, origin, bind_host);
 }
 
+std::vector<std::string> parse_public_hosts(const std::string& csv) {
+    std::vector<std::string> out;
+    std::size_t start = 0;
+    while (start <= csv.size()) {
+        const std::size_t end = csv.find(',', start);
+        std::string item = csv.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        const auto b = item.find_first_not_of(" \t");
+        const auto e = item.find_last_not_of(" \t");
+        item = b == std::string::npos ? std::string{} : item.substr(b, e - b + 1);
+        if (const auto hp = parse_host(item, "443"); hp && !hp->name.empty() && hp->port.empty()) {
+            out.push_back(hp->name);
+        }
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return out;
+}
+
+std::optional<std::string> cross_site_problem(const GuardPolicy& policy, const std::optional<std::string>& host,
+                                              const std::optional<std::string>& origin, bool access_asserted) {
+    const auto hp = host ? parse_host(*host, "443") : std::nullopt;
+    const bool is_public = hp && hp->port.empty()
+                        && std::find(policy.public_hosts.begin(), policy.public_hosts.end(), hp->name)
+                               != policy.public_hosts.end();
+    if (!is_public) return cross_site_problem(host, origin, policy.bind_host);
+    if (!access_asserted) return "public Host '" + *host + "' without the Access assertion";
+    if (!origin) return std::nullopt;
+    const auto oh = origin_host(*origin);
+    if (!oh || *oh != hp->name) return "cross-site Origin '" + *origin + "'";
+    return std::nullopt;
+}
+
+std::optional<std::string> ws_handshake_problem(const GuardPolicy& policy, const std::optional<std::string>& host,
+                                                const std::optional<std::string>& origin, bool access_asserted) {
+    if (!origin) return std::nullopt;
+    return cross_site_problem(policy, host, origin, access_asserted);
+}
+
 } // namespace ergo::studio::net

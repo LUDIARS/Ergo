@@ -1,7 +1,7 @@
 #pragma once
 
 /// EditorLink — engine-side client for the unified ergo tool's `scene_editor`
-/// plugin (tools/ergo/src/plugins/scene_editor/). Target `ergo_scene_link`.
+/// plugin (ergo_studio, tools/studio/plugins/scene_editor/). Target `ergo_scene_link`.
 ///
 /// Connects out to `ws://host:5170/scene_editor/ws` over the shared transport
 /// (`ergo_common_ws`), publishes Scene snapshots for the editor's tree and
@@ -19,7 +19,7 @@
 ///     link.poll(*scene);           // once per frame, main thread
 ///
 /// Every scene published so far is re-sent (after a `hello`) whenever the
-/// connection (re)opens, so a restarted tools/ergo sees the host's scenes
+/// connection (re)opens, so a restarted ergo_studio sees the host's scenes
 /// again without host code. After poll() applies patches it re-publishes each
 /// touched scene — also when a patch was rejected — so the editor always
 /// shows the engine's actual state.

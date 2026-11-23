@@ -2,11 +2,11 @@
 
 ## 概要
 
-Ergo 統合開発者ツール (`tools/ergo`) の組み込みプラグインの 1 つ。
+Ergo 統合開発者ツール (`ergo_studio`、 `tools/studio`) の組み込みプラグインの 1 つ。
 エンジン (ホストアプリ) が `ergo_log` で出した行を WebSocket で受け取り、
-アプリごとに直近 10k 行をリングに保持してブラウザに表示する。 UI では
+アプリごとに直近 10k 行をリングに保持して Studio のタブに表示する。 UI では
 アプリを選び、 レベル・文字列・フレーム範囲で絞り込み、 自動スクロールと
-一時停止ができる。 GUI アプリや Electron / Custos 経由の実行のように
+一時停止ができる。 GUI アプリや Custos 経由の実行のように
 コンソールが見えない場合でも、 動かしながらログで詰まりを探せる。
 
 リポジトリ内のエンジン側クライアントは `ergo_log_live` の `LiveSink`
@@ -16,24 +16,25 @@ JSON のコードは書かない。
 
 ## 設置場所
 
-- 実装: `tools/ergo/src/plugins/log/`
-  - `index.ts` — plugin definition (Hono routes + WS 中継)
-  - `protocol.ts` — wire protocol の型、 受信フレームのガード
-    (`sanitizeLine` / `sanitizeLinesMsg`)、 コンソール形式のパーサ
-    (`parseConsoleLine`)
-  - `ring.ts` — アプリごとの行リング (`LineRing`) とフィルタ
-  - `ui/index.html` / `ui/styles.css` / `ui/app.js` — UI 本体 (ES module)
-- 登録: `tools/ergo/src/core/registry.ts` の `PLUGIN_FACTORIES`
-- テスト: `tools/ergo/tests/plugins/log/` (`ring` / `protocol` / `relay`)
+- 実装: `tools/studio/plugins/log/`
+  - `log_plugin.{h,cpp}` — プラグイン本体 (HTTP ルート + WS 中継)
+  - `log_protocol.{h,cpp}` — wire protocol の型、 受信フレームのガード
+    (`sanitize_line` / `sanitize_lines_msg`)、 コンソール形式のパーサ
+    (`parse_console_line`)
+  - `line_ring.{h,cpp}` / `lines_query.{h,cpp}` / `log_apps.{h,cpp}` — アプリごとの
+    行リング (`LineRing`)、 絞り込み、 アプリの台帳
+- 登録: `tools/studio/builtin_plugins.cpp`
+- テスト: `tests/studio/test_studio_log.cpp` (ctest)
+- 旧 `tools/ergo/src/plugins/log/` (TypeScript + ブラウザ UI) は 2026-11-06 に削除
 
 ## URL
 
 | URL | 役割 |
 |---|---|
-| `http://localhost:5170/log/` | UI |
+| (Studio の `log` タブ) | UI |
 | `http://localhost:5170/log/api/apps` | 保持しているアプリの一覧 (`{ apps: AppInfo[] }`) |
 | `http://localhost:5170/log/api/lines?app=...` | アプリの行 (下記) |
-| `http://localhost:5170/log/api/health` | プラグインヘルス (`clients` / `apps` / `engines` / `uis`。`clients` は hello 前を含む全接続で、シェルのバッジに出る) |
+| `http://localhost:5170/log/api/health` | プラグインヘルス (`clients` / `apps` / `engines` / `uis`。`clients` は hello 前を含む全接続) |
 | `ws://localhost:5170/log/ws` | エンジン / UI 共通の WS 入口 |
 
 ### `GET /log/api/lines`
@@ -139,21 +140,21 @@ UI の接続が送った `lines` は無視する。
   描き直す)
 - 列: frame / time (s) / lvl / thread (アプリ内で `T1`、 `T2`、 ... と短く
   表示。 ホバーで tid) / message
-- ブラウザはサーバと同じ 10k 行を持ち、 表示は条件に合う新しい 2,000 行まで
+- タブはサーバと同じ 10k 行を持ち、 表示は条件に合う新しい 2,000 行まで
 
 ## コンソール形式
 
-`protocol.ts` の `parseConsoleLine(text)` は、 ergo_log のコンソール出力
+`log_protocol.h` の `parse_console_line(text)` は、 ergo_log のコンソール出力
 `[F%08llu][TAG] msg` の 1 行を `{ lvl, frame, msg }` にする (行末の
-`\n` / `\r\n` / `\r` は無視、 それ以外の形式は null)。 ツールが起動した
+`\n` / `\r\n` / `\r` は無視、 それ以外の形式は nullopt)。 ツールが起動した
 プロセスの標準出力を同じモデルに流し込む将来の runner (ergo-redesign の
 `apps` plugin) 向けで、 このプラグイン自身は使っていない。
 
 ## 既知の制限
 
-- ツール本体 (`tools/ergo` の core) のログ (`PluginContext.log`) はこの
-  プラグインに流さない (core がプラグインを import することになるため)
-- 行の削除・保存・エクスポートは無い。 UI の表示はブラウザ側の絞り込み
+- ツール本体 (`ergo_studio` の host 層) のログ (`LogFn`) はこの
+  プラグインに流さない (host がプラグインに依存することになるため)
+- 行の削除・保存・エクスポートは無い。 UI の表示はタブ側の絞り込み
   だけで、 サーバ側の購読フィルタは無い
 - 時刻はエンジンの時計なので、 別プロセスのアプリ同士の `ts_us` は
   比べられない

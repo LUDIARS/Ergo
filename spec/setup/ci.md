@@ -8,7 +8,7 @@ main に入れるまでの運用は [branch-and-pr.md](branch-and-pr.md) 「マ�
 ## 現在の検証の経路
 
 - **GitHub Actions では Ergo のビルド・テストを走らせない。** 以前の
-  `ci` / `packages-integration` ワークフロー (各ツールチェーンの ctest、`tools/ergo`、
+  `ci` / `packages-integration` ワークフロー (各ツールチェーンの ctest、
   Unity パッケージのコア、Pictor / Tela との統合ビルド) はリポジトリの方針で廃止した。
   下の各構成は、そのとき検査していた内容を手元で回すためのコマンドとして残している。
 - **マージのゲートは Revisor のローカルレビュー。** Revisor は登録されたテストケース
@@ -28,14 +28,13 @@ main に入れるまでの運用は [branch-and-pr.md](branch-and-pr.md) 「マ�
 | linux-clang | Linux、clang、`-Wall -Wextra`、Release | clang だけが出すエラー。警告は出すだけで `-Werror` は付けない |
 | linux-asan | Linux、GCC、Debug、ASan + LSan + UBSan | 範囲外アクセス、解放後使用、リーク、未定義動作 (下記「サニタイザ」) |
 | macos | macOS、AppleClang、Release | macOS 固有の差 (入力 HID / ソケット / オーディオ) |
-| tools-ergo | Node 22 | `tools/ergo` の型 (src + tests)、`tsc` ビルド、node:test (サーバコア・plugin pack 読み込み・パスガード・各プラグインの中継) |
 | unity-package-core | .NET 8 | Unity パッケージ (`unity/com.ludiars.ergo.packages`) のコアを Unity なしで |
 | packages-integration | Windows、プリセット `ci-packages` | Ergo + Pictor + Tela をマニフェストの pin で取得した統合ビルド (下記) |
 
 - C++ の各構成は ctest の全テストを走らせる (後から足したテストも自動で入る)。
   その中の `test_module_catalog` (`tests/test_module_catalog.cmake`、コンパイラ不要) は
   `module_list.{md,yaml}`・README・[config-reference.md](config-reference.md)・
-  `tools/ergo` のプラグイン一覧・`spec/domains` とコードの食い違い、壊れた相対リンクを
+  `ergo_studio` のプラグイン一覧 (`tools/studio/builtin_plugins.cpp`)・`spec/domains` とコードの食い違い、壊れた相対リンクを
   検出する。単体では `cmake -DERGO_SOURCE_DIR=. -P tests/test_module_catalog.cmake`。
 - CMake プリセットの名前の `ci-` は以前の GitHub Actions のレグに由来する。
   ドキュメントと手元の手順が参照しているので名前は変えていない。中身は手元の検証構成。
@@ -101,20 +100,6 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DERGO_BUILD_TESTS=ON -DERGO_AUDI
 cmake --build build --parallel
 ctest --test-dir build --parallel 4 --output-on-failure
 ```
-
-### tools-ergo
-
-```bash
-git submodule update --init lib/lapilli      # @ludiars/one-shot (file: 依存)
-cd tools/ergo
-ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci       # Electron 本体はテストに要らない
-npm run typecheck && npm run build && npm test
-```
-
-`npm run typecheck` は `tsconfig.test.json` で src と tests をまとめて型検査する
-(`npm run build` の `tsconfig.json` は src だけ)。テストは
-`tools/ergo/tests/{core,helpers,plugins/<id>}/` に置き、一時ディレクトリと
-ポート 0 だけを使う (固定ポート・ネットワーク・LLM 呼び出しなし)。
 
 ### unity-package-core
 

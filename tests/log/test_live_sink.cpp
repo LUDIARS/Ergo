@@ -4,7 +4,7 @@
 // port 0) that answers the upgrade and then never reads, to pin down the
 // back-pressure: a stalled tool costs counted drops in LiveSink's own queue
 // and never blocks stop(). spec/feature/tool/log.md has the wire protocol
-// the tools/ergo `log` plugin tests against.
+// the ergo_studio `log` plugin (tools/studio/plugins/log/) tests against.
 
 #include "gtest/gtest.h"
 

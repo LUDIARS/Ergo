@@ -34,7 +34,7 @@
 - **ゲーム / アプリ開発者 (主)**: C++ で自作ゲームやアプリを作る人。入力・キャラクター制御・音・描画の土台を毎回は書き直したくない。
   Ergo をリポジトリごと `add_subdirectory` で取り込み、必要なモジュールだけリンクする。
 - **ツール / エンジン開発者**: Pictor (描画) や周辺パッケージと組み合わせる人。版の揃い方・リンクの形・描画パイプラインの構成を図で確かめたい。
-- **テクニカルアーティスト / 調整担当**: パーティクル・UI レイアウト・変数を、ビルドし直さずに Web ツール (`tools/ergo`) から触りたい。
+- **テクニカルアーティスト / 調整担当**: パーティクル・UI レイアウト・変数を、ビルドし直さずに開発者ツール (`ergo_studio`) から触りたい。
 
 ### 2.3 カスタマージャーニー (使われ方)
 
@@ -42,7 +42,7 @@
 2. **取り込む**: `add_subdirectory` で全体を取り込み、`ERGO_BUILD_<名>` で要らないモジュールを外す。
    Pictor・Tela などの外部パッケージは `ergo-packages.json` の宣言どおりに揃う。
 3. **組み込む**: 入力・キャラクター制御・ゲームルール部品・音・描画を、自分のゲームのループへつなぐ。ゲーム固有の処理は自分のリポに残す。
-4. **動かしながら直す**: `BIND_VAR` で変数を公開し、`tools/ergo` から値を変える。性能のタイムラインやログで詰まりを見つける。
+4. **動かしながら直す**: `BIND_VAR` で変数を公開し、`ergo_studio` から値を変える。性能のタイムラインやログで詰まりを見つける。
 5. **把握する**: パッケージの版とリンク、描画パイプラインを Tela の関係図で読み、壊れ方を先に知る。
 6. **使い続ける**: 新しいモジュールやパッケージの版を取り込み、同じ手順で更新する。
 
@@ -112,7 +112,7 @@
 | `build-packages` | `cmake/` (`packages/` と `deps/` を含む)、`ergo-packages.json`、`CMakePresets.json`、`tests/packages/`、`lib/`、`.gitmodules`、`package_manager` / `package_watch`、`tools/package_cli/`、`unity/com.ludiars.ergo.packages/`、`tests/unity_packages/`、`contracts/` (テストの契約ランタイム)、`.github/workflows/` |
 | `structure-visualization` | `graph_layout` / `tela_graph` / `render_viz` / `package_model` / `package_scan` / `package_viz`、`tools/render_viz/`、`tools/package_viz/` |
 | `observability` | `log` / `frame` / `profile` / `bind` / `custos` |
-| `dev-tools` | `tools/ergo/` |
+| `dev-tools` | `tools/studio/`・`src/studio/`・`include/ergo/studio/`・`tests/studio/` (Ergo Studio。旧 `tools/ergo/` は 2026-11-06 に削除) |
 | `input` | `input` |
 | `physics` | `physics2d` |
 | `audio` | `audio` / `sound` |
@@ -156,7 +156,7 @@
 | # | 対象 | 何か | 根拠 | 推奨 | 結果 (2026-10-14) |
 | --- | --- | --- | --- | --- | --- |
 | L1 | `src` / `include/ergo` / `tests` の `shuriken_migrator`、`tools/shuriken_migrator/` | Unity の ParticleSystem (Shuriken) を Ergo のパーティクル設定に変換するライブラリと CLI | `module_list.md` / `module_list.yaml` / README / `spec/feature/module/` のどれにも載っていない。リポ内で使うのは自分の CLI だけ (`CMakeLists.txt` の `ergo_shuriken_migrator`)。直近の機能追加は特定タイトル向け書き出しの一本化で、Unity からの移行という一回きりの用途 | **移行**: 使っているタイトルのツール側へ移す。移行が済んだら Ergo から削除 | 未着手: 移行先のリポでの作業が先 (別の委託) |
-| L2 | `tools/ergo/src/plugins/vfx-suggest/ks_export.ts` | VFX 提案の結果を特定タイトルの GPU エミッタ JSON に書き出す処理 | 冒頭コメントのとおり特定タイトル専用。CLAUDE.md の「ゲーム固有のものは Ergo に入れず、ホストのプラグインパックで持つ」に反する | **移行**: ホストのプラグインパックへ。`vfx-suggest` 本体は汎用なので残す | 未着手: 移行先のプラグインパックでの作業が先 (別の委託) |
+| L2 | `tools/studio/plugins/vfx_suggest/ks_export.cpp` (旧 `tools/ergo/src/plugins/vfx-suggest/ks_export.ts`) | VFX 提案の結果を特定タイトルの GPU エミッタ JSON に書き出す処理 | 冒頭コメントのとおり特定タイトル専用。CLAUDE.md の「ゲーム固有のものは Ergo に入れず、ホストのプラグインパックで持つ」に反する | **移行**: ホストのプラグインパックへ。`vfx-suggest` 本体は汎用なので残す | 未着手: 移行先のプラグインパックでの作業が先 (別の委託) |
 | L3 | `include/ergo/bind/json_min.h` | `ergo::common::jsonm` を `ergo::bind::jsonm` として再公開する互換シム | コメントが 2026-04-21 廃止の `ergo_inspector` との共有を前提にしている。利用は `src/bind/bind_engine.cpp` と `tests/bind/test_json_min.cpp` の 2 か所だけ | **移行**: 2 か所を `ergo/common/json_min.h` に直してシムを削除 | **済み**: `src/bind/bind_engine.cpp` は翻訳単位内の別名、テストは `ergo::common::jsonm` を直接使う。シムを削除 |
 | L4 | `.anatomia/domains/render-orchestration.json` | spec/domains へ移す前の旧ドメイン定義 | Anatomia は `spec/domains` があるとそちらを優先し、この置き場を読まない。`.gitignore` は `.anatomia/*` を除外しているのに追跡が残っている。範囲は `rendering` と重なる | **削除** | **済み**: 削除して追跡から外した。`legacy` の membership からも外した |
 | L5 | `review/` (2026-05-13 〜 2026-05-30、`latest.json`) | 日付別のコード規約レビュー記録 | 最終更新は 2026-05-30。現在のレビューはリポの外で別に管理する運用で、ここは更新されていない | **削除** (残したい記録はレビューの管理先へ移す) | **済み**: 削除。4 日分の記録 (2026-05-13 / 15 / 17 / 30) はリポ外のレビュー管理先に同じ日付で残っているため移す物は無かった。`legacy` の membership からも外した |

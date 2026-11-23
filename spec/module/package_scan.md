@@ -27,7 +27,7 @@
 | 観測対象 | `<root>/<path_hint>/package.json` | `name`、 `dependencies` / `devDependencies` のうち `file:` / `workspace:` / `@ludiars/*` |
 | 観測対象 | `<root>/<path_hint>/.gitmodules` | `[submodule]` の `path` / `url` |
 | 観測対象 | `<root>/<path_hint>/.git/index` | gitlink (mode 160000) の SHA。 `.git` がチェックアウトの中のディレクトリのときだけ (worktree の `.git` ファイルが指す先は範囲外なので読まない)。 index 版 2 / 3 のみ |
-| Ergo | マニフェストのあるディレクトリの `.gitmodules` / `.git/index`、 `tools/ergo/package.json` (`ScanOptions::ergo_paths`) | 同上 |
+| Ergo | マニフェストのあるディレクトリの `.gitmodules` / `.git/index`、 `ScanOptions::ergo_paths` の `package.json` (既定は旧 `tools/ergo`。削除済みなら無いものとして読み飛ばす) | 同上 |
 
 ## 依存
 
@@ -36,7 +36,7 @@
 
 ## 変数 (値型)
 
-- `UsageNode`: `id` (観測名 / モジュール名 / `ergo` / `tools/ergo` / `npm:<名>` / `repo:<名>`)、 `kind`
+- `UsageNode`: `id` (観測名 / モジュール名 / `ergo` / tool パッケージのパス (旧 `tools/ergo`) / `npm:<名>` / `repo:<名>`)、 `kind`
   (Musa / Related / SharedTs / Ergo / Tool / Unobserved)、 `code`、 `declared_group`、 `reason` (未観測の理由)、 `package_name`。
 - `UsageEdge`: `from` → `to` (使う側 → 使われる側)、 重なった `kinds`、 `evidence` (1 つ以上)。 実線の種類が 1 つでもあれば実線。
 - `Evidence`: `file` (兄弟は `<path_hint>/<file>`、 Ergo は `ergo:<file>`)、 `line` (1 始まり)、 `key`
@@ -64,7 +64,7 @@ relation の未知の kind は辺にせず `notes` に残す。 自己ループ�
 
 ### 依存先の帰属 (パスの計算だけ)
 
-`file:` は (1) 同じ読み取り元の submodule → (2) Ergo の tool パッケージ (`lib/lapilli`) → (3) `tools/ergo`・Ergo の他の場所
+`file:` は (1) 同じ読み取り元の submodule → (2) Ergo の tool パッケージ (`lib/lapilli`) → (3) `ergo_paths` (旧 `tools/ergo`)・Ergo の他の場所
 → (4) 観測対象のチェックアウト → (5) 兄弟の根の直下 `<Seg>` (名前の一致する tool、 無ければ `repo:<Seg>`) → (6) `npm:<依存名>`。
 submodule の url はリポ名で 観測対象 (path_hint の末尾) → tool パッケージ → `repo:<名>`。 それ以外の依存は、 読んだ
 `package.json` の `name` の表 (例: `@ludiars/terpsichore` → terpsichore) → `npm:<依存名>`。

@@ -13,7 +13,7 @@ curl のような **コンパイルを伴う外部 C/C++ ライブラリ** を�
 > に attribution を載せる。本マネージャは「取得してビルドする依存」専用。
 
 > 用語注意: ここで言う「サードパーティ」は **C/C++ ライブラリ** を指す。
-> `tools/ergo` の Web エディタ拡張 (`ERGO_PLUGIN_DIR` / plugin pack) とは別物。
+> `ergo_studio` のエディタ拡張 (`ERGO_PLUGIN_DIR` / plugin pack) とは別物。
 > そちらは [`external-plugins.md`](external-plugins.md) を参照。
 
 ## 構成 (SRP で 3 層)

@@ -1,7 +1,7 @@
 // Scene::apply_patch — field-level edits in the scene_editor wire format.
 //
 // Kept apart from scene.cpp (document load/save) because it is the editing
-// surface: every path accepted here is one the tools/ergo `scene_editor`
+// surface: every path accepted here is one the ergo_studio `scene_editor`
 // plugin can send, and is documented in spec/feature/tool/scene_editor.md.
 
 #include "ergo/scene/scene.h"

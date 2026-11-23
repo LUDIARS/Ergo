@@ -54,6 +54,8 @@ public:
 struct ServerConfig {
     std::string bind_host = "127.0.0.1";
     uint16_t    port      = 5170;   // 0 = pick a free port (tests)
+    /// Names answered through Cloudflare Access (request_guard.h); empty = loopback names only.
+    std::vector<std::string> public_hosts = {};
 };
 
 using LogFn = std::function<void(const std::string& level, const std::string& msg)>;

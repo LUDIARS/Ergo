@@ -10,6 +10,7 @@
 #include "ergo/studio/net/server.h"
 #ifdef ERGO_STUDIO_HAS_SHELL
 #  include "ergo/studio/shell/studio_window.h"
+#  include "views/view_registry.h"
 #endif
 
 #include <atomic>
@@ -112,7 +113,8 @@ int main(int argc, char** argv) {
     }
     host::PluginHost plugins(std::move(loaded), &log_line);
 
-    net::Server server({settings.bind_host, settings.port}, plugins, plugins, &log_line);
+    net::Server server({settings.bind_host, settings.port, settings.public_hosts}, plugins, plugins, &log_line);
+    for (const auto& h : settings.public_hosts) log_line("info", "[ergo] published as https://" + h + "/web/ (Cloudflare Access only)");
     std::string err;
     if (!server.start(err)) {
         log_line("error", "[ergo] " + err);
@@ -131,9 +133,11 @@ int main(int argc, char** argv) {
     int code = 0;
 #ifdef ERGO_STUDIO_HAS_SHELL
     if (!settings.headless) {
+        views::ViewRegistry views(&plugins);   // native tabs; outlives the window's app
         shell::WindowConfig wc;
         wc.font_path  = settings.font_path;
         wc.shader_dir = settings.shader_dir;
+        wc.views      = views.lookup();
         try {
             code = shell::run_studio_window(plugins, wc, g_stop, err);
         } catch (const std::exception& e) {

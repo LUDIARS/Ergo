@@ -20,7 +20,7 @@
 ///
 /// Output goes through sinks. The console sink (the format above) is
 /// installed by default; add_sink() adds more destinations (e.g. the
-/// `ergo_log_live` LiveSink that streams to the tools/ergo `log` plugin),
+/// `ergo_log_live` LiveSink that streams to the ergo_studio `log` plugin),
 /// and remove_sink(&console_sink()) silences the console in a GUI app.
 /// Each record also carries a timestamp from an injectable time source;
 /// wire it to `ergo_profile` so log lines line up with the timeline:

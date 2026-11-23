@@ -150,12 +150,14 @@ void Server::serve_connection(std::intptr_t s) {
     const HttpRequest& req = parser.request();
     const auto host   = req.header("host");
     const auto origin = req.header("origin");
+    const GuardPolicy policy{cfg_.bind_host, cfg_.public_hosts};
+    const bool access_asserted = req.header(kAccessAssertionHeader).has_value();
 
     const bool upgrade = req.method == "GET" && header_has_token(req, "upgrade", "websocket")
                       && header_has_token(req, "connection", "upgrade");
     if (!upgrade) {
         HttpResponse res;
-        if (const auto problem = cross_site_problem(host, origin, cfg_.bind_host)) {
+        if (const auto problem = cross_site_problem(policy, host, origin, access_asserted)) {
             res = HttpResponse::json(403, json_error(*problem));
         } else {
             try {
@@ -175,7 +177,7 @@ void Server::serve_connection(std::intptr_t s) {
     const auto key = req.header("sec-websocket-key");
     const auto ver = req.header("sec-websocket-version");
     if (plugin_id.empty() || !ws_.accepts(plugin_id) || !key || !ver || *ver != "13") { finish(); return; }
-    if (const auto problem = ws_handshake_problem(host, origin, cfg_.bind_host)) {
+    if (const auto problem = ws_handshake_problem(policy, host, origin, access_asserted)) {
         log_("warn", "[ergo] refused WS " + req.path + ": " + *problem);
         const std::string out = "HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n";
         sock::send_all(s, out.data(), out.size());

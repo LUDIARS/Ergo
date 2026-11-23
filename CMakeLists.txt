@@ -287,7 +287,7 @@ if(ERGO_BUILD_PARTICLE)
         endforeach()
     endif()
 
-    # ergo_particle_link — receive-only feeder for tools/ergo's `particle`
+    # ergo_particle_link — receive-only feeder for Ergo Studio's `particle`
     # plugin over ergo_common_ws. Separate so ergo_particle stays socket-free.
     option(ERGO_BUILD_PARTICLE_LINK "Build ergo_particle_link (WS feeder for the particle plugin)" ON)
     if(ERGO_BUILD_PARTICLE_LINK)
@@ -304,7 +304,7 @@ endif()
 
 # ---------------------------------------------------------------------------
 # ergo_bind — outbound WS client publishing host vars to the unified
-# ergo tool's `variable` plugin (tools/ergo/)
+# Ergo Studio's `variable` plugin (tools/studio/plugins/variable)
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_BIND)
     add_library(ergo_bind
@@ -396,7 +396,7 @@ if(ERGO_BUILD_SCENE)
         endforeach()
     endif()
 
-    # ergo_scene_link — engine client for tools/ergo's `scene_editor` plugin
+    # ergo_scene_link — engine client for Ergo Studio's `scene_editor` plugin
     # (publish scenes, apply patches) over ergo_common_ws.
     option(ERGO_BUILD_SCENE_LINK "Build ergo_scene_link (WS client for the scene_editor plugin)" ON)
     if(ERGO_BUILD_SCENE_LINK)
@@ -599,7 +599,7 @@ if(ERGO_BUILD_LOG)
         add_test(NAME test_log_sink COMMAND test_log_sink)
     endif()
 
-    # ergo_log_live — LiveSink streaming records to tools/ergo's `log` plugin
+    # ergo_log_live — LiveSink streaming records to Ergo Studio's `log` plugin
     # over ergo_common_ws. Separate so ergo_log stays socket-free.
     option(ERGO_BUILD_LOG_LIVE "Build ergo_log_live (LiveSink for the log plugin)" ON)
     if(ERGO_BUILD_LOG_LIVE AND TARGET ergo_common_ws)
@@ -1100,7 +1100,7 @@ if(ERGO_BUILD_STUDIO)
         src/studio/host/usage_hint.cpp
     )
     target_include_directories(ergo_studio_host PUBLIC include)
-    target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common)
+    target_link_libraries(ergo_studio_host PUBLIC ergo_studio_net ergo_common ${CMAKE_DL_LIBS})
     if(MSVC)
         target_compile_options(ergo_studio_host PRIVATE /utf-8)
     endif()
@@ -1272,6 +1272,18 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/studio/studio_routes_sources.cpp
         tools/studio/plugins/studio/studio_routes_tasks.cpp
         tools/studio/plugins/ui_layout/ui_layout_plugin.cpp
+        tools/studio/plugins/common/workspace_profiles.cpp
+        tools/studio/plugins/assets/asset_catalog.cpp
+        tools/studio/plugins/assets/assets_plugin.cpp
+        tools/studio/plugins/web/web_plugin.cpp
+        tools/studio/plugins/git/git_ops.cpp
+        tools/studio/plugins/git/git_plugin.cpp
+        tools/studio/plugins/services/services_plugin.cpp
+        tools/studio/plugins/tuning/tuning_plugin.cpp
+        tools/studio/plugins/tuning/tuning_store.cpp
+        tools/studio/plugins/lookdev/lookdev_plugin.cpp
+        tools/studio/plugins/lookdev/lookdev_post.cpp
+        tools/studio/plugins/lookdev/lookdev_store.cpp
         tools/studio/plugins/variable/variable_plugin.cpp
         tools/studio/plugins/variable/variable_registry.cpp
         tools/studio/plugins/visus/visus_plugin.cpp
@@ -1292,6 +1304,10 @@ if(ERGO_BUILD_STUDIO)
     target_include_directories(ergo_studio_plugins PUBLIC tools/studio)
     include(cmake/ErgoEmbedText.cmake)
     ergo_embed_text(ergo_studio_plugins ergo_vfx_catalog_json tools/studio/plugins/vfx_suggest/catalog.json)
+    # The web page (spec/feature/tool/web.md) ships inside the executable.
+    ergo_embed_text(ergo_studio_plugins ergo_web_index_html tools/studio/plugins/web/page/index.html)
+    ergo_embed_text(ergo_studio_plugins ergo_web_app_js tools/studio/plugins/web/page/app.js)
+    ergo_embed_text(ergo_studio_plugins ergo_web_style_css tools/studio/plugins/web/page/style.css)
     target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform)
     if(MSVC)
         target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
@@ -1312,6 +1328,8 @@ if(ERGO_BUILD_STUDIO)
             tests/studio/test_studio_studio_api.cpp
             tests/studio/test_studio_log.cpp
             tests/studio/test_studio_scene_editor.cpp
+            tests/studio/test_studio_game_ops.cpp
+            tests/studio/test_studio_web.cpp
         )
         target_link_libraries(test_studio_plugins PRIVATE ergo_studio_plugins ergo_gtest_main)
         if(MSVC)
@@ -1320,14 +1338,37 @@ if(ERGO_BUILD_STUDIO)
         add_test(NAME test_studio_plugins COMMAND test_studio_plugins)
     endif()
 
-    # ergo_studio_views : the built-in plugins' tabs (ui_kit trees over a plugin's in-process API; no GPU)
+    # ergo_studio_views : native tabs drawn from each plugin's own HTTP API (no GPU)
     if(TARGET ergo_studio_ui)
         add_library(ergo_studio_views STATIC
+            tools/studio/views/api_view.cpp
+            tools/studio/views/explorer_view.cpp
+            tools/studio/views/git_view.cpp
+            tools/studio/views/services_view.cpp
+            tools/studio/views/tuning_view.cpp
+            tools/studio/views/json_render.cpp
             tools/studio/views/lesson_view.cpp
+            tools/studio/views/log_view.cpp
+            tools/studio/views/lookdev_view.cpp
+            tools/studio/views/musa_views.cpp
+            tools/studio/views/plugin_api.cpp
+            tools/studio/views/studio_view.cpp
+            tools/studio/views/thaleia_view.cpp
+            tools/studio/views/vfx_suggest_view.cpp
+            tools/studio/views/view_registry.cpp
         )
-        target_link_libraries(ergo_studio_views PUBLIC ergo_studio_plugins ergo_studio_ui)
+        target_include_directories(ergo_studio_views PUBLIC tools/studio)
+        target_link_libraries(ergo_studio_views PUBLIC ergo_studio_ui ergo_studio_host ergo_studio_plugins)
         if(MSVC)
             target_compile_options(ergo_studio_views PRIVATE /utf-8)
+        endif()
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_studio_views tests/studio/test_studio_views.cpp)
+            target_link_libraries(test_studio_views PRIVATE ergo_studio_views ergo_studio_plugins ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_studio_views PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_studio_views COMMAND test_studio_views)
         endif()
     endif()
 
@@ -2284,7 +2325,7 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
     target_include_directories(ergo_studio PRIVATE tools/studio)
     target_link_libraries(ergo_studio PRIVATE ergo_studio_views ergo_studio_plugins ergo_studio_host ergo_studio_net)
     if(_ergo_studio_shell)
-        target_link_libraries(ergo_studio PRIVATE ergo_studio_shell)
+        target_link_libraries(ergo_studio PRIVATE ergo_studio_shell ergo_studio_views)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
         add_dependencies(ergo_studio ergo_studio_shaders)
     endif()
