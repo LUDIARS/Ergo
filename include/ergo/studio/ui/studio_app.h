@@ -1,10 +1,12 @@
 #pragma once
-/// The Studio window's UI, GPU independent: a tab per plugin (plus an
-/// overview of every plugin's health), a scrollable content area, and the
-/// ui_kit context that turns it into a draw list. The shell feeds input and
-/// draws draw_list(); tests drive it directly.
+/// The built-in window's UI on ergo_ui_kit (a build without Tela; the Tela
+/// window and the browser use ergo/studio/tela/ instead), GPU independent:
+/// a tab per plugin (plus an overview of every plugin's health), a scrollable
+/// content area, and the ui_kit context that turns it into a draw list. The
+/// shell feeds input and draws draw_list(); tests drive it directly.
 #include "ergo/studio/host/plugin_host.h"
-#include "ergo/studio/ui/plugin_view.h"
+#include "ergo/studio/ui/studio_pages.h"
+#include "ergo/studio/ui/ui_kit_emitter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -23,10 +25,6 @@ struct InputState {
     std::string      text;     ///< UTF-8 typed (and pasted) since the last frame
     std::vector<Key> keys;     ///< editing keys pressed since the last frame, in order
 };
-
-/// Views for plugins that do not draw their own (IPlugin::view() == nullptr):
-/// the exe attaches native tabs to built-in and external plugins by id.
-using ViewLookup = std::function<host::IPluginView*(host::IPlugin&)>;
 
 class StudioApp {
 public:
@@ -50,13 +48,9 @@ public:
     const std::string& focused_field() const { return bind_.focused; }
 
 private:
-    host::IPluginView* view_of(host::IPlugin& p) const;
     /// Apply typed text / keys to the focused field; true when something changed.
     bool edit_focused(const InputState& in);
     void rebuild();
-    void build_tabs(ViewBuilder& bar);
-    void build_overview(ViewBuilder& b);
-    void build_generic(ViewBuilder& b, host::IPlugin& p);
     uint64_t content_revision() const;
 
     host::PluginHost&         host_;

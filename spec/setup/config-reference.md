@@ -94,6 +94,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | `ERGO_FETCH_DEPENDENCIES` | ON | 依存を upstream から取得してよいかのマスタースイッチ (`cmake/ErgoDependencies.cmake`) | — | OFF で override も無いまま要求されると構成エラー |
 | `ERGO_WITH_CURL` | OFF | libcurl を取得してビルド (`CURL::libcurl`、`third_party/dependencies.cmake`) | `ERGO_FETCH_DEPENDENCIES` か `ERGO_SOURCE_DIR_CURL` | 構成エラー |
 | `ERGO_ODEUM_SOURCE_DIR` | (空) | Odeum の checkout。`native/` を取り込み、`play` プラグインの遠隔プレイ (映像・入力) を Odeum の `odeum_remote_play` で持つ ([play.md](../feature/tool/play.md)) | Odeum の依存 (libdatachannel・Boost・nlohmann_json・Lorica・OpenSSL 3。Odeum の CMake が取得、オフラインは `FETCHCONTENT_SOURCE_DIR_*`) | 空なら遠隔プレイなし (ビルド・実行・ログだけ) |
+| `ERGO_TELA_SOURCE_DIR` | (空) | Tela の checkout。`add_subdirectory` で取り込み、Studio の UI を Tela で描く: ブラウザの `/shell/` と、Pictor + Vulkan があれば窓の GPU 描画 (`Tela::Gpu`) ([shell.md](../feature/tool/shell.md))。Tela のヘッダーを読むターゲットだけ C++20 | 窓の GPU 描画は `ERGO_PACKAGES=pictor` と Vulkan SDK | 空なら今までの ui_kit の窓だけ (`/shell/` なし) |
 | `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF | 疎通テスト `test_thirdparty_deps` (curl を強制 ON) | `ERGO_BUILD_TESTS` | テストを作らない (curl は ON のまま取得・ビルドする) |
 | `ERGO_CURL_USE_SSL` | ON | curl の TLS backend を有効化 (Windows は Schannel、`cmake/deps/curl.cmake`) | `ERGO_WITH_CURL` | 宣言されない |
 | `ERGO_DEPENDENCY_CACHE_DIR` | (空) | 取得ソースの共有キャッシュ dir (空 = `<build>/_deps`) | — | — |

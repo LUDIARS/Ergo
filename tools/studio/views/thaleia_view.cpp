@@ -63,11 +63,10 @@ void ThaleiaView::render(ui::ViewBuilder& b) {
         }
     }
     ui::ViewBuilder row = b.row(12);
-    row.node().layout.align_cross = ui_kit::AlignCross::Start;
+    row.node().align_start = true;
     {
         ui::ViewBuilder tree = row.panel(2);
-        tree.node().layout.w_sizing = ui_kit::Sizing::Fixed;
-        tree.node().size.x          = 280;
+        tree.node().width = 280;
         if (slot_state(tree, "tree")) {
             int budget = 400;   // nodes drawn at most (a huge tree must not stall the UI)
             const JsonValue& root = slot("tree").result.json;
@@ -82,8 +81,7 @@ void ThaleiaView::render(ui::ViewBuilder& b) {
     }
     {
         ui::ViewBuilder doc = row.panel(4);
-        doc.node().layout.w_sizing = ui_kit::Sizing::Fixed;
-        doc.node().size.x          = kDocWidth + 20;
+        doc.node().width = kDocWidth + 20;
         render_document(doc);
     }
 }
@@ -140,7 +138,8 @@ void ThaleiaView::render_document(ui::ViewBuilder& b) {
             b.wrapped(std::string(static_cast<std::size_t>(lvl) * 2, ' ') + bullet + inline_text(bl.find("inlines")), kDocWidth);
         } else if (kind == "code") {
             ui::ViewBuilder c = b.panel(1);
-            c.node().style.fill = t.background;
+            c.node().has_fill = true;
+            c.node().fill     = t.background;
             for (const auto& l : ui::wrap_text(text_of(bl, "code"), kDocWidth - 20, t.small_size, b.measure())) {
                 c.label(l, &t.muted, t.small_size);
             }

@@ -1,12 +1,13 @@
 #pragma once
-/// Building a plugin tab as an ergo_ui_kit node tree (GPU independent).
+/// Building a plugin tab as a ViewNode tree (GPU and backend independent).
 ///
 /// Views are rebuilt whenever their data changes (IPluginView::revision());
-/// a ViewBuilder appends nodes to a container and records click handlers by
-/// node path, which the Studio app wires into ui_kit's event dispatch.
-/// ui_kit does not measure text, so Text nodes get their size from an
-/// ITextMeasure (the shell's font in the app, a fixed advance in tests).
-#include "ergo/ui_kit/ui_kit.h"
+/// a ViewBuilder appends ViewNodes to a container. A backend draws the tree:
+/// ui_kit (ui_kit_emitter.h) for the built-in window, Tela (ergo/studio/tela/)
+/// for the Tela window and the browser. Text that must fit a width (wrapped,
+/// clipped_label) is cut here with an ITextMeasure (the shell's font in the
+/// app, a fixed advance in tests and for Tela).
+#include "ergo/studio/ui/view_node.h"
 
 #include <functional>
 #include <memory>
@@ -56,54 +57,15 @@ struct Theme {
     float         title_size = 20.0f;
 };
 
-using ClickFn = std::function<void()>;
-
-struct ClickBinding {
-    std::string path;   ///< ui_kit resolved path of the clickable node
-    ClickFn     fn;
-};
-
-/// A slider: a click on its track reports where along it (0 = left .. 1 = right).
-using SetFractionFn = std::function<void(float)>;
-
-struct SliderBinding {
-    std::string   path;   ///< resolved path of the track
-    SetFractionFn fn;
-};
-
-/// A text field: the string it edits lives in the view (it must outlive the
-/// next rebuild), the app routes typed text to the focused one.
-struct FieldBinding {
-    std::string  path;        ///< resolved path of the field's frame
-    std::string* value = nullptr;
-    ClickFn      on_submit;   ///< Enter (single-line fields only)
-    bool         multiline = false;
-};
-
-/// What one build of the UI registers. `focused` is kept by the app across
-/// rebuilds (the path of the field that receives keys, empty = none).
-struct Bindings {
-    std::vector<ClickBinding> clicks;
-    std::vector<FieldBinding> fields;
-    std::vector<SliderBinding> sliders;
-    std::string               focused;
-    void clear() {
-        clicks.clear();
-        fields.clear();
-        sliders.clear();
-    }
-};
-
 class ViewBuilder {
 public:
-    /// Appends under `container`, whose resolved path will be `container_path`.
-    ViewBuilder(ui_kit::Node& container, std::string container_path, const ITextMeasure& measure, const Theme& theme,
-                Bindings& bindings);
+    /// Appends to `container` (kept by the caller until the tree is drawn).
+    ViewBuilder(ViewNode& container, const ITextMeasure& measure, const Theme& theme);
 
-    /// The node this builder appends to (resolved again on every call:
+    /// The container this builder appends to (resolved again on every call:
     /// children live in vectors, so a reference would dangle after a sibling
-    /// is added higher up).
-    ui_kit::Node& node();
+    /// is added higher up). Views adjust its `width`, `align_start` or `fill`.
+    ViewNode& node();
 
     const Theme&        theme() const { return theme_; }
     const ITextMeasure& measure() const { return measure_; }
@@ -135,28 +97,31 @@ public:
     void wrapped(const std::string& text, float max_width, const ui_kit::Color* color = nullptr, float font_size = 0);
     /// A label cut to `max_width` px with "…" (table cells).
     void clipped_label(const std::string& text, float max_width, const ui_kit::Color* color = nullptr);
+    /// A media stream `stream` (a key the browser page resolves, e.g. "play:<target>"; empty = none
+    /// yet). Hosts that cannot show it draw the frame and `label`.
+    void video(const std::string& label, const std::string& stream, float width, float height);
+    /// The next element gets `name` instead of a counted one, so page scripts and tests can find it
+    /// (unique among its siblings; [A-Za-z0-9_-] only).
+    void name_next(std::string name);
 
-    /// A horizontal row; `fill` makes it take the full width.
+    /// A horizontal row.
     ViewBuilder row(float gap = 8);
     /// A vertical group with a panel background.
     ViewBuilder panel(float gap = 6);
 
 private:
-    ViewBuilder(ui_kit::Node& root, std::vector<std::size_t> index, std::string path, const ITextMeasure& measure,
-                const Theme& theme, Bindings& bindings);
-    void          field_frame(std::string& value, const std::string& placeholder, float width, int lines, bool multiline,
-                              ClickFn on_submit, bool masked = false);
-    ViewBuilder   child(ui_kit::Node n);   ///< add `n` and return a builder for it
-    void          add(ui_kit::Node n);
-    std::string   next_name(const char* kind);
+    ViewBuilder(ViewNode& root, std::vector<std::size_t> index, const ITextMeasure& measure, const Theme& theme);
+    ViewBuilder child(ViewNode n);   ///< add `n` and return a builder for it
+    void        add(ViewNode n);
+    std::string next_name(const char* kind);
+    ViewNode    text_node(const char* kind, const std::string& text, float size, const ui_kit::Color& color);
 
-    ui_kit::Node&              root_;
-    std::vector<std::size_t>   index_;   ///< child indices from root_
-    std::string                path_;
-    const ITextMeasure&        measure_;
-    const Theme&               theme_;
-    Bindings&                  bind_;
-    int                        counter_ = 0;
+    ViewNode&                root_;
+    std::vector<std::size_t> index_;   ///< child indices from root_
+    const ITextMeasure&      measure_;
+    const Theme&             theme_;
+    int                      counter_ = 0;
+    std::string              pending_name_;
 };
 
 } // namespace ergo::studio::ui

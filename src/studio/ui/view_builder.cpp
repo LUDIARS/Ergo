@@ -3,10 +3,6 @@
 namespace ergo::studio::ui {
 
 using ui_kit::Color;
-using ui_kit::LayoutMode;
-using ui_kit::Node;
-using ui_kit::NodeKind;
-using ui_kit::Sizing;
 
 float FixedAdvanceMeasure::width(const std::string& utf8, float font_size) const {
     std::size_t cps = 0;
@@ -85,58 +81,54 @@ std::string fit_tail(const std::string& text, float max_width, float font_size, 
     return text.substr(starts[lo]);
 }
 
-ViewBuilder::ViewBuilder(Node& container, std::string container_path, const ITextMeasure& measure, const Theme& theme,
-                         Bindings& bindings)
-    : root_(container), path_(std::move(container_path)), measure_(measure), theme_(theme), bind_(bindings) {}
+ViewBuilder::ViewBuilder(ViewNode& container, const ITextMeasure& measure, const Theme& theme)
+    : root_(container), measure_(measure), theme_(theme) {}
 
-ViewBuilder::ViewBuilder(Node& root, std::vector<std::size_t> index, std::string path, const ITextMeasure& measure,
-                         const Theme& theme, Bindings& bindings)
-    : root_(root), index_(std::move(index)), path_(std::move(path)), measure_(measure), theme_(theme), bind_(bindings) {}
+ViewBuilder::ViewBuilder(ViewNode& root, std::vector<std::size_t> index, const ITextMeasure& measure, const Theme& theme)
+    : root_(root), index_(std::move(index)), measure_(measure), theme_(theme) {}
 
-Node& ViewBuilder::node() {
-    Node* n = &root_;
+ViewNode& ViewBuilder::node() {
+    ViewNode* n = &root_;
     for (std::size_t i : index_) n = &n->children[i];
     return *n;
 }
 
-std::string ViewBuilder::next_name(const char* kind) { return std::string(kind) + std::to_string(counter_++); }
+std::string ViewBuilder::next_name(const char* kind) {
+    std::string n = std::string(kind) + std::to_string(counter_++);
+    if (!pending_name_.empty()) n = std::move(pending_name_);
+    pending_name_.clear();
+    return n;
+}
 
-void ViewBuilder::add(Node n) { node().children.push_back(std::move(n)); }
+void ViewBuilder::name_next(std::string name) { pending_name_ = std::move(name); }
 
-ViewBuilder ViewBuilder::child(Node n) {
-    const std::string path = path_ + "/" + n.name;
-    Node& me = node();
+void ViewBuilder::add(ViewNode n) { node().children.push_back(std::move(n)); }
+
+ViewBuilder ViewBuilder::child(ViewNode n) {
+    ViewNode& me = node();
     me.children.push_back(std::move(n));
     std::vector<std::size_t> idx = index_;
     idx.push_back(me.children.size() - 1);
-    return ViewBuilder(root_, std::move(idx), path, measure_, theme_, bind_);
+    return ViewBuilder(root_, std::move(idx), measure_, theme_);
 }
 
-namespace {
-Node text_node(std::string name, const std::string& text, float size, const Color& color, const ITextMeasure& m) {
-    Node t;
-    t.name             = std::move(name);
-    t.kind             = NodeKind::Text;
-    t.text             = text;
-    t.style.font_size  = size;
-    t.style.text_color = color;
-    t.size             = {m.width(text, size), m.line_height(size)};
+ViewNode ViewBuilder::text_node(const char* kind, const std::string& text, float size, const Color& color) {
+    ViewNode t;
+    t.kind      = ViewKind::Text;
+    t.name      = next_name(kind);
+    t.text      = text;
+    t.font_size = size;
+    t.color     = color;
     return t;
 }
-} // namespace
 
-void ViewBuilder::title(const std::string& text) {
-    add(text_node(next_name("title"), text, theme_.title_size, theme_.text, measure_));
-}
+void ViewBuilder::title(const std::string& text) { add(text_node("title", text, theme_.title_size, theme_.text)); }
 
 void ViewBuilder::label(const std::string& text, const Color* color, float font_size) {
-    add(text_node(next_name("label"), text, font_size > 0 ? font_size : theme_.font_size, color ? *color : theme_.text,
-                  measure_));
+    add(text_node("label", text, font_size > 0 ? font_size : theme_.font_size, color ? *color : theme_.text));
 }
 
-void ViewBuilder::muted(const std::string& text) {
-    add(text_node(next_name("muted"), text, theme_.small_size, theme_.muted, measure_));
-}
+void ViewBuilder::muted(const std::string& text) { add(text_node("muted", text, theme_.small_size, theme_.muted)); }
 
 void ViewBuilder::paragraph(const std::string& text) {
     std::size_t start = 0;
@@ -149,19 +141,13 @@ void ViewBuilder::paragraph(const std::string& text) {
 }
 
 void ViewBuilder::button(const std::string& text, ClickFn on_click, bool primary) {
-    Node b;
-    b.name                = next_name("button");
-    b.kind                = NodeKind::Frame;
-    b.style.fill          = primary ? theme_.accent : theme_.panel_alt;
-    b.style.corner_radius = 4;
-    b.layout.mode         = LayoutMode::Horizontal;
-    b.layout.pad_l = b.layout.pad_r = 12;
-    b.layout.pad_t = b.layout.pad_b = 6;
-    b.layout.w_sizing = b.layout.h_sizing = Sizing::Hug;
-    b.children.push_back(text_node("text", text, theme_.font_size, theme_.text, measure_));
-    const std::string path = path_ + "/" + b.name;
+    ViewNode b;
+    b.kind     = ViewKind::Button;
+    b.name     = next_name("button");
+    b.text     = text;
+    b.primary  = primary;
+    b.on_click = std::move(on_click);
     add(std::move(b));
-    if (on_click) bind_.clicks.push_back({path, std::move(on_click)});
 }
 
 void ViewBuilder::field(const std::string& key, const std::string& value, const Color* value_color) {
@@ -171,178 +157,119 @@ void ViewBuilder::field(const std::string& key, const std::string& value, const 
 }
 
 void ViewBuilder::status(bool ok, const std::string& text) {
-    ViewBuilder r = row(8);
-    Node dot;
-    dot.name                = "dot";
-    dot.kind                = NodeKind::Shape;
-    dot.size                = {10, 10};
-    dot.style.fill          = ok ? theme_.ok : theme_.error;
-    dot.style.corner_radius = 5;
-    r.add(std::move(dot));
-    r.label(text);
+    ViewNode s;
+    s.kind = ViewKind::Status;
+    s.name = next_name("status");
+    s.text = text;
+    s.ok   = ok;
+    add(std::move(s));
 }
 
 void ViewBuilder::separator() {
-    Node s;
-    s.name            = next_name("sep");
-    s.kind            = NodeKind::Shape;
-    s.size            = {1, 1};
-    s.style.fill      = theme_.panel_alt;
-    s.layout.w_sizing = Sizing::Fill;
+    ViewNode s;
+    s.kind = ViewKind::Separator;
+    s.name = next_name("sep");
     add(std::move(s));
 }
 
 void ViewBuilder::spacer(float h) {
-    Node s;
-    s.name = next_name("space");
-    s.size = {1, h};
+    ViewNode s;
+    s.kind   = ViewKind::Spacer;
+    s.name   = next_name("space");
+    s.height = h;
     add(std::move(s));
 }
 
-void ViewBuilder::field_frame(std::string& value, const std::string& placeholder, float width, int lines,
-                              bool multiline, ClickFn on_submit, bool masked) {
-    Node f;
-    f.name                = next_name("field");
-    f.kind                = NodeKind::Frame;
-    f.layout.mode         = LayoutMode::Vertical;
-    f.layout.pad_l = f.layout.pad_r = 8;
-    f.layout.pad_t = f.layout.pad_b = 5;
-    f.clip                = true;
-    const std::string path = path_ + "/" + f.name;
-    const bool focused     = bind_.focused == path;
-    f.style.fill           = focused ? theme_.panel : theme_.panel_alt;
-    f.style.corner_radius  = 4;
-    const float lh         = measure_.line_height(theme_.font_size);
-    f.size                 = {width, lh * static_cast<float>(lines) + 10};
-    const float inner      = width - 16;
-    const std::string caret = focused ? "|" : "";
-    if (value.empty() && !focused) {
-        f.children.push_back(text_node("ph", fit_text(placeholder, inner, theme_.font_size, measure_), theme_.font_size,
-                                       theme_.muted, measure_));
-    } else if (masked) {
-        std::string dots;
-        for (unsigned char c : value) {
-            if ((c & 0xC0) != 0x80) dots += "\xE2\x80\xA2";   // one bullet per code point
-        }
-        f.children.push_back(text_node("text", fit_tail(dots + caret, inner, theme_.font_size, measure_), theme_.font_size,
-                                       theme_.text, measure_));
-    } else if (!multiline) {
-        f.children.push_back(text_node("text", fit_tail(value + caret, inner, theme_.font_size, measure_), theme_.font_size,
-                                       theme_.text, measure_));
-    } else {
-        // The last `lines` lines (the caret sits at the end of the text).
-        std::vector<std::string> ls;
-        std::size_t start = 0;
-        const std::string all = value + caret;
-        while (true) {
-            const auto end = all.find('\n', start);
-            ls.push_back(all.substr(start, end == std::string::npos ? std::string::npos : end - start));
-            if (end == std::string::npos) break;
-            start = end + 1;
-        }
-        const std::size_t first = ls.size() > static_cast<std::size_t>(lines) ? ls.size() - lines : 0;
-        for (std::size_t i = first; i < ls.size(); ++i) {
-            f.children.push_back(text_node("line" + std::to_string(i), fit_tail(ls[i], inner, theme_.font_size, measure_),
-                                           theme_.font_size, theme_.text, measure_));
-        }
-    }
-    add(std::move(f));
-    bind_.fields.push_back({path, &value, std::move(on_submit), multiline});
-    // Clicking a field focuses it (the app owns focus; this only names the path).
-    Bindings* b = &bind_;
-    bind_.clicks.push_back({path, [b, path] { b->focused = path; }});
-}
-
 void ViewBuilder::text_field(std::string& value, const std::string& placeholder, float width, ClickFn on_submit) {
-    field_frame(value, placeholder, width, 1, false, std::move(on_submit));
+    ViewNode f;
+    f.kind      = ViewKind::Field;
+    f.name      = next_name("field");
+    f.text      = placeholder;
+    f.width     = width;
+    f.value     = &value;
+    f.on_submit = std::move(on_submit);
+    add(std::move(f));
 }
 
 void ViewBuilder::secret_field(std::string& value, const std::string& placeholder, float width) {
-    field_frame(value, placeholder, width, 1, false, {}, true);
+    ViewNode f;
+    f.kind   = ViewKind::Field;
+    f.name   = next_name("field");
+    f.text   = placeholder;
+    f.width  = width;
+    f.value  = &value;
+    f.secret = true;
+    add(std::move(f));
 }
 
 void ViewBuilder::text_area(std::string& value, float width, int lines) {
-    field_frame(value, {}, width, lines < 1 ? 1 : lines, true, {});
+    ViewNode f;
+    f.kind      = ViewKind::Field;
+    f.name      = next_name("field");
+    f.width     = width;
+    f.lines     = lines < 1 ? 1 : lines;
+    f.multiline = true;
+    f.value     = &value;
+    add(std::move(f));
 }
 
 void ViewBuilder::list_item(const std::string& text, bool selected, ClickFn on_click, const std::string& detail) {
-    Node it;
-    it.name                = next_name("item");
-    it.kind                = NodeKind::Frame;
-    it.layout.mode         = LayoutMode::Horizontal;
-    it.layout.gap          = 10;
-    it.layout.align_cross  = ui_kit::AlignCross::Center;
-    it.layout.pad_l = it.layout.pad_r = 8;
-    it.layout.pad_t = it.layout.pad_b = 4;
-    it.layout.w_sizing     = Sizing::Fill;
-    it.layout.h_sizing     = Sizing::Hug;
-    it.style.fill          = selected ? theme_.accent : theme_.panel_alt;
-    it.style.corner_radius = 3;
-    it.children.push_back(text_node("text", text, theme_.font_size, theme_.text, measure_));
-    if (!detail.empty()) {
-        it.children.push_back(text_node("detail", detail, theme_.small_size, selected ? theme_.text : theme_.muted, measure_));
-    }
-    const std::string path = path_ + "/" + it.name;
+    ViewNode it;
+    it.kind     = ViewKind::ListItem;
+    it.name     = next_name("item");
+    it.text     = text;
+    it.detail   = detail;
+    it.selected = selected;
+    it.on_click = std::move(on_click);
     add(std::move(it));
-    if (on_click) bind_.clicks.push_back({path, std::move(on_click)});
 }
 
 void ViewBuilder::slider(float fraction, SetFractionFn on_set, float width) {
-    const float f = fraction < 0 ? 0.0f : (fraction > 1 ? 1.0f : fraction);
-    Node track;
-    track.name                = next_name("slider");
-    track.kind                = NodeKind::Frame;
-    track.size                = {width, 14};
-    track.layout.w_sizing     = Sizing::Fixed;
-    track.layout.h_sizing     = Sizing::Fixed;
-    track.style.fill          = theme_.panel_alt;
-    track.style.corner_radius = 3;
-    Node fill;
-    fill.name                = "fill";
-    fill.kind                = NodeKind::Frame;
-    fill.size                = {width * f, 14};
-    fill.layout.w_sizing     = Sizing::Fixed;
-    fill.layout.h_sizing     = Sizing::Fixed;
-    fill.style.fill          = theme_.accent;
-    fill.style.corner_radius = 3;
-    track.children.push_back(std::move(fill));
-    const std::string path = path_ + "/" + track.name;
-    add(std::move(track));
-    if (on_set) bind_.sliders.push_back({path, std::move(on_set)});
+    ViewNode s;
+    s.kind     = ViewKind::Slider;
+    s.name     = next_name("slider");
+    s.fraction = fraction < 0 ? 0.0f : (fraction > 1 ? 1.0f : fraction);
+    s.width    = width;
+    s.on_set   = std::move(on_set);
+    add(std::move(s));
 }
 
 void ViewBuilder::wrapped(const std::string& text, float max_width, const Color* color, float font_size) {
     const float size = font_size > 0 ? font_size : theme_.font_size;
     for (const auto& l : wrap_text(text, max_width, size, measure_)) {
-        add(text_node(next_name("line"), l, size, color ? *color : theme_.text, measure_));
+        add(text_node("line", l, size, color ? *color : theme_.text));
     }
 }
 
 void ViewBuilder::clipped_label(const std::string& text, float max_width, const Color* color) {
-    add(text_node(next_name("label"), fit_text(text, max_width, theme_.font_size, measure_), theme_.font_size,
-                  color ? *color : theme_.text, measure_));
+    add(text_node("label", fit_text(text, max_width, theme_.font_size, measure_), theme_.font_size,
+                  color ? *color : theme_.text));
+}
+
+void ViewBuilder::video(const std::string& label, const std::string& stream, float width, float height) {
+    ViewNode v;
+    v.kind   = ViewKind::Video;
+    v.name   = next_name("video");
+    v.text   = label;
+    v.detail = stream;
+    v.width  = width;
+    v.height = height;
+    add(std::move(v));
 }
 
 ViewBuilder ViewBuilder::row(float gap) {
-    Node r;
-    r.name               = next_name("row");
-    r.layout.mode        = LayoutMode::Horizontal;
-    r.layout.gap         = gap;
-    r.layout.align_cross = ui_kit::AlignCross::Center;
-    r.layout.w_sizing = r.layout.h_sizing = Sizing::Hug;
+    ViewNode r;
+    r.kind = ViewKind::Row;
+    r.name = next_name("row");
+    r.gap  = gap;
     return child(std::move(r));
 }
 
 ViewBuilder ViewBuilder::panel(float gap) {
-    Node p;
-    p.name                = next_name("panel");
-    p.layout.mode         = LayoutMode::Vertical;
-    p.layout.gap          = gap;
-    p.layout.pad_l = p.layout.pad_r = p.layout.pad_t = p.layout.pad_b = 10;
-    p.layout.w_sizing     = Sizing::Fill;
-    p.layout.h_sizing     = Sizing::Hug;
-    p.style.fill          = theme_.panel;
-    p.style.corner_radius = 6;
+    ViewNode p;
+    p.kind = ViewKind::Panel;
+    p.name = next_name("panel");
+    p.gap  = gap;
     return child(std::move(p));
 }
 

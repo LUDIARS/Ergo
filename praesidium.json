@@ -2,6 +2,25 @@
   "version": 1,
   "native": [
     {
+      "file": "src/studio/tela/glfw_tela_input.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "tela-786c12c",
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
       "file": "examples/compose_loop/main.cpp",
       "standard": "c++17",
       "includes": [
@@ -3432,6 +3451,180 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": []
+    },
+    {
+      "file": "src/studio/ui/studio_pages.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/ui/ui_kit_emitter.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/views/assets_view.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/views/play_view.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/tela/browser_screens.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-786c12c"
+      ]
+    },
+    {
+      "file": "src/studio/tela/screen_hub.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-786c12c"
+      ]
+    },
+    {
+      "file": "src/studio/tela/shell_routes.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-786c12c"
+      ]
+    },
+    {
+      "file": "src/studio/tela/studio_declaration.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-786c12c"
+      ]
+    },
+    {
+      "file": "src/studio/tela/tela_emitter.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-786c12c"
+      ]
+    },
+    {
+      "file": "src/studio/tela/tela_layer.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "tela-786c12c",
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "src/studio/tela/tela_window.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "tela-786c12c",
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "tests/studio/test_studio_tela.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-786c12c"
+      ]
     }
   ],
   "web": []

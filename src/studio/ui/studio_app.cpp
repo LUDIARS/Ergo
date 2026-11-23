@@ -1,7 +1,5 @@
 #include "ergo/studio/ui/studio_app.h"
 
-#include "ergo/common/json_min.h"
-#include "ergo/studio/host/health_report.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -11,38 +9,16 @@ namespace ergo::studio::ui {
 using ui_kit::LayoutMode;
 using ui_kit::Node;
 using ui_kit::Sizing;
-namespace jm = ergo::common::jsonm;
 
 namespace {
 
 constexpr float kSidebarWidth = 230;
 constexpr float kScrollStep   = 48;
 
-std::string scalar_text(const jm::JsonValue& v) {
-    if (v.is_string()) return v.s;
-    if (v.is_bool()) return v.b ? "true" : "false";
-    if (v.is_number()) {
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%g", v.n);
-        return buf;
-    }
-    return jm::serialize(v);
-}
-
-bool health_ok(const jm::JsonValue& h) {
-    const jm::JsonValue* ok = h.find("ok");
-    return ok && ok->as_bool();
-}
-
 } // namespace
 
 StudioApp::StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme, ViewLookup views)
     : host_(host), measure_(measure), theme_(std::move(theme)), views_(std::move(views)) {}
-
-host::IPluginView* StudioApp::view_of(host::IPlugin& p) const {
-    if (host::IPluginView* v = p.view()) return v;
-    return views_ ? views_(p) : nullptr;
-}
 
 void StudioApp::set_viewport(int w, int h) {
     if (w == vw_ && h == vh_) return;
@@ -63,7 +39,7 @@ void StudioApp::select_tab(std::size_t i) {
 uint64_t StudioApp::content_revision() const {
     if (active_ == 0) return 0;
     host::IPlugin* p = host_.plugins()[active_ - 1];
-    host::IPluginView* v = view_of(*p);
+    host::IPluginView* v = view_of(*p, views_);
     return v ? v->view_revision() : 0;
 }
 
@@ -119,7 +95,7 @@ void StudioApp::frame(const InputState& in, float dt) {
     since_health_ += dt;
     const bool health_due = since_health_ * 1000 >= static_cast<float>(health_interval_.count());
     // Health changes without a revision: the overview and generic tabs re-read it periodically.
-    const bool shows_health = active_ == 0 || !view_of(*host_.plugins()[active_ - 1]);
+    const bool shows_health = active_ == 0 || !view_of(*host_.plugins()[active_ - 1], views_);
     // Periodic refreshes wait until the button is up (the layout must not move under a press).
     const bool periodic = health_due && shows_health && !in.down;
     if (periodic) since_health_ = 0;
@@ -172,16 +148,22 @@ void StudioApp::rebuild() {
     root.children.push_back(std::move(view));
 
     {
-        ViewBuilder tabs(root.children[0], "Root/Tabs", measure_, theme_, bind_);
-        build_tabs(tabs);
+        ViewNode tabs;
+        ViewBuilder tb(tabs, measure_, theme_);
+        build_tab_list(tb, host_, active_, [this](std::size_t i) { select_tab(i); });
+        emit_ui_kit(tabs, root.children[0], "Root/Tabs", measure_, theme_, bind_);
     }
-    ViewBuilder body(root.children[1].children[0], "Root/View/Content", measure_, theme_, bind_);
-    if (active_ == 0) {
-        build_overview(body);
-    } else {
-        host::IPlugin* p = host_.plugins()[active_ - 1];
-        if (host::IPluginView* v = view_of(*p)) v->build(body);
-        else build_generic(body, *p);
+    {
+        ViewNode body;
+        ViewBuilder bb(body, measure_, theme_);
+        if (active_ == 0) {
+            build_overview(bb, host_);
+        } else {
+            host::IPlugin* p = host_.plugins()[active_ - 1];
+            if (host::IPluginView* v = view_of(*p, views_)) v->build(bb);
+            else build_generic(bb, *p);
+        }
+        emit_ui_kit(body, root.children[1].children[0], "Root/View/Content", measure_, theme_, bind_);
     }
 
     // Keep the context (its hover / pressed state) across rebuilds: replacing it
@@ -207,51 +189,6 @@ void StudioApp::rebuild() {
             fn(f < 0 ? 0.0f : (f > 1 ? 1.0f : f));
         });
     }
-}
-
-void StudioApp::build_tabs(ViewBuilder& bar) {
-    auto tab = [&](std::size_t i, const std::string& title) {
-        bar.list_item(title, i == active_, [this, i] { select_tab(i); });
-    };
-    tab(0, "\xE6\xA6\x82\xE8\xA6\x81");   // 概要
-    for (std::size_t i = 0; i < host_.plugins().size(); ++i) {
-        const auto& info = host_.plugins()[i]->info();
-        tab(i + 1, info.title);
-    }
-}
-
-void StudioApp::build_overview(ViewBuilder& b) {
-    b.title("Ergo Studio");
-    b.muted("\xE8\xAA\xAD\xE3\x81\xBF\xE8\xBE\xBC\xE3\x82\x93\xE3\x81\xA0\xE3\x83\x97\xE3\x83\xA9\xE3\x82\xB0\xE3\x82\xA4\xE3\x83\xB3\xE3\x81\xA8\xE7\x8A\xB6\xE6\x85\x8B");   // 読み込んだプラグインと状態
-    for (host::IPlugin* p : host_.plugins()) {
-        const auto h = host::plugin_health(*p);
-        ViewBuilder panel = b.panel(4);
-        panel.status(health_ok(h), p->info().title + "  (" + p->info().id + ")");
-        if (const jm::JsonValue* err = h.find("err")) panel.muted(scalar_text(*err));
-        else if (const jm::JsonValue* w = h.find("warning")) panel.muted(scalar_text(*w));
-    }
-    for (const auto& r : host_.rejected()) {
-        ViewBuilder panel = b.panel(4);
-        panel.status(false, "\xE8\xAA\xAD\xE3\x81\xBF\xE8\xBE\xBC\xE3\x82\x81\xE3\x81\xAA\xE3\x81\x8B\xE3\x81\xA3\xE3\x81\x9F\xE5\xA4\x96\xE9\x83\xA8\xE3\x83\x91\xE3\x83\x83\xE3\x82\xAF: " + r.source);   // 読み込めなかった外部パック
-        panel.muted(r.reason);
-    }
-}
-
-void StudioApp::build_generic(ViewBuilder& b, host::IPlugin& p) {
-    const auto& info = p.info();
-    b.title(info.title);
-    if (!info.description.empty()) b.muted(info.description);
-    const auto h = host::plugin_health(p);
-    ViewBuilder panel = b.panel(4);
-    panel.status(health_ok(h), health_ok(h) ? "ok" : "not ok");
-    for (const auto& [k, v] : *h.o) {
-        if (k == "ok" || k == "id" || k == "title") continue;
-        panel.field(k, scalar_text(v));
-    }
-    ViewBuilder ep = b.panel(4);
-    ep.muted("\xE3\x82\xA8\xE3\x83\xB3\xE3\x83\x89\xE3\x83\x9D\xE3\x82\xA4\xE3\x83\xB3\xE3\x83\x88");   // エンドポイント
-    if (p.http()) ep.label("HTTP  /" + info.id + "/api/...");
-    if (p.socket()) ep.label("WS    /" + info.id + "/ws");
 }
 
 } // namespace ergo::studio::ui

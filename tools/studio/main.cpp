@@ -8,9 +8,15 @@
 #include "ergo/studio/host/external_loader.h"
 #include "ergo/studio/host/plugin_host.h"
 #include "ergo/studio/net/server.h"
-#ifdef ERGO_STUDIO_HAS_SHELL
+#include "views/view_registry.h"
+#ifdef ERGO_STUDIO_HAS_TELA
+#  include "ergo/studio/tela/screen_hub.h"
+#  include "ergo/studio/tela/shell_routes.h"
+#endif
+#ifdef ERGO_STUDIO_HAS_TELA_WINDOW
+#  include "ergo/studio/tela/tela_window.h"
+#elif defined(ERGO_STUDIO_HAS_SHELL)
 #  include "ergo/studio/shell/studio_window.h"
-#  include "views/view_registry.h"
 #endif
 
 #include <atomic>
@@ -112,8 +118,23 @@ int main(int argc, char** argv) {
         return 1;
     }
     host::PluginHost plugins(std::move(loaded), &log_line);
+    views::ViewRegistry views(&plugins);   // native tabs; outlives every screen
 
-    net::Server server({settings.bind_host, settings.port, settings.public_hosts}, plugins, plugins, &log_line);
+#ifdef ERGO_STUDIO_HAS_TELA
+    // One Tela declaration for every screen: the window and the browser pages of /shell/
+    // (spec/feature/tool/shell.md). The routes sit in front of the plugin host.
+    tela_shell::StudioDeclaration declaration(plugins, views.lookup());
+    tela_shell::BrowserScreens    pages(&log_line);
+    tela_shell::ScreenHub         hub(declaration, pages);
+    tela_shell::ShellRoutes       routes(plugins, plugins, pages, settings.bind_host);
+    net::IHttpHandler&            http_handler = routes;
+    net::IWsAcceptor&             ws_acceptor  = routes;
+#else
+    net::IHttpHandler& http_handler = plugins;
+    net::IWsAcceptor&  ws_acceptor  = plugins;
+#endif
+
+    net::Server server({settings.bind_host, settings.port, settings.public_hosts}, http_handler, ws_acceptor, &log_line);
     for (const auto& h : settings.public_hosts) log_line("info", "[ergo] published as https://" + h + "/web/ (Cloudflare Access only)");
     std::string err;
     if (!server.start(err)) {
@@ -122,6 +143,9 @@ int main(int argc, char** argv) {
     }
     const std::string addr = settings.bind_host + ":" + std::to_string(server.port());
     log_line("info", "[ergo] http://" + addr + "/");
+#ifdef ERGO_STUDIO_HAS_TELA
+    log_line("info", "[ergo] browser shell: http://" + addr + "/shell/");
+#endif
     for (auto* p : plugins.plugins()) {
         log_line("info", "[ergo]   -> " + p->info().title + "  (/" + p->info().id + "/" + (p->socket() ? ", ws" : "") + ")");
         if (!p->info().usage_hint.empty()) {
@@ -131,13 +155,28 @@ int main(int argc, char** argv) {
     for (const auto& r : plugins.rejected()) log_line("error", "[ergo]   !! rejected " + r.source + ": " + r.reason);
 
     int code = 0;
-#ifdef ERGO_STUDIO_HAS_SHELL
+#if defined(ERGO_STUDIO_HAS_TELA_WINDOW)
     if (!settings.headless) {
-        views::ViewRegistry views(&plugins);   // native tabs; outlives the window's app
+        tela_shell::TelaWindowConfig wc;
+        wc.font_path  = settings.font_path;
+        wc.shader_dir = settings.shader_dir;
+        try {
+            code = tela_shell::run_tela_window(hub, wc, g_stop, err);
+        } catch (const std::exception& e) {
+            err  = std::string("unexpected exception: ") + e.what();
+            code = 9;
+        }
+        if (code != 0) log_line("error", "[ergo] window: " + err);
+    } else
+#elif defined(ERGO_STUDIO_HAS_SHELL)
+    if (!settings.headless) {
         shell::WindowConfig wc;
         wc.font_path  = settings.font_path;
         wc.shader_dir = settings.shader_dir;
         wc.views      = views.lookup();
+#  ifdef ERGO_STUDIO_HAS_TELA
+        wc.on_frame = [&hub](float dt) { hub.pump(dt); };   // browser pages share the window's UI thread
+#  endif
         try {
             code = shell::run_studio_window(plugins, wc, g_stop, err);
         } catch (const std::exception& e) {
@@ -148,7 +187,18 @@ int main(int argc, char** argv) {
     } else
 #endif
     {
+#ifdef ERGO_STUDIO_HAS_TELA
+        // No window: this thread is the UI thread of the browser pages.
+        auto last = std::chrono::steady_clock::now();
+        while (!g_stop.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+            const auto now = std::chrono::steady_clock::now();
+            hub.pump(std::chrono::duration<float>(now - last).count());
+            last = now;
+        }
+#else
         while (!g_stop.load()) std::this_thread::sleep_for(std::chrono::milliseconds(200));
+#endif
     }
     server.stop();
     return code;

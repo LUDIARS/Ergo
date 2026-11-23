@@ -18,6 +18,9 @@ struct WindowConfig {
     std::string font_path;    ///< TTF / OTF / TTC
     std::string shader_dir;   ///< holds ui_widget.vert.spv / ui_widget.frag.spv
     ui::ViewLookup views;     ///< native tabs for plugins without their own view
+    /// Runs on the window's thread once per frame (dt in seconds): other
+    /// screens that share the UI thread (the browser pages) are pumped here.
+    std::function<void(float)> on_frame;
 };
 
 /// Opens the window and runs the UI loop. Returns 0 on a normal close, or a

@@ -129,6 +129,7 @@ int run_studio_window(host::PluginHost& host, const WindowConfig& cfg, const std
         const auto now = std::chrono::steady_clock::now();
         const float dt = std::chrono::duration<float>(now - last).count();
         last = now;
+        if (cfg.on_frame) cfg.on_frame(dt);
 
         int fbw = 0, fbh = 0, ww = 0, wh = 0;
         glfwGetFramebufferSize(win, &fbw, &fbh);

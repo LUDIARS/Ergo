@@ -1131,10 +1131,13 @@ if(ERGO_BUILD_STUDIO)
             ENVIRONMENT "ERGO_TEST_ECHO_PACK=$<TARGET_FILE:ergo_studio_echo_pack>")
     endif()
 
-    # ergo_studio_ui : the Studio window's UI as ui_kit trees (tabs, overview, views) — no GPU
+    # ergo_studio_ui : the Studio's UI as ViewNode trees (tabs, overview, views) and their ui_kit
+    # drawing (the built-in window of a build without Tela) — no GPU
     if(TARGET ergo_ui_kit)
         add_library(ergo_studio_ui STATIC
             src/studio/ui/studio_app.cpp
+            src/studio/ui/studio_pages.cpp
+            src/studio/ui/ui_kit_emitter.cpp
             src/studio/ui/view_builder.cpp
         )
         target_include_directories(ergo_studio_ui PUBLIC include)
@@ -1149,6 +1152,31 @@ if(ERGO_BUILD_STUDIO)
                 target_compile_options(test_studio_ui PRIVATE /utf-8)
             endif()
             add_test(NAME test_studio_ui COMMAND test_studio_ui)
+        endif()
+    endif()
+
+    # ergo_studio_tela : the Studio's UI as one Tela declaration, a tela::Runtime per screen and the
+    # browser shell (GET /shell/, WS /shell/ws) — no GPU (spec/feature/tool/shell.md).
+    # ERGO_TELA_SOURCE_DIR = a Tela checkout (cmake/ErgoStudioTela.cmake); empty = no Tela.
+    include(cmake/ErgoStudioTela.cmake)
+    ergo_studio_add_tela()
+    if(TARGET ergo_studio_ui AND TARGET Tela::Web AND ERGO_STUDIO_TELA_WEB_JS)
+        add_library(ergo_studio_tela STATIC
+            src/studio/tela/browser_screens.cpp
+            src/studio/tela/screen_hub.cpp
+            src/studio/tela/shell_routes.cpp
+            src/studio/tela/studio_declaration.cpp
+            src/studio/tela/tela_emitter.cpp
+        )
+        target_include_directories(ergo_studio_tela PUBLIC include)
+        target_link_libraries(ergo_studio_tela PUBLIC ergo_studio_ui ergo_studio_net Tela::Web)
+        target_compile_features(ergo_studio_tela PUBLIC cxx_std_20)
+        include(cmake/ErgoEmbedText.cmake)
+        ergo_embed_text(ergo_studio_tela ergo_shell_index_html src/studio/tela/page/index.html)
+        ergo_embed_text(ergo_studio_tela ergo_shell_js src/studio/tela/page/shell.js)
+        ergo_embed_text(ergo_studio_tela ergo_tela_js "${ERGO_STUDIO_TELA_WEB_JS}")
+        if(MSVC)
+            target_compile_options(ergo_studio_tela PRIVATE /utf-8)
         endif()
     endif()
 
@@ -1372,6 +1400,7 @@ if(ERGO_BUILD_STUDIO)
     if(TARGET ergo_studio_ui)
         add_library(ergo_studio_views STATIC
             tools/studio/views/api_view.cpp
+            tools/studio/views/assets_view.cpp
             tools/studio/views/explorer_view.cpp
             tools/studio/views/git_view.cpp
             tools/studio/views/services_view.cpp
@@ -1381,6 +1410,7 @@ if(ERGO_BUILD_STUDIO)
             tools/studio/views/log_view.cpp
             tools/studio/views/lookdev_view.cpp
             tools/studio/views/musa_views.cpp
+            tools/studio/views/play_view.cpp
             tools/studio/views/plugin_api.cpp
             tools/studio/views/studio_view.cpp
             tools/studio/views/thaleia_view.cpp
@@ -1399,6 +1429,15 @@ if(ERGO_BUILD_STUDIO)
                 target_compile_options(test_studio_views PRIVATE /utf-8)
             endif()
             add_test(NAME test_studio_views COMMAND test_studio_views)
+            # The Tela declaration over the real views: document shape, tabs, two screens, /shell/ws.
+            if(TARGET ergo_studio_tela)
+                add_executable(test_studio_tela tests/studio/test_studio_tela.cpp)
+                target_link_libraries(test_studio_tela PRIVATE ergo_studio_tela ergo_studio_views ergo_studio_plugins ergo_gtest_main)
+                if(MSVC)
+                    target_compile_options(test_studio_tela PRIVATE /utf-8)
+                endif()
+                add_test(NAME test_studio_tela COMMAND test_studio_tela)
+            endif()
         endif()
     endif()
 
@@ -2342,6 +2381,22 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
             list(APPEND _ergo_studio_spv "${_out}")
         endforeach()
         add_custom_target(ergo_studio_shaders DEPENDS ${_ergo_studio_spv})
+
+        # ergo_studio_tela_window : the window on Tela's GPU backend (replaces the ui_kit drawing
+        # when Tela is there; the same shaders).
+        if(TARGET ergo_studio_tela AND TARGET Tela::Gpu)
+            add_library(ergo_studio_tela_window STATIC
+                src/studio/tela/glfw_tela_input.cpp
+                src/studio/tela/tela_layer.cpp
+                src/studio/tela/tela_window.cpp
+            )
+            target_include_directories(ergo_studio_tela_window PUBLIC include)
+            target_link_libraries(ergo_studio_tela_window PUBLIC ergo_studio_tela ergo_render pictor glfw Tela::Gpu)
+            target_compile_definitions(ergo_studio_tela_window PRIVATE NOMINMAX)
+            if(MSVC)
+                target_compile_options(ergo_studio_tela_window PRIVATE /utf-8)
+            endif()
+        endif()
     else()
         message(STATUS "ergo_studio: no real render path (pictor / ergo_render / glfw) — building the headless server only")
     endif()
@@ -2358,6 +2413,14 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
         target_link_libraries(ergo_studio PRIVATE ergo_studio_shell ergo_studio_views)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
         add_dependencies(ergo_studio ergo_studio_shaders)
+    endif()
+    if(TARGET ergo_studio_tela)
+        target_link_libraries(ergo_studio PRIVATE ergo_studio_tela)
+        target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_TELA=1)
+    endif()
+    if(TARGET ergo_studio_tela_window)
+        target_link_libraries(ergo_studio PRIVATE ergo_studio_tela_window)
+        target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_TELA_WINDOW=1)
     endif()
     if(MSVC)
         target_compile_options(ergo_studio PRIVATE /utf-8)

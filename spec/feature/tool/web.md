@@ -18,6 +18,13 @@ Portus と Custos 参考」(同日) により Ergo Studio の `play` プラグ�
 | 公開名の検査 | `src/studio/net/request_guard.cpp` | `ERGO_STUDIO_PUBLIC_HOSTS` の名前を、Access を通った要求にだけ許す |
 | 遠隔プレイ | `play` プラグイン (`tools/studio/plugins/play/`、play.md) | ビルド・実行・停止・WebRTC の画面配信と操作 |
 
+## Tela の `/shell/` との関係
+
+Tela を取り込んだ構成 (`ERGO_TELA_SOURCE_DIR`) では、Studio の窓と同じ UI をブラウザの `/shell/` で開ける
+([shell.md](shell.md))。このページにしか無かったアセット一覧と遠隔プレイは Studio のタブ (`assets` / `play`) にも
+入れた。この HTML のページと `GET /web/api/config` は、`/shell/` で同じことができるのを確かめてから段 4 で消す
+(spec/plan/2026-11-23-studio-on-tela.md)。それまでは両方が並ぶ。
+
 ## ページのタブ
 
 | タブ | 内容 | 使う API |

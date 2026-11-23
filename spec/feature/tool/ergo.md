@@ -38,9 +38,13 @@ Ergo の開発者向けツール (particle / variable / scene_editor / log / Stu
 ## 起動モード
 
 - **既定: ウィンドウ付き** (`ergo_studio.exe`)
-  - GLFW + Vulkan + Pictor の `UIRenderer` / `FrameComposer` でタブ UI を描く
-    (`src/studio/shell/`)。文字は `ERGO_STUDIO_FONT` (既定 `<Windows>\Fonts\meiryo.ttc`)
-    を Pictor の FontLoader で 1 枚のアトラスにし、CPU のキャンバスに組んで重ねる
+  - `ERGO_TELA_SOURCE_DIR` あり: タブ UI は 1 つの Tela の宣言で、窓は GLFW + Vulkan のまま
+    Tela の GPU バックエンド (`Tela::Gpu`) で描く (`src/studio/tela/`)。同じ UI をブラウザの
+    `http://localhost:5170/shell/` でも開ける (画面ごとに配置・フォーカス・スクロール、値は共通)。
+    詳細は [shell.md](shell.md)
+  - `ERGO_TELA_SOURCE_DIR` なし: GLFW + Vulkan + Pictor の `UIRenderer` / `FrameComposer` で
+    ui_kit のタブ UI を描く (`src/studio/shell/`、段 4 で撤去予定)
+  - 文字は `ERGO_STUDIO_FONT` (既定 `<Windows>\Fonts\meiryo.ttc`)
   - エンジンクライアント (`ergo_bind` / `ergo_particle_link` / `ergo_scene_link` /
     `ergo_log_live`) は従来通り `ws://127.0.0.1:5170/<id>/ws` に接続する (同じポート)
 - **ヘッドレス: `ergo_studio.exe --headless`**、または Pictor 無し
@@ -63,9 +67,11 @@ Ergo の開発者向けツール (particle / variable / scene_editor / log / Stu
 | `http://localhost:5170/api/health`   | 全プラグイン集約ヘルス                           |
 | `http://localhost:5170/<id>/api/*`   | プラグイン固有の REST                            |
 | `ws://localhost:5170/<id>/ws`        | プラグイン固有の WebSocket                        |
+| `http://localhost:5170/shell/`       | ブラウザで開く Studio の UI (Tela、[shell.md](shell.md)) |
+| `ws://localhost:5170/shell/ws`       | そのページの描画と入力 (Tela の WebSession)        |
 
-UI はブラウザではなくアプリのウィンドウ (タブ) にある。HTTP / WS はエンジン・ホスト・
-外部ツールとの接続口として残す。
+UI はアプリのウィンドウ (タブ) と、Tela を取り込んだ構成ではブラウザの `/shell/` にある
+(同じ宣言)。HTTP / WS はエンジン・ホスト・外部ツールとの接続口として残す。
 
 ### 接続元の制限 (クロスサイト / DNS リバインディング)
 

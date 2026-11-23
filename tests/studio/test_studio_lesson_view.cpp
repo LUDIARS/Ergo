@@ -1,6 +1,8 @@
 #include "fake_http.h"
 #include "views/lesson_view.h"
 
+#include "ergo/studio/ui/ui_kit_emitter.h"
+
 #include <gtest/gtest.h>
 
 #include <chrono>
@@ -61,12 +63,14 @@ void collect(const ergo::ui_kit::Node& n, std::vector<std::string>& out) {
 
 Built build(views::LessonView& view) {
     Built                   out;
-    ergo::ui_kit::Node      root;
+    ui::ViewNode            tree;
     ui::FixedAdvanceMeasure measure;
     ui::Theme               theme;
-    ui::Bindings            bindings;
-    ui::ViewBuilder         b(root, "Root", measure, theme, bindings);
+    ui::ViewBuilder         b(tree, measure, theme);
     view.build(b);
+    ergo::ui_kit::Node root;
+    ui::Bindings       bindings;
+    ui::emit_ui_kit(tree, root, "Root", measure, theme, bindings);
     collect(root, out.texts);
     out.clicks = bindings.clicks;
     return out;
