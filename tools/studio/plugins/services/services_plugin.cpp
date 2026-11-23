@@ -63,18 +63,18 @@ JsonValue pick_services(const JsonValue& excubitor_list, const std::vector<Works
     return out;
 }
 
-ServicesPlugin::ServicesPlugin(studio::StudioConfig cfg, std::string plugin_dirs,
+ServicesPlugin::ServicesPlugin(studio::StudioConfig cfg, std::shared_ptr<const IProfileSource> profiles,
                                std::shared_ptr<platform::IHttpClient> http, host::LogFn log)
     : info_{"services", "サービス", "ゲームのサーバーやツールを Excubitor 経由で起動・停止する (起動時は Concordia にテストを一報)。",
             "\xE2\x96\xB6"},
       cfg_(std::move(cfg)),
-      plugin_dirs_(std::move(plugin_dirs)),
+      profiles_(std::move(profiles)),
       caller_(std::make_unique<studio::ServiceCaller>(std::move(http), cfg_.request_timeout_ms)),
       endpoints_(std::make_unique<studio::EndpointResolver>(cfg_, *caller_)),
       log_(std::move(log)) {}
 
 ProfileSet ServicesPlugin::profiles() const {
-    return load_workspace_profiles(std::filesystem::u8path(cfg_.home), plugin_dirs_, &process_env);
+    return profiles_->profiles();
 }
 
 bool ServicesPlugin::offered(const std::string& code) const {
@@ -168,9 +168,9 @@ net::HttpResponse ServicesPlugin::logs(const std::string& code) {
     return json_response(200, result.data);
 }
 
-std::unique_ptr<host::IPlugin> make_services_plugin(const studio::StudioConfig& cfg, const std::string& plugin_dirs,
-                                                    const host::LogFn& log) {
-    return std::make_unique<ServicesPlugin>(cfg, plugin_dirs, platform::make_system_http_client(), log);
+std::unique_ptr<host::IPlugin> make_services_plugin(const studio::StudioConfig& cfg,
+                                                    std::shared_ptr<const IProfileSource> profiles, const host::LogFn& log) {
+    return std::make_unique<ServicesPlugin>(cfg, std::move(profiles), platform::make_system_http_client(), log);
 }
 
 } // namespace ergo::studio::plugins::services

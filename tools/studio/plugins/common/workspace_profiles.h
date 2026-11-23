@@ -4,6 +4,10 @@
 ///   {
 ///     "name":     "amicii",
 ///     "root":     "${LUDIARS_ROOT}/Amicii",          (optional; default: the file's folder)
+///     "style":    "unity",                            (optional; unity | cpp-ludiars | cpp-other | other,
+///                                                      wins over detection: ergo/studio/project/project_style.h)
+///     "domain":   "game",                             (optional; what the project is for: lesson, game, cglive,
+///                                                      industrial or any other text; shown, not interpreted)
 ///     "services": ["amicii-server", "amicii-server-tune"],   (Excubitor service codes)
 ///     "tuning":   {"amicii-server": "games/september/balance/versions"},  (ergo_bind app -> folder)
 ///     "git":      ["."],                              (repositories)
@@ -36,6 +40,8 @@ struct WorkspaceProfile {
     std::string                                  name;
     std::filesystem::path                        source;    ///< the file it came from
     std::filesystem::path                        root;
+    std::string                                  style;     ///< explicit "style" ("" = detect from root)
+    std::string                                  domain;    ///< "domain" as written ("" = none)
     std::vector<std::string>                     services;
     std::map<std::string, std::filesystem::path> tuning;    ///< app -> versions folder (absolute)
     std::vector<std::filesystem::path>           git;       ///< repositories (absolute)

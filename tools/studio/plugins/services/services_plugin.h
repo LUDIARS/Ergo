@@ -4,14 +4,14 @@
 /// Studio. Starting announces a test to Concordia first (the same claim the
 /// cc-test rule asks of people and sessions) and stopping releases it, so the
 /// traffic control knows what is under test. Which services are offered comes
-/// from the workspace profiles (common/workspace_profiles.h); without a
+/// from the open project's profile (common/profile_source.h); without a
 /// profile every Excubitor service is listed.
 ///   GET  /api/health                       Excubitor and Concordia reachable, profiles read
 ///   GET  /api/services                     [{code, name, state, running, port, project, profile}]
 ///   POST /api/services/<code>/control      {action: start|stop|restart, force?}: a claim held by
 ///                                          someone else refuses a start unless `force`
 ///   GET  /api/services/<code>/logs         Excubitor's recent log lines
-#include "../common/workspace_profiles.h"
+#include "../common/profile_source.h"
 #include "../studio/endpoints.h"
 
 #include "ergo/studio/host/plugin.h"
@@ -28,8 +28,8 @@ JsonValue pick_services(const JsonValue& excubitor_list, const std::vector<Works
 
 class ServicesPlugin final : public host::IPlugin, public host::IPluginHttp, public host::IPluginHealth {
 public:
-    ServicesPlugin(studio::StudioConfig cfg, std::string plugin_dirs, std::shared_ptr<platform::IHttpClient> http,
-                   host::LogFn log);
+    ServicesPlugin(studio::StudioConfig cfg, std::shared_ptr<const IProfileSource> profiles,
+                   std::shared_ptr<platform::IHttpClient> http, host::LogFn log);
 
     const host::PluginInfo& info() const override { return info_; }
     host::IPluginHttp*      http() override { return this; }
@@ -47,13 +47,13 @@ private:
 
     host::PluginInfo                          info_;
     studio::StudioConfig                      cfg_;
-    std::string                               plugin_dirs_;
+    std::shared_ptr<const IProfileSource>     profiles_;
     std::unique_ptr<studio::ServiceCaller>    caller_;
     std::unique_ptr<studio::EndpointResolver> endpoints_;
     host::LogFn                               log_;
 };
 
-std::unique_ptr<host::IPlugin> make_services_plugin(const studio::StudioConfig& cfg, const std::string& plugin_dirs,
-                                                    const host::LogFn& log);
+std::unique_ptr<host::IPlugin> make_services_plugin(const studio::StudioConfig& cfg,
+                                                    std::shared_ptr<const IProfileSource> profiles, const host::LogFn& log);
 
 } // namespace ergo::studio::plugins::services

@@ -31,7 +31,8 @@
 
 namespace ergo::studio::app {
 
-std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
+std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s,
+                                                 std::shared_ptr<const plugins::IProfileSource> profiles) {
     namespace p = ergo::studio::plugins;
     std::vector<host::PluginFactory> f;
     // The lesson plugin reads and sets the game's variables through the variable plugin.
@@ -41,27 +42,23 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
     });
     f.push_back([game_variables](const host::LogFn& log) { return make_bridged_variable_plugin(game_variables, log); });
     f.push_back([cfg = s.studio](const host::LogFn& log) { return p::lookdev::make_lookdev_plugin(cfg, log); });
-    // Game workspace operations (services, tuning versions, git), driven by the workspace profiles.
-    f.push_back([cfg = s.studio, dirs = s.plugin_dirs](const host::LogFn& log) {
-        return p::services::make_services_plugin(cfg, dirs, log);
+    // Game workspace operations (services, tuning versions, git), driven by the open project's profile.
+    f.push_back([cfg = s.studio, profiles](const host::LogFn& log) {
+        return p::services::make_services_plugin(cfg, profiles, log);
     });
-    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
-        return p::tuning::make_tuning_plugin(home, dirs, log);
+    f.push_back([home = s.studio.home, profiles](const host::LogFn& log) {
+        return p::tuning::make_tuning_plugin(home, profiles, log);
     });
-    f.push_back([cfg = s.studio, dirs = s.plugin_dirs](const host::LogFn& log) {
-        return p::git::make_git_plugin(cfg.home, dirs, cfg.request_timeout_ms, log);
+    f.push_back([cfg = s.studio, profiles](const host::LogFn& log) {
+        return p::git::make_git_plugin(profiles, cfg.request_timeout_ms, log);
     });
     // The Studio in a browser (spec/feature/tool/web.md) and the asset list it shows.
-    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
-        return p::assets::make_assets_plugin(home, dirs, log);
-    });
+    f.push_back([profiles](const host::LogFn& log) { return p::assets::make_assets_plugin(profiles, log); });
     f.push_back([cfg = p::web::WebConfig{s.public_hosts}](const host::LogFn& log) {
         return p::web::make_web_plugin(cfg, log);
     });
     // Remote play: build, run and stream the profiles' games (spec/feature/tool/play.md).
-    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
-        return p::play::make_play_plugin(home, dirs, log);
-    });
+    f.push_back([profiles](const host::LogFn& log) { return p::play::make_play_plugin(profiles, log); });
     f.push_back(&p::particle::make_particle_plugin);
     f.push_back(&p::scene_editor::make_scene_editor_plugin);
     f.push_back(&p::log::make_log_plugin);

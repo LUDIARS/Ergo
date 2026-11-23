@@ -12,6 +12,7 @@
 #include "remote_play.h"
 #include "target_runner.h"
 #include "../common/json_util.h"
+#include "../common/profile_source.h"
 #include "ergo/studio/host/plugin.h"
 
 #include <map>
@@ -22,7 +23,7 @@
 
 namespace ergo::studio::plugins::play {
 
-/// Where the targets come from (workspace profiles).
+/// Where the targets come from (the open project's profile).
 using TargetSource = std::function<std::vector<PlayTarget>(std::vector<std::string>& errors)>;
 
 struct PlayDeps {
@@ -73,11 +74,13 @@ private:
     std::unique_ptr<TargetRunner>            runner_;   // last: stopped first, its callbacks reach the rest
 };
 
-/// The plugin with the system pieces: profiles from `studio_home` and
-/// `plugin_dirs`, child processes, and Odeum's remote play when linked.
+/// The plugin with the system pieces: targets from `profiles`, child
+/// processes, and Odeum's remote play when linked.
 /// Reads ERGO_STUDIO_FFMPEG, ERGO_STUDIO_STUN_URLS, ERGO_STUDIO_TURN_KEY_ID and
 /// ERGO_STUDIO_TURN_KEY_API_TOKEN; throws when only one TURN variable is set.
-std::unique_ptr<host::IPlugin> make_play_plugin(const std::string& studio_home, const std::string& plugin_dirs,
-                                                const host::LogFn& log);
+std::unique_ptr<host::IPlugin> make_play_plugin(std::shared_ptr<const IProfileSource> profiles, const host::LogFn& log);
+
+/// The targets of every profile `profiles` gives (a bad "play" or an unreadable profile is an error line).
+TargetSource profile_targets(std::shared_ptr<const IProfileSource> profiles);
 
 } // namespace ergo::studio::plugins::play

@@ -22,6 +22,10 @@ JSON 1 ファイルで 1 ワークスペース (`tools/studio/plugins/common/wor
 - パスは `root` からの相対。`root` を省くとファイルのあるフォルダ
 - `${NAME}` は環境変数。未設定ならそのプロフィールは使わず、理由を health に出す (空のまま進めない)
 - 読めないファイルは health の `profile_errors` に出す
+- プラグインが使うのは **ランチャーで開いたプロジェクトのプロフィールだけ** (`IProfileSource`、[ergo.md](ergo.md) の「ランチャー」)。
+  上の 2 か所はランチャーの一覧の元。プロジェクトを開いていない間、プラグインから見えるプロフィールは無い
+- `"style"` (省略可): `unity` / `cpp-ludiars` / `cpp-other` / `other`。省くと root から判定する (ランチャーに出す)
+- `"domain"` (省略可、文字列): 用途 (`lesson` / `game` / `cglive` / `industrial` など任意)。ランチャーに出して記録するだけで解釈しない
 
 ## services (サービス)
 

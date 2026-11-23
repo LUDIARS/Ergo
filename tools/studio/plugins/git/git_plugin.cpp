@@ -25,17 +25,16 @@ net::HttpResponse answer(const GitOutcome& o) {
 
 } // namespace
 
-GitPlugin::GitPlugin(GitOps ops, std::string home, std::string plugin_dirs, host::LogFn log)
+GitPlugin::GitPlugin(GitOps ops, std::shared_ptr<const IProfileSource> profiles, host::LogFn log)
     : info_{"git", "Git", "ゲームのワークスペースのリポジトリを、状態の確認・ブランチ・コミット・pull・push まで Studio から扱う。",
             "\xF0\x9F\x8C\xBF"},
       ops_(std::move(ops)),
-      home_(std::move(home)),
-      plugin_dirs_(std::move(plugin_dirs)),
+      profiles_(std::move(profiles)),
       log_(std::move(log)) {}
 
 std::vector<GitPlugin::Repo> GitPlugin::repos() const {
     std::vector<Repo> out;
-    for (const auto& p : load_workspace_profiles(fs::u8path(home_), plugin_dirs_, &process_env).profiles) {
+    for (const auto& p : profiles_->profiles().profiles) {
         for (const auto& path : p.git) {
             const bool seen = std::any_of(out.begin(), out.end(), [&](const Repo& r) { return r.path == path; });
             if (!seen) out.push_back({path, p.name});
@@ -47,7 +46,7 @@ std::vector<GitPlugin::Repo> GitPlugin::repos() const {
 JsonValue GitPlugin::snapshot() const {
     const auto list = repos();
     JsonValue out = jobj({{"ok", jbool(!list.empty())}, {"repos", jnum(static_cast<double>(list.size()))}});
-    if (list.empty()) out.set("err", jstr("no workspace profile lists a repository (profiles: <studio home>/profiles, ERGO_PLUGIN_DIR)"));
+    if (list.empty()) out.set("err", jstr("the open project's profile lists no repository (or no project is open)"));
     return out;
 }
 
@@ -112,9 +111,9 @@ net::HttpResponse GitPlugin::act(const Repo& repo, const std::string& what, cons
     return answer(done);
 }
 
-std::unique_ptr<host::IPlugin> make_git_plugin(const std::string& studio_home, const std::string& plugin_dirs, int timeout_ms,
+std::unique_ptr<host::IPlugin> make_git_plugin(std::shared_ptr<const IProfileSource> profiles, int timeout_ms,
                                                const host::LogFn& log) {
-    return std::make_unique<GitPlugin>(GitOps(platform::make_system_process_runner(), timeout_ms), studio_home, plugin_dirs, log);
+    return std::make_unique<GitPlugin>(GitOps(platform::make_system_process_runner(), timeout_ms), std::move(profiles), log);
 }
 
 } // namespace ergo::studio::plugins::git

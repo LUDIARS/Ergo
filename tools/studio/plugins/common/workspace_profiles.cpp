@@ -3,6 +3,8 @@
 #include "json_parse.h"
 #include "json_util.h"
 
+#include "ergo/studio/project/project_style.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
@@ -107,6 +109,20 @@ std::optional<WorkspaceProfile> parse_workspace_profile(const std::string& text,
         const auto r = resolve(p.root, root->as_string(), env, err);
         if (!r) return std::nullopt;
         p.root = *r;
+    }
+    if (const JsonValue* style = field(*json, "style"); style != nullptr) {
+        if (!style->is_string() || !project::parse_style(style->as_string())) {
+            err = "\"style\" must be one of unity, cpp-ludiars, cpp-other, other";
+            return std::nullopt;
+        }
+        p.style = style->as_string();
+    }
+    if (const JsonValue* domain = field(*json, "domain"); domain != nullptr) {
+        if (!domain->is_string()) {
+            err = "\"domain\" must be a string";
+            return std::nullopt;
+        }
+        p.domain = domain->as_string();
     }
     if (const JsonValue* list = field(*json, "services"); list != nullptr && list->is_array()) {
         for (const auto& item : *list->a) {

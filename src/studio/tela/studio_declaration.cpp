@@ -8,6 +8,7 @@ namespace ergo::studio::tela_shell {
 namespace {
 
 constexpr float kSidebarWidth = 230;
+constexpr float kBandHeight   = 48;   // the open project's band over the tabs
 
 /// 公開名からはこのタブを操作できません (ローカルの画面から操作してください)
 const char* const kLockedNotice =
@@ -18,8 +19,14 @@ const char* const kLockedNotice =
 
 } // namespace
 
-StudioDeclaration::StudioDeclaration(host::PluginHost& host, ui::ViewLookup views, ui::Theme theme)
-    : host_(host), views_(std::move(views)), theme_(std::move(theme)), tela_theme_(tela_theme(theme_)) {}
+StudioDeclaration::StudioDeclaration(host::PluginHost& host, ui::ViewLookup views, ui::Theme theme,
+                                     project::Launcher* launcher)
+    : host_(host), views_(std::move(views)), theme_(std::move(theme)), launcher_(launcher),
+      tela_theme_(tela_theme(theme_)) {}
+
+bool StudioDeclaration::showing_launcher() const {
+    return launcher_ != nullptr && !launcher_->project().current();
+}
 
 bool StudioDeclaration::loopback_only(const std::string& plugin_id) {
     return plugin_id == "studio" || plugin_id == "lesson";
@@ -56,7 +63,8 @@ bool StudioDeclaration::refresh(float dt) {
     const bool shows_health = active_ == 0 || !ui::view_of(*host_.plugins()[active_ - 1], views_);
     const bool periodic     = health_due && shows_health;
     if (health_due) since_health_ = 0;
-    if (!dirty_ && content_revision() == built_revision_ && !periodic) return false;
+    const bool launcher_moved = launcher_ != nullptr && launcher_->revision() != built_launcher_revision_;
+    if (!dirty_ && !launcher_moved && content_revision() == built_revision_ && !periodic) return false;
     rebuild();
     return true;
 }
@@ -64,6 +72,11 @@ bool StudioDeclaration::refresh(float dt) {
 void StudioDeclaration::rebuild() {
     dirty_          = false;
     built_revision_ = content_revision();
+    built_launcher_revision_ = launcher_ ? launcher_->revision() : 0;
+    if (showing_launcher()) {
+        rebuild_launcher();
+        return;
+    }
 
     ui::ViewNode tabs;
     {
@@ -85,7 +98,49 @@ void StudioDeclaration::rebuild() {
     published_ = {};
     declare(full_, tabs, body, false);
     declare(published_, tabs, body, loopback_only(active_plugin()));
+    if (const auto project = launcher_ ? launcher_->project().current() : std::nullopt) {
+        ui::ViewNode band;
+        {
+            ui::ViewBuilder b(band, measure_, theme_);
+            ui::build_project_bar(b, *project, [this] { launcher_->close(); });
+        }
+        declare_band(full_, band);
+        declare_band(published_, band);
+    }
     ++revision_;
+}
+
+void StudioDeclaration::rebuild_launcher() {
+    // The launcher alone; a page under a public name gets it without add / remove.
+    const auto build = [this](bool local) {
+        ui::ViewNode body;
+        ui::ViewBuilder b(body, measure_, theme_);
+        ui::build_launcher(b, *launcher_, launcher_input_, local, [this] { touch(); });
+        return body;
+    };
+    full_      = {};
+    published_ = {};
+    declare_launcher(full_, build(true));
+    declare_launcher(published_, build(false));
+    ++revision_;
+}
+
+void StudioDeclaration::declare_launcher(::tela::Document& doc, const ui::ViewNode& body) {
+    const EmitOptions content{measure_, theme_, true, [this] { touch(); }};
+    ::tela::Layout l;
+    l.positioned = true;
+    l.padding    = 24;
+    l.gap        = 10;
+    doc.scroll(launcher_id(), [&] { emit_children(body, doc, launcher_id(), content); }, l);
+}
+
+void StudioDeclaration::declare_band(::tela::Document& doc, const ui::ViewNode& band) {
+    const EmitOptions nav{measure_, theme_, true, [this] { touch(); }};
+    ::tela::Layout l;
+    l.positioned = true;
+    l.height     = kBandHeight;
+    l.padding    = 6;
+    doc.scroll(project_id(), [&] { emit_children(band, doc, project_id(), nav); }, l);
 }
 
 void StudioDeclaration::declare(::tela::Document& doc, const ui::ViewNode& tabs, const ui::ViewNode& body,
@@ -94,8 +149,10 @@ void StudioDeclaration::declare(::tela::Document& doc, const ui::ViewNode& tabs,
     const EmitOptions nav{measure_, theme_, true, touched};
     const EmitOptions content{measure_, theme_, !locked, touched};
 
+    const float top = launcher_ != nullptr ? kBandHeight : 0;
     ::tela::Layout side;
     side.positioned = true;
+    side.y          = top;
     side.width      = kSidebarWidth;
     side.padding    = 6;
     side.gap        = 2;
@@ -104,6 +161,7 @@ void StudioDeclaration::declare(::tela::Document& doc, const ui::ViewNode& tabs,
     ::tela::Layout main;
     main.positioned = true;
     main.x          = kSidebarWidth;
+    main.y          = top;
     main.padding    = 16;
     main.gap        = 8;
     const std::string id = content_id();

@@ -4,7 +4,13 @@
 /// a tab per plugin (plus an overview of every plugin's health), a scrollable
 /// content area, and the ui_kit context that turns it into a draw list. The
 /// shell feeds input and draws draw_list(); tests drive it directly.
+///
+/// With a launcher the app starts on the launcher alone (no tabs); once a
+/// project is open it shows the project band over the tabs
+/// (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A).
 #include "ergo/studio/host/plugin_host.h"
+#include "ergo/studio/project/launcher.h"
+#include "ergo/studio/ui/launcher_view.h"
 #include "ergo/studio/ui/studio_pages.h"
 #include "ergo/studio/ui/ui_kit_emitter.h"
 
@@ -28,8 +34,10 @@ struct InputState {
 
 class StudioApp {
 public:
-    /// `host` owns the plugins; it outlives the app.
-    StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme = {}, ViewLookup views = {});
+    /// `host` owns the plugins; it outlives the app. `launcher` (optional,
+    /// outlives the app): show the launcher until a project is open.
+    StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme = {}, ViewLookup views = {},
+              project::Launcher* launcher = nullptr);
 
     void set_viewport(int w, int h);
     /// Rebuild when needed, then layout + input + draw list.
@@ -42,6 +50,8 @@ public:
     std::size_t tab_count() const { return 1 + host_.plugins().size(); }
     std::size_t active_tab() const { return active_; }
     void        select_tab(std::size_t i);
+    /// True while the launcher is shown instead of the tabs.
+    bool        showing_launcher() const;
     /// How often the overview re-reads health (it is cheap, but not free).
     void        set_health_interval(std::chrono::milliseconds ms) { health_interval_ = ms; }
     /// Path of the focused text field ("" = none).
@@ -51,12 +61,18 @@ private:
     /// Apply typed text / keys to the focused field; true when something changed.
     bool edit_focused(const InputState& in);
     void rebuild();
+    void rebuild_launcher(ui_kit::Node& root);
+    void rebuild_tabs(ui_kit::Node& root, float top);
+    void bind_handlers(ui_kit::Document doc);
     uint64_t content_revision() const;
 
     host::PluginHost&         host_;
     const ITextMeasure&       measure_;
     Theme                     theme_;
     ViewLookup                views_;
+    project::Launcher*        launcher_ = nullptr;
+    LauncherInput             launcher_input_;
+    uint64_t                  built_launcher_revision_ = ~0ull;
     ui_kit::UIContext         ctx_;
     Bindings                  bind_;
     bool                      was_down_ = false;

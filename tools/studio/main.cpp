@@ -3,11 +3,15 @@
 // here (design: "the entry point only assembles host and shell").
 #include "builtin_plugins.h"
 #include "studio_settings.h"
+#include "plugins/common/launcher_profiles.h"
+#include "plugins/common/profile_source.h"
 #include "plugins/studio/plugin_ledger.h"
 
 #include "ergo/studio/host/external_loader.h"
 #include "ergo/studio/host/plugin_host.h"
 #include "ergo/studio/net/server.h"
+#include "ergo/studio/project/launcher.h"
+#include "ergo/studio/project/launcher_routes.h"
 #include "views/view_registry.h"
 #ifdef ERGO_STUDIO_HAS_TELA
 #  include "ergo/studio/tela/screen_hub.h"
@@ -109,9 +113,18 @@ int main(int argc, char** argv) {
         ? settings.plugin_dirs
         : plugins::studio::plugin_dirs_with_ledger(settings.plugin_dirs,
                                                    plugins::studio::read_ledger(std::filesystem::u8path(settings.studio.home)));
+    // The launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A): nothing is open on start;
+    // the game-ops plugins see only the project opened there.
+    const std::filesystem::path home = std::filesystem::u8path(settings.studio.home);
+    project::OpenProject open_project;
+    project::Launcher    launcher(project::ProjectCatalog(home.empty() ? home : home / "recent_projects.json"),
+                                  open_project, plugins::launcher_deps(home, settings.plugin_dirs));
+    if (!launcher.notice().empty()) log_line("warn", "[ergo] " + launcher.notice());
+    const auto profiles = std::make_shared<plugins::OpenProjectProfiles>(open_project);
+
     host::LoadResult loaded;
     try {
-        loaded = host::instantiate_plugins(app::builtin_plugins(settings),
+        loaded = host::instantiate_plugins(app::builtin_plugins(settings, profiles),
                                            host::load_external_factories(pack_dirs, &log_line), &log_line);
     } catch (const std::exception& e) {
         log_line("error", e.what());   // a built-in plugin is broken: a bug in this build
@@ -123,7 +136,7 @@ int main(int argc, char** argv) {
 #ifdef ERGO_STUDIO_HAS_TELA
     // One Tela declaration for every screen: the window and the browser pages of /shell/
     // (spec/feature/tool/shell.md). The routes sit in front of the plugin host.
-    tela_shell::StudioDeclaration declaration(plugins, views.lookup());
+    tela_shell::StudioDeclaration declaration(plugins, views.lookup(), ui::Theme{}, &launcher);
     tela_shell::BrowserScreens    pages(&log_line);
     tela_shell::ScreenHub         hub(declaration, pages);
     tela_shell::ShellRoutes       routes(plugins, plugins, pages, settings.bind_host);
@@ -133,8 +146,9 @@ int main(int argc, char** argv) {
     net::IHttpHandler& http_handler = plugins;
     net::IWsAcceptor&  ws_acceptor  = plugins;
 #endif
+    project::LauncherRoutes launcher_routes(launcher, http_handler, settings.bind_host);   // /api/launcher/*
 
-    net::Server server({settings.bind_host, settings.port, settings.public_hosts}, http_handler, ws_acceptor, &log_line);
+    net::Server server({settings.bind_host, settings.port, settings.public_hosts}, launcher_routes, ws_acceptor, &log_line);
     for (const auto& h : settings.public_hosts) log_line("info", "[ergo] published as https://" + h + "/web/ (Cloudflare Access only)");
     std::string err;
     if (!server.start(err)) {
@@ -174,6 +188,7 @@ int main(int argc, char** argv) {
         wc.font_path  = settings.font_path;
         wc.shader_dir = settings.shader_dir;
         wc.views      = views.lookup();
+        wc.launcher   = &launcher;
 #  ifdef ERGO_STUDIO_HAS_TELA
         wc.on_frame = [&hub](float dt) { hub.pump(dt); };   // browser pages share the window's UI thread
 #  endif

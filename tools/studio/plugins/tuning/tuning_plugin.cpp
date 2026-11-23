@@ -32,24 +32,25 @@ std::string query_value(const std::string& query, const std::string& key) {
 
 } // namespace
 
-TuningPlugin::TuningPlugin(TuningStore store, std::string home, std::string plugin_dirs, host::LogFn log)
+TuningPlugin::TuningPlugin(TuningStore store, std::string home, std::shared_ptr<const IProfileSource> profiles,
+                           host::LogFn log)
     : info_{"tuning", "調整値", "ゲームが ergo_bind で出す値をカテゴリごとに調整し、名前とメモ付きの版として保存・比較・復元する。",
             "\xF0\x9F\x8E\x9A"},
       store_(std::move(store)),
       home_(std::move(home)),
-      plugin_dirs_(std::move(plugin_dirs)),
+      profiles_(std::move(profiles)),
       log_(std::move(log)) {}
 
 fs::path TuningPlugin::folder_of(const std::string& app) const {
     fs::path profile_dir;
-    for (const auto& p : load_workspace_profiles(fs::u8path(home_), plugin_dirs_, &process_env).profiles) {
+    for (const auto& p : profiles_->profiles().profiles) {
         if (const auto it = p.tuning.find(app); it != p.tuning.end()) profile_dir = it->second;
     }
     return store_.folder(app, profile_dir);
 }
 
 JsonValue TuningPlugin::snapshot() const {
-    const ProfileSet set = load_workspace_profiles(fs::u8path(home_), plugin_dirs_, &process_env);
+    const ProfileSet set = profiles_->profiles();
     JsonValue folders = JsonValue::make_object();
     for (const auto& p : set.profiles) {
         for (const auto& [app, dir] : p.tuning) folders.set(app, jstr(dir.u8string()));
@@ -113,10 +114,11 @@ net::HttpResponse TuningPlugin::save(const net::HttpRequest& req) {
     return json_response(200, jobj({{"ok", jbool(true)}, {"id", jstr(*id)}}));
 }
 
-std::unique_ptr<host::IPlugin> make_tuning_plugin(const std::string& studio_home, const std::string& plugin_dirs,
-                                                  const host::LogFn& log) {
+std::unique_ptr<host::IPlugin> make_tuning_plugin(const std::string& studio_home,
+                                                  std::shared_ptr<const IProfileSource> profiles, const host::LogFn& log) {
     const fs::path home = fs::u8path(studio_home);
-    return std::make_unique<TuningPlugin>(TuningStore(home.empty() ? fs::path() : home / "tuning"), studio_home, plugin_dirs, log);
+    return std::make_unique<TuningPlugin>(TuningStore(home.empty() ? fs::path() : home / "tuning"), studio_home,
+                                          std::move(profiles), log);
 }
 
 } // namespace ergo::studio::plugins::tuning

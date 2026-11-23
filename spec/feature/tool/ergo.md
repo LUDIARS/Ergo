@@ -232,7 +232,7 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 ## 現行プラグイン (組み込み・汎用)
 
 ### `services`
-- ワークスペースのプロフィールに書いた Excubitor のサービスを起動・停止・再起動し、ログを見る。仕様は [game-ops.md](game-ops.md)
+- 開いているプロジェクトのプロフィールに書いた Excubitor のサービスを起動・停止・再起動し、ログを見る。仕様は [game-ops.md](game-ops.md)
 
 ### `tuning`
 - ゲームが `ergo_bind` で出す全変数の調整と、その値の版 (保存・差分・戻す)。仕様は [game-ops.md](game-ops.md)
@@ -389,6 +389,44 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 > 仕様は AC リポ側を参照。
 
 
+## ランチャー (プロジェクトの選択)
+
+設計: [2026-11-23-studio-launcher-and-devserver.md](../../plan/2026-11-23-studio-launcher-and-devserver.md) の A、
+様式: [2026-11-23-studio-gen5-intake.md](../../plan/2026-11-23-studio-gen5-intake.md) の 1。Unity Hub / Godot の
+プロジェクトマネージャと同じく、**起動直後はランチャーだけ**を出し、前回のプロジェクトを自動では開かない。
+
+- プロジェクト = ワークスペースプロフィール 1 つ。識別子はプロフィールファイルの絶対パス (`source`)。
+- 一覧: 最近起動・追加した順 (`<studio home>/recent_projects.json`) → 見つかったプロフィール
+  (`<studio home>/profiles/*.json`、`<ERGO_PLUGIN_DIR>/*.studio.json`) で最近に無いもの。
+  行: 名前・root・様式・用途・最後に起動した時刻。ファイルが消えた行は「プロフィールが見つかりません」。
+- 操作: 開く / 一覧から外す / パスを入れて追加。「リモート開発サーバ起動」は段 2 (`ergo_devserver`) の置き場として
+  押せないボタンで出す。外す・追加は loopback の画面だけに出す。
+- キャッシュ `recent_projects.json`: `{"version":1,"projects":[{"source","name","root","style","domain","last_opened"}]}`。
+  開いたら先頭へ、同じ `source` は 1 つにまとめ、上限 30。一時ファイルに書いて置き換える。読めない・形が違う
+  ファイルは空として扱い、**原本を上書きしない** (この起動中の変更はメモリだけ、ランチャーに注意を出す)。
+- 様式 (`style`): `unity` / `cpp-ludiars` / `cpp-other` / `other`。プロフィールの `"style"` があればそれ、無ければ
+  root を見て判定する (`include/ergo/studio/project/project_style.h` の `detect(FileProbe)`、純粋関数)。
+- 用途 (`domain`): プロフィールの `"domain"` をそのまま出す (`lesson` / `game` / `cglive` / `industrial` や任意の文字列)。
+  [2026-11-23-ergo-curation-and-data-tables.md](../../plan/2026-11-23-ergo-curation-and-data-tables.md) の入口。この段では
+  表示と記録だけで、用途ごとの判定・候補提示・プラグイン構成・データテーブルは持たない (用途で分岐するコードは書かない)。
+- 開いた後は今のタブ一覧と、上に帯 (プロジェクト名・root・「ランチャーへ戻る」)。段 2 で devserver に
+  載せ替えるまでの暫定。
+- プラグインは開いたプロジェクトのプロフィールだけを見る: `services` / `tuning` / `git` / `assets` / `play` は
+  `load_workspace_profiles()` を直接呼ばず `IProfileSource` (`tools/studio/plugins/common/profile_source.h`) を受ける。
+  Studio では `OpenProjectProfiles` (開いているプロフィールを読む。未選択なら空)、テストでは `FixedProfiles`。
+
+| 経路 | 内容 |
+|---|---|
+| `GET /api/launcher/projects` | `{open: {source, name, root, style, domain} \| null, projects: [{source, name, root, style, domain, last_opened, recent, missing, open}], notice}` |
+| `POST /api/launcher/open` | `{source}` を開く (読めないプロフィールは 409) |
+| `POST /api/launcher/close` | ランチャーへ戻る |
+| `POST /api/launcher/add` | `{source}` を一覧に足す (開かない)。**loopback のみ** (公開名は 403) |
+| `POST /api/launcher/remove` | `{source}` を一覧から外す (ファイルは残す。開いていれば閉じる)。**loopback のみ** |
+
+実装: `src/studio/project/` (`ergo_studio_project`: `recent_projects` / `project_catalog` / `open_project` /
+`launcher` / `launcher_routes` / `project_style`)、画面は `src/studio/ui/launcher_view.cpp` (ViewBuilder のみ)。
+経路は `LauncherRoutes` がプラグインホスト (と `/shell/`) の前に置く。
+
 ## タブ UI (ネイティブ)
 
 ウィンドウは左のサイドバーにプラグインを並べ、選んだもののタブを右に出す
@@ -456,5 +494,7 @@ ctest (`tests/studio/`、mini-gtest)。hermetic で、一時ディレクトリ�
 | `test_studio_external.cpp` | C ABI の pack 読み込み (`fixtures/echo_pack.c`)、壊れたエントリ |
 | `test_studio_plugins.cpp` ほか `test_studio_<plugin>.cpp` | 組み込みプラグインごとの API |
 | `test_studio_studio_api.cpp` / `test_studio_studio_domain.cpp` | `studio` の API・台帳・接続図 |
-| `test_studio_ui.cpp` | StudioApp のタブとクリック (GPU 無し) |
+| `test_studio_ui.cpp` | StudioApp のタブとクリック、ランチャーだけで始まること (GPU 無し) |
+| `test_studio_project.cpp` | `recent_projects.json` の往復・並び・上限・重複・壊れたファイル・消えたプロフィール、ランチャーの操作、様式の判定、`/api/launcher/*` |
+| `test_studio_profile_source.cpp` | `IProfileSource`: 開いたプロジェクトのプロフィールだけが見えること、様式の明示と判定 |
 | `test_studio_shell_text.cpp` | フォントアトラスとテキストキャンバス (`ERGO_STUDIO_TEST_FONT`) |

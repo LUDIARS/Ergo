@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <filesystem>
+#include <fstream>
 
 using namespace ergo::studio;
 using namespace ergo::studio::ui;
@@ -135,4 +137,85 @@ TEST(StudioUi, ClickSurvivesARebuildBetweenPressAndRelease) {
     app.frame({x, y, false}, 0.5f);   // the release frame is also a refresh frame
     app.frame({x, y, false}, 0.016f);
     EXPECT_EQ(app.active_tab(), 2u);
+}
+
+// ---- the launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A) ----
+
+namespace {
+
+namespace fs = std::filesystem;
+
+/// A launcher over one profile file in a fresh folder (any existing file is a profile).
+struct LauncherFixture {
+    LauncherFixture() {
+        static std::atomic<int> n{0};
+        dir = fs::temp_directory_path() / ("ergo-ui-launcher-" + std::to_string(++n));
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+        fs::create_directories(dir);
+        std::ofstream(dir / "game.json") << "{}";
+        project::LauncherDeps deps;
+        deps.probe = [](const fs::path& source, std::string&) -> std::optional<project::ProjectRef> {
+            return project::ProjectRef{source.u8string(), "game", "D:/game", "cpp-ludiars", "game"};
+        };
+        deps.discover = [d = dir] {
+            return std::vector<project::ProjectRef>{{(d / "game.json").u8string(), "game", "D:/game", "cpp-ludiars", "game"}};
+        };
+        deps.now = [] { return std::string("2026-11-23T10:00:00Z"); };
+        launcher = std::make_unique<project::Launcher>(project::ProjectCatalog(dir / "recent_projects.json"), open,
+                                                       std::move(deps));
+    }
+    fs::path                           dir;
+    project::OpenProject               open;
+    std::unique_ptr<project::Launcher> launcher;
+};
+
+void click_text(StudioApp& app, const std::string& text) {
+    const auto* t = find_text(app.draw_list(), text);
+    ASSERT_NE(t, nullptr);
+    click_at(app, t->rect.x + t->rect.w / 2, t->rect.y + t->rect.h / 2);
+}
+
+} // namespace
+
+TEST(StudioUiLauncher, StartsOnTheLauncherAloneWithoutTabs) {
+    Fixture f;
+    LauncherFixture l;
+    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get());
+    app.set_viewport(1000, 700);
+    app.frame({}, 0.016f);
+    EXPECT_TRUE(app.showing_launcher());
+    EXPECT_NE(find_text(app.draw_list(), "game"), nullptr);
+    EXPECT_NE(find_text(app.draw_list(), "リモート開発サーバ起動"), nullptr);
+    EXPECT_EQ(find_text(app.draw_list(), "Counter"), nullptr);   // no tab list
+    EXPECT_EQ(find_text(app.draw_list(), "Plain"), nullptr);
+}
+
+TEST(StudioUiLauncher, OpeningShowsTheBandAndTabsAndBackReturns) {
+    Fixture f;
+    LauncherFixture l;
+    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get());
+    app.set_viewport(1000, 700);
+    app.frame({}, 0.016f);
+    click_text(app, "開く");
+    EXPECT_FALSE(app.showing_launcher());
+    ASSERT_TRUE(l.open.current().has_value());
+    EXPECT_NE(find_text(app.draw_list(), "Counter"), nullptr);
+    EXPECT_NE(find_text(app.draw_list(), "ランチャーへ戻る"), nullptr);
+
+    click_text(app, "ランチャーへ戻る");
+    EXPECT_TRUE(app.showing_launcher());
+    EXPECT_EQ(find_text(app.draw_list(), "Counter"), nullptr);
+}
+
+TEST(StudioUiLauncher, OpeningFromElsewhereRebuilds) {
+    Fixture f;
+    LauncherFixture l;
+    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get());
+    app.frame({}, 0.016f);
+    std::string err;
+    ASSERT_TRUE(l.launcher->open((l.dir / "game.json").u8string(), err));   // e.g. POST /api/launcher/open
+    app.frame({}, 0.016f);
+    EXPECT_FALSE(app.showing_launcher());
+    EXPECT_NE(find_text(app.draw_list(), "Counter"), nullptr);
 }

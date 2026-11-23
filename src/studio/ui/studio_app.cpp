@@ -14,11 +14,17 @@ namespace {
 
 constexpr float kSidebarWidth = 230;
 constexpr float kScrollStep   = 48;
+constexpr float kBandHeight   = 48;   // the open project's band over the tabs
 
 } // namespace
 
-StudioApp::StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme, ViewLookup views)
-    : host_(host), measure_(measure), theme_(std::move(theme)), views_(std::move(views)) {}
+StudioApp::StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme, ViewLookup views,
+                     project::Launcher* launcher)
+    : host_(host), measure_(measure), theme_(std::move(theme)), views_(std::move(views)), launcher_(launcher) {}
+
+bool StudioApp::showing_launcher() const {
+    return launcher_ != nullptr && !launcher_->project().current();
+}
 
 void StudioApp::set_viewport(int w, int h) {
     if (w == vw_ && h == vh_) return;
@@ -99,7 +105,8 @@ void StudioApp::frame(const InputState& in, float dt) {
     // Periodic refreshes wait until the button is up (the layout must not move under a press).
     const bool periodic = health_due && shows_health && !in.down;
     if (periodic) since_health_ = 0;
-    if (dirty_ || content_revision() != built_revision_ || periodic) rebuild();
+    const bool launcher_moved = launcher_ != nullptr && launcher_->revision() != built_launcher_revision_;
+    if (dirty_ || launcher_moved || content_revision() != built_revision_ || periodic) rebuild();
     const std::string focus_before = bind_.focused;
     ctx_.feed_input({in.x, in.y, in.down});
     ctx_.update(dt);
@@ -109,6 +116,7 @@ void StudioApp::frame(const InputState& in, float dt) {
 void StudioApp::rebuild() {
     dirty_          = false;
     built_revision_ = content_revision();
+    built_launcher_revision_ = launcher_ ? launcher_->revision() : 0;
     bind_.clear();
 
     ui_kit::Document doc;
@@ -116,12 +124,51 @@ void StudioApp::rebuild() {
     root.name       = "Root";
     root.size       = {static_cast<float>(vw_), static_cast<float>(vh_)};
     root.style.fill = theme_.background;
+    if (showing_launcher()) rebuild_launcher(root);
+    else rebuild_tabs(root, launcher_ ? kBandHeight : 0);
+    bind_handlers(std::move(doc));
+}
 
+namespace {
+
+/// A clipped viewport with a column moved up by the scroll offset.
+Node scroll_view(const char* name, float x, float y, float w, float h, float scroll) {
+    Node view;
+    view.name     = name;
+    view.position = {x, y};
+    view.size     = {w, h};
+    view.clip     = true;
+    Node content;
+    content.name            = "Content";
+    content.position        = {0, -scroll};
+    content.size            = {w, 0};
+    content.layout.mode     = LayoutMode::Vertical;
+    content.layout.gap      = 8;
+    content.layout.pad_l = content.layout.pad_r = content.layout.pad_t = content.layout.pad_b = 16;
+    content.layout.h_sizing = Sizing::Hug;
+    view.children.push_back(std::move(content));
+    return view;
+}
+
+} // namespace
+
+void StudioApp::rebuild_launcher(Node& root) {
+    // The launcher alone: no tab list until a project is open.
+    root.children.push_back(scroll_view("Launcher", 0, 0, static_cast<float>(vw_), static_cast<float>(vh_), scroll_));
+    ViewNode body;
+    ViewBuilder b(body, measure_, theme_);
+    build_launcher(b, *launcher_, launcher_input_, true, [this] { dirty_ = true; });
+    emit_ui_kit(body, root.children[0].children[0], "Root/Launcher/Content", measure_, theme_, bind_);
+}
+
+void StudioApp::rebuild_tabs(Node& root, float top) {
     // Left: one line per plugin (16+ plugins do not fit a horizontal bar). Right: the tab.
     const float side_w = std::min(kSidebarWidth, static_cast<float>(vw_) * 0.4f);
+    const float h      = std::max(1.0f, static_cast<float>(vh_) - top);
     Node bar;
     bar.name             = "Tabs";
-    bar.size             = {side_w, static_cast<float>(vh_)};
+    bar.position         = {0, top};
+    bar.size             = {side_w, h};
     bar.style.fill       = theme_.panel;
     bar.layout.mode      = LayoutMode::Vertical;
     bar.layout.gap       = 2;
@@ -129,23 +176,7 @@ void StudioApp::rebuild() {
     bar.layout.pad_t     = 8;
     bar.clip             = true;
     root.children.push_back(std::move(bar));
-
-    // Content: clipped viewport + a column moved up by the scroll offset.
-    Node view;
-    view.name     = "View";
-    view.position = {side_w, 0};
-    view.size     = {static_cast<float>(vw_) - side_w, static_cast<float>(vh_)};
-    view.clip     = true;
-    Node content;
-    content.name            = "Content";
-    content.position        = {0, -scroll_};
-    content.size            = {static_cast<float>(vw_) - side_w, 0};
-    content.layout.mode     = LayoutMode::Vertical;
-    content.layout.gap      = 8;
-    content.layout.pad_l = content.layout.pad_r = content.layout.pad_t = content.layout.pad_b = 16;
-    content.layout.h_sizing = Sizing::Hug;
-    view.children.push_back(std::move(content));
-    root.children.push_back(std::move(view));
+    root.children.push_back(scroll_view("View", side_w, top, static_cast<float>(vw_) - side_w, h, scroll_));
 
     {
         ViewNode tabs;
@@ -165,7 +196,27 @@ void StudioApp::rebuild() {
         }
         emit_ui_kit(body, root.children[1].children[0], "Root/View/Content", measure_, theme_, bind_);
     }
+    const auto project = launcher_ ? launcher_->project().current() : std::nullopt;
+    if (!project) return;
+    Node band;
+    band.name          = "Project";
+    band.size          = {static_cast<float>(vw_), top};
+    band.style.fill    = theme_.panel_alt;
+    band.layout.mode   = LayoutMode::Vertical;
+    band.layout.pad_l  = band.layout.pad_r = 12;
+    band.layout.pad_t  = 8;
+    band.clip          = true;
+    root.children.push_back(std::move(band));
+    ViewNode body;
+    ViewBuilder bb(body, measure_, theme_);
+    build_project_bar(bb, *project, [this] {
+        launcher_->close();
+        dirty_ = true;
+    });
+    emit_ui_kit(body, root.children.back(), "Root/Project", measure_, theme_, bind_);
+}
 
+void StudioApp::bind_handlers(ui_kit::Document doc) {
     // Keep the context (its hover / pressed state) across rebuilds: replacing it
     // would lose a press that started before the rebuild, so the click never fires.
     ctx_.clear_handlers();

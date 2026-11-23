@@ -8,8 +8,15 @@
 /// while focus and scroll stay per screen. The active tab is part of the
 /// declaration and therefore shared.
 ///
+/// With a launcher it declares the launcher alone (no tab list) until a
+/// project is open, then the project band over the tabs
+/// (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A). A page under a
+/// public name gets the launcher without add / remove (loopback only).
+///
 /// Single UI-thread owner: views and their callbacks run on that thread.
 #include "ergo/studio/host/plugin_host.h"
+#include "ergo/studio/project/launcher.h"
+#include "ergo/studio/ui/launcher_view.h"
 #include "ergo/studio/tela/tela_emitter.h"
 #include "ergo/studio/ui/studio_pages.h"
 
@@ -28,8 +35,10 @@ enum class ScreenAccess { local, published };
 
 class StudioDeclaration {
 public:
-    /// `host` owns the plugins and outlives the declaration.
-    StudioDeclaration(host::PluginHost& host, ui::ViewLookup views, ui::Theme theme = {});
+    /// `host` owns the plugins and outlives the declaration; so does `launcher`
+    /// (optional: without one the tabs are declared from the start).
+    StudioDeclaration(host::PluginHost& host, ui::ViewLookup views, ui::Theme theme = {},
+                      project::Launcher* launcher = nullptr);
 
     /// Rebuild when an action / edit happened, the active view's revision moved,
     /// or (overview and generic tabs) health is due. True when it rebuilt.
@@ -45,6 +54,8 @@ public:
     std::size_t tab_count() const { return 1 + host_.plugins().size(); }
     std::size_t active_tab() const { return active_; }
     void        select_tab(std::size_t i);
+    /// True while the launcher is declared instead of the tabs.
+    bool        showing_launcher() const;
     /// Id of the active tab's plugin ("" = overview).
     std::string active_plugin() const;
     void        set_health_interval(std::chrono::milliseconds ms) { health_interval_ = ms; }
@@ -55,16 +66,25 @@ public:
     static bool loopback_only(const std::string& plugin_id);
     /// Id of the tab list and of a tab's scroll ("content/<plugin id | overview>").
     static const char* tabs_id() { return "tabs"; }
+    /// Id of the launcher's scroll and of the open project's band.
+    static const char* launcher_id() { return "launcher"; }
+    static const char* project_id() { return "project"; }
     std::string        content_id() const;
 
 private:
     void     rebuild();
+    void     rebuild_launcher();
     void     declare(::tela::Document& doc, const ui::ViewNode& tabs, const ui::ViewNode& body, bool locked);
+    void     declare_band(::tela::Document& doc, const ui::ViewNode& band);
+    void     declare_launcher(::tela::Document& doc, const ui::ViewNode& body);
     uint64_t content_revision() const;
 
     host::PluginHost&         host_;
     ui::ViewLookup            views_;
     ui::Theme                 theme_;
+    project::Launcher*        launcher_ = nullptr;
+    ui::LauncherInput         launcher_input_;
+    uint64_t                  built_launcher_revision_ = ~0ull;
     ::tela::Theme             tela_theme_;
     ApproximateMeasure        measure_;
     ::tela::Document          full_, published_;

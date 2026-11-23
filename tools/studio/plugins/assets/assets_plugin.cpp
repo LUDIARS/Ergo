@@ -23,16 +23,15 @@ std::string query(const net::HttpRequest& req, const std::string& key) {
 
 } // namespace
 
-AssetsPlugin::AssetsPlugin(std::string home, std::string plugin_dirs, host::LogFn log)
+AssetsPlugin::AssetsPlugin(std::shared_ptr<const IProfileSource> profiles, host::LogFn log)
     : info_{"assets", "Assets", "ゲームのアセット (ワークスペースのプロフィールの assets) を一覧し、画像と文字のファイルを見る。読み取りのみ。",
             "\xF0\x9F\x97\x82"},
-      home_(std::move(home)),
-      plugin_dirs_(std::move(plugin_dirs)),
+      profiles_(std::move(profiles)),
       log_(std::move(log)) {}
 
 std::vector<AssetsPlugin::Root> AssetsPlugin::roots() const {
     std::vector<Root> out;
-    for (const auto& p : load_workspace_profiles(fs::u8path(home_), plugin_dirs_, &process_env).profiles) {
+    for (const auto& p : profiles_->profiles().profiles) {
         for (const auto& r : p.assets) out.push_back({p.name, r});
     }
     return out;
@@ -41,7 +40,7 @@ std::vector<AssetsPlugin::Root> AssetsPlugin::roots() const {
 JsonValue AssetsPlugin::snapshot() const {
     const auto list = roots();
     JsonValue out = jobj({{"ok", jbool(!list.empty())}, {"roots", jnum(static_cast<double>(list.size()))}});
-    if (list.empty()) out.set("err", jstr("no workspace profile lists \"assets\" (profiles: <studio home>/profiles, ERGO_PLUGIN_DIR)"));
+    if (list.empty()) out.set("err", jstr("the open project's profile lists no \"assets\" (or no project is open)"));
     return out;
 }
 
@@ -107,9 +106,9 @@ net::HttpResponse AssetsPlugin::file(const net::HttpRequest& req) const {
     return res;
 }
 
-std::unique_ptr<host::IPlugin> make_assets_plugin(const std::string& studio_home, const std::string& plugin_dirs,
+std::unique_ptr<host::IPlugin> make_assets_plugin(std::shared_ptr<const IProfileSource> profiles,
                                                   const host::LogFn& log) {
-    return std::make_unique<AssetsPlugin>(studio_home, plugin_dirs, log);
+    return std::make_unique<AssetsPlugin>(std::move(profiles), log);
 }
 
 } // namespace ergo::studio::plugins::assets

@@ -16,6 +16,9 @@
 
 #include <tela/runtime.hpp>
 
+#include <atomic>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 using namespace ergo::studio;
@@ -369,4 +372,98 @@ TEST(StudioTela, AssetAndPlayHelpers) {
     EXPECT_EQ(views::PlayView::stream_key("demo"), "play:demo");
     EXPECT_EQ(views::play_state_text("running"), "実行中");
     EXPECT_EQ(views::play_state_text("idle"), "停止中");
+}
+
+// ---- the launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A) ----
+
+namespace {
+
+namespace fs = std::filesystem;
+
+const tela::Element* find_suffix(const tela::Document& d, const std::string& suffix) {
+    for (const auto& e : d.elements()) {
+        if (e.id.size() >= suffix.size() && e.id.compare(e.id.size() - suffix.size(), suffix.size(), suffix) == 0) return &e;
+    }
+    return nullptr;
+}
+
+struct LauncherFixture {
+    LauncherFixture() {
+        static std::atomic<int> n{0};
+        dir = fs::temp_directory_path() / ("ergo-tela-launcher-" + std::to_string(++n));
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+        fs::create_directories(dir);
+        std::ofstream(dir / "game.json") << "{}";
+        project::LauncherDeps deps;
+        deps.probe = [](const fs::path& source, std::string&) -> std::optional<project::ProjectRef> {
+            return project::ProjectRef{source.string(), "game", "D:/game", "unity", "lesson"};
+        };
+        deps.now = [] { return std::string("2026-11-23T10:00:00Z"); };
+        launcher = std::make_unique<project::Launcher>(project::ProjectCatalog(dir / "recent_projects.json"), open,
+                                                       std::move(deps));
+        std::string err;
+        launcher->add((dir / "game.json").string(), err);   // a recent row (remove is shown on local screens)
+        decl = std::make_unique<ts::StudioDeclaration>(*base.host, ui::ViewLookup{}, ui::Theme{}, launcher.get());
+    }
+    Fixture                                base;
+    fs::path                               dir;
+    project::OpenProject                   open;
+    std::unique_ptr<project::Launcher>     launcher;
+    std::unique_ptr<ts::StudioDeclaration> decl;
+};
+
+} // namespace
+
+TEST(StudioTelaLauncher, DeclaresTheLauncherAloneUntilAProjectIsOpen) {
+    LauncherFixture f;
+    f.decl->refresh(0);
+    const auto& local = f.decl->document(ts::ScreenAccess::local);
+    EXPECT_TRUE(f.decl->showing_launcher());
+    EXPECT_NE(find(local, ts::StudioDeclaration::launcher_id()), nullptr);
+    EXPECT_EQ(find(local, ts::StudioDeclaration::tabs_id()), nullptr);   // no tab list
+    EXPECT_EQ(find(local, "content/overview"), nullptr);
+    const auto* devserver = find_suffix(local, "/devserver");
+    ASSERT_NE(devserver, nullptr);
+    EXPECT_FALSE(static_cast<bool>(devserver->action));   // stage 2: shown, not usable yet
+    EXPECT_NE(find_suffix(local, "/remove"), nullptr);
+    EXPECT_NE(find_suffix(local, "/add"), nullptr);
+
+    // A page under a public name: the list without add / remove.
+    const auto& published = f.decl->document(ts::ScreenAccess::published);
+    EXPECT_NE(find_suffix(published, "/open"), nullptr);
+    EXPECT_EQ(find_suffix(published, "/remove"), nullptr);
+    EXPECT_EQ(find_suffix(published, "/add"), nullptr);
+}
+
+TEST(StudioTelaLauncher, OpenShowsTheBandOverTheTabsAndBackReturns) {
+    LauncherFixture f;
+    f.decl->refresh(0);
+    const auto* open = find_suffix(f.decl->document(ts::ScreenAccess::local), "/open");
+    ASSERT_NE(open, nullptr);
+    ASSERT_TRUE(static_cast<bool>(open->action));
+    open->action();
+    EXPECT_TRUE(f.decl->refresh(0));
+    const auto& doc = f.decl->document(ts::ScreenAccess::local);
+    EXPECT_FALSE(f.decl->showing_launcher());
+    EXPECT_NE(find(doc, ts::StudioDeclaration::tabs_id()), nullptr);
+    EXPECT_NE(find(doc, ts::StudioDeclaration::project_id()), nullptr);
+    EXPECT_EQ(find(doc, ts::StudioDeclaration::launcher_id()), nullptr);
+
+    const auto* back = find_suffix(doc, "/back");
+    ASSERT_NE(back, nullptr);
+    back->action();
+    EXPECT_TRUE(f.decl->refresh(0));
+    EXPECT_TRUE(f.decl->showing_launcher());
+    EXPECT_FALSE(f.open.current().has_value());
+}
+
+TEST(StudioTelaLauncher, AnOpenFromHttpRebuildsTheDeclaration) {
+    LauncherFixture f;
+    f.decl->refresh(0);
+    EXPECT_FALSE(f.decl->refresh(0));
+    std::string err;
+    ASSERT_TRUE(f.launcher->open((f.dir / "game.json").string(), err));
+    EXPECT_TRUE(f.decl->refresh(0));
+    EXPECT_FALSE(f.decl->showing_launcher());
 }

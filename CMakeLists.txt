@@ -1131,17 +1131,43 @@ if(ERGO_BUILD_STUDIO)
             ENVIRONMENT "ERGO_TEST_ECHO_PACK=$<TARGET_FILE:ergo_studio_echo_pack>")
     endif()
 
+    # ergo_studio_project : the launcher's model — recent projects (recent_projects.json), the open project,
+    # project style detection and the /api/launcher/* routes (no GPU;
+    # spec/plan/2026-11-23-studio-launcher-and-devserver.md, A)
+    add_library(ergo_studio_project STATIC
+        src/studio/project/launcher.cpp
+        src/studio/project/launcher_routes.cpp
+        src/studio/project/open_project.cpp
+        src/studio/project/project_catalog.cpp
+        src/studio/project/project_style.cpp
+        src/studio/project/recent_projects.cpp
+    )
+    target_include_directories(ergo_studio_project PUBLIC include)
+    target_link_libraries(ergo_studio_project PUBLIC ergo_studio_net ergo_common)
+    if(MSVC)
+        target_compile_options(ergo_studio_project PRIVATE /utf-8)
+    endif()
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_studio_project tests/studio/test_studio_project.cpp)
+        target_link_libraries(test_studio_project PRIVATE ergo_studio_project ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_project PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_project COMMAND test_studio_project)
+    endif()
+
     # ergo_studio_ui : the Studio's UI as ViewNode trees (tabs, overview, views) and their ui_kit
     # drawing (the built-in window of a build without Tela) — no GPU
     if(TARGET ergo_ui_kit)
         add_library(ergo_studio_ui STATIC
+            src/studio/ui/launcher_view.cpp
             src/studio/ui/studio_app.cpp
             src/studio/ui/studio_pages.cpp
             src/studio/ui/ui_kit_emitter.cpp
             src/studio/ui/view_builder.cpp
         )
         target_include_directories(ergo_studio_ui PUBLIC include)
-        target_link_libraries(ergo_studio_ui PUBLIC ergo_studio_host ergo_ui_kit)
+        target_link_libraries(ergo_studio_ui PUBLIC ergo_studio_host ergo_studio_project ergo_ui_kit)
         if(MSVC)
             target_compile_options(ergo_studio_ui PRIVATE /utf-8)
         endif()
@@ -1240,7 +1266,9 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/common/json_pretty.cpp
         tools/studio/plugins/common/json_util.cpp
         tools/studio/plugins/common/latest_blob_plugin.cpp
+        tools/studio/plugins/common/launcher_profiles.cpp
         tools/studio/plugins/common/mutation_guard.cpp
+        tools/studio/plugins/common/profile_source.cpp
         tools/studio/plugins/common/safe_path.cpp
         tools/studio/plugins/lesson/demo_apply.cpp
         tools/studio/plugins/lesson/lesson_client.cpp
@@ -1345,7 +1373,7 @@ if(ERGO_BUILD_STUDIO)
     ergo_embed_text(ergo_studio_plugins ergo_web_index_html tools/studio/plugins/web/page/index.html)
     ergo_embed_text(ergo_studio_plugins ergo_web_app_js tools/studio/plugins/web/page/app.js)
     ergo_embed_text(ergo_studio_plugins ergo_web_style_css tools/studio/plugins/web/page/style.css)
-    target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform)
+    target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform ergo_studio_project)
     # Remote play (spec/feature/tool/play.md) is Odeum's odeum_remote_play (Odeum
     # spec/feature/remote-play-library.md). ERGO_ODEUM_SOURCE_DIR = an Odeum checkout builds it here
     # (its dependencies come from Odeum's own CMake; pass FETCHCONTENT_SOURCE_DIR_* for an offline build).
@@ -1388,6 +1416,7 @@ if(ERGO_BUILD_STUDIO)
             tests/studio/test_studio_game_ops.cpp
             tests/studio/test_studio_web.cpp
             tests/studio/test_studio_play.cpp
+            tests/studio/test_studio_profile_source.cpp
         )
         target_link_libraries(test_studio_plugins PRIVATE ergo_studio_plugins ergo_gtest_main)
         if(MSVC)

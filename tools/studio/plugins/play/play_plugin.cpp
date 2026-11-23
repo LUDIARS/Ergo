@@ -276,8 +276,21 @@ void PlayPlugin::broadcast(const JsonValue& msg) {
     }
 }
 
-std::unique_ptr<host::IPlugin> make_play_plugin(const std::string& studio_home, const std::string& plugin_dirs,
-                                                const host::LogFn& log) {
+TargetSource profile_targets(std::shared_ptr<const IProfileSource> profiles) {
+    return [profiles = std::move(profiles)](std::vector<std::string>& errors) {
+        std::vector<PlayTarget> out;
+        const ProfileSet set = profiles->profiles();
+        for (const auto& e : set.errors) errors.push_back(e);
+        for (const auto& p : set.profiles) {
+            if (p.play.is_null()) continue;
+            std::string err;
+            if (!parse_play_targets(p.play, p.name, p.root, out, err)) errors.push_back(p.source.u8string() + ": " + err);
+        }
+        return out;
+    };
+}
+
+std::unique_ptr<host::IPlugin> make_play_plugin(std::shared_ptr<const IProfileSource> profiles, const host::LogFn& log) {
     RemotePlayConfig remote;
     remote.ffmpeg         = process_env("ERGO_STUDIO_FFMPEG").value_or("ffmpeg");
     remote.stun_urls      = process_env("ERGO_STUDIO_STUN_URLS");
@@ -286,16 +299,7 @@ std::unique_ptr<host::IPlugin> make_play_plugin(const std::string& studio_home, 
     if (remote.turn_key_id.empty() != remote.turn_key_token.empty())
         throw std::runtime_error("set both ERGO_STUDIO_TURN_KEY_ID and ERGO_STUDIO_TURN_KEY_API_TOKEN, or neither");
     PlayDeps deps;
-    deps.targets = [home = studio_home, dirs = plugin_dirs](std::vector<std::string>& errors) {
-        std::vector<PlayTarget> out;
-        const ProfileSet set = load_workspace_profiles(fs::u8path(home), dirs, &process_env);
-        for (const auto& p : set.profiles) {
-            if (p.play.is_null()) continue;
-            std::string err;
-            if (!parse_play_targets(p.play, p.name, p.root, out, err)) errors.push_back(p.source.u8string() + ": " + err);
-        }
-        return out;
-    };
+    deps.targets = profile_targets(std::move(profiles));
     deps.remote = make_remote_play(remote, log);
     deps.start  = &platform::start_live_process;
     return std::make_unique<PlayPlugin>(std::move(deps), log);

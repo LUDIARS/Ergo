@@ -4,6 +4,7 @@
 #include "plugins/assets/asset_catalog.h"
 #include "plugins/assets/assets_plugin.h"
 #include "plugins/common/json_parse.h"
+#include "plugins/common/profile_source.h"
 #include "plugins/common/workspace_profiles.h"
 #include "plugins/web/web_plugin.h"
 
@@ -140,7 +141,9 @@ TEST(WebAssets, PluginListsAndPreviewsFromAProfile) {
     write(game / "tex" / "hero.glb", "GLB");
     write(home / "profiles" / "g.json",
           std::string(R"({"name":"g","root":")") + game.generic_u8string() + R"(","assets":[{"name":"Textures","path":"tex"}]})");
-    assets::AssetsPlugin plugin(home.u8string(), "", nullptr);
+    // The plugin sees what its IProfileSource gives (the open project's profile in the Studio).
+    const auto profiles = std::make_shared<FixedProfiles>(read_profile_file(home / "profiles" / "g.json", &process_env));
+    assets::AssetsPlugin plugin(profiles, nullptr);
 
     const auto roots = plugin.handle(get("/assets/api/roots"), "/api/roots");
     EXPECT_EQ(roots.status, 200);
