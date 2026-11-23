@@ -22,7 +22,6 @@ struct StudioSettings {
     std::string bind_host = "127.0.0.1";   ///< ERGO_HOST
     uint16_t    port      = kDefaultPort;  ///< PORT
     std::vector<std::string> public_hosts; ///< ERGO_STUDIO_PUBLIC_HOSTS (names served through Cloudflare Access)
-    std::string play_url;                  ///< ERGO_STUDIO_PLAY_URL (remote play page the web tab embeds)
     std::string user_home;                 ///< USERPROFILE (Windows) / HOME
     std::string plugin_dirs;               ///< ERGO_PLUGIN_DIR
     std::string visus_roots;               ///< VISUS_PROJECT_ROOTS

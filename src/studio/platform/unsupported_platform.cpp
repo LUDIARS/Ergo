@@ -4,6 +4,7 @@
 // unsupported_http_client.cpp in a build without libcurl.)
 #include "ergo/studio/platform/clipboard.h"
 #include "ergo/studio/platform/credential_store.h"
+#include "ergo/studio/platform/live_process.h"
 #include "ergo/studio/platform/process_runner.h"
 
 namespace ergo::studio::platform {
@@ -47,6 +48,10 @@ public:
 
 } // namespace
 
+std::unique_ptr<ILiveProcess> start_live_process(const LiveProcessSpec&, LiveProcessHandlers, std::string& err) {
+    err = kUnsupported;
+    return nullptr;
+}
 std::shared_ptr<IClipboard>       make_system_clipboard() { return std::make_shared<UnsupportedClipboard>(); }
 std::shared_ptr<IProcessRunner>   make_system_process_runner() { return std::make_shared<UnsupportedProcessRunner>(); }
 std::optional<std::filesystem::path> find_on_path(const std::string&) { return std::nullopt; }

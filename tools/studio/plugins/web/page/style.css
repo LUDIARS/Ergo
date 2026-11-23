@@ -28,7 +28,12 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 a { color: var(--accent); }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
 @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
-.play iframe { width: 100%; height: calc(100vh - 150px); min-height: 480px; border: 1px solid var(--line); border-radius: 8px; background: #000; }
+.stage { position: relative; height: calc(100vh - 330px); min-height: 360px; border: 1px solid var(--line); border-radius: 8px; background: #000; outline: none; }
+.stage:focus { border-color: var(--accent, #4c8dff); }
+.stage video { width: 100%; height: 100%; object-fit: contain; display: block; touch-action: none; }
+.stage .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; margin: 0; pointer-events: none; }
+#play-buttons button { touch-action: none; user-select: none; }
+#play-log { max-height: 160px; }
 .side { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list li { border-bottom: 1px solid var(--line); padding: 8px 0; }

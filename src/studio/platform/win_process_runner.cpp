@@ -1,5 +1,6 @@
 // Windows IProcessRunner: CreateProcessW with piped stdio.
 #include "ergo/studio/platform/process_runner.h"
+#include "win_command.h"
 
 #ifndef NOMINMAX
 #  define NOMINMAX
@@ -38,11 +39,6 @@ std::string env(const char* name) {
     return out;
 }
 
-std::string lower(std::string s) {
-    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
 std::vector<std::string> split(const std::string& s, char sep) {
     std::vector<std::string> out;
     std::size_t start = 0;
@@ -67,38 +63,10 @@ class WinProcessRunner final : public IProcessRunner {
 public:
     ProcessResult run(const ProcessSpec& spec) override {
         ProcessResult r;
-        const auto exe = find_on_path(spec.program);
-        if (!exe) {
-            r.error = "program not found on PATH: " + spec.program;
-            return r;
-        }
-        const std::string ext = lower(exe->extension().u8string());
-        const bool        shim = ext == ".cmd" || ext == ".bat";
-
-        std::string cmdline;
-        std::wstring app;
-        if (shim) {
-            // cmd.exe re-parses the line: refuse anything it could act on.
-            for (const auto& a : spec.args) {
-                if (!cmd_safe_arg(a)) {
-                    r.error = "argument not allowed for a .cmd program: " + a;
-                    return r;
-                }
-            }
-            const std::string comspec = env("ComSpec");
-            if (comspec.empty()) {
-                r.error = "ComSpec is not set";
-                return r;
-            }
-            app     = widen(comspec);
-            cmdline = "cmd.exe /d /s /c \"" + quote_windows_arg(exe->u8string());
-            for (const auto& a : spec.args) cmdline += " " + quote_windows_arg(a);
-            cmdline += "\"";
-        } else {
-            app     = exe->wstring();
-            cmdline = quote_windows_arg(exe->u8string());
-            for (const auto& a : spec.args) cmdline += " " + quote_windows_arg(a);
-        }
+        WinCommand command;
+        if (!build_win_command(spec.program, spec.args, command, r.error)) return r;
+        const std::wstring& app     = command.app;
+        const std::string&  cmdline = command.cmdline;
 
         SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
         HANDLE in_r = nullptr, in_w = nullptr, out_r = nullptr, out_w = nullptr, err_r = nullptr, err_w = nullptr;

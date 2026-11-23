@@ -1158,11 +1158,14 @@ if(ERGO_BUILD_STUDIO)
     # error otherwise; the credential store, process runner and clipboard report "unsupported" (no other path).
     if(WIN32)
         add_library(ergo_studio_platform STATIC
+            src/studio/platform/line_splitter.cpp
             src/studio/platform/process_quote.cpp
             src/studio/platform/sha256.cpp
             src/studio/platform/url_encode.cpp
             src/studio/platform/win_clipboard.cpp
+            src/studio/platform/win_command.cpp
             src/studio/platform/win_credential_store.cpp
+            src/studio/platform/win_live_process.cpp
             src/studio/platform/win_process_runner.cpp
             src/studio/platform/winhttp_client.cpp
         )
@@ -1170,6 +1173,7 @@ if(ERGO_BUILD_STUDIO)
     else()
         add_library(ergo_studio_platform STATIC
             src/studio/platform/http_request_check.cpp
+            src/studio/platform/line_splitter.cpp
             src/studio/platform/process_quote.cpp
             src/studio/platform/sha256.cpp
             src/studio/platform/unsupported_platform.cpp
@@ -1276,6 +1280,11 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/assets/asset_catalog.cpp
         tools/studio/plugins/assets/assets_plugin.cpp
         tools/studio/plugins/web/web_plugin.cpp
+        tools/studio/plugins/play/play_message.cpp
+        tools/studio/plugins/play/play_plugin.cpp
+        tools/studio/plugins/play/play_target.cpp
+        tools/studio/plugins/play/target_log.cpp
+        tools/studio/plugins/play/target_runner.cpp
         tools/studio/plugins/git/git_ops.cpp
         tools/studio/plugins/git/git_plugin.cpp
         tools/studio/plugins/services/services_plugin.cpp
@@ -1309,6 +1318,26 @@ if(ERGO_BUILD_STUDIO)
     ergo_embed_text(ergo_studio_plugins ergo_web_app_js tools/studio/plugins/web/page/app.js)
     ergo_embed_text(ergo_studio_plugins ergo_web_style_css tools/studio/plugins/web/page/style.css)
     target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform)
+    # Remote play (spec/feature/tool/play.md) is Odeum's odeum_remote_play (Odeum
+    # spec/feature/remote-play-library.md). ERGO_ODEUM_SOURCE_DIR = an Odeum checkout builds it here
+    # (its dependencies come from Odeum's own CMake; pass FETCHCONTENT_SOURCE_DIR_* for an offline build).
+    # Without it the play plugin still builds, runs and logs games, and refuses video and input.
+    set(ERGO_ODEUM_SOURCE_DIR "" CACHE PATH "Odeum checkout for remote play in the play plugin (empty = no remote play)")
+    if(ERGO_ODEUM_SOURCE_DIR)
+        set(ODEUM_BUILD_RELAY OFF CACHE BOOL "" FORCE)
+        set(ODEUM_BUILD_LESSON OFF CACHE BOOL "" FORCE)
+        set(ODEUM_BUILD_RUNNER OFF CACHE BOOL "" FORCE)
+        set(ODEUM_BUILD_REMOTE_PLAY ON CACHE BOOL "" FORCE)
+        set(_ergo_build_testing ${BUILD_TESTING})
+        set(BUILD_TESTING OFF)   # Odeum's own tests run in Odeum
+        add_subdirectory(${ERGO_ODEUM_SOURCE_DIR}/native ${CMAKE_BINARY_DIR}/_odeum EXCLUDE_FROM_ALL)
+        set(BUILD_TESTING ${_ergo_build_testing})
+        target_sources(ergo_studio_plugins PRIVATE tools/studio/plugins/play/remote_play_odeum.cpp)
+        target_link_libraries(ergo_studio_plugins PRIVATE Odeum::remote_play)
+        message(STATUS "ergo_studio_plugins: remote play from Odeum (${ERGO_ODEUM_SOURCE_DIR})")
+    else()
+        target_sources(ergo_studio_plugins PRIVATE tools/studio/plugins/play/remote_play_unavailable.cpp)
+    endif()
     if(MSVC)
         target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
     endif()
@@ -1330,6 +1359,7 @@ if(ERGO_BUILD_STUDIO)
             tests/studio/test_studio_scene_editor.cpp
             tests/studio/test_studio_game_ops.cpp
             tests/studio/test_studio_web.cpp
+            tests/studio/test_studio_play.cpp
         )
         target_link_libraries(test_studio_plugins PRIVATE ergo_studio_plugins ergo_gtest_main)
         if(MSVC)

@@ -142,6 +142,7 @@ std::optional<WorkspaceProfile> parse_workspace_profile(const std::string& text,
             p.assets.push_back({label != nullptr && label->is_string() ? label->as_string() : path->as_string(), *d});
         }
     }
+    if (const JsonValue* play = field(*json, "play"); play != nullptr) p.play = deep_copy(*play);
     return p;
 }
 

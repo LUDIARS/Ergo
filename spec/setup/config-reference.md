@@ -93,6 +93,7 @@ ctest `test_module_catalog` (`tests/test_module_catalog.cmake`) は、
 | **管理対象の外部ライブラリ** ([third-party-deps.md](third-party-deps.md)) | | | | |
 | `ERGO_FETCH_DEPENDENCIES` | ON | 依存を upstream から取得してよいかのマスタースイッチ (`cmake/ErgoDependencies.cmake`) | — | OFF で override も無いまま要求されると構成エラー |
 | `ERGO_WITH_CURL` | OFF | libcurl を取得してビルド (`CURL::libcurl`、`third_party/dependencies.cmake`) | `ERGO_FETCH_DEPENDENCIES` か `ERGO_SOURCE_DIR_CURL` | 構成エラー |
+| `ERGO_ODEUM_SOURCE_DIR` | (空) | Odeum の checkout。`native/` を取り込み、`play` プラグインの遠隔プレイ (映像・入力) を Odeum の `odeum_remote_play` で持つ ([play.md](../feature/tool/play.md)) | Odeum の依存 (libdatachannel・Boost・nlohmann_json・Lorica・OpenSSL 3。Odeum の CMake が取得、オフラインは `FETCHCONTENT_SOURCE_DIR_*`) | 空なら遠隔プレイなし (ビルド・実行・ログだけ) |
 | `ERGO_BUILD_THIRDPARTY_SMOKE` | OFF | 疎通テスト `test_thirdparty_deps` (curl を強制 ON) | `ERGO_BUILD_TESTS` | テストを作らない (curl は ON のまま取得・ビルドする) |
 | `ERGO_CURL_USE_SSL` | ON | curl の TLS backend を有効化 (Windows は Schannel、`cmake/deps/curl.cmake`) | `ERGO_WITH_CURL` | 宣言されない |
 | `ERGO_DEPENDENCY_CACHE_DIR` | (空) | 取得ソースの共有キャッシュ dir (空 = `<build>/_deps`) | — | — |
@@ -169,7 +170,9 @@ CMake の必須要件: バージョン `>= 3.20` (`cmake_minimum_required`)、C+
 | `PORT` | `5170` | サーバ全体 | listen ポート (1..65535。それ以外は起動しない) | `tools/studio/studio_settings.cpp` |
 | `ERGO_HOST` | `127.0.0.1` | サーバ全体 | bind するアドレス。LAN に出したいときだけ `0.0.0.0` などにする。この名前は `Host` 検査でも信頼される | `tools/studio/studio_settings.cpp` |
 | `ERGO_STUDIO_PUBLIC_HOSTS` | (なし) | サーバ全体 | Cloudflare Access 経由で公開する名前 (カンマ区切り、ポートなし)。この名前の要求は `Cf-Access-Jwt-Assertion` ヘッダーがあるときだけ通す。listen は loopback のまま ([web.md](../feature/tool/web.md)) | `tools/studio/studio_settings.cpp` |
-| `ERGO_STUDIO_PLAY_URL` | (なし) | `web` | ゲームタブに埋め込む遠隔プレイのページ (Odeum runner)。`http(s)://` 以外は起動エラー | `tools/studio/studio_settings.cpp` |
+| `ERGO_STUDIO_FFMPEG` | `ffmpeg` (PATH) | `play` | 遠隔プレイで窓を撮る ffmpeg ([play.md](../feature/tool/play.md)) | `tools/studio/plugins/play/play_plugin.cpp` |
+| `ERGO_STUDIO_STUN_URLS` | `stun:stun.cloudflare.com:3478` | `play` | STUN サーバー (カンマ区切り、`stun:` / `stuns:` だけ) | `tools/studio/plugins/play/play_plugin.cpp` |
+| `ERGO_STUDIO_TURN_KEY_ID` / `ERGO_STUDIO_TURN_KEY_API_TOKEN` | (なし) | `play` | Cloudflare TURN の鍵。両方あるときだけ TURN を使う。片方だけなら起動エラー。値はログにも API にも出さない | `tools/studio/plugins/play/play_plugin.cpp` |
 | `ERGO_PLUGIN_DIR` | (なし) | 外部プラグインの読み込み | ゲーム固有の plugin pack のディレクトリ。OS のパス区切りで複数可 ([external-plugins.md](external-plugins.md))。`studio` の台帳で有効な pack が後ろに足される | `tools/studio/studio_settings.cpp` / `tools/studio/main.cpp` |
 | `ERGO_PICTOR_PROFILE_DIR` | (なし。未設定なら API は 503) | `render_pipeline` | `*.profile.json` の場所 ([plugin-data-roots.md](plugin-data-roots.md)) | `tools/studio/studio_settings.cpp` |
 | `VISUS_PROJECT_ROOTS` | (なし。未設定なら API は 503) | `visus` | 描画定義のプロジェクトルート。`;` 区切りで複数可 | `tools/studio/studio_settings.cpp` |

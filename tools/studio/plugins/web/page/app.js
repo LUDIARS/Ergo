@@ -473,20 +473,237 @@ async function preview(e) {
   } catch (err) { box.append(el('p', { class: 'empty', text: '読めません: ' + err.message })); }
 }
 
+// ---- remote play (the play plugin: spec/feature/tool/play.md) ---------------
+
+const play = { targets: [], ws: null, pc: null, watching: '', logNext: 0, logTarget: '', retry: 0, lastMove: 0 };
+const STATE_TEXT = { idle: '停止中', building: 'ビルド中', running: '実行中', failed: '失敗' };
+
+// KeyboardEvent.code -> the plugin's key names (key_names.h).
+function keyName(code) {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  if (/^F([1-9]|1[0-2])$/.test(code)) return code;
+  const named = {
+    Enter: 'Enter', NumpadEnter: 'Enter', Escape: 'Escape', Space: 'Space', Tab: 'Tab', Backspace: 'Backspace',
+    ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl', AltLeft: 'Alt', AltRight: 'Alt',
+    ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Insert: 'Insert', Delete: 'Delete',
+    Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', CapsLock: 'CapsLock', Minus: 'Minus',
+    Equal: 'Equal', BracketLeft: 'BracketLeft', BracketRight: 'BracketRight', Semicolon: 'Semicolon', Quote: 'Quote',
+    Comma: 'Comma', Period: 'Period', Slash: 'Slash', Backslash: 'Backslash', Backquote: 'Backquote',
+  };
+  return named[code] || '';
+}
+
+function playSend(msg) {
+  if (play.ws && play.ws.readyState === WebSocket.OPEN) play.ws.send(JSON.stringify(msg));
+}
+
+function currentTarget() { return play.targets.find((t) => t.name === $('play-target').value); }
+
+function renderPlayState() {
+  const t = currentTarget();
+  $('play-missing').hidden = play.targets.length > 0;
+  for (const id of ['play-build', 'play-run', 'play-stop', 'play-watch']) $(id).disabled = !t;
+  const pill = $('play-state');
+  if (!t) { pill.textContent = '-'; pill.className = 'pill'; return; }
+  const busy = t.state === 'building' || t.state === 'running';
+  $('play-build').disabled = !t.can_build || busy;
+  $('play-run').disabled = busy;
+  $('play-stop').disabled = !busy;
+  pill.textContent = (STATE_TEXT[t.state] || t.state) + (t.exit_code != null && !busy ? ' (終了コード ' + t.exit_code + ')' : '');
+  pill.className = 'pill' + (t.state === 'running' ? ' ok' : t.state === 'failed' ? ' bad' : '');
+  const box = $('play-buttons');
+  box.replaceChildren();
+  for (const b of t.buttons) {
+    const btn = el('button', { text: b.label });
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); playSend({ type: 'key', key: b.key, down: true }); });
+    for (const ev of ['pointerup', 'pointerleave']) btn.addEventListener(ev, () => playSend({ type: 'key', key: b.key, down: false }));
+    box.append(btn);
+  }
+}
+
+async function loadTargets() {
+  try {
+    const data = await api('/play/api/targets');
+    const keep = $('play-target').value;
+    play.targets = data.targets || [];
+    const sel = $('play-target');
+    sel.replaceChildren(...play.targets.map((t) => el('option', { value: t.name, text: t.label })));
+    if (play.targets.some((t) => t.name === keep)) sel.value = keep;
+    for (const e of data.errors || []) toast('プロフィールの play を読めません: ' + e, true);
+  } catch (e) { toast('遊べるゲームの一覧を読めません: ' + e.message, true); }
+  renderPlayState();
+}
+
+async function targetAction(action) {
+  const t = currentTarget();
+  if (!t) return;
+  try {
+    await api('/play/api/targets/' + encodeURIComponent(t.name) + '/' + action, { body: {} });
+  } catch (e) { toast(t.label + ': ' + e.message, true); }
+  loadTargets();
+}
+
+async function pollLogs() {
+  const t = currentTarget();
+  if (t) {
+    if (play.logTarget !== t.name) { play.logTarget = t.name; play.logNext = 0; $('play-log').textContent = ''; }
+    try {
+      const data = await api('/play/api/targets/' + encodeURIComponent(t.name) + '/logs?since=' + play.logNext);
+      if (data.lines.length) {
+        const pre = $('play-log');
+        const atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+        const lines = (pre.textContent ? pre.textContent.split('\n') : []).concat(data.lines.map((l) => l.text));
+        pre.textContent = lines.slice(-2000).join('\n');
+        if (atEnd) pre.scrollTop = pre.scrollHeight;
+      }
+      play.logNext = data.next;
+    } catch { /* the next poll retries */ }
+  }
+  setTimeout(pollLogs, 1000);
+}
+
+function connectPlay() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  play.ws = new WebSocket(proto + '//' + location.host + '/play/ws');
+  play.ws.addEventListener('open', () => { play.retry = 0; });
+  play.ws.addEventListener('message', async (ev) => {
+    let m;
+    try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.type === 'answer' && play.pc) {
+      try { await play.pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); } catch (e) { toast('映像をつなげません: ' + e.message, true); }
+    } else if (m.type === 'state') {
+      const t = play.targets.find((x) => x.name === m.target);
+      if (t) { t.state = m.state; t.exit_code = m.exit_code; renderPlayState(); }
+    } else if (m.type === 'error') {
+      if (m.error === 'stream_ended') stopWatching();
+      toast('遠隔プレイ: ' + (m.message || m.error), true);
+    }
+  });
+  play.ws.addEventListener('close', () => {
+    stopWatching();
+    play.retry = Math.min(play.retry + 1, 6);
+    setTimeout(connectPlay, 500 * play.retry);
+  });
+}
+
+function stopWatching() {
+  if (play.pc) { play.pc.close(); play.pc = null; }
+  play.watching = '';
+  $('play-video').srcObject = null;
+  $('play-note').hidden = false;
+  $('play-watch').textContent = '映像を見る';
+}
+
+async function watch() {
+  const t = currentTarget();
+  if (!t) return;
+  if (play.watching) {   // the button toggles
+    stopWatching();
+    if (play.ws) play.ws.close();   // the plugin ends the viewer with the socket; it reconnects
+    return;
+  }
+  try {
+    const ice = await api('/play/api/ice');
+    const pc = new RTCPeerConnection({ iceServers: ice.iceServers || [] });
+    play.pc = pc;
+    const tr = pc.addTransceiver('video', { direction: 'recvonly' });
+    const caps = RTCRtpReceiver.getCapabilities && RTCRtpReceiver.getCapabilities('video');
+    if (caps && tr.setCodecPreferences) {
+      const h264 = caps.codecs.filter((c) => /h264/i.test(c.mimeType));
+      if (h264.length) tr.setCodecPreferences(h264);
+    }
+    pc.addEventListener('track', (e) => {
+      $('play-video').srcObject = e.streams[0] || new MediaStream([e.track]);
+      $('play-note').hidden = true;
+    });
+    await pc.setLocalDescription(await pc.createOffer());
+    // The Studio takes one offer with its candidates (no trickle): wait for gathering.
+    await new Promise((resolve) => {
+      if (pc.iceGatheringState === 'complete') return resolve();
+      const done = () => { if (pc.iceGatheringState === 'complete') resolve(); };
+      pc.addEventListener('icegatheringstatechange', done);
+      setTimeout(resolve, 3000);
+    });
+    play.watching = t.name;
+    $('play-watch').textContent = '映像を止める';
+    playSend({ type: 'offer', target: t.name, sdp: pc.localDescription.sdp });
+  } catch (e) {
+    stopWatching();
+    toast('映像をつなげません: ' + e.message, true);
+  }
+}
+
+// Pointer position as 0..1 of the picture (the video keeps its aspect ratio).
+function videoPoint(e, clamp) {
+  const v = $('play-video');
+  const r = v.getBoundingClientRect();
+  const vw = v.videoWidth || r.width, vh = v.videoHeight || r.height;
+  const scale = Math.min(r.width / vw, r.height / vh);
+  const w = vw * scale, h = vh * scale;
+  const x = (e.clientX - r.left - (r.width - w) / 2) / w;
+  const y = (e.clientY - r.top - (r.height - h) / 2) / h;
+  if (clamp) return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+  return { x, y };
+}
+
+function bindPlayInput() {
+  const stage = $('play-stage');
+  const video = $('play-video');
+  const onKey = (down) => (e) => {
+    if (!play.watching) return;
+    const key = keyName(e.code);
+    if (!key) return;
+    e.preventDefault();
+    if (down && e.repeat) return;   // the game sees the key held, not repeated
+    playSend({ type: 'key', key, down });
+  };
+  stage.addEventListener('keydown', onKey(true));
+  stage.addEventListener('keyup', onKey(false));
+  video.addEventListener('contextmenu', (e) => e.preventDefault());
+  video.addEventListener('pointerdown', (e) => {
+    stage.focus();
+    const p = videoPoint(e);
+    if (!play.watching || !p) return;
+    video.setPointerCapture(e.pointerId);
+    playSend({ type: 'pointer', x: p.x, y: p.y, button: e.button, phase: 'down' });
+  });
+  video.addEventListener('pointerup', (e) => {
+    const p = videoPoint(e, true);   // a release outside the picture still lets go
+    if (!play.watching || !p) return;
+    playSend({ type: 'pointer', x: p.x, y: p.y, button: e.button, phase: 'up' });
+  });
+  video.addEventListener('pointermove', (e) => {
+    const now = performance.now();
+    if (!play.watching || now - play.lastMove < 16) return;
+    const p = videoPoint(e);
+    if (!p) return;
+    play.lastMove = now;
+    playSend({ type: 'pointer', x: p.x, y: p.y, button: 0, phase: 'move' });
+  });
+  video.addEventListener('wheel', (e) => {
+    const p = videoPoint(e);
+    if (!play.watching || !p || !e.deltaY) return;
+    e.preventDefault();
+    const notches = -Math.sign(e.deltaY) * Math.max(1, Math.min(10, Math.round(Math.abs(e.deltaY) / 100)));
+    playSend({ type: 'wheel', x: p.x, y: p.y, delta: notches });
+  }, { passive: false });
+}
+
+$('play-target').addEventListener('change', () => { if (play.watching) stopWatching(); renderPlayState(); });
+$('play-build').addEventListener('click', () => targetAction('build'));
+$('play-run').addEventListener('click', () => targetAction('run'));
+$('play-stop').addEventListener('click', () => targetAction('stop'));
+$('play-watch').addEventListener('click', watch);
+
 // ---- start -----------------------------------------------------------------
 
 async function start() {
-  try {
-    const cfg = await api('/web/api/config');
-    if (cfg.play_url) {
-      $('play-frame').src = cfg.play_url;
-      $('play-frame').hidden = false;
-      $('play-open').href = cfg.play_url;
-      $('play-open').hidden = false;
-    } else {
-      $('play-missing').hidden = false;
-    }
-  } catch (e) { toast('設定を読めません: ' + e.message, true); }
+  bindPlayInput();
+  await loadTargets();
+  connectPlay();
+  pollLogs();
   loadServices();
   loadPresets();
   connect();

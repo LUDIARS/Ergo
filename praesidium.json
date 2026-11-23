@@ -3289,6 +3289,149 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": []
+    },
+    {
+      "file": "src/studio/platform/line_splitter.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/platform/win_command.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/studio/platform/win_live_process.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/play_message.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/play_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/play_target.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/target_log.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/target_runner.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/remote_play_unavailable.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/play/remote_play_odeum.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "odeum-remote-play"
+      ]
+    },
+    {
+      "file": "tests/studio/test_studio_play.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
     }
   ],
   "web": []

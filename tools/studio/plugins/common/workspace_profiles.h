@@ -8,12 +8,15 @@
 ///     "tuning":   {"amicii-server": "games/september/balance/versions"},  (ergo_bind app -> folder)
 ///     "git":      ["."],                              (repositories)
 ///     "assets":   [{"name": "Models", "path": "games/september/models"}]  (asset folders, read only)
+///     "play":     [{"name": "game", "run": {...}, "window": "Game"}]  (play plugin; read there, play_target.h)
 ///   }
 /// Paths are relative to `root`; "${NAME}" expands an environment variable (a
 /// missing one makes the profile invalid, not silently empty). Profiles are
 /// read from <studio home>/profiles/*.json and, for plugin packs, from
 /// <each ERGO_PLUGIN_DIR folder>/*.studio.json (a pack ships its profile beside
 /// its library).
+#include "json_util.h"
+
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -37,6 +40,7 @@ struct WorkspaceProfile {
     std::map<std::string, std::filesystem::path> tuning;    ///< app -> versions folder (absolute)
     std::vector<std::filesystem::path>           git;       ///< repositories (absolute)
     std::vector<AssetRoot>                       assets;    ///< asset folders, in file order
+    JsonValue                                    play;      ///< the raw "play" value (null when absent)
 };
 
 struct ProfileSet {

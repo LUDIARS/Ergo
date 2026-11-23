@@ -62,11 +62,6 @@ StudioSettings read_settings(const EnvFn& env, const std::filesystem::path& exe_
     take(env, "HOME", s.user_home);
 #endif
     s.public_hosts = net::parse_public_hosts(env("ERGO_STUDIO_PUBLIC_HOSTS"));
-    take(env, "ERGO_STUDIO_PLAY_URL", s.play_url);
-    if (!s.play_url.empty() && s.play_url.rfind("https://", 0) != 0 && s.play_url.rfind("http://", 0) != 0) {
-        if (s.error.empty()) s.error = "ERGO_STUDIO_PLAY_URL must start with https:// or http:// (got \"" + s.play_url + "\")";
-        s.play_url.clear();
-    }
     take(env, "ERGO_PLUGIN_DIR", s.plugin_dirs);
     take(env, "VISUS_PROJECT_ROOTS", s.visus_roots);
     take(env, "ERGO_UI_LAYOUT_ROOT", s.ui_layout_root);
@@ -102,7 +97,10 @@ std::string studio_usage() {
            "  ERGO_HOST                address to bind (default 127.0.0.1)\n"
            "  ERGO_STUDIO_PUBLIC_HOSTS host names published through Cloudflare Access, comma list\n"
            "                           (answered only with the Cf-Access-Jwt-Assertion header; default none)\n"
-           "  ERGO_STUDIO_PLAY_URL     remote play page (Odeum runner) the web page's game tab embeds\n"
+           "  ERGO_STUDIO_FFMPEG       ffmpeg for remote play capture (default: ffmpeg on PATH)\n"
+           "  ERGO_STUDIO_STUN_URLS    STUN servers for remote play, comma list (default stun.cloudflare.com)\n"
+           "  ERGO_STUDIO_TURN_KEY_ID, ERGO_STUDIO_TURN_KEY_API_TOKEN\n"
+           "                           Cloudflare TURN key for remote play (both or neither)\n"
            "  ERGO_PLUGIN_DIR          external plugin pack directories (separated by "
 #ifdef _WIN32
            "';'"

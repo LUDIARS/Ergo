@@ -2,11 +2,12 @@
 
 依頼 (2026-11-23, neco): 「ErgoStudio を限定 Web 公開して、アセットの一覧、ライティング調整が出来るようにする。
 またゲームのビルドと実行と実行しながらの調整を出来るようにする。Amicii をサンプルとしてセットアップ Web 公開まで」。
-遠隔プレイは「Odeum や Custos に WebRTC でのリモートプレイ実装あるのでそれ使って」(同日)。
+遠隔プレイは、はじめ Odeum runner のページを枠で出していたが、「Web から操作したりアセット確認する実装は Ergo が持つよ。
+Portus と Custos 参考」(同日) により Ergo Studio の `play` プラグインが持つ (play.md)。
 
 ネイティブ版の設計 (spec/plan/2026-11-05-ergo-studio-native.md) はブラウザ版を廃止した (J9)。
 この仕様は、その判断のうち「ブラウザ UI を TS で二重に保守しない」を守ったまま、**ネイティブの Studio が
-1 枚のページを配る**形で限定公開を足す。ページは他のプラグインの既存 API だけを使い、新しい変更系の API は持たない。
+1 枚のページを配る**形で限定公開を足す。ページは他のプラグインの API だけを使い、web プラグイン自身は変更系の API を持たない。
 
 ## 構成
 
@@ -15,13 +16,13 @@
 | `web` プラグイン | `tools/studio/plugins/web/` | ページ (`page/index.html`・`app.js`・`style.css`、実行ファイルに埋め込み) と `GET /web/api/config` |
 | `assets` プラグイン | `tools/studio/plugins/assets/` | プロフィールの `assets` フォルダの一覧と、画像・文字ファイルの表示 (読み取りのみ) |
 | 公開名の検査 | `src/studio/net/request_guard.cpp` | `ERGO_STUDIO_PUBLIC_HOSTS` の名前を、Access を通った要求にだけ許す |
-| 遠隔プレイ | Odeum `odeum-runner` (Custos の C++ 版) | ビルド・実行・停止・WebRTC の画面配信と操作。ページはそのページを枠 (iframe) で出す |
+| 遠隔プレイ | `play` プラグイン (`tools/studio/plugins/play/`、play.md) | ビルド・実行・停止・WebRTC の画面配信と操作 |
 
 ## ページのタブ
 
 | タブ | 内容 | 使う API |
 |---|---|---|
-| ゲーム | 遠隔プレイの枠 (`ERGO_STUDIO_PLAY_URL`) と、プロフィールのサービスの起動・再起動・停止・ログ | iframe、`/services/api/services`・`/api/services/<code>/{control,logs}` |
+| ゲーム | プロフィールの `play` のゲームのビルド・実行・停止・ログ、映像 (`<video>`) と操作 (キーボード・マウス・ホイール・操作ボタン)、サービスの起動・再起動・停止・ログ | `/play/api/*`・WS `/play/ws`、`/services/api/services`・`/api/services/<code>/{control,logs}` |
 | ライティング | `look/...` の変数をグループ別にスライダー・数値欄・切り替えで出す。プリセットの読み込み (`look.apply`) と保存 (`look.preset`) | WS `/variable/ws` (role `ui`)、`/lookdev/api/presets` |
 | 調整値 | ゲームが出す全変数。名前で絞り込み。版の保存・差分・戻す | WS `/variable/ws`、`/tuning/api/versions` |
 | アセット | プロフィールの `assets` フォルダを順にたどる一覧 (種類・大きさ・更新時刻)、画像と文字ファイルの表示 | `/assets/api/{roots,list,file}` |
@@ -29,6 +30,7 @@
 変数の扱いは lookdev タブ・tuning タブ (ネイティブ) と同じ取り決め (lookdev.md・game-ops.md)。
 `look/Capture` と `look.apply` / `look.preset` / `look.capture_*` は調整の一覧に出さない。
 撮影して投稿 (lookdev の `capture-dir` / `post`) はページから行わない (画面は遠隔プレイで見える)。
+映像の上でクリックすると枠にフォーカスが入り、キーとマウスがゲームの窓に届く。映像の外をクリックすると止まる。
 
 ## 不変条件
 
@@ -40,10 +42,11 @@
 一覧に無い名前・ポート付きの名前は従来どおり拒む。署名の検証は Access 側に任せる (ヘッダーの有無で
 「Access を通ってきた」ことだけを見る。loopback に届く経路はトンネルとこの PC だけ)。
 
-### WEB-INV-02 ページは新しい変更系を持たない {#SPEC-ergo-web-no-new-mutation}
+### WEB-INV-02 ページから使える変更は決まったものだけ {#SPEC-ergo-web-no-new-mutation}
 
-ページが使う変更は、変数の `set` (WS)、プリセットと版の保存、サービスの起動・停止 (Concordia への一報付き)
-だけで、どれも既存のプラグインの API。次はページから (公開名から) できない:
+ページが使う変更は、変数の `set` (WS)、プリセットと版の保存、サービスの起動・停止 (Concordia への一報付き)、
+`play` の目標のビルド・実行・停止と入力 (プロフィールに書いたコマンドだけ、PLAY-INV-01〜03) だけ。
+次はページから (公開名から) できない:
 
 - `studio` (AI への指示・プラグインの導入) と `lesson`: もとから loopback の Host だけ (ST-INV-03)
 - `git` の変更系 (commit / switch / pull / push / fetch): この PC からだけ (`check_mutation` を足した)
@@ -59,30 +62,18 @@ data・shader 種別の文字ファイル (`text/plain`) だけ、16 MB まで�
 
 ### WEB-INV-04 ページの CSP {#SPEC-ergo-web-csp}
 
-`default-src 'self'`、`connect-src 'self'` (同じ名前の WS を含む)、`frame-src` は `ERGO_STUDIO_PLAY_URL` の
-origin だけ (未設定なら `'none'`)、`frame-ancestors 'none'`。サーバからの値は `textContent` で出し、HTML として入れない。
-
-## 遠隔プレイ (Odeum runner)
-
-ビルド・実行・停止・画面配信・操作は Odeum の `odeum-runner` (Custos の C++ 移植) が持つ。Studio は作らない。
-
-- アプリの定義 (ビルド・実行のコマンド、窓の名前、操作キー) はゲームのリポが持つ `apps.json`
-  (`CUSTOS_APPS_FILE`)。Amicii は `tools/runner/amicii.apps.json`。
-- 画面は ffmpeg の gdigrab で窓を撮って H.264 にし、WebRTC で送る。遠隔の NAT 越しは TURN
-  (`CUSTOS_TURN_KEY_ID` / `CUSTOS_TURN_KEY_API_TOKEN`、Cloudflare) が要る。
-- runner も loopback で listen し、公開名は `LUDIARS_ALLOWED_HOSTS` / `CUSTOS_ALLOWED_ORIGINS` で許す。
-- ページは runner のページを枠で出す。runner とページは同じ登録ドメインの別の名前にし、
-  同じ Access アプリで守る (同一サイトなので Access のクッキーが枠の中でも届く)。
+`default-src 'self'`、`connect-src 'self'` (同じ名前の WS を含む)、`media-src 'self' blob:` (WebRTC の映像)、
+`frame-src 'none'`、`frame-ancestors 'none'`。サーバからの値は `textContent` で出し、HTML として入れない。
 
 ## 公開 (Excubitor + Cloudflare Access)
 
 | 項目 | 値 |
 |---|---|
-| Studio | `ergo-studio` (Excubitor)。env `ERGO_STUDIO_PUBLIC_HOSTS=<Studio の公開名>`、`ERGO_STUDIO_PLAY_URL=https://<runner の公開名>/`、`ERGO_PLUGIN_DIR=<ゲームの pack フォルダ>` |
-| runner | `odeum-runner` (Excubitor)。env `CUSTOS_APPS_FILE`、`LUDIARS_ALLOWED_HOSTS=<runner の公開名>`、`CUSTOS_ALLOWED_ORIGINS=https://<runner の公開名>` |
-| Access | 2 つの名前を 1 つの Access アプリ (許可は人間が決めた相手だけ) に入れ、ローカルのトンネルの経路を張る (`cf-access-publish` スキル) |
+| Studio | `ergo-studio` (Excubitor)。env `ERGO_STUDIO_PUBLIC_HOSTS=<Studio の公開名>`、`ERGO_PLUGIN_DIR=<ゲームの pack フォルダ>`。遠隔の NAT 越しに映像を送るなら `ERGO_STUDIO_TURN_KEY_ID` / `ERGO_STUDIO_TURN_KEY_API_TOKEN` (Cloudflare TURN)。ビルドは `-DERGO_ODEUM_SOURCE_DIR=<Odeum>` (遠隔プレイは Odeum の `odeum_remote_play`) |
+| Access | 公開名を Access アプリ (許可は人間が決めた相手だけ) に入れ、ローカルのトンネルの経路を張る (`cf-access-publish` スキル) |
 
 公開名・許可する相手・TURN の鍵は、拠点の設定 (Excubitor) に置き、このリポには書かない。
+WebRTC の映像はトンネルを通らない (ブラウザと Studio の間を直接か TURN 経由で流れる)。
 
 ## テスト
 

@@ -2,6 +2,7 @@
 
 #include "plugins/assets/assets_plugin.h"
 #include "plugins/git/git_plugin.h"
+#include "plugins/play/play_plugin.h"
 #include "plugins/web/web_plugin.h"
 #include "lesson_variables.h"
 #include "plugins/lesson/lesson_plugin.h"
@@ -54,8 +55,12 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s) {
     f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
         return p::assets::make_assets_plugin(home, dirs, log);
     });
-    f.push_back([cfg = p::web::WebConfig{s.play_url, s.public_hosts}](const host::LogFn& log) {
+    f.push_back([cfg = p::web::WebConfig{s.public_hosts}](const host::LogFn& log) {
         return p::web::make_web_plugin(cfg, log);
+    });
+    // Remote play: build, run and stream the profiles' games (spec/feature/tool/play.md).
+    f.push_back([home = s.studio.home, dirs = s.plugin_dirs](const host::LogFn& log) {
+        return p::play::make_play_plugin(home, dirs, log);
     });
     f.push_back(&p::particle::make_particle_plugin);
     f.push_back(&p::scene_editor::make_scene_editor_plugin);

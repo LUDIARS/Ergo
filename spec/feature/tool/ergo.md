@@ -183,7 +183,7 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 ## プラグイン一覧
 
 `tools/studio/builtin_plugins.cpp` に登録された組み込みプラグインの全部
-(23 個)。「供給元」はプラグインにデータを送る側で、次の 4 種類:
+(24 個)。「供給元」はプラグインにデータを送る側で、次の 4 種類:
 
 - **リポ内クライアント**: Ergo のターゲットがエンジン側から WS で接続する
 - **ホスト提供**: ホスト (ゲーム・Pictor を回すプログラム) が自分で送る / 自分で HTTP を出す。Ergo にクライアントは無い
@@ -211,6 +211,7 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 | `git` | git (子プロセス) | プロフィールに書いたリポジトリ | REST `GET /git/api/repos`・`/api/repos/<i>/{status,log,branches}`、`POST /api/repos/<i>/{fetch,pull,push,switch,commit}` (変更系は loopback の Host だけ)。WS なし | [game-ops.md](game-ops.md) |
 | `assets` | — | ファイル: プロフィールの `assets` に書いたフォルダ (読み取りのみ) | REST `GET /assets/api/roots`・`/api/list?root=&dir=`・`/api/file?root=&path=` (画像と小さな文字ファイルだけ)。WS なし | [web.md](web.md) |
 | `web` | — | アプリのみ (他のプラグインの API を使うブラウザのページ) | ページ `GET /web/`、`GET /web/api/config`。公開は Cloudflare Access 経由 (`ERGO_STUDIO_PUBLIC_HOSTS`) | [web.md](web.md) |
+| `play` | Odeum `odeum_remote_play` (`ERGO_ODEUM_SOURCE_DIR`) | 子プロセス: プロフィールの `play` に書いたビルド・実行のコマンド、ゲームの窓 (ffmpeg で撮影) | REST `GET /play/api/{health,targets,ice}`・`/api/targets/<name>/logs`、`POST /api/targets/<name>/{build,run,stop}`。WS `/play/ws` (offer → answer、key / pointer / wheel、state) | [play.md](play.md) |
 | `lesson` | `ergo_bind` (`variable` プラグイン経由) | odeum-lesson (授業の進行) と、`variable` に接続したゲーム | REST `/lesson/api/*` (変更系は loopback の Host・同一 Origin・JSON のみ)。WS なし | [lesson.md](lesson.md) |
 | `vfx-breed` | `ergo_particle` (設定の形) | アプリのみ + 任意で LLM (方向指示) | REST `POST /vfx-breed/api/generation`、`GET /api/seeds`・`/api/genes`。WS なし | 本書「`vfx-breed`」 |
 | `scene_editor` | `ergo_scene` | リポ内クライアント: `ergo_scene_link` (`include/ergo/scene/editor_link.h`) | WS `/scene_editor/ws`: エンジンが `{op:"scene", id, json}` を送り、UI の `{op:"patch", scene_id, actor_id, field, value}` をそのシーンの持ち主へ転送。REST `GET /scene_editor/api/scenes` | [scene_editor.md](scene_editor.md) |
@@ -238,6 +239,9 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 
 ### `web`
 - ブラウザで開く Studio (アセット・ライティング・調整値・ゲームの起動と遠隔プレイ)。Cloudflare Access で限定公開する。仕様は [web.md](web.md)
+
+### `play`
+- プロフィールの `play` のゲームをビルド・実行・停止し、窓の画面を WebRTC で送って、キーボードとマウスで操作する。遠隔プレイの本体は Odeum の `odeum_remote_play`。仕様は [play.md](play.md)
 
 ### `studio`
 - デスクトップでゲームを AI と作る画面。LUDIARS の各サービス (Cc / Actio / Br / Curare / Revisor /

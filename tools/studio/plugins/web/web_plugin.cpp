@@ -2,9 +2,6 @@
 
 #include "../common/json_util.h"
 
-#include <algorithm>
-#include <cctype>
-
 // The page, compiled in by ergo_embed_text (CMakeLists.txt).
 extern const char        ergo_web_index_html[];
 extern const std::size_t ergo_web_index_html_size;
@@ -15,27 +12,9 @@ extern const std::size_t ergo_web_style_css_size;
 
 namespace ergo::studio::plugins::web {
 
-std::string url_origin(const std::string& url) {
-    std::string lower = url;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    std::size_t scheme_end = 0;
-    if (lower.rfind("https://", 0) == 0) scheme_end = 8;
-    else if (lower.rfind("http://", 0) == 0) scheme_end = 7;
-    else return {};
-    const std::size_t end = lower.find_first_of("/?#", scheme_end);
-    const std::string authority = lower.substr(scheme_end, end == std::string::npos ? std::string::npos : end - scheme_end);
-    if (authority.empty() || authority.find('@') != std::string::npos) return {};
-    const bool ok = std::all_of(authority.begin(), authority.end(), [](unsigned char c) {
-        return std::isalnum(c) || c == '.' || c == '-' || c == ':' || c == '[' || c == ']';
-    });
-    if (!ok) return {};
-    return lower.substr(0, scheme_end) + authority;
-}
-
-std::string page_csp(const std::string& play_url) {
-    const std::string frame = url_origin(play_url);
-    return "default-src 'self'; img-src 'self' data: blob:; connect-src 'self'; style-src 'self'; script-src 'self'; "
-           "frame-src " + (frame.empty() ? std::string("'none'") : frame) + "; frame-ancestors 'none'; base-uri 'none'; "
+std::string page_csp() {
+    return "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; "
+           "style-src 'self'; script-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; "
            "form-action 'none'";
 }
 
@@ -59,7 +38,7 @@ net::HttpResponse WebPlugin::handle(const net::HttpRequest& req, const std::stri
     if (req.method != "GET") return net::HttpResponse::json(405, "{\"ok\":false,\"err\":\"method not allowed\"}");
     if (sub == "/" || sub == "/index.html") {
         auto res = page_file(ergo_web_index_html, ergo_web_index_html_size, "text/html; charset=utf-8");
-        res.headers["content-security-policy"] = page_csp(cfg_.play_url);
+        res.headers["content-security-policy"] = page_csp();
         res.headers["x-frame-options"] = "DENY";
         return res;
     }
@@ -69,18 +48,13 @@ net::HttpResponse WebPlugin::handle(const net::HttpRequest& req, const std::stri
     if (sub == "/api/config") {
         JsonValue hosts = JsonValue::make_array();
         for (const auto& h : cfg_.public_hosts) hosts.push(jstr(h));
-        return json_response(200, jobj({{"play_url", jstr(url_origin(cfg_.play_url).empty() ? std::string() : cfg_.play_url)},
-                                        {"public_hosts", hosts}}));
+        return json_response(200, jobj({{"public_hosts", hosts}}));
     }
     return net::HttpResponse::json(404, "{\"ok\":false,\"err\":\"not found\"}");
 }
 
 JsonValue WebPlugin::snapshot() const {
-    JsonValue out = jobj({{"ok", jbool(true)},
-                          {"play_url", jbool(!url_origin(cfg_.play_url).empty())},
-                          {"public_hosts", jnum(static_cast<double>(cfg_.public_hosts.size()))}});
-    if (url_origin(cfg_.play_url).empty()) out.set("note", jstr("ERGO_STUDIO_PLAY_URL is not set: the game tab shows the services only"));
-    return out;
+    return jobj({{"ok", jbool(true)}, {"public_hosts", jnum(static_cast<double>(cfg_.public_hosts.size()))}});
 }
 
 std::unique_ptr<host::IPlugin> make_web_plugin(const WebConfig& cfg, const host::LogFn&) {

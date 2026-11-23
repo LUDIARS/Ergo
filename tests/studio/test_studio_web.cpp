@@ -166,31 +166,25 @@ TEST(WebAssets, PluginListsAndPreviewsFromAProfile) {
 
 // ---- web plugin --------------------------------------------------------------
 
-TEST(WebPage, OriginAndCsp) {
-    EXPECT_EQ(web::url_origin("https://Play.Example.org/app?x=1"), "https://play.example.org");
-    EXPECT_EQ(web::url_origin("http://127.0.0.1:7676/"), "http://127.0.0.1:7676");
-    EXPECT_EQ(web::url_origin("javascript:alert(1)"), "");
-    EXPECT_EQ(web::url_origin("https://user@evil.example/"), "");
-    EXPECT_NE(web::page_csp("https://play.example.org/x").find("frame-src https://play.example.org;"), std::string::npos);
-    EXPECT_NE(web::page_csp("").find("frame-src 'none'"), std::string::npos);
+TEST(WebPage, CspAllowsNoFrames) {
+    const std::string csp = web::page_csp();
+    EXPECT_NE(csp.find("frame-src 'none'"), std::string::npos);
+    EXPECT_NE(csp.find("frame-ancestors 'none'"), std::string::npos);
+    EXPECT_NE(csp.find("media-src 'self' blob:"), std::string::npos);
+    EXPECT_NE(csp.find("connect-src 'self'"), std::string::npos);
 }
 
 TEST(WebPage, ServesThePageAndConfig) {
-    web::WebPlugin plugin({"https://play.example.org/", {"studio.example.org"}});
+    web::WebPlugin plugin({{"studio.example.org"}});
     const auto page = plugin.handle(get("/web/"), "/");
     EXPECT_EQ(page.status, 200);
     EXPECT_NE(page.body.find("Ergo Studio"), std::string::npos);
-    EXPECT_NE(page.headers.at("content-security-policy").find("frame-src https://play.example.org"), std::string::npos);
+    EXPECT_NE(page.body.find("play-video"), std::string::npos);
+    EXPECT_EQ(page.headers.at("content-security-policy"), web::page_csp());
     EXPECT_EQ(plugin.handle(get("/web/app.js"), "/app.js").status, 200);
     const auto cfg = plugin.handle(get("/web/api/config"), "/api/config");
     EXPECT_EQ(cfg.status, 200);
-    EXPECT_NE(cfg.body.find("https://play.example.org/"), std::string::npos);
     EXPECT_NE(cfg.body.find("studio.example.org"), std::string::npos);
+    EXPECT_EQ(cfg.body.find("play_url"), std::string::npos);
     EXPECT_EQ(plugin.handle(get("/web/nope"), "/nope").status, 404);
-}
-
-TEST(WebPage, AnUnusablePlayUrlIsNotOffered) {
-    web::WebPlugin plugin({"javascript:alert(1)", {}});
-    const auto cfg = plugin.handle(get("/web/api/config"), "/api/config");
-    EXPECT_EQ(cfg.body.find("javascript"), std::string::npos);
 }
