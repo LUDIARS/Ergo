@@ -7,6 +7,7 @@
 4. 「開発サーバだけど Studio が Web サーバ化して CF Tunnel や Tailscale でアクセス出来るようになる感じね」(2026-11-24) → 別プログラムにしない (§B)
 5. 「アセット生成は Fg に移譲で Clio で管理」(2026-11-24) → 生成は Figmentum、管理は Clio。Ergo は依頼と表示だけ (§C)
 6. 「アセットは Pictor の Visus の単位でまとめてほしい」(2026-11-24) → 生成・管理・表示の単位を Visus にする (§C)
+7. 「外部から取り込んだものについては、Anatomia 同様に自動解析するようにして、Visus を作ってそれのリストを画像付きで表示するようにする。画像はモデル表示用の窓で撮影したキャプチャとする」(2026-11-24) → §C2
 
 前提: Ergo #4112 (fd1536e, 段 3) で Studio の UI は Tela の宣言 1 つになり、窓 (Tela GPU) とブラウザ (`/shell/`、Tela::Web) が
 同じ宣言を描く。HTTP / WS は Ergo 自前の `src/studio/net`。旧 tool は `tools/ergo` (Node + Electron、2026-11-06 削除、
@@ -103,12 +104,51 @@ neco (2026-11-24):「アセット生成は Fg に移譲で Clio で管理」。�
   - Ergo は Visus の `metadata` を解釈しない (Visus v2 と同じくホストに委ねる)。形の検証は Pictor の serializer に任せる。
 - 依頼と一覧の口 (API) は Figmentum と Clio の側で決める。Ergo はその口を使うプラグインを足すだけにする (Ergo のコアに分岐を書かない)。
 
+## C2. 取り込んだアセットの自動解析と、画像付きの Visus 一覧
+
+neco (2026-11-24) の指示 7。外から取り込んだもの (アセットストアの fbx・テクスチャ・アニメーションなど) は、Anatomia がコードを
+解析するのと同じく、取り込んだ時点で自動で解析し、Visus を作って、画像付きの一覧で見せる。
+
+### 流れ
+
+1. **取り込み**: プロフィールに「取り込み口」のフォルダ (`import`) を書く。そこに置かれたもの (と、Clio に外部のものとして登録されたもの) が対象。
+   Figmentum で生成したものは最初から Visus なので対象外。
+2. **解析 (自動・決定的)**: ファイルを読んで、モデルのパーツ (material slot 名)・マテリアル・テクスチャの参照・アニメーションのクリップ・
+   大きさ (外接箱) を取り出す。fbx の読み込みは Pictor のモデルの読み込みを使う (Ergo で別の読み込みを書かない)。
+   結果は解析の記録として保存し、元のファイルの sha256 が変わらなければ解析し直さない (Anatomia と同じ増分)。
+3. **Visus の作成**: 解析の結果から `<name>.visus.json` (Visus v2) を作る。`kind: model`、`asset` = 取り込んだ fbx、
+   `parts[]` = パーツごとに既定のシェーダ (`builtin:pbr`) と見つかったテクスチャ (`metadata.texture.*`)、
+   `metadata.animation.clips` = 同じ場所のアニメーション、`metadata.scale.target_height` は付けない (人が決める)。
+   名前は取り込んだファイル名から作り、同名があれば連番。作った Visus には `metadata.import.source` (元のパス) と
+   `metadata.import.sha256` を入れ、自動で作ったことが分かるようにする。人が直した Visus は自動で上書きしない。
+4. **撮影**: モデル表示用の窓で Visus を描き、その画面をキャプチャして一覧の画像にする (縮小した PNG、Visus ごとに 1 枚、
+   既定のカメラは外接箱に合わせた斜め上から)。窓は Pictor の描画をそのまま使う (Pictor の `VulkanContext` は
+   swapchain の読み出し用の設定を持つ)。Visus か元のファイルが変わったら撮り直す。
+5. **登録と表示**: Visus と画像を Clio に Visus 単位で登録する (§C)。Studio のアセット確認は Visus の一覧を画像付きで並べ、
+   選ぶと Visus の中身 (パーツ・シェーダ・テクスチャ・子) と、モデル表示用の窓での表示を出す。
+
+### 置き場所 (Ergo のコアに分岐を書かない)
+
+- 解析と Visus の作成は Studio のプラグイン (`asset_import`、新規) にする。今の `visus` プラグイン (探す・読む・保存) と
+  `assets` プラグイン (ファイルを見る) はそのまま使う。
+- モデル表示用の窓は、Studio の窓 (ランチャー) とは別の、Pictor で描く窓にする。Web 側からも撮影を頼めるように、
+  撮影の依頼と結果 (画像のパス) は API で受け渡す。拠点 (窓なし) では撮影できないので、画像は「未撮影」と出す。
+- 既存の `lookdev` の撮影の仕組み (`look.capture_request` / `look.capture_path`) はゲームの画面用。モデル表示用の窓は
+  ゲームを動かさずに Visus を 1 つずつ描く別物にする (lookdev の作りは参考にする)。
+
+### テスト
+
+- 解析: fbx からパーツ・テクスチャ・クリップを取り出す (小さなテスト用 fbx)、sha256 が同じなら解析し直さない、壊れたファイルは理由付きで飛ばす。
+- Visus の作成: 解析の結果から Visus v2 の形 (Pictor の serializer で読めること)、同名の連番、人が直した Visus を上書きしない。
+- 撮影: 撮影の依頼と結果の受け渡し (偽の窓で)、撮り直しの条件、窓なしでは「未撮影」。実際の画像の見た目は人の確認として残す。
+
 ## D. 段階
 
 1. ランチャー (A) と `IProfileSource`。Studio 単体で完結。
 2. Studio の Web サーバ化: Portus の HTTP/WS に移し、手元と遠隔の 2 つの口、Host とヘッダーでの入口の確認、ランチャーからの起動・停止・URL 表示、`--headless --project`。
 3. 機能の載せ替え: assets → play → vfx / particle → tuning / variable / log / services / git。
 4. 生成 (C): Figmentum の依頼の口と Clio の一覧の口が決まってから、それを使うプラグイン (生成画面・Clio のアセット確認)。
+4b. 取り込み (C2): 解析と Visus の自動作成、モデル表示用の窓と撮影、画像付きの一覧。
 5. 撤去: Studio 窓のタブ群、Ergo 自前の `src/studio/net` (Portus に置き換え後)、web プラグインの HTML (Actio 80ae489f)。
 
 ## 決まったこと
