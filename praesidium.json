@@ -34,7 +34,7 @@
         "VK_USE_PLATFORM_WIN32_KHR=1"
       ],
       "packages": [
-        "pictor",
+        "pictor-e1fdad1",
         "odeum-lorica-5e8281b",
         "vulkan"
       ]
@@ -64,7 +64,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor"
+        "pictor-e1fdad1"
       ]
     },
     {
@@ -78,7 +78,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor"
+        "pictor-e1fdad1"
       ]
     },
     {
@@ -92,7 +92,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor"
+        "pictor-e1fdad1"
       ]
     },
     {
@@ -120,8 +120,15 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor"
+        "pictor-e1fdad1"
       ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/static_model_source.cpp",
+      "standard": "c++17",
+      "includes": ["include"],
+      "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN"],
+      "packages": ["pictor-e1fdad1"]
     },
     {
       "file": "tools/studio/plugins/asset_import/preview_mesh.cpp",
@@ -134,7 +141,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor",
+        "pictor-e1fdad1",
         "odeum-lorica-5e8281b"
       ]
     },
@@ -149,7 +156,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor",
+        "pictor-e1fdad1",
         "glfw"
       ]
     },
@@ -166,7 +173,7 @@
         "VK_USE_PLATFORM_WIN32_KHR=1"
       ],
       "packages": [
-        "pictor",
+        "pictor-e1fdad1",
         "vulkan",
         "glfw"
       ]
@@ -193,7 +200,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor"
+        "pictor-e1fdad1"
       ]
     },
     {

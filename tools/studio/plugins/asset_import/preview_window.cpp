@@ -79,7 +79,7 @@ void PreviewWindow::pump(const fs::path& project_root) {
         FolderAssetCatalog catalog(catalog_root);
         if (request->capture && !request->explicit_request &&
             has_capture(catalog.find(request->name), request->revision)) return;
-        const auto mesh = preview_mesh(source_format(request->source), *model);
+        const auto mesh = preview_mesh(request->source, *model);
         if (!state_->window) state_->window = std::make_unique<Window>();
         const auto png = draw_preview(state_->window->vk, state_->shaders, mesh, request->capture);
         if (request->capture) store_capture(catalog, *request, png);

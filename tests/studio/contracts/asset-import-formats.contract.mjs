@@ -4,11 +4,10 @@ export default {
     return (result.status === 0 && [
       'AssetImport.SourceFamilies',
       'AssetImport.SourcePriority',
-      'AssetImport.UnsupportedPictorLoaders',
     ].every((name) => {
       const passed = '[       OK ] ' + name;
       return lines.some((line) => line === passed || line.startsWith(passed + ' ('));
     }))
-      || 'Source families, selection and unsupported-loader regressions must execute and pass';
+      || 'Source families and selection regressions must execute and pass';
   },
 };

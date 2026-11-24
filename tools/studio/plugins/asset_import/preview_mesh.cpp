@@ -1,5 +1,6 @@
 #include "preview_mesh.h"
 #include "model_analysis.h"
+#include "static_model_source.h"
 
 #include "pictor/animation/fbx_importer.h"
 #include "pictor/core/transform_math.h"
@@ -35,9 +36,30 @@ struct Triangle {
     float3 color;
 };
 
+constexpr std::size_t kMaxPreviewTriangles = 500000;
+
+Triangle lit_triangle(const std::array<float3, 3>& points, const float3& color) {
+    const auto normal = cross(points[1] - points[0], points[2] - points[0]);
+    const auto len = std::sqrt(dot(normal, normal));
+    const auto diffuse = len > 0 && std::isfinite(len)
+        ? std::abs(dot(normal, {-.4f, -.4f, .8246f})) / len : 0.0;
+    return {points, color * static_cast<float>(.25 + .75 * diffuse)};
+}
+
+void charge_triangle(lorica::input_budget& budget) {
+    if (!budget.consume(sizeof(Triangle), 1, 1)) throw std::runtime_error("preview triangle limit exceeded");
+}
+
+float3 preview_point(const float3& position) {
+    const auto projected = camera_space(position);
+    if (!std::isfinite(projected.x) || !std::isfinite(projected.y) || !std::isfinite(projected.z)) {
+        throw std::runtime_error("non-finite model preview vertex");
+    }
+    return projected;
+}
+
 std::vector<Triangle> triangles(const pictor::FBXScene& scene) {
-    constexpr std::size_t max_triangles = 500000;
-    lorica::input_budget budget({max_triangles * sizeof(Triangle), max_triangles, max_triangles, 1});
+    lorica::input_budget budget({kMaxPreviewTriangles * sizeof(Triangle), kMaxPreviewTriangles, kMaxPreviewTriangles, 1});
     std::vector<Triangle> result;
     for (const auto id : scene.ids_of_type(pictor::FBXObjectType::GEOMETRY)) {
         const auto* mesh = scene.triangulate(id);
@@ -55,8 +77,8 @@ std::vector<Triangle> triangles(const pictor::FBXScene& scene) {
             break;
         }
         for (std::size_t i = 0; i < mesh->indices.size() / 3; ++i) {
-            if (!budget.consume(sizeof(Triangle), 1, 1)) throw std::runtime_error("preview triangle limit exceeded");
-            Triangle tri{};
+            charge_triangle(budget);
+            std::array<float3, 3> points{};
             for (std::size_t k = 0; k < 3; ++k) {
                 const auto index = mesh->indices[i*3 + k];
                 if (index < 0 || static_cast<std::size_t>(index) >= mesh->positions.size()) {
@@ -64,37 +86,52 @@ std::vector<Triangle> triangles(const pictor::FBXScene& scene) {
                 }
                 const auto p = pictor::transform_math::transform_point(transform,
                     mesh->positions[static_cast<std::size_t>(index)]);
-                auto v = camera_space({p.x, p.y, p.z});
-                if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z)) {
-                    throw std::runtime_error("non-finite FBX preview vertex");
-                }
-                tri.points[k] = v;
+                points[k] = preview_point({p.x, p.y, p.z});
             }
-            const auto normal = cross(tri.points[1] - tri.points[0], tri.points[2] - tri.points[0]);
-            const auto len = std::sqrt(dot(normal, normal));
-            const auto diffuse = len > 0 && std::isfinite(len)
-                ? std::abs(dot(normal, {-.4f, -.4f, .8246f})) / len : 0.0;
             auto color = float3{.68f, .74f, .85f};
             if (i < mesh->material_per_tri.size()) {
                 const auto slot = static_cast<std::size_t>(mesh->material_per_tri[i]);
                 if (slot < materials.size()) color = materials[slot]->diffuse;
             }
-            tri.color = color * static_cast<float>(.25 + .75 * diffuse);
-            result.push_back(tri);
+            result.push_back(lit_triangle(points, color));
         }
     }
     return result;
 }
 
-} // namespace
+std::vector<Triangle> triangles(const pictor::ModelImportResult& model) {
+    lorica::input_budget budget({kMaxPreviewTriangles * sizeof(Triangle), kMaxPreviewTriangles, kMaxPreviewTriangles, 1});
+    std::vector<Triangle> result;
+    for (const auto& part : model.parts) {
+        const auto& rgba = model.materials.at(part.material_slot).base_color;
+        const float3 color{rgba[0], rgba[1], rgba[2]};
+        for (std::size_t i = 0; i < part.indices.size() / 3; ++i) {
+            charge_triangle(budget);
+            std::array<float3, 3> points{};
+            for (std::size_t k = 0; k < 3; ++k) {
+                points[k] = preview_point(part.vertices.at(part.indices[i * 3 + k]).position);
+            }
+            result.push_back(lit_triangle(points, color));
+        }
+    }
+    return result;
+}
 
-std::vector<PreviewVertex> preview_mesh(SourceFormat format, const std::string& bytes) {
-    if (const auto* issue = model_loader_issue(format)) throw std::runtime_error(issue);
+std::vector<Triangle> fbx_triangles(const std::string& bytes) {
     const pictor::FBXImporter loader;
     const auto model = loader.import_memory(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
     if (!model.success || !model.scene) throw std::runtime_error(model.error_message);
-    auto mesh = triangles(*model.scene);
-    if (mesh.empty()) throw std::runtime_error("FBX has no drawable triangles");
+    return triangles(*model.scene);
+}
+
+} // namespace
+
+std::vector<PreviewVertex> preview_mesh(const std::filesystem::path& source, const std::string& bytes) {
+    const auto format = source_format(source);
+    if (const auto* issue = model_loader_issue(format)) throw std::runtime_error(issue);
+    const auto mesh = format == SourceFormat::Fbx
+        ? fbx_triangles(bytes) : triangles(load_static_model(source, bytes));
+    if (mesh.empty()) throw std::runtime_error("model has no drawable triangles");
     auto low = mesh.front().points[0];
     auto high = low;
     for (const auto& triangle : mesh) for (const auto& p : triangle.points) {

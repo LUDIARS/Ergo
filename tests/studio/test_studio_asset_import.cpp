@@ -202,7 +202,7 @@ TEST_F(AssetImport, SourceFamilies) {
     ASSERT_EQ(sources->size(), 2u);
     EXPECT_EQ(sources->at(0).as_string(), obj.generic_u8string());
     EXPECT_EQ(sources->at(1).as_string(), blend.generic_u8string());
-    EXPECT_FALSE(preview_mesh(source_format(fbx), kFbx).empty());
+    EXPECT_FALSE(preview_mesh(fbx, kFbx).empty());
 }
 
 TEST_F(AssetImport, SourcePriority) {
@@ -240,18 +240,23 @@ TEST_F(AssetImport, SourcePriority) {
     EXPECT_EQ(selected.size(), 4u);
 }
 
-TEST_F(AssetImport, UnsupportedPictorLoaders) {
+TEST_F(AssetImport, PictorModelLoaders) {
     const auto obj = inbox / "Wavefront.obj";
     write(obj, "mtllib Wavefront.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl Paint\nf 1 2 3\n");
     write(inbox / "Wavefront.mtl", "newmtl Paint\nKd 0 1 0\nmap_Kd paint.png\n");
+    write(inbox / "paint.png", "fixture");
     const auto gltf = inbox / "Scene.gltf";
     const std::string gltf_scene = R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],)"
-        R"("nodes":[{"mesh":0}],"meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],)"
+        R"("nodes":[{"mesh":0}],"meshes":[{"primitives":[{"attributes":{"POSITION":0},"material":0}]}],)"
+        R"("materials":[{"name":"Paint","pbrMetallicRoughness":{"baseColorFactor":[0,1,0,1],"baseColorTexture":{"index":0}}}],)"
+        R"("textures":[{"source":0}],"images":[{"uri":"paint.png"}],)"
         R"("accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]}],)"
         R"("bufferViews":[{"buffer":0,"byteLength":36}],"buffers":[{"byteLength":36)";
     write(gltf, gltf_scene + R"(,"uri":"data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA"}]})");
     const auto glb = inbox / "Hero.glb";
     std::string glb_json = gltf_scene + "}]}";
+    glb_json.replace(glb_json.find("paint.png"), sizeof("paint.png") - 1,
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jA6sAAAAASUVORK5CYII=");
     while (glb_json.size() % 4) glb_json += ' ';
     std::string glb_bytes = "glTF";
     const auto append_u32 = [&](std::uint32_t value) {
@@ -269,25 +274,46 @@ TEST_F(AssetImport, UnsupportedPictorLoaders) {
     write(glb, glb_bytes);
     write(inbox / "Hero.fbx", kFbx);
     FolderAssetCatalog catalog(root / ".ergo-visus");
-    const auto issues = import_assets(inbox, catalog);
-    ASSERT_EQ(issues.size(), 3u);
-    for (const auto& issue : issues) {
-        EXPECT_NE(issue.reason.find("Pictor"), std::string::npos);
-        EXPECT_NE(issue.reason.find("loader"), std::string::npos);
-    }
-    EXPECT_EQ(issues.front().source, glb.u8string());
-    EXPECT_TRUE(catalog.entries().empty());
+    ASSERT_TRUE(import_assets(inbox, catalog).empty());
+    ASSERT_EQ(catalog.entries().size(), 3u);
     for (const auto& file : {obj, gltf, glb}) {
+        const auto entry = catalog.find(file.stem().u8string());
+        const auto json = read_bounded(entry.visus_path(), kMaxVisusBytes);
+        ASSERT_TRUE(json);
+        pictor::VisusDesc desc;
+        ASSERT_TRUE(pictor::from_visus_json(*json, desc));
+        EXPECT_EQ((entry.directory / fs::u8path(desc.asset)).lexically_normal(), file);
+        ASSERT_EQ(desc.parts.size(), 1u);
+        EXPECT_EQ(desc.parts[0].part, "Paint");
+        EXPECT_TRUE(desc.parts[0].shader.is_default_builtin());
+        const auto texture = desc.parts[0].metadata.get_string("texture.diffuse");
+        ASSERT_TRUE(texture);
+        if (file == glb) {
+            EXPECT_EQ(*texture, "embedded:image/0");
+        } else {
+            EXPECT_EQ((entry.directory / fs::u8path(*texture)).lexically_normal(), inbox / "paint.png");
+        }
+
         const auto bytes = read_bounded(file, kMaxModelBytes);
         ASSERT_TRUE(bytes);
-        std::string reason;
-        try {
-            preview_mesh(source_format(file), *bytes);
-        } catch (const std::runtime_error& error) {
-            reason = error.what();
-        }
-        EXPECT_NE(reason.find("Pictor"), std::string::npos);
+        const auto mesh = preview_mesh(file, *bytes);
+        ASSERT_EQ(mesh.size(), 3u);
+        EXPECT_EQ(mesh.front().color.x, 0);
+        EXPECT_GT(mesh.front().color.y, 0);
+        EXPECT_EQ(mesh.front().color.z, 0);
     }
+}
+
+TEST_F(AssetImport, BrokenPreferredModel) {
+    const auto glb = inbox / "Hero.glb";
+    write(glb, "invalid GLB");
+    write(inbox / "Hero.fbx", kFbx);
+    FolderAssetCatalog catalog(root / ".ergo-visus");
+    const auto issues = import_assets(inbox, catalog);
+    ASSERT_EQ(issues.size(), 1u);
+    EXPECT_EQ(issues.front().source, glb.u8string());
+    EXPECT_FALSE(issues.front().reason.empty());
+    EXPECT_TRUE(catalog.entries().empty());
 }
 
 } // namespace

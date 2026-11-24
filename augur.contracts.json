@@ -5,8 +5,17 @@
   "importFrom": "../../contracts/contract-runtime.mjs",
   "contracts": [
     {
+      "id": "C-17",
+      "criterion": "C-17 verifyPictorModelImport(executable): OBJ+MTL・glTF・GLB で Visus とテクスチャ参照が生成され、プレビュー用の三角形を作れる",
+      "symbol": "verifyPictorModelImport",
+      "file": "tests/studio/verify_asset_import.mjs",
+      "module": "tests/studio/contracts/pictor-model-import.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
       "id": "C-16",
-      "criterion": "C-16 verifyAssetImportFormats(executable): 同名の組を優先順位で選び、代替素材を Visus に記録し、未対応の形式を理由付きで飛ばす",
+      "criterion": "C-16 verifyAssetImportFormats(executable): 同名の組を優先順位で選び、代替素材と .blend を Visus に記録する",
       "symbol": "verifyAssetImportFormats",
       "file": "tests/studio/verify_asset_import.mjs",
       "module": "tests/studio/contracts/asset-import-formats.contract.mjs",

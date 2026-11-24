@@ -27,10 +27,13 @@ pictor::VisusDesc definition(const CatalogEntry& entry, const fs::path& source, 
     desc.kind = pictor::VisusKind::MODEL;
     desc.asset = path_from(entry.directory, source);
     desc.parts = std::move(analysis.parts);
+    const auto format = source_format(source);
     for (auto& part : desc.parts) {
         std::vector<std::pair<std::string, std::string>> textures;
         for (const auto& [key, value] : part.metadata) {
             if (key.compare(0, 8, "texture.") != 0) continue;
+            if ((format == SourceFormat::Gltf || format == SourceFormat::Glb) &&
+                value.as_string().compare(0, 15, "embedded:image/") == 0) continue;
             const auto requested = fs::u8path(value.as_string());
             const auto relative = requested.is_absolute() ? requested.filename() : requested;
             auto path = (source.parent_path() / relative).lexically_normal();

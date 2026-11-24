@@ -1,4 +1,5 @@
 #include "model_analysis.h"
+#include "static_model_source.h"
 
 #include "pictor/animation/fbx_importer.h"
 
@@ -18,14 +19,40 @@ std::string texture_slot(const std::string& channel) {
     return channel;
 }
 
+ModelAnalysis analyze_static(const pictor::ModelImportResult& model) {
+    ModelAnalysis analysis;
+    const auto& bounds = model.bounds;
+    analysis.minimum = {bounds.min.x, bounds.min.y, bounds.min.z};
+    analysis.maximum = {bounds.max.x, bounds.max.y, bounds.max.z};
+    std::map<std::string, pictor::VisusPart> parts;
+    for (const auto& mesh : model.parts) {
+        const auto& material = model.materials.at(mesh.material_slot);
+        auto [entry, added] = parts.try_emplace(material.name);
+        if (!added) continue;
+        auto& part = entry->second;
+        part.part = material.name;
+        const auto add_texture = [&](const char* slot, const std::optional<std::size_t>& index) {
+            if (index) {
+                part.metadata.set(std::string(pictor::visus_keys::kTexturePrefix) + slot,
+                                  model.textures.at(*index).reference);
+            }
+        };
+        add_texture("diffuse", material.base_color_texture);
+        add_texture("normal", material.bump_texture);
+        add_texture("specular", material.specular_texture);
+    }
+    for (auto& entry : parts) analysis.parts.push_back(std::move(entry.second));
+    return analysis;
+}
+
 } // namespace
 
 const char* model_loader_issue(SourceFormat format) {
     switch (format) {
-    case SourceFormat::Fbx: return nullptr;
-    case SourceFormat::Obj: return "Pictor does not expose an OBJ/MTL model loader";
-    case SourceFormat::Gltf: return "Pictor does not expose a glTF model loader";
-    case SourceFormat::Glb: return "Pictor does not expose a GLB model loader";
+    case SourceFormat::Fbx:
+    case SourceFormat::Obj:
+    case SourceFormat::Gltf:
+    case SourceFormat::Glb: return nullptr;
     case SourceFormat::Blend: return "Blender files are alternate import sources only";
     case SourceFormat::Unknown: return "unrecognized model source format";
     }
@@ -33,8 +60,10 @@ const char* model_loader_issue(SourceFormat format) {
 }
 
 ModelAnalysis analyze_model(const std::filesystem::path& source, const std::string& bytes) {
-    if (const auto* issue = model_loader_issue(source_format(source))) throw std::runtime_error(issue);
-    return analyze_fbx(bytes);
+    const auto format = source_format(source);
+    if (const auto* issue = model_loader_issue(format)) throw std::runtime_error(issue);
+    if (format == SourceFormat::Fbx) return analyze_fbx(bytes);
+    return analyze_static(load_static_model(source, bytes));
 }
 
 ModelAnalysis analyze_fbx(const std::string& bytes) {

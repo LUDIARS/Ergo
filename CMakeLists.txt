@@ -1496,6 +1496,7 @@ if(ERGO_BUILD_STUDIO)
             tools/studio/plugins/asset_import/capture_request.cpp
             tools/studio/plugins/asset_import/import_assets.cpp
             tools/studio/plugins/asset_import/model_analysis.cpp
+            tools/studio/plugins/asset_import/static_model_source.cpp
             tools/studio/plugins/asset_import/preview_mesh.cpp
             tools/studio/plugins/asset_import/source_family.cpp)
         target_link_libraries(ergo_studio_plugins PRIVATE pictor Lorica::boundary)

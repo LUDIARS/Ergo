@@ -6,7 +6,7 @@
       "code": "Pc",
       "group": "render",
       "repository": "https://github.com/LUDIARS/Pictor.git",
-      "rev": "625d83d61c90c30ceed3fab2bd2e11a7edf8d39f",
+      "rev": "e1fdad19db3ecdce363393f17928f0d84ba97692",
       "expect_tag": "v2.2.0",
       "platforms": ["desktop", "android", "ios", "emscripten"],
       "cmake": {
