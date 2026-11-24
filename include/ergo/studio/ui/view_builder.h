@@ -75,7 +75,7 @@ public:
     void muted(const std::string& text);
     /// One line per "\n"; long lines are not wrapped (a scroll view clips them).
     void paragraph(const std::string& text);
-    void button(const std::string& text, ClickFn on_click, bool primary = false);
+    void button(const std::string& text, ClickFn on_click, bool primary = false, bool local_only = false);
     /// A key / value line ("clients: 2").
     void field(const std::string& key, const std::string& value, const ui_kit::Color* value_color = nullptr);
     /// Coloured dot + label (health).

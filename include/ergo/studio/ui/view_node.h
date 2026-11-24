@@ -49,6 +49,7 @@ struct ViewNode {
     int           lines     = 1;   ///< Field rows
 
     bool primary   = false;   ///< Button
+    bool local_only = false;  ///< Button action is unavailable on published screens
     bool selected  = false;   ///< ListItem
     bool ok        = false;   ///< Status
     bool multiline = false;   ///< Field: Enter inserts a newline

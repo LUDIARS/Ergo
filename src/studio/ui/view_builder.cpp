@@ -140,12 +140,13 @@ void ViewBuilder::paragraph(const std::string& text) {
     }
 }
 
-void ViewBuilder::button(const std::string& text, ClickFn on_click, bool primary) {
+void ViewBuilder::button(const std::string& text, ClickFn on_click, bool primary, bool local_only) {
     ViewNode b;
     b.kind     = ViewKind::Button;
     b.name     = next_name("button");
     b.text     = text;
     b.primary  = primary;
+    b.local_only = local_only;
     b.on_click = std::move(on_click);
     add(std::move(b));
 }

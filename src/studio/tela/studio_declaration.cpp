@@ -107,8 +107,8 @@ void StudioDeclaration::rebuild() {
     }
     full_      = {};
     published_ = {};
-    declare(full_, tabs, body, false);
-    declare(published_, tabs, body, loopback_only(active_plugin()));
+    declare(full_, tabs, body, false, false);
+    declare(published_, tabs, body, loopback_only(active_plugin()), true);
     if (const auto project = launcher_ ? launcher_->project().current() : std::nullopt) {
         ui::ViewNode band;
         {
@@ -156,10 +156,10 @@ void StudioDeclaration::declare_band(::tela::Document& doc, const ui::ViewNode& 
 }
 
 void StudioDeclaration::declare(::tela::Document& doc, const ui::ViewNode& tabs, const ui::ViewNode& body,
-                                bool locked) {
+                                bool locked, bool published) {
     const auto touched = [this] { touch(); };
     const EmitOptions nav{measure_, theme_, true, touched};
-    const EmitOptions content{measure_, theme_, !locked, touched};
+    const EmitOptions content{measure_, theme_, !locked, touched, published};
 
     const float top = launcher_ != nullptr ? kBandHeight : 0;
     ::tela::Layout side;

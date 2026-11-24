@@ -1,5 +1,5 @@
 {
   "service": "ergo",
-  "include": ["tests/packages/verify_git_remote_source.mjs", "tests/packages/verify_package_cli_process.mjs", "tests/studio/verify_entrance.mjs", "tests/studio/verify_web_server.mjs", "tests/studio/verify_dev_server.mjs", "tests/studio/verify_served_profile.mjs", "tests/studio/verify_launcher_window.mjs", "tests/studio/verify_tela_launcher.mjs", "tests/studio/verify_start_arguments.mjs"],
+  "include": ["tests/packages/verify_git_remote_source.mjs", "tests/packages/verify_package_cli_process.mjs", "tests/studio/verify_entrance.mjs", "tests/studio/verify_web_server.mjs", "tests/studio/verify_dev_server.mjs", "tests/studio/verify_served_profile.mjs", "tests/studio/verify_launcher_window.mjs", "tests/studio/verify_tela_launcher.mjs", "tests/studio/verify_start_arguments.mjs", "tests/studio/verify_asset_import.mjs"],
   "rules": { "contract-wrap": true }
 }

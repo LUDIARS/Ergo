@@ -6,6 +6,7 @@
 #include "ergo/studio/tela/screen_hub.h"
 
 #include <atomic>
+#include <functional>
 #include <string>
 
 namespace ergo::studio::tela_shell {
@@ -16,6 +17,8 @@ struct TelaWindowConfig {
     int         height = 800;
     std::string font_path;    ///< TrueType / OpenType file
     std::string shader_dir;   ///< holds ui_widget.vert.spv / ui_widget.frag.spv
+    std::function<void()> on_frame;
+    std::function<void()> before_close;
 };
 
 /// Opens the window and runs the UI loop until the window closes or `stop`

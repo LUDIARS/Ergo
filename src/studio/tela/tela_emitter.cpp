@@ -132,6 +132,7 @@ private:
         switch (v.kind) {
             case ViewKind::Text: text(v, id, w); return;
             case ViewKind::Button: {
+                if (o_.published && v.local_only) return;
                 ::tela::Layout l;
                 l.width   = w;
                 l.padding = kButtonPad;

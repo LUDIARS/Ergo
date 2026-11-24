@@ -158,6 +158,15 @@ std::optional<WorkspaceProfile> parse_workspace_profile(const std::string& text,
             p.assets.push_back({label != nullptr && label->is_string() ? label->as_string() : path->as_string(), *d});
         }
     }
+    if (const auto* import = field(*json, "import")) {
+        if (!import->is_string() || import->as_string().empty()) {
+            err = "\"import\" must be a nonempty folder path";
+            return std::nullopt;
+        }
+        const auto dir = resolve(p.root, import->as_string(), env, err);
+        if (!dir) return std::nullopt;
+        p.import_dir = *dir;
+    }
     if (const auto* layouts = field(*json, "tuningTemplates"); layouts && layouts->is_object())
         p.tuning_templates = deep_copy(*layouts);
     if (const JsonValue* play = field(*json, "play"); play != nullptr) p.play = deep_copy(*play);

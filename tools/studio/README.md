@@ -30,6 +30,7 @@ Default port: **5170** (override with `PORT=...`).
 | `http://localhost:5170/tuning/`          | Every value a game publishes through `ergo_bind`, and named versions of them (`spec/feature/tool/game-ops.md`) |
 | `http://localhost:5170/git/`             | The profile's repositories: status, log, branches, commit, pull, push (mutations from this machine only) |
 | `http://localhost:5170/assets/`          | Read-only list of the profile's asset folders, image and text preview (`spec/feature/tool/web.md`) |
+| `http://localhost:5170/asset_import/api/list` | プロフィールの `import` にある FBX を Visus 単位で一覧する。画像と詳細は `/shell/` の「Visus 一覧」タブで確認する。 |
 | `http://localhost:5170/web/`             | **Browser page** of the Studio: assets, lighting, tuning, game (services + remote play). Published through Cloudflare Access (`spec/feature/tool/web.md`) |
 | `http://localhost:5170/play/`            | Build, run and stop the profiles' games; WebRTC video and input through Odeum's `odeum_remote_play` (`spec/feature/tool/play.md`) |
 | `http://localhost:5170/lesson/`          | Link to an odeum-lesson class: step checks and demo switches over the game's variables (`spec/feature/tool/lesson.md`) |

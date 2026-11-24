@@ -11,12 +11,13 @@ struct LocalOnly {
 };
 
 // Keep in step with mutation_guard's users and LauncherRoutes (spec/feature/tool/ergo.md).
-constexpr std::array<LocalOnly, 5> kLocalOnly{{
+constexpr std::array<LocalOnly, 6> kLocalOnly{{
     {"/api/launcher/add", false},
     {"/api/launcher/remove", false},
     {"/studio", true},
     {"/lesson", true},
     {"/git", true},
+    {"/asset_import", true},
 }};
 
 bool reading(const std::string& method) { return method == "GET" || method == "HEAD" || method == "OPTIONS"; }

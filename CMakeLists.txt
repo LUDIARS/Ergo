@@ -1451,6 +1451,16 @@ if(ERGO_BUILD_STUDIO)
     else()
         target_sources(ergo_studio_plugins PRIVATE tools/studio/plugins/play/remote_play_unavailable.cpp)
     endif()
+    if(TARGET pictor AND TARGET Lorica::boundary)
+        target_sources(ergo_studio_plugins PRIVATE
+            tools/studio/plugins/asset_import/asset_catalog.cpp
+            tools/studio/plugins/asset_import/asset_import_plugin.cpp
+            tools/studio/plugins/asset_import/capture_request.cpp
+            tools/studio/plugins/asset_import/import_assets.cpp
+            tools/studio/plugins/asset_import/model_analysis.cpp)
+        target_link_libraries(ergo_studio_plugins PRIVATE pictor Lorica::boundary)
+        target_compile_definitions(ergo_studio_plugins PUBLIC ERGO_STUDIO_HAS_ASSET_IMPORT=1)
+    endif()
     if(MSVC)
         target_compile_options(ergo_studio_plugins PRIVATE /utf-8)
     endif()
@@ -1480,12 +1490,19 @@ if(ERGO_BUILD_STUDIO)
             target_compile_options(test_studio_plugins PRIVATE /utf-8)
         endif()
         add_test(NAME test_studio_plugins COMMAND test_studio_plugins)
+        if(TARGET pictor AND TARGET Lorica::boundary)
+            add_executable(test_studio_asset_import tests/studio/test_studio_asset_import.cpp)
+            target_link_libraries(test_studio_asset_import PRIVATE ergo_studio_plugins ergo_studio_ingress
+                ergo_gtest_main pictor)
+            add_test(NAME test_studio_asset_import COMMAND test_studio_asset_import)
+        endif()
     endif()
 
     # ergo_studio_views : native tabs drawn from each plugin's own HTTP API (no GPU)
     if(TARGET ergo_studio_ui)
         add_library(ergo_studio_views STATIC
             tools/studio/views/api_view.cpp
+            tools/studio/views/asset_import_view.cpp
             tools/studio/views/assets_view.cpp
             tools/studio/views/explorer_view.cpp
             tools/studio/views/git_view.cpp
@@ -2511,6 +2528,34 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
     if(TARGET ergo_studio_tela_window)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_tela_window)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_TELA_WINDOW=1)
+        if(TARGET Lorica::boundary)
+            add_library(ergo_studio_asset_preview STATIC
+                tools/studio/plugins/asset_import/preview_gpu.cpp
+                tools/studio/plugins/asset_import/preview_mesh.cpp
+                tools/studio/plugins/asset_import/preview_surface.cpp
+                tools/studio/plugins/asset_import/preview_window.cpp
+                src/custos/png_writer.cpp)
+            target_include_directories(ergo_studio_asset_preview PRIVATE include src/custos)
+            target_compile_definitions(ergo_studio_asset_preview PRIVATE NOMINMAX)
+            target_link_libraries(ergo_studio_asset_preview PRIVATE pictor glfw Lorica::boundary ergo_studio_plugins)
+            if(MSVC)
+                target_compile_options(ergo_studio_asset_preview PRIVATE /utf-8)
+            endif()
+            target_link_libraries(ergo_studio PRIVATE ergo_studio_asset_preview)
+            target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_ASSET_PREVIEW=1)
+            set(_asset_preview_spv)
+            foreach(_stage vert frag)
+                set(_in "${CMAKE_CURRENT_SOURCE_DIR}/tools/studio/plugins/asset_import/asset_preview.${_stage}")
+                set(_out "${ERGO_STUDIO_OUT}/shaders/asset_preview.${_stage}.spv")
+                add_custom_command(OUTPUT "${_out}"
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${ERGO_STUDIO_OUT}/shaders"
+                    COMMAND "${ERGO_GLSLC}" "${_in}" -o "${_out}"
+                    DEPENDS "${_in}" VERBATIM)
+                list(APPEND _asset_preview_spv "${_out}")
+            endforeach()
+            add_custom_target(ergo_studio_asset_preview_shaders DEPENDS ${_asset_preview_spv})
+            add_dependencies(ergo_studio ergo_studio_asset_preview_shaders)
+        endif()
     endif()
     if(MSVC)
         target_compile_options(ergo_studio PRIVATE /utf-8)

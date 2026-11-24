@@ -23,6 +23,10 @@ int run_tela_window(ScreenHub& hub, const TelaWindowConfig& cfg, const std::atom
         err = "window could not be created (GLFW)";
         return 3;
     }
+    struct CloseCallback {
+        const std::function<void()>& callback;
+        ~CloseCallback() { if (callback) callback(); }
+    } before_close{cfg.before_close};
     pictor::VulkanContext vk;
     if (!vk.initialize(&surface)) {
         err = "Vulkan could not start: " + vk.init_result().detail;
@@ -60,6 +64,7 @@ int run_tela_window(ScreenHub& hub, const TelaWindowConfig& cfg, const std::atom
                 last            = now;
                 redraw          = input.synchronize() || redraw;
                 hub.pump(dt);
+                if (cfg.on_frame) cfg.on_frame();
                 if (!runtime.viewport().visible || (!runtime.needs_frame() && !redraw)) continue;
                 render::FrameContext frame;
                 frame.dt     = dt;

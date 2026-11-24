@@ -1,6 +1,7 @@
 #include "view_registry.h"
 
 #include "assets_view.h"
+#include "asset_import_view.h"
 #include "explorer_view.h"
 #include "git_view.h"
 #include "log_view.h"
@@ -23,6 +24,7 @@ std::unique_ptr<host::IPluginView> make_view(host::IPlugin& plugin, const Plugin
     if (id == "tuning") return std::make_unique<TuningView>(plugin, find ? find("variable") : nullptr);
     if (id == "git") return std::make_unique<GitView>(plugin);
     if (id == "assets") return std::make_unique<AssetsView>(plugin);
+    if (id == "asset_import") return std::make_unique<AssetImportView>(plugin);
     if (id == "play") return std::make_unique<PlayView>(plugin);
     if (id == "lookdev") return std::make_unique<LookdevView>(plugin, find ? find("variable") : nullptr);
     if (id == "musa_thaleia") return std::make_unique<ThaleiaView>(plugin);

@@ -7,6 +7,9 @@
 #include "plugins/common/launcher_profiles.h"
 #include "plugins/common/profile_source.h"
 #include "plugins/studio/plugin_ledger.h"
+#ifdef ERGO_STUDIO_HAS_ASSET_PREVIEW
+#  include "plugins/asset_import/preview_window.h"
+#endif
 
 #include "ergo/studio/host/external_loader.h"
 #include "ergo/studio/host/plugin_host.h"
@@ -50,6 +53,14 @@ namespace {
 
 std::atomic<bool> g_stop{false};
 std::mutex        g_log_mtx;
+
+std::filesystem::path utf8_path(const std::string& text) {
+#ifdef __cpp_char8_t
+    return std::filesystem::path(std::u8string(text.begin(), text.end()));
+#else
+    return std::filesystem::u8path(text);
+#endif
+}
 
 void log_line(const std::string& level, const std::string& msg) {
     std::lock_guard<std::mutex> lk(g_log_mtx);
@@ -138,19 +149,28 @@ int main(int argc, char** argv) {
     const std::string pack_dirs = settings.studio.home.empty()
         ? settings.plugin_dirs
         : plugins::studio::plugin_dirs_with_ledger(settings.plugin_dirs,
-                                                   plugins::studio::read_ledger(std::filesystem::u8path(settings.studio.home)));
+                                                   plugins::studio::read_ledger(utf8_path(settings.studio.home)));
     // The launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A): nothing is open on start;
     // the game-ops plugins see only the project opened there.
-    const std::filesystem::path home = std::filesystem::u8path(settings.studio.home);
+    const std::filesystem::path home = utf8_path(settings.studio.home);
     project::OpenProject open_project;
     project::Launcher    launcher(project::ProjectCatalog(home.empty() ? home : home / "recent_projects.json"),
                                   open_project, plugins::launcher_deps(home, settings.plugin_dirs));
     if (!launcher.notice().empty()) log_line("warn", "[ergo] " + launcher.notice());
     const auto profiles = std::make_shared<plugins::OpenProjectProfiles>(open_project);
+    plugins::asset_import::RequestPreview request_preview;
+#ifdef ERGO_STUDIO_HAS_ASSET_PREVIEW
+    plugins::asset_import::PreviewWindow preview(utf8_path(settings.shader_dir), &log_line);
+    if (!settings.headless) {
+        request_preview = [&preview](plugins::asset_import::CaptureRequest request) {
+            return preview.request(std::move(request));
+        };
+    }
+#endif
 
     host::LoadResult loaded;
     try {
-        loaded = host::instantiate_plugins(app::builtin_plugins(settings, profiles),
+        loaded = host::instantiate_plugins(app::builtin_plugins(settings, profiles, std::move(request_preview)),
                                            host::load_external_factories(pack_dirs, &log_line), &log_line);
     } catch (const std::exception& e) {
         log_line("error", e.what());   // a built-in plugin is broken: a bug in this build
@@ -231,6 +251,13 @@ int main(int argc, char** argv) {
         tela_shell::TelaWindowConfig wc;
         wc.font_path  = settings.font_path;
         wc.shader_dir = settings.shader_dir;
+#ifdef ERGO_STUDIO_HAS_ASSET_PREVIEW
+        wc.on_frame = [&] {
+            const auto project = open_project.current();
+            preview.pump(project ? utf8_path(project->root) : std::filesystem::path{});
+        };
+        wc.before_close = [&] { preview.close(); };
+#endif
         try {
             code = tela_shell::run_tela_window(hub, wc, g_stop, err);
         } catch (const std::exception& e) {

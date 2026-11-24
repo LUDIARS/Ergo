@@ -79,7 +79,8 @@ private:
     void     rebuild_launcher();
     ui::ViewNode build_launcher_body(const ui::LauncherScreen& screen);
     uint64_t launcher_revision() const;
-    void     declare(::tela::Document& doc, const ui::ViewNode& tabs, const ui::ViewNode& body, bool locked);
+    void     declare(::tela::Document& doc, const ui::ViewNode& tabs, const ui::ViewNode& body,
+                     bool locked, bool published);
     void     declare_band(::tela::Document& doc, const ui::ViewNode& band);
     void     declare_launcher(::tela::Document& doc, const ui::ViewNode& body);
     uint64_t content_revision() const;

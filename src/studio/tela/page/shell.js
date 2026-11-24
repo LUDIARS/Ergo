@@ -13,6 +13,47 @@
   const note = document.getElementById('note');
   const wsBase = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host;
   const shell = { socket: null, view: null, retry: 0 };
+  const thumbnails = new Map();
+  const thumbnailStream = 'visus:/asset_import/api/thumbnail?name=';
+
+  function syncThumbnails(frame) {
+    const shown = new Set();
+    const canvasBox = canvas.getBoundingClientRect();
+    const stageBox = canvas.parentElement.getBoundingClientRect();
+    for (const e of frame.elements) {
+      if (e.kind !== 'video' || typeof e.stream !== 'string' ||
+          !e.stream.startsWith(thumbnailStream) || e.clip[2] <= 0 || e.clip[3] <= 0) continue;
+      shown.add(e.id);
+      let wrapper = thumbnails.get(e.id);
+      if (!wrapper) {
+        wrapper = document.createElement('div');
+        Object.assign(wrapper.style, { position: 'absolute', overflow: 'hidden', pointerEvents: 'none' });
+        const img = document.createElement('img');
+        Object.assign(img.style, { position: 'absolute', objectFit: 'contain' });
+        wrapper.appendChild(img);
+        canvas.parentElement.appendChild(wrapper);
+        thumbnails.set(e.id, wrapper);
+      }
+      const img = wrapper.firstChild;
+      const url = e.stream.slice('visus:'.length);
+      if (img.getAttribute('src') !== url) img.src = url;
+      img.alt = e.label || '';
+      Object.assign(wrapper.style, {
+        left: `${canvasBox.left - stageBox.left + e.clip[0]}px`,
+        top: `${canvasBox.top - stageBox.top + e.clip[1]}px`,
+        width: `${e.clip[2]}px`, height: `${e.clip[3]}px`,
+      });
+      Object.assign(img.style, {
+        left: `${e.bounds[0] - e.clip[0]}px`, top: `${e.bounds[1] - e.clip[1]}px`,
+        width: `${e.bounds[2]}px`, height: `${e.bounds[3]}px`,
+      });
+    }
+    for (const [id, wrapper] of thumbnails) {
+      if (shown.has(id)) continue;
+      wrapper.remove();
+      thumbnails.delete(id);
+    }
+  }
 
   function showNote(text) { note.textContent = text; note.hidden = !text; }
 
@@ -30,11 +71,15 @@
     socket.addEventListener('message', (ev) => {
       if (!shell.view) return;
       shell.view.receive(ev.data);
-      if (shell.view.frame) play.sync(shell.view.frame);
+      if (shell.view.frame) {
+        play.sync(shell.view.frame);
+        syncThumbnails(shell.view.frame);
+      }
     });
     socket.addEventListener('close', () => {
       showNote('Studio との接続が切れました。つなぎ直しています…');
       play.stop();
+      syncThumbnails({ elements: [] });
       shell.retry = Math.min(shell.retry + 1, 6);
       setTimeout(connect, 500 * shell.retry);
     });

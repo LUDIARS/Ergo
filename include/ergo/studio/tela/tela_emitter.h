@@ -24,6 +24,7 @@ struct EmitOptions {
     bool interactive = true;
     /// Runs after every action, edit or slider move (the declaration rebuilds).
     std::function<void()> touched;
+    bool published = false;
 };
 
 /// Declare the children of `tree` under the element being declared now.

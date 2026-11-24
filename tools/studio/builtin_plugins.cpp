@@ -1,5 +1,8 @@
 #include "builtin_plugins.h"
 
+#ifdef ERGO_STUDIO_HAS_ASSET_IMPORT
+#include "plugins/asset_import/asset_import_plugin.h"
+#endif
 #include "plugins/assets/assets_plugin.h"
 #include "plugins/git/git_plugin.h"
 #include "plugins/play/play_plugin.h"
@@ -32,7 +35,8 @@
 namespace ergo::studio::app {
 
 std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s,
-                                                 std::shared_ptr<const plugins::IProfileSource> profiles) {
+                                                 std::shared_ptr<const plugins::IProfileSource> profiles,
+                                                 [[maybe_unused]] plugins::asset_import::RequestPreview preview) {
     namespace p = ergo::studio::plugins;
     std::vector<host::PluginFactory> f;
     // The lesson plugin reads and sets the game's variables through the variable plugin.
@@ -54,6 +58,11 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s,
     });
     // The Studio in a browser (spec/feature/tool/web.md) and the asset list it shows.
     f.push_back([profiles](const host::LogFn& log) { return p::assets::make_assets_plugin(profiles, log); });
+#ifdef ERGO_STUDIO_HAS_ASSET_IMPORT
+    f.push_back([profiles, preview](const host::LogFn& log) {
+        return p::asset_import::make_asset_import_plugin(profiles, preview, log);
+    });
+#endif
     f.push_back([cfg = p::web::WebConfig{s.public_hosts}](const host::LogFn& log) {
         return p::web::make_web_plugin(cfg, log);
     });

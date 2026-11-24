@@ -21,6 +21,169 @@
       ]
     },
     {
+      "file": "tools/studio/plugins/asset_import/preview_gpu.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "src/custos"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "odeum-lorica-5e8281b",
+        "vulkan"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/asset_catalog.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "odeum-lorica-5e8281b"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/asset_import_plugin.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/capture_request.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/import_assets.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor",
+        "odeum-lorica-5e8281b"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/model_analysis.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/preview_mesh.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor",
+        "odeum-lorica-5e8281b"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/preview_surface.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor",
+        "glfw"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/preview_window.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "PICTOR_HAS_VULKAN=1",
+        "VK_USE_PLATFORM_WIN32_KHR=1"
+      ],
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw"
+      ]
+    },
+    {
+      "file": "tools/studio/views/asset_import_view.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_studio_asset_import.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio",
+        "third_party"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "pictor"
+      ]
+    },
+    {
       "file": "examples/compose_loop/main.cpp",
       "standard": "c++17",
       "includes": [
@@ -765,22 +928,31 @@
       ],
       "defines": [
         "NOMINMAX",
-        "WIN32_LEAN_AND_MEAN"
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_ASSET_IMPORT=1"
       ],
       "packages": []
     },
     {
       "file": "tools/studio/main.cpp",
-      "standard": "c++17",
+      "standard": "c++20",
       "includes": [
         "include",
         "tools/studio"
       ],
       "defines": [
         "NOMINMAX",
-        "WIN32_LEAN_AND_MEAN"
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_TELA=1",
+        "ERGO_STUDIO_HAS_TELA_WINDOW=1",
+        "ERGO_STUDIO_HAS_ASSET_PREVIEW=1"
       ],
-      "packages": []
+      "packages": [
+        "pictor",
+        "vulkan",
+        "glfw",
+        "tela-786c12c"
+      ]
     },
     {
       "file": "tools/studio/plugins/common/claude_cli.cpp",

@@ -26,6 +26,9 @@
   ],
   "membership": [
     {
+      "pathPattern": "^tools/studio/plugins/asset_import/[^/]+$"
+    },
+    {
       "pathPattern": "^tools/studio/(?:.*/)?[^/]+$"
     },
     {

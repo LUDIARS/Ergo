@@ -5,6 +5,15 @@
   "importFrom": "../../contracts/contract-runtime.mjs",
   "contracts": [
     {
+      "id": "C-12",
+      "criterion": "C-12 verifyAssetImport(executable): FBX の増分解析、Visus の生成と手編集の保持、撮影の受け渡し、窓なしでの未撮影を確認する",
+      "symbol": "verifyAssetImport",
+      "file": "tests/studio/verify_asset_import.mjs",
+      "module": "tests/studio/contracts/asset-import.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
       "id": "C-1",
       "criterion": "C-1 verifyGitRemoteSource(executable): 先頭ハイフンはプロセス呼び出しなしで未観測となり、通常の取得元はオプション終端後に渡される",
       "symbol": "verifyGitRemoteSource",
