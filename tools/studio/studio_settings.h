@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,8 +21,12 @@ constexpr uint16_t kDefaultPort = 5170;
 
 struct StudioSettings {
     std::string bind_host = "127.0.0.1";   ///< ERGO_HOST
-    uint16_t    port      = kDefaultPort;  ///< PORT
+    uint16_t    port      = kDefaultPort;  ///< PORT: the local gate (this machine)
+    /// --remote-port / ERGO_STUDIO_REMOTE_PORT: the remote gate (the tunnel / tailscale serve target); nullopt = off
+    std::optional<uint16_t>  remote_port;
     std::vector<std::string> public_hosts; ///< ERGO_STUDIO_PUBLIC_HOSTS (names served through Cloudflare Access)
+    std::vector<std::string> tailnet_hosts;///< ERGO_STUDIO_TAILNET_HOSTS (*.ts.net names served through tailscale serve)
+    std::string project;                   ///< --project <profile.json>: serve it from the start
     std::string user_home;                 ///< USERPROFILE (Windows) / HOME
     std::string plugin_dirs;               ///< ERGO_PLUGIN_DIR
     std::string visus_roots;               ///< VISUS_PROJECT_ROOTS
@@ -40,8 +45,9 @@ struct StudioSettings {
 };
 
 /// `exe_dir` is the directory of ergo_studio.exe. The command line accepts only
-/// --headless and --help / -h; anything else sets `error` (arguments are checked
-/// before the environment, so a typo is reported even when PORT is also bad).
+/// --headless, --project <path>, --remote-port <port> and --help / -h; anything
+/// else sets `error` (arguments are checked before the environment, so a typo is
+/// reported even when PORT is also bad). --remote-port wins over ERGO_STUDIO_REMOTE_PORT.
 StudioSettings read_settings(const EnvFn& env, const std::filesystem::path& exe_dir, int argc, char** argv);
 
 /// The --help text: every option read_settings accepts and every environment

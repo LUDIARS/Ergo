@@ -1057,8 +1057,11 @@ endif()
 
 # ---------------------------------------------------------------------------
 # Ergo Studio (native) — spec/plan/2026-11-05-ergo-studio-native.md
-#   ergo_studio_net  : loopback HTTP/1.1 + WebSocket server (no GPU)
-#   ergo_studio_host : plugin host on top of ergo_studio_net (no GPU)
+#   ergo_studio_net     : the HTTP / WebSocket contract types (and the old loopback server, still used by
+#                         the terpsichore plugin's own command server until stage 5)
+#   ergo_studio_ingress : the entrance check of the two gates and the loopback-only operations (no sockets)
+#   ergo_studio_host    : plugin host on top of the contract (no GPU)
+#   ergo_studio_web     : the Studio's web server on Portus C++ (cmake/ErgoStudioPortus.cmake)
 # ---------------------------------------------------------------------------
 if(ERGO_BUILD_STUDIO)
     add_library(ergo_studio_net STATIC
@@ -1086,6 +1089,26 @@ if(ERGO_BUILD_STUDIO)
             target_compile_options(test_studio_net PRIVATE /utf-8)
         endif()
         add_test(NAME test_studio_net COMMAND test_studio_net)
+    endif()
+
+    # ergo_studio_ingress : which requests each gate lets in, and what the remote gate refuses
+    # (spec/feature/tool/ergo.md "口と入口") — no sockets, no Portus
+    add_library(ergo_studio_ingress STATIC
+        src/studio/ingress/entrance.cpp
+        src/studio/ingress/remote_scope.cpp
+    )
+    target_include_directories(ergo_studio_ingress PUBLIC include)
+    target_link_libraries(ergo_studio_ingress PUBLIC ergo_studio_net)
+    if(MSVC)
+        target_compile_options(ergo_studio_ingress PRIVATE /utf-8)
+    endif()
+    if(ERGO_BUILD_TESTS)
+        add_executable(test_studio_ingress tests/studio/test_studio_ingress.cpp)
+        target_link_libraries(test_studio_ingress PRIVATE ergo_studio_ingress ergo_gtest_main)
+        if(MSVC)
+            target_compile_options(test_studio_ingress PRIVATE /utf-8)
+        endif()
+        add_test(NAME test_studio_ingress COMMAND test_studio_ingress)
     endif()
 
     # ergo_studio_host : plugin contract, loading, health, request routing (no GPU)
@@ -1132,9 +1155,10 @@ if(ERGO_BUILD_STUDIO)
     endif()
 
     # ergo_studio_project : the launcher's model — recent projects (recent_projects.json), the open project,
-    # project style detection and the /api/launcher/* routes (no GPU;
-    # spec/plan/2026-11-23-studio-launcher-and-devserver.md, A)
+    # project style detection, the /api/launcher/* routes and the remote dev server's lifecycle (no GPU,
+    # no sockets; spec/plan/2026-11-23-studio-launcher-and-devserver.md, A / B)
     add_library(ergo_studio_project STATIC
+        src/studio/project/dev_server.cpp
         src/studio/project/launcher.cpp
         src/studio/project/launcher_routes.cpp
         src/studio/project/open_project.cpp
@@ -1154,6 +1178,39 @@ if(ERGO_BUILD_STUDIO)
             target_compile_options(test_studio_project PRIVATE /utf-8)
         endif()
         add_test(NAME test_studio_project COMMAND test_studio_project)
+    endif()
+
+    # ergo_studio_web : the Studio's web server on Portus C++ — two gates (local / remote), the route
+    # table, body limits, the masked access log (spec/feature/tool/ergo.md "Web サーバ"). Portus stays
+    # PRIVATE: the public headers speak the net:: contract only.
+    include(cmake/ErgoStudioPortus.cmake)
+    ergo_studio_add_portus()
+    if(ERGO_STUDIO_HAS_PORTUS)
+        add_library(ergo_studio_web STATIC
+            src/studio/web/connection.cpp
+            src/studio/web/head_request.cpp
+            src/studio/web/listener.cpp
+            src/studio/web/log_bridge.cpp
+            src/studio/web/request_pipeline.cpp
+            src/studio/web/route_table.cpp
+            src/studio/web/web_server.cpp
+            src/studio/web/wire.cpp
+            src/studio/web/ws_session.cpp
+        )
+        target_include_directories(ergo_studio_web PUBLIC include)
+        target_link_libraries(ergo_studio_web PUBLIC ergo_studio_ingress ergo_studio_project ergo_studio_net ergo_common
+                                              PRIVATE portus::portus)
+        if(MSVC)
+            target_compile_options(ergo_studio_web PRIVATE /utf-8)
+        endif()
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_studio_web_server tests/studio/test_studio_web_server.cpp)
+            target_link_libraries(test_studio_web_server PRIVATE ergo_studio_web portus::portus ergo_common_ws ergo_gtest_main)
+            if(MSVC)
+                target_compile_options(test_studio_web_server PRIVATE /utf-8)
+            endif()
+            add_test(NAME test_studio_web_server COMMAND test_studio_web_server)
+        endif()
     endif()
 
     # ergo_studio_ui : the Studio's UI as ViewNode trees (tabs, overview, views) and their ui_kit
@@ -2362,7 +2419,10 @@ endif()
 # Placed after ergo_render. Without the real render path the executable still
 # builds as a headless server (no window) and says so at configure time.
 # ---------------------------------------------------------------------------
-if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views)
+if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views AND NOT TARGET ergo_studio_web)
+    message(STATUS "ergo_studio: not built — its web server needs Portus C++ (-DERGO_PORTUS_SOURCE_DIR=<Portus>/cpp)")
+endif()
+if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views AND TARGET ergo_studio_web)
     set(ERGO_STUDIO_OUT "${CMAKE_BINARY_DIR}/studio")
     set(_ergo_studio_shell OFF)
     if(TARGET pictor AND TARGET ergo_render AND TARGET glfw AND ERGO_RENDER_BACKEND_ENABLED)
@@ -2437,7 +2497,8 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
         tools/studio/studio_settings.cpp
     )
     target_include_directories(ergo_studio PRIVATE tools/studio)
-    target_link_libraries(ergo_studio PRIVATE ergo_studio_views ergo_studio_plugins ergo_studio_host ergo_studio_net)
+    target_link_libraries(ergo_studio PRIVATE ergo_studio_views ergo_studio_plugins ergo_studio_host ergo_studio_net
+                                              ergo_studio_ingress ergo_studio_web)
     if(_ergo_studio_shell)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_shell ergo_studio_views)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_SHELL=1)
@@ -2466,7 +2527,7 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
             tools/studio/studio_settings.cpp
         )
         target_include_directories(test_studio_settings PRIVATE tools/studio)
-        target_link_libraries(test_studio_settings PRIVATE ergo_studio_plugins ergo_gtest_main)
+        target_link_libraries(test_studio_settings PRIVATE ergo_studio_plugins ergo_studio_ingress ergo_gtest_main)
         if(MSVC)
             target_compile_options(test_studio_settings PRIVATE /utf-8)
         endif()

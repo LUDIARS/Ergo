@@ -139,7 +139,7 @@ TEST(StudioUi, ClickSurvivesARebuildBetweenPressAndRelease) {
     EXPECT_EQ(app.active_tab(), 2u);
 }
 
-// ---- the launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A) ----
+// ---- the launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A / B) ----
 
 namespace {
 
@@ -170,6 +170,38 @@ struct LauncherFixture {
     std::unique_ptr<project::Launcher> launcher;
 };
 
+/// A dev server that records start / stop and opens the project the way the real one does.
+class FakeDevServer final : public project::IDevServerControl {
+public:
+    explicit FakeDevServer(project::Launcher& l) : launcher_(l) {}
+    bool start(const std::string& source, std::string& err) override {
+        if (!launcher_.open(source, err)) return false;
+        running_ = true;
+        ++revision_;
+        return true;
+    }
+    void stop() override {
+        running_ = false;
+        launcher_.close();
+        ++revision_;
+    }
+    project::DevServerStatus status() const override {
+        project::DevServerStatus s;
+        s.running = running_;
+        if (running_) {
+            if (const auto c = launcher_.project().current()) s.source = c->source;
+            s.local_url = "http://127.0.0.1:5170/";
+        }
+        return s;
+    }
+    uint64_t revision() const override { return revision_; }
+
+private:
+    project::Launcher& launcher_;
+    bool               running_  = false;
+    uint64_t           revision_ = 0;
+};
+
 void click_text(StudioApp& app, const std::string& text) {
     const auto* t = find_text(app.draw_list(), text);
     ASSERT_NE(t, nullptr);
@@ -181,41 +213,48 @@ void click_text(StudioApp& app, const std::string& text) {
 TEST(StudioUiLauncher, StartsOnTheLauncherAloneWithoutTabs) {
     Fixture f;
     LauncherFixture l;
-    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get());
+    FakeDevServer dev(*l.launcher);
+    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get(), &dev);
     app.set_viewport(1000, 700);
     app.frame({}, 0.016f);
     EXPECT_TRUE(app.showing_launcher());
     EXPECT_NE(find_text(app.draw_list(), "game"), nullptr);
     EXPECT_NE(find_text(app.draw_list(), "リモート開発サーバ起動"), nullptr);
+    EXPECT_EQ(find_text(app.draw_list(), "開く"), nullptr);   // the window serves projects, it does not open tabs
     EXPECT_EQ(find_text(app.draw_list(), "Counter"), nullptr);   // no tab list
     EXPECT_EQ(find_text(app.draw_list(), "Plain"), nullptr);
 }
 
-TEST(StudioUiLauncher, OpeningShowsTheBandAndTabsAndBackReturns) {
+TEST(StudioUiLauncher, StartingTheServerKeepsTheLauncherAndStopCloses) {
     Fixture f;
     LauncherFixture l;
-    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get());
+    FakeDevServer dev(*l.launcher);
+    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get(), &dev);
     app.set_viewport(1000, 700);
     app.frame({}, 0.016f);
-    click_text(app, "開く");
-    EXPECT_FALSE(app.showing_launcher());
+    click_text(app, "リモート開発サーバ起動");
+    app.frame({}, 0.016f);
     ASSERT_TRUE(l.open.current().has_value());
-    EXPECT_NE(find_text(app.draw_list(), "Counter"), nullptr);
-    EXPECT_NE(find_text(app.draw_list(), "ランチャーへ戻る"), nullptr);
-
-    click_text(app, "ランチャーへ戻る");
-    EXPECT_TRUE(app.showing_launcher());
+    EXPECT_TRUE(app.showing_launcher());   // the tabs are on the web side
     EXPECT_EQ(find_text(app.draw_list(), "Counter"), nullptr);
+    EXPECT_NE(find_text(app.draw_list(), "手元: http://127.0.0.1:5170/"), nullptr);
+    EXPECT_NE(find_text(app.draw_list(), "停止"), nullptr);
+
+    click_text(app, "停止");
+    app.frame({}, 0.016f);
+    EXPECT_FALSE(l.open.current().has_value());
+    EXPECT_NE(find_text(app.draw_list(), "リモート開発サーバ起動"), nullptr);
 }
 
-TEST(StudioUiLauncher, OpeningFromElsewhereRebuilds) {
+TEST(StudioUiLauncher, OpeningFromElsewhereKeepsTheWindowOnTheLauncher) {
     Fixture f;
     LauncherFixture l;
-    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get());
+    FakeDevServer dev(*l.launcher);
+    StudioApp app(*f.host, f.measure, Theme{}, {}, l.launcher.get(), &dev);
     app.frame({}, 0.016f);
     std::string err;
     ASSERT_TRUE(l.launcher->open((l.dir / "game.json").u8string(), err));   // e.g. POST /api/launcher/open
     app.frame({}, 0.016f);
-    EXPECT_FALSE(app.showing_launcher());
-    EXPECT_NE(find_text(app.draw_list(), "Counter"), nullptr);
+    EXPECT_TRUE(app.showing_launcher());
+    EXPECT_EQ(find_text(app.draw_list(), "Counter"), nullptr);
 }

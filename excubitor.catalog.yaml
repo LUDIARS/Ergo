@@ -7,6 +7,9 @@
 # deploy (update) 時は build_command で Pictor (pin) 込みで構成・ビルドし直す
 # (Vulkan SDK が必要)。遠隔プレイ (play プラグイン) のために Odeum の native/ も取り込む (ERGO_ODEUM_SOURCE_DIR)。
 # UI は Tela で描く (ERGO_TELA_SOURCE_DIR。窓は Tela の GPU 描画、ブラウザは /shell/、spec/feature/tool/shell.md)。
+# Web サーバは Portus C++ (ERGO_PORTUS_SOURCE_DIR、OpenSSL 3 が要る)。窓はランチャーで、「リモート開発サーバ起動」で
+# 開いたプロジェクトを PORT (手元の口) で配信する。遠隔の口 (ERGO_STUDIO_REMOTE_PORT) は既定で無効
+# (cloudflared / tailscale serve の転送先にするときだけ env で足す。spec/feature/tool/ergo.md「口と入口」)。
 # GUI なので自動起動・自動 respawn はしない。
 services:
   - code: ergo-lesson-game
@@ -39,7 +42,7 @@ services:
     app_kind: native
     cwd: ${ARS_ROOT}/Ergo
     exec: ${ARS_ROOT}/Ergo/build/studio/ergo_studio.exe
-    build_command: cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON -DERGO_ODEUM_SOURCE_DIR=${ARS_ROOT}/Odeum -DERGO_TELA_SOURCE_DIR=${ARS_ROOT}/Tela && cmake --build build --config Release --target ergo_studio
+    build_command: cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON -DERGO_ODEUM_SOURCE_DIR=${ARS_ROOT}/Odeum -DERGO_TELA_SOURCE_DIR=${ARS_ROOT}/Tela -DERGO_PORTUS_SOURCE_DIR=${ARS_ROOT}/Portus/cpp -DERGO_STUDIO_REQUIRE_WEB=ON && cmake --build build --config Release --target ergo_studio
     env:
       # Pictor の FontLoader が TTC (meiryo.ttc) を読めない間の暫定 (Actio f127eb73)。
       # 直ったらこの行を消し、既定の <Windows>\Fonts\meiryo.ttc に戻す。

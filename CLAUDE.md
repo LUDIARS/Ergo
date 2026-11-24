@@ -97,10 +97,10 @@ target_link_libraries(myapp PRIVATE ergo_input ergo_bind)
 統合済み (`particle` / `variable` プラグインなど)。
 
 ```bash
-cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON
+cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON -DERGO_PORTUS_SOURCE_DIR=<Portus>/cpp
 cmake --build build --config Release --target ergo_studio
-build/studio/ergo_studio.exe              # ウィンドウ付き (Vulkan SDK が要る)
-build/studio/ergo_studio.exe --headless   # サーバのみ、既定ポート 5170
+build/studio/ergo_studio.exe              # 窓 = ランチャー (Vulkan SDK が要る)。「リモート開発サーバ起動」で配信
+build/studio/ergo_studio.exe --headless --project <profile.json>   # 窓なしで起動直後から配信、既定ポート 5170
 ```
 
 LUDIARS の環境では Excubitor のサービス `ergo-studio` (`excubitor.catalog.yaml`)

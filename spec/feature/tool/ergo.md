@@ -47,19 +47,32 @@ Ergo の開発者向けツール (particle / variable / scene_editor / log / Stu
   - 文字は `ERGO_STUDIO_FONT` (既定 `<Windows>\Fonts\meiryo.ttc`)
   - エンジンクライアント (`ergo_bind` / `ergo_particle_link` / `ergo_scene_link` /
     `ergo_log_live`) は従来通り `ws://127.0.0.1:5170/<id>/ws` に接続する (同じポート)
+- 窓はランチャーだけ (下の「ランチャー」)。Web サーバ (下の「Web サーバ」) は窓の「リモート開発サーバ起動」で
+  始まり、それまでは何も待ち受けない
 - **ヘッドレス: `ergo_studio.exe --headless`**、または Pictor 無し
   (`ERGO_PACKAGES` に pictor が無い) でビルドした exe
-  - ウィンドウを開かずサーバのみ。CI・リモート接続などで使う
+  - ウィンドウを開かず、起動直後から Web サーバ。`--project` が無ければプロジェクト未選択のまま
+    (`POST /api/launcher/open` かブラウザのランチャーで開く)
+- **拠点: `ergo_studio.exe --headless --project <profile.json>`** (Mac / AWS で Excubitor のサービスとして起動する形)
+  - 窓を出さず、そのプロフィールを開いて起動直後から Web サーバ。読めないプロフィールは終了コード 1
 
-ビルド: `cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON` →
-`cmake --build build --config Release --target ergo_studio` (Vulkan SDK が要る。
-`ERGO_BUILD_STUDIO=OFF` で Studio 一式を外す)。出力は `build/studio/` に
+| 引数 | 内容 |
+|---|---|
+| `--headless` | 窓を出さない |
+| `--project <path>` (`--project=<path>`) | そのワークスペースプロフィールを開いて起動直後から配信する |
+| `--remote-port <port>` (`--remote-port=<port>`) | 遠隔の口を `127.0.0.1:<port>` で有効にする (`ERGO_STUDIO_REMOTE_PORT` より優先) |
+| `--help` / `-h` | 使い方を出して終わる |
+
+ビルド: `cmake -S . -B build -DERGO_PACKAGES=pictor -DERGO_PACKAGES_FETCH=ON -DERGO_PORTUS_SOURCE_DIR=<Portus>/cpp` →
+`cmake --build build --config Release --target ergo_studio` (Vulkan SDK と OpenSSL 3 が要る。
+`ERGO_BUILD_STUDIO=OFF` で Studio 一式を外す)。`ERGO_PORTUS_SOURCE_DIR` が無い構成では Web サーバが無いので
+`ergo_studio` を作らない (古い `src/studio/net` のサーバには落とさない。`-DERGO_STUDIO_REQUIRE_WEB=ON` で構成エラーにする)。出力は `build/studio/` に
 `ergo_studio.exe`・`shaders/`・`sdk/include/ergo/studio/plugin_abi.h`。
 起動は Excubitor の `ergo-studio` (`excubitor.catalog.yaml`、`app_kind: native`)。
 
 ## ポートと URL
 
-既定ポート: **5170** (`PORT` 環境変数で上書き可)
+既定ポート: **5170** (`PORT` 環境変数で上書き可)。これは手元の口 (下の「口と入口」)。
 
 | URL                                  | 役割                                            |
 |--------------------------------------|------------------------------------------------|
@@ -73,12 +86,62 @@ Ergo の開発者向けツール (particle / variable / scene_editor / log / Stu
 UI はアプリのウィンドウ (タブ) と、Tela を取り込んだ構成ではブラウザの `/shell/` にある
 (同じ宣言)。HTTP / WS はエンジン・ホスト・外部ツールとの接続口として残す。
 
+## Web サーバ (Portus C++)
+
+設計: [2026-11-23-studio-launcher-and-devserver.md](../../plan/2026-11-23-studio-launcher-and-devserver.md) の B と D の 2
+(Actio c6c6c340)。開発サーバは別プログラムにせず、Studio 自身が開いたプロジェクトの Web サーバになる (neco 2026-11-24)。
+HTTP / WS は Portus C++ (`portus/http.hpp` `ws.hpp` `log.hpp`、`cmake/ErgoStudioPortus.cmake`) の上に作る
+(`src/studio/web/`、`ergo_studio_web`)。
+
+- 1 つの Portus のイベントループが両方の口を受ける。HTTP と WebSocket は同じポート (`/<id>/ws`、エンジンの接続口)。
+  ハンドラは Portus のスレッドプールで、WebSocket のプラグインのコールバックは接続ごとのスレッドで順に動く
+  (どちらもイベントループでは動かさない)。1 接続 1 要求 (`connection: close`)。
+- 要求の順序 (`RequestPipeline`): 入口の確認 (403) → ルート表 (表に無い経路は **404**、ハンドラは呼ばない) →
+  遠隔の口なら loopback 専用の操作 (403) → ハンドラ (例外は 500)。
+- ルート表 (`route_table.h`、Portus の表駆動ルータ): Studio 自身の経路 `GET /api/health` `/api/plugins`
+  `/api/launcher/projects`、`POST /api/launcher/open|close|add|remove`、`GET /shell` `/shell/index.html`
+  `/shell/tela.js` `/shell/shell.js` と、読み込んだプラグインの `/<id>` 以下。
+- 上限: ヘッダー 64 KiB (超えたら 431)、本文 `Content-Length` 32 MiB (超えたら 413、ハンドラの前)、chunked は 411、
+  クエリの組は 256 まで、WebSocket の 1 メッセージ 32 MiB (超えたら 1009)、要求を受け切るまで 30 秒。
+- ログ: 応答ごとに method・path (クエリは書かない)・status・口・誰か (`who`) を Portus の Logger で書く
+  (秘匿名のフィールドは Portus が伏せる。ヘッダーは書かない)。断った要求は warn、遠隔の口は info。
+- 起動・停止 (`project::DevServer`): 「リモート開発サーバ起動」でプロジェクトを開いてサーバを始め、「停止」で止めて
+  プロジェクトを閉じる。同時に 1 プロジェクト (別のを起動すると今の方を止めてから切り替える)。
+  サーバの作り方は外から渡す (`ServeFn`) ので、`ergo_studio_project` はソケットも Portus も知らない。
+
+### 口と入口
+
+cloudflared も `tailscale serve` も 127.0.0.1 から接続してくるので、相手のアドレスでは手元か遠隔かを区別できない。
+**どの口で受けたか** (`net::HttpRequest::gate`、サーバが待ち受けから入れる。ヘッダーからは決めない) で操作の範囲を決める。
+
+| 口 | 待ち受け | できること |
+|---|---|---|
+| 手元 | `127.0.0.1:<PORT>` (既定 5170) | 全操作 |
+| 遠隔 | `127.0.0.1:<ERGO_STUDIO_REMOTE_PORT>` (`--remote-port`。**既定は無効**) | 閲覧と、loopback 専用以外の操作。cloudflared / `tailscale serve` の転送先にだけ使う |
+
+入口の確認 (`src/studio/ingress/entrance.cpp`):
+
+- 手元の口: 下の「接続元の制限」のとおり (loopback の名前と同じ Origin)。`ERGO_STUDIO_PUBLIC_HOSTS` /
+  `ERGO_STUDIO_TAILNET_HOSTS` の名前の Host が来たら断る (転送先のポートを間違えている)。
+- 遠隔の口: Host が
+  - `ERGO_STUDIO_PUBLIC_HOSTS` の名前なら Cloudflare Access の `Cf-Access-Jwt-Assertion` が必要。誰か = `Cf-Access-Authenticated-User-Email`
+  - `ERGO_STUDIO_TAILNET_HOSTS` (`*.ts.net` だけを読む) の名前なら `tailscale serve` が付ける `Tailscale-User-Login` が必要
+    (tailnet の外、Funnel からの要求には無いので断る)。誰か = その値
+  - どちらでもない Host (loopback の名前を含む) は断る。Origin があるならその名前と一致すること。
+    WebSocket のハンドシェイクも同じ (遠隔では Origin 無しでもヘッダーが要る)。
+  - 空のヘッダーは無いものとして扱う。値の中身は見ない (署名の検証は Cloudflare / Tailscale 側)。
+- 遠隔の口で断る loopback 専用の操作 (`src/studio/ingress/remote_scope.cpp`、GET / HEAD / OPTIONS 以外):
+  `POST /api/launcher/add` `/api/launcher/remove`、`/studio/*` (AI への指示・プラグインの導入)、`/lesson/*`
+  (クラスへの接続)、`/git/*`。`mutation_guard` を使うプラグインと `LauncherRoutes` に合わせる。
+  ブラウザの `/shell/` は遠隔の口で開いたページを `ScreenAccess::published` にする (Host ではなく口で決める)。
+- 公開の設定 (Tunnel の経路と Access、`tailscale serve`) は Studio の外で行う。Studio は自分で変えない。
+
 ### 接続元の制限 (クロスサイト / DNS リバインディング)
 
 127.0.0.1 に bind していても、ブラウザは任意のサイトから
 `ws://127.0.0.1:5170/...` を開かせ、プリフライト無しの POST (`text/plain` など) も
 送らせる。DNS リバインディングのページは自分のホスト名のままここへ届く。そのため
-サーバ (`src/studio/net/request_guard.cpp`) は次を満たさない要求を **403** で拒む:
+手元の口 (`src/studio/ingress/entrance.cpp` が `src/studio/net/request_guard.cpp` を使う) は次を満たさない要求を **403** で拒む:
 
 - HTTP: `Host` が `localhost` / `*.localhost`、IP リテラル、または `ERGO_HOST` の名前で
   あること。`Origin` があるなら、そのホストが `Host` と一致すること。
@@ -95,13 +158,16 @@ WebSocket の 1 メッセージは最大 **32 MiB**。超えたらその接続�
 
 ```
 include/ergo/studio/
-├── net/        # loopback HTTP/1.1 + WebSocket サーバ、request_guard
+├── net/        # HTTP / WS の契約 (HttpRequest / IHttpHandler / IWsAcceptor)、request_guard。旧サーバは段 5 で撤去
+├── ingress/    # 口ごとの入口の確認、遠隔の口で断る操作 (ソケット無し)
+├── web/        # Web サーバ (Portus C++): ルート表、RequestPipeline、WebServer
+├── project/    # ランチャーのモデル、/api/launcher/*、DevServer (起動・停止・切り替え)
 ├── host/       # IPlugin 契約、ローダ、PluginHost (ルーティング)、外部 pack
 ├── platform/   # WinHTTP クライアント、資格情報ストア、プロセス実行、SHA-256
 ├── ui/         # StudioApp / ViewBuilder / IPluginView (GPU 非依存)
 ├── shell/      # フォントアトラス、テキストキャンバス、UiLayer、StudioWindow (Pictor)
 └── plugin_abi.h  # 外部 plugin pack の C ABI (v1)
-src/studio/{net,host,platform,ui,shell}/   # 上の実装 (ergo_studio_<層> ライブラリ)
+src/studio/{net,ingress,web,project,host,platform,ui,shell}/   # 上の実装 (ergo_studio_<層> ライブラリ)
 tools/studio/
 ├── main.cpp / studio_settings.* / builtin_plugins.*   # exe
 └── plugins/    # 組み込み (汎用) プラグイン。1 プラグイン = 1 ディレクトリ
@@ -399,8 +465,11 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 - 一覧: 最近起動・追加した順 (`<studio home>/recent_projects.json`) → 見つかったプロフィール
   (`<studio home>/profiles/*.json`、`<ERGO_PLUGIN_DIR>/*.studio.json`) で最近に無いもの。
   行: 名前・root・様式・用途・最後に起動した時刻。ファイルが消えた行は「プロフィールが見つかりません」。
-- 操作: 開く / 一覧から外す / パスを入れて追加。「リモート開発サーバ起動」は段 2 (Studio 自身の Web サーバ化、
-  neco 2026-11-24) の置き場として押せないボタンで出す。外す・追加は loopback の画面だけに出す。
+- 窓はランチャーだけ。行の操作: 「リモート開発サーバ起動」(配信中の行は「停止」) / 一覧から外す、と、パスを入れて追加。
+  上に Web サーバの状態 (停止中、または手元の URL と、遠隔が有効なら転送先と公開名・tailnet 名の URL)。
+  プロフィールが消えた行の起動ボタンは押せない。外す・追加は手元の画面だけに出す。
+- ブラウザ (`/shell/`) は、プロジェクトが開いていればそのタブと帯、開いていなければランチャー (行は「開く」、
+  `--headless` だけで起動したサーバ向け)。
 - キャッシュ `recent_projects.json`: `{"version":1,"projects":[{"source","name","root","style","domain","last_opened"}]}`。
   開いたら先頭へ、同じ `source` は 1 つにまとめ、上限 30。一時ファイルに書いて置き換える。読めない・形が違う
   ファイルは空として扱い、**原本を上書きしない** (この起動中の変更はメモリだけ、ランチャーに注意を出す)。
@@ -409,8 +478,8 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 - 用途 (`domain`): プロフィールの `"domain"` をそのまま出す (`lesson` / `game` / `cglive` や任意の文字列。産業系は対象外、neco 2026-11-24)。
   [2026-11-23-ergo-curation-and-data-tables.md](../../plan/2026-11-23-ergo-curation-and-data-tables.md) の入口。この段では
   表示と記録だけで、用途ごとの判定・候補提示・プラグイン構成・データテーブルは持たない (用途で分岐するコードは書かない)。
-- 開いた後は今のタブ一覧と、上に帯 (プロジェクト名・root・「ランチャーへ戻る」)。段 2 で機能の画面を Web 側へ
-  移すまでの暫定 (その後、窓はランチャーだけ)。
+- 開いた後の機能の画面 (タブ一覧と、上に帯: プロジェクト名・root・「ランチャーへ戻る」) は Web 側だけに出す。
+  段 1 の暫定 (窓でタブを出す) は段 2 で外した。
 - プラグインは開いたプロジェクトのプロフィールだけを見る: `services` / `tuning` / `git` / `assets` / `play` は
   `load_workspace_profiles()` を直接呼ばず `IProfileSource` (`tools/studio/plugins/common/profile_source.h`) を受ける。
   Studio では `OpenProjectProfiles` (開いているプロフィールを読む。未選択なら空)、テストでは `FixedProfiles`。
@@ -420,11 +489,12 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 | `GET /api/launcher/projects` | `{open: {source, name, root, style, domain} \| null, projects: [{source, name, root, style, domain, last_opened, recent, missing, open}], notice}` |
 | `POST /api/launcher/open` | `{source}` を開く (読めないプロフィールは 409) |
 | `POST /api/launcher/close` | ランチャーへ戻る |
-| `POST /api/launcher/add` | `{source}` を一覧に足す (開かない)。**loopback のみ** (公開名は 403) |
-| `POST /api/launcher/remove` | `{source}` を一覧から外す (ファイルは残す。開いていれば閉じる)。**loopback のみ** |
+| `POST /api/launcher/add` | `{source}` を一覧に足す (開かない)。**手元の口のみ** (遠隔の口は 403) |
+| `POST /api/launcher/remove` | `{source}` を一覧から外す (ファイルは残す。開いていれば閉じる)。**手元の口のみ** |
 
 実装: `src/studio/project/` (`ergo_studio_project`: `recent_projects` / `project_catalog` / `open_project` /
-`launcher` / `launcher_routes` / `project_style`)、画面は `src/studio/ui/launcher_view.cpp` (ViewBuilder のみ)。
+`launcher` / `launcher_routes` / `project_style` / `dev_server`)、画面は `src/studio/ui/launcher_view.cpp` (ViewBuilder のみ。
+窓は `IDevServerControl` だけを見る)。
 経路は `LauncherRoutes` がプラグインホスト (と `/shell/`) の前に置く。
 
 ## タブ UI (ネイティブ)
@@ -489,12 +559,14 @@ ctest (`tests/studio/`、mini-gtest)。hermetic で、一時ディレクトリ�
 
 | 場所 | 対象 |
 |---|---|
-| `test_studio_net.cpp` | HTTP パーサ・WS フレーム・request_guard・サーバ |
+| `test_studio_net.cpp` | HTTP パーサ・WS フレーム・request_guard・旧サーバ (terpsichore の command server が使う間) |
+| `test_studio_ingress.cpp` | 口と入口: 手元の口の loopback の名前と Origin、手元の口に公開名・tailnet 名が来たら断る、公開名で Access のヘッダーが無ければ断る、tailnet 名で `Tailscale-User-Login` が無ければ断る、知らない Host と Origin の食い違いを断る、遠隔の口で断る操作 |
+| `test_studio_web_server.cpp` | Web サーバ: ルート表に無い経路は 404、本文上限 (413)、遠隔の口は既定で無効、口はポートで決まる (遠隔の口で loopback 専用の操作を断る)、エンジンの WS クライアントが同じポートで話せる |
 | `test_studio_host.cpp` | id と形の検査、ルーティング、`/api/health` の `rejected` |
 | `test_studio_external.cpp` | C ABI の pack 読み込み (`fixtures/echo_pack.c`)、壊れたエントリ |
 | `test_studio_plugins.cpp` ほか `test_studio_<plugin>.cpp` | 組み込みプラグインごとの API |
 | `test_studio_studio_api.cpp` / `test_studio_studio_domain.cpp` | `studio` の API・台帳・接続図 |
-| `test_studio_ui.cpp` | StudioApp のタブとクリック、ランチャーだけで始まること (GPU 無し) |
-| `test_studio_project.cpp` | `recent_projects.json` の往復・並び・上限・重複・壊れたファイル・消えたプロフィール、ランチャーの操作、様式の判定、`/api/launcher/*` |
-| `test_studio_profile_source.cpp` | `IProfileSource`: 開いたプロジェクトのプロフィールだけが見えること、様式の明示と判定 |
+| `test_studio_ui.cpp` | StudioApp のタブとクリック、窓はランチャーだけで、起動・停止しても窓にタブが出ないこと (GPU 無し) |
+| `test_studio_project.cpp` | `recent_projects.json` の往復・並び・上限・重複・壊れたファイル・消えたプロフィール、ランチャーの操作、様式の判定、`/api/launcher/*` (add / remove は口で決まる)、DevServer の起動・停止・切り替え |
+| `test_studio_profile_source.cpp` | `IProfileSource`: 開いたプロジェクトのプロフィールだけが見えること (`--project` で配信したプロフィールだけ)、様式の明示と判定 |
 | `test_studio_shell_text.cpp` | フォントアトラスとテキストキャンバス (`ERGO_STUDIO_TEST_FONT`) |

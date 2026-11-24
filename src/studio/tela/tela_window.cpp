@@ -49,7 +49,7 @@ int run_tela_window(ScreenHub& hub, const TelaWindowConfig& cfg, const std::atom
         }
         if (code == 0) {
             GlfwTelaInput input(surface.glfw_window(), runtime);
-            hub.add(runtime, ScreenAccess::local);
+            hub.add(runtime, ScreenAccess::window);   // the window is the launcher (the tabs are on /shell/)
             auto last   = std::chrono::steady_clock::now();
             bool redraw = true;   // the swapchain needs an image even when the runtime did not change
             while (!stop.load() && !surface.should_close()) {

@@ -7,6 +7,8 @@
 #include "plugins/play/play_plugin.h"
 #include "plugins/tuning/tuning_plugin.h"
 
+#include "ergo/studio/project/dev_server.h"
+#include "ergo/studio/project/launcher.h"
 #include "ergo/studio/project/open_project.h"
 
 #include <gtest/gtest.h>
@@ -14,6 +16,8 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <optional>
 
 using namespace ergo::studio;
 using namespace ergo::studio::plugins;
@@ -120,6 +124,34 @@ TEST(ProfileSource, TuningAndPlaySeeOnlyTheOpenProject) {
     ASSERT_EQ(targets.size(), 1u);
     EXPECT_EQ(targets[0].name, "beta");
     EXPECT_TRUE(errors.empty());
+}
+
+// ergo_studio --project <profile.json>: the dev server serves that profile, and the plugins see it alone.
+TEST(ProfileSource, TheServedProjectIsTheOnlyProfileThePluginsSee) {
+    TwoGames games;
+    project::OpenProject open;
+    project::Launcher    launcher(project::ProjectCatalog(games.home / "recent_projects.json"), open,
+                                  launcher_deps(games.home, "", &no_env));
+    struct Serving final : project::IServing {
+        uint16_t                local_port() const override { return 5170; }
+        std::optional<uint16_t> remote_port() const override { return std::nullopt; }
+    };
+    project::DevServer dev(launcher, [](std::string&) { return std::make_unique<Serving>(); });
+    const auto         source = std::make_shared<OpenProjectProfiles>(open, &no_env);
+    EXPECT_TRUE(source->profiles().profiles.empty());   // the launcher: nothing open yet
+
+    std::string err;
+    ASSERT_TRUE(dev.start((games.home / "profiles" / "alpha.json").u8string(), err));
+    ProfileSet set = source->profiles();
+    ASSERT_EQ(set.profiles.size(), 1u);
+    EXPECT_EQ(set.profiles[0].name, "alpha");
+    assets::AssetsPlugin plugin(source, nullptr);
+    const std::string roots = plugin.handle(get("/assets/api/roots"), "/api/roots").body;
+    EXPECT_NE(roots.find("\"alpha\""), std::string::npos);
+    EXPECT_EQ(roots.find("\"beta\""), std::string::npos);
+
+    dev.stop();
+    EXPECT_TRUE(source->profiles().profiles.empty());
 }
 
 TEST(ProfileSource, AFixedSetIsGivenAsIs) {

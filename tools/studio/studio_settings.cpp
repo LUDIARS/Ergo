@@ -1,5 +1,6 @@
 #include "studio_settings.h"
 
+#include "ergo/studio/ingress/entrance.h"
 #include "ergo/studio/net/request_guard.h"
 
 #include <cstdlib>
@@ -24,8 +25,28 @@ void take(const EnvFn& env, const char* key, std::string& out) {
     if (!v.empty()) out = v;
 }
 
-/// The command line: --headless and --help / -h only. Returns the error for the
-/// first argument that is not one of them ("" when all are known).
+/// A port 1..65535, or nullopt.
+std::optional<uint16_t> port_number(const std::string& text) {
+    if (text.empty() || text.size() > 5) return std::nullopt;
+    char*      e = nullptr;
+    const long n = std::strtol(text.c_str(), &e, 10);
+    if (e != text.c_str() + text.size() || n < 1 || n > 65535) return std::nullopt;
+    return static_cast<uint16_t>(n);
+}
+
+bool is_option(const std::string& arg, const std::string& name) {
+    return arg == name || arg.compare(0, name.size() + 1, name + "=") == 0;
+}
+
+/// The value of "--name value" or "--name=value", advancing `i` past it ("" when missing).
+std::string option_value(int argc, char** argv, int& i, const std::string& arg, const std::string& name) {
+    if (arg != name) return arg.substr(name.size() + 1);
+    if (i + 1 >= argc || argv[i + 1] == nullptr) return {};
+    return argv[++i];
+}
+
+/// The command line. Returns the error for the first argument that cannot be
+/// used ("" when all are known).
 std::string read_arguments(int argc, char** argv, StudioSettings& s) {
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i] ? argv[i] : "";
@@ -33,6 +54,13 @@ std::string read_arguments(int argc, char** argv, StudioSettings& s) {
             s.headless = true;
         } else if (a == "--help" || a == "-h") {
             s.show_help = true;
+        } else if (is_option(a, "--project")) {
+            s.project = trim(option_value(argc, argv, i, a, "--project"));
+            if (s.project.empty()) return "--project needs a profile path (ergo_studio --project <profile.json>)";
+        } else if (is_option(a, "--remote-port")) {
+            const std::string v = trim(option_value(argc, argv, i, a, "--remote-port"));
+            s.remote_port       = port_number(v);
+            if (!s.remote_port) return "--remote-port must be 1..65535 (got \"" + v + "\")";
         } else {
             const char* what = !a.empty() && a[0] == '-' ? "unknown option" : "unexpected argument";
             return std::string(what) + " \"" + a + "\" (ergo_studio --help lists the options)";
@@ -61,7 +89,17 @@ StudioSettings read_settings(const EnvFn& env, const std::filesystem::path& exe_
 #else
     take(env, "HOME", s.user_home);
 #endif
-    s.public_hosts = net::parse_public_hosts(env("ERGO_STUDIO_PUBLIC_HOSTS"));
+    if (!s.remote_port) {
+        if (const std::string p = trim(env("ERGO_STUDIO_REMOTE_PORT")); !p.empty()) {
+            s.remote_port = port_number(p);
+            if (!s.remote_port && s.error.empty()) s.error = "ERGO_STUDIO_REMOTE_PORT must be 1..65535 (got \"" + p + "\")";
+        }
+    }
+    if (s.remote_port && *s.remote_port == s.port && s.error.empty()) {
+        s.error = "the remote port must differ from PORT (" + std::to_string(s.port) + ")";
+    }
+    s.public_hosts  = net::parse_public_hosts(env("ERGO_STUDIO_PUBLIC_HOSTS"));
+    s.tailnet_hosts = ingress::parse_tailnet_hosts(env("ERGO_STUDIO_TAILNET_HOSTS"));
     take(env, "ERGO_PLUGIN_DIR", s.plugin_dirs);
     take(env, "VISUS_PROJECT_ROOTS", s.visus_roots);
     take(env, "ERGO_UI_LAYOUT_ROOT", s.ui_layout_root);
@@ -82,21 +120,31 @@ StudioSettings read_settings(const EnvFn& env, const std::filesystem::path& exe_
 }
 
 std::string studio_usage() {
-    return "usage: ergo_studio [--headless]\n"
+    return "usage: ergo_studio [--headless] [--project <profile.json>] [--remote-port <port>]\n"
            "       ergo_studio --help | -h\n"
            "\n"
-           "Ergo Studio: the loopback HTTP / WebSocket server the engine clients and tools talk to,\n"
-           "plus its window. Stop it with Ctrl+C (SIGINT).\n"
+           "Ergo Studio: the launcher window and the web server of the project it serves (the remote dev\n"
+           "server: HTTP / WebSocket for the browser and the engine clients). The window is the launcher;\n"
+           "its \"start the remote dev server\" button starts the web server. Stop it with Ctrl+C (SIGINT).\n"
            "\n"
            "options:\n"
-           "  --headless   server only, no window (a build without the window is always headless)\n"
-           "  --help, -h   print this text and exit (nothing is started)\n"
+           "  --headless             no window: the web server runs from the start\n"
+           "                         (a build without the window is always headless)\n"
+           "  --project <path>       serve this workspace profile from the start (with --headless: how a\n"
+           "                         site runs it as an Excubitor service)\n"
+           "  --remote-port <port>   turn the remote gate on at 127.0.0.1:<port> (default: off)\n"
+           "  --help, -h             print this text and exit (nothing is started)\n"
            "\n"
            "environment (unset or empty = the default):\n"
-           "  PORT                     port to listen on, 1..65535 (default " + std::to_string(kDefaultPort) + ")\n"
+           "  PORT                     the local gate (this machine, every operation), 1..65535\n"
+           "                           (default " + std::to_string(kDefaultPort) + ")\n"
+           "  ERGO_STUDIO_REMOTE_PORT  the remote gate, the target of cloudflared / tailscale serve\n"
+           "                           (default off; --remote-port wins). Loopback-only operations are refused there\n"
            "  ERGO_HOST                address to bind (default 127.0.0.1)\n"
-           "  ERGO_STUDIO_PUBLIC_HOSTS host names published through Cloudflare Access, comma list\n"
-           "                           (answered only with the Cf-Access-Jwt-Assertion header; default none)\n"
+           "  ERGO_STUDIO_PUBLIC_HOSTS host names published through Cloudflare Access, comma list (remote gate;\n"
+           "                           answered only with the Cf-Access-Jwt-Assertion header; default none)\n"
+           "  ERGO_STUDIO_TAILNET_HOSTS *.ts.net names served through tailscale serve, comma list (remote gate;\n"
+           "                           answered only with the Tailscale-User-Login header; default none)\n"
            "  ERGO_STUDIO_FFMPEG       ffmpeg for remote play capture (default: ffmpeg on PATH)\n"
            "  ERGO_STUDIO_STUN_URLS    STUN servers for remote play, comma list (default stun.cloudflare.com)\n"
            "  ERGO_STUDIO_TURN_KEY_ID, ERGO_STUDIO_TURN_KEY_API_TOKEN\n"

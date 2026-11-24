@@ -14,16 +14,18 @@ namespace {
 
 constexpr float kSidebarWidth = 230;
 constexpr float kScrollStep   = 48;
-constexpr float kBandHeight   = 48;   // the open project's band over the tabs
 
 } // namespace
 
 StudioApp::StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme, ViewLookup views,
-                     project::Launcher* launcher)
-    : host_(host), measure_(measure), theme_(std::move(theme)), views_(std::move(views)), launcher_(launcher) {}
+                     project::Launcher* launcher, project::IDevServerControl* devserver)
+    : host_(host), measure_(measure), theme_(std::move(theme)), views_(std::move(views)), launcher_(launcher),
+      devserver_(devserver) {}
 
-bool StudioApp::showing_launcher() const {
-    return launcher_ != nullptr && !launcher_->project().current();
+bool StudioApp::showing_launcher() const { return launcher_ != nullptr; }
+
+uint64_t StudioApp::launcher_revision() const {
+    return launcher_->revision() + (devserver_ != nullptr ? devserver_->revision() : 0);
 }
 
 void StudioApp::set_viewport(int w, int h) {
@@ -105,7 +107,7 @@ void StudioApp::frame(const InputState& in, float dt) {
     // Periodic refreshes wait until the button is up (the layout must not move under a press).
     const bool periodic = health_due && shows_health && !in.down;
     if (periodic) since_health_ = 0;
-    const bool launcher_moved = launcher_ != nullptr && launcher_->revision() != built_launcher_revision_;
+    const bool launcher_moved = launcher_ != nullptr && launcher_revision() != built_launcher_revision_;
     if (dirty_ || launcher_moved || content_revision() != built_revision_ || periodic) rebuild();
     const std::string focus_before = bind_.focused;
     ctx_.feed_input({in.x, in.y, in.down});
@@ -116,7 +118,7 @@ void StudioApp::frame(const InputState& in, float dt) {
 void StudioApp::rebuild() {
     dirty_          = false;
     built_revision_ = content_revision();
-    built_launcher_revision_ = launcher_ ? launcher_->revision() : 0;
+    built_launcher_revision_ = launcher_ ? launcher_revision() : 0;
     bind_.clear();
 
     ui_kit::Document doc;
@@ -125,7 +127,7 @@ void StudioApp::rebuild() {
     root.size       = {static_cast<float>(vw_), static_cast<float>(vh_)};
     root.style.fill = theme_.background;
     if (showing_launcher()) rebuild_launcher(root);
-    else rebuild_tabs(root, launcher_ ? kBandHeight : 0);
+    else rebuild_tabs(root);
     bind_handlers(std::move(doc));
 }
 
@@ -153,21 +155,21 @@ Node scroll_view(const char* name, float x, float y, float w, float h, float scr
 } // namespace
 
 void StudioApp::rebuild_launcher(Node& root) {
-    // The launcher alone: no tab list until a project is open.
+    // The launcher alone: the window shows no tabs (they are on the web side).
     root.children.push_back(scroll_view("Launcher", 0, 0, static_cast<float>(vw_), static_cast<float>(vh_), scroll_));
     ViewNode body;
     ViewBuilder b(body, measure_, theme_);
-    build_launcher(b, *launcher_, launcher_input_, true, [this] { dirty_ = true; });
+    build_launcher(b, *launcher_, launcher_input_, LauncherScreen{true, devserver_}, [this] { dirty_ = true; });
     emit_ui_kit(body, root.children[0].children[0], "Root/Launcher/Content", measure_, theme_, bind_);
 }
 
-void StudioApp::rebuild_tabs(Node& root, float top) {
+void StudioApp::rebuild_tabs(Node& root) {
     // Left: one line per plugin (16+ plugins do not fit a horizontal bar). Right: the tab.
     const float side_w = std::min(kSidebarWidth, static_cast<float>(vw_) * 0.4f);
-    const float h      = std::max(1.0f, static_cast<float>(vh_) - top);
+    const float h      = std::max(1.0f, static_cast<float>(vh_));
     Node bar;
     bar.name             = "Tabs";
-    bar.position         = {0, top};
+    bar.position         = {0, 0};
     bar.size             = {side_w, h};
     bar.style.fill       = theme_.panel;
     bar.layout.mode      = LayoutMode::Vertical;
@@ -176,7 +178,7 @@ void StudioApp::rebuild_tabs(Node& root, float top) {
     bar.layout.pad_t     = 8;
     bar.clip             = true;
     root.children.push_back(std::move(bar));
-    root.children.push_back(scroll_view("View", side_w, top, static_cast<float>(vw_) - side_w, h, scroll_));
+    root.children.push_back(scroll_view("View", side_w, 0, static_cast<float>(vw_) - side_w, h, scroll_));
 
     {
         ViewNode tabs;
@@ -196,24 +198,6 @@ void StudioApp::rebuild_tabs(Node& root, float top) {
         }
         emit_ui_kit(body, root.children[1].children[0], "Root/View/Content", measure_, theme_, bind_);
     }
-    const auto project = launcher_ ? launcher_->project().current() : std::nullopt;
-    if (!project) return;
-    Node band;
-    band.name          = "Project";
-    band.size          = {static_cast<float>(vw_), top};
-    band.style.fill    = theme_.panel_alt;
-    band.layout.mode   = LayoutMode::Vertical;
-    band.layout.pad_l  = band.layout.pad_r = 12;
-    band.layout.pad_t  = 8;
-    band.clip          = true;
-    root.children.push_back(std::move(band));
-    ViewNode body;
-    ViewBuilder bb(body, measure_, theme_);
-    build_project_bar(bb, *project, [this] {
-        launcher_->close();
-        dirty_ = true;
-    });
-    emit_ui_kit(body, root.children.back(), "Root/Project", measure_, theme_, bind_);
 }
 
 void StudioApp::bind_handlers(ui_kit::Document doc) {

@@ -1,7 +1,6 @@
 #include "ergo/studio/project/launcher_routes.h"
 
 #include "ergo/common/json_min.h"
-#include "ergo/studio/net/request_guard.h"
 
 #include <utility>
 
@@ -26,8 +25,7 @@ net::HttpResponse ok() { return net::HttpResponse::json(200, "{\"ok\":true}"); }
 
 } // namespace
 
-LauncherRoutes::LauncherRoutes(Launcher& launcher, net::IHttpHandler& next, std::string bind_host)
-    : launcher_(launcher), next_(next), bind_host_(std::move(bind_host)) {}
+LauncherRoutes::LauncherRoutes(Launcher& launcher, net::IHttpHandler& next) : launcher_(launcher), next_(next) {}
 
 net::HttpResponse LauncherRoutes::handle(const net::HttpRequest& req) {
     if (req.path.rfind(kPrefix, 0) != 0) return next_.handle(req);
@@ -75,7 +73,7 @@ net::HttpResponse LauncherRoutes::list() const {
 }
 
 net::HttpResponse LauncherRoutes::act(const std::string& what, const net::HttpRequest& req) {
-    if ((what == "add" || what == "remove") && !net::is_trusted_host(req.header("host"), bind_host_)) {
+    if ((what == "add" || what == "remove") && req.gate != net::Gate::local) {
         return fail(403, "the project list can only be changed from this machine");
     }
     if (what == "close") {

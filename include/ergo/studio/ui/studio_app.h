@@ -5,9 +5,9 @@
 /// content area, and the ui_kit context that turns it into a draw list. The
 /// shell feeds input and draws draw_list(); tests drive it directly.
 ///
-/// With a launcher the app starts on the launcher alone (no tabs); once a
-/// project is open it shows the project band over the tabs
-/// (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A).
+/// With a launcher the window is the launcher only (no tabs): a project is
+/// served by the remote dev server and its tabs are on the web side
+/// (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A / B).
 #include "ergo/studio/host/plugin_host.h"
 #include "ergo/studio/project/launcher.h"
 #include "ergo/studio/ui/launcher_view.h"
@@ -35,9 +35,10 @@ struct InputState {
 class StudioApp {
 public:
     /// `host` owns the plugins; it outlives the app. `launcher` (optional,
-    /// outlives the app): show the launcher until a project is open.
+    /// outlives the app): show the launcher instead of the tabs. `devserver`
+    /// (optional, outlives the app): its rows start / stop the remote dev server.
     StudioApp(host::PluginHost& host, const ITextMeasure& measure, Theme theme = {}, ViewLookup views = {},
-              project::Launcher* launcher = nullptr);
+              project::Launcher* launcher = nullptr, project::IDevServerControl* devserver = nullptr);
 
     void set_viewport(int w, int h);
     /// Rebuild when needed, then layout + input + draw list.
@@ -50,7 +51,7 @@ public:
     std::size_t tab_count() const { return 1 + host_.plugins().size(); }
     std::size_t active_tab() const { return active_; }
     void        select_tab(std::size_t i);
-    /// True while the launcher is shown instead of the tabs.
+    /// True when the launcher is shown instead of the tabs (always, with a launcher).
     bool        showing_launcher() const;
     /// How often the overview re-reads health (it is cheap, but not free).
     void        set_health_interval(std::chrono::milliseconds ms) { health_interval_ = ms; }
@@ -62,15 +63,18 @@ private:
     bool edit_focused(const InputState& in);
     void rebuild();
     void rebuild_launcher(ui_kit::Node& root);
-    void rebuild_tabs(ui_kit::Node& root, float top);
+    void rebuild_tabs(ui_kit::Node& root);
     void bind_handlers(ui_kit::Document doc);
     uint64_t content_revision() const;
+    /// The launcher's revision plus the dev server's (a start / stop redraws the rows).
+    uint64_t launcher_revision() const;
 
     host::PluginHost&         host_;
     const ITextMeasure&       measure_;
     Theme                     theme_;
     ViewLookup                views_;
     project::Launcher*        launcher_ = nullptr;
+    project::IDevServerControl* devserver_ = nullptr;
     LauncherInput             launcher_input_;
     uint64_t                  built_launcher_revision_ = ~0ull;
     ui_kit::UIContext         ctx_;

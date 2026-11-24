@@ -20,9 +20,14 @@ const char* const kLockedNotice =
 } // namespace
 
 StudioDeclaration::StudioDeclaration(host::PluginHost& host, ui::ViewLookup views, ui::Theme theme,
-                                     project::Launcher* launcher)
-    : host_(host), views_(std::move(views)), theme_(std::move(theme)), launcher_(launcher),
+                                     project::Launcher* launcher, project::IDevServerControl* devserver)
+    : host_(host), views_(std::move(views)), theme_(std::move(theme)), launcher_(launcher), devserver_(devserver),
       tela_theme_(tela_theme(theme_)) {}
+
+uint64_t StudioDeclaration::launcher_revision() const {
+    if (launcher_ == nullptr) return 0;
+    return launcher_->revision() + (devserver_ != nullptr ? devserver_->revision() : 0);
+}
 
 bool StudioDeclaration::showing_launcher() const {
     return launcher_ != nullptr && !launcher_->project().current();
@@ -53,6 +58,7 @@ uint64_t StudioDeclaration::content_revision() const {
 }
 
 const ::tela::Document& StudioDeclaration::document(ScreenAccess access) const {
+    if (access == ScreenAccess::window) return launcher_ != nullptr ? window_ : full_;
     return access == ScreenAccess::local ? full_ : published_;
 }
 
@@ -63,7 +69,7 @@ bool StudioDeclaration::refresh(float dt) {
     const bool shows_health = active_ == 0 || !ui::view_of(*host_.plugins()[active_ - 1], views_);
     const bool periodic     = health_due && shows_health;
     if (health_due) since_health_ = 0;
-    const bool launcher_moved = launcher_ != nullptr && launcher_->revision() != built_launcher_revision_;
+    const bool launcher_moved = launcher_ != nullptr && launcher_revision() != built_launcher_revision_;
     if (!dirty_ && !launcher_moved && content_revision() == built_revision_ && !periodic) return false;
     rebuild();
     return true;
@@ -72,7 +78,12 @@ bool StudioDeclaration::refresh(float dt) {
 void StudioDeclaration::rebuild() {
     dirty_          = false;
     built_revision_ = content_revision();
-    built_launcher_revision_ = launcher_ ? launcher_->revision() : 0;
+    built_launcher_revision_ = launcher_revision();
+    if (launcher_ != nullptr) {
+        // The window: this machine's launcher, whatever the pages show.
+        window_ = {};
+        declare_launcher(window_, build_launcher_body(ui::LauncherScreen{true, devserver_}));
+    }
     if (showing_launcher()) {
         rebuild_launcher();
         return;
@@ -110,18 +121,19 @@ void StudioDeclaration::rebuild() {
     ++revision_;
 }
 
+ui::ViewNode StudioDeclaration::build_launcher_body(const ui::LauncherScreen& screen) {
+    ui::ViewNode    body;
+    ui::ViewBuilder b(body, measure_, theme_);
+    ui::build_launcher(b, *launcher_, launcher_input_, screen, [this] { touch(); });
+    return body;
+}
+
 void StudioDeclaration::rebuild_launcher() {
-    // The launcher alone; a page under a public name gets it without add / remove.
-    const auto build = [this](bool local) {
-        ui::ViewNode body;
-        ui::ViewBuilder b(body, measure_, theme_);
-        ui::build_launcher(b, *launcher_, launcher_input_, local, [this] { touch(); });
-        return body;
-    };
+    // The pages' launcher (rows open the project here); a page on the remote gate gets it without add / remove.
     full_      = {};
     published_ = {};
-    declare_launcher(full_, build(true));
-    declare_launcher(published_, build(false));
+    declare_launcher(full_, build_launcher_body(ui::LauncherScreen{true, nullptr}));
+    declare_launcher(published_, build_launcher_body(ui::LauncherScreen{false, nullptr}));
     ++revision_;
 }
 

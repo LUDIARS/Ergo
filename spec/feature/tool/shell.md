@@ -57,12 +57,18 @@ Studio の UI は 1 つの宣言 (`tela::Document`) にまとめ、それを画�
 
 ## ランチャー
 
-- ランチャー ([ergo.md](ergo.md) の「ランチャー」) があるとき、`StudioDeclaration` と ui_kit 窓の `StudioApp` は
-  プロジェクトが開くまで **ランチャーだけ** を宣言する (id `launcher` の scroll。タブ一覧 `tabs` と `content/*` は出さない)。
-- 開いた後は上に帯 (id `project`、高さ 48: 名前・root・「ランチャーへ戻る」) を置き、その下に今のタブ一覧と中身。
-- ランチャーの revision (一覧の変化と開閉) が変わったら作り直す。`/api/launcher/open` で別の画面から開いたときも
-  全画面が切り替わる。
-- 公開名から開いたページのランチャーには「一覧から外す」と「追加」を宣言しない (loopback のみの操作)。
+段 2 (Studio の Web サーバ化、[ergo.md](ergo.md) の「Web サーバ」) から、**窓はランチャーだけ**、機能の画面は Web 側だけ。
+
+- ランチャー ([ergo.md](ergo.md) の「ランチャー」) があるとき、窓 (Tela の窓は `ScreenAccess::window` の宣言、
+  ui_kit の窓は `StudioApp`) はいつも **ランチャーだけ** を宣言する (id `launcher` の scroll。タブ一覧 `tabs` と
+  `content/*` は出さない)。行のボタンは「リモート開発サーバ起動」(要素名 `devserver`) と、配信中の行の「停止」
+  (`devserver-stop`)。上に Web サーバの状態 (手元の URL、遠隔が有効なら転送先と公開名・tailnet 名の URL) を出す。
+  窓が見るのは `project::IDevServerControl` だけ (Web サーバの中身を知らない)。
+- ブラウザのページ (`ScreenAccess::local` / `published`) は、プロジェクトが開くまでランチャー (行は「開く」、要素名 `open`)、
+  開いた後は上に帯 (id `project`、高さ 48: 名前・root・「ランチャーへ戻る」) とタブ一覧と中身。
+- ランチャーの revision (一覧の変化と開閉) と Web サーバの revision (起動・停止) が変わったら作り直す。
+  `/api/launcher/open` で別の画面から開いたときも全画面が切り替わる。
+- 遠隔の口から開いたページのランチャーには「一覧から外す」と「追加」を宣言しない (手元の口だけの操作)。
 - ランチャーを渡さない構成 (テスト・埋め込み) は従来どおり最初からタブを出す。
 
 ## 画面ごとの Runtime
@@ -86,12 +92,13 @@ Studio の UI は 1 つの宣言 (`tela::Document`) にまとめ、それを画�
 
 - `shell` はプラグイン id として予約済み (`is_reserved_plugin_id`)。経路は `ShellRoutes` がプラグインホストの
   前に置く。
-- 接続元の検査は今の `request_guard` のまま (Host、Origin、公開名では Cloudflare Access のヘッダー)。
+- 接続元の検査は Web サーバの入口の確認 ([ergo.md](ergo.md) の「口と入口」: 手元の口は Host と Origin、遠隔の口は
+  公開名なら Cloudflare Access のヘッダー、tailnet 名なら `Tailscale-User-Login`)。
 - 同時に開けるページは 8 枚まで。9 枚目は 1013 で閉じる。入力の大きさの上限は Tela の `WebLimits` の既定。
-- **公開名から開いたページ** (Host が loopback の名前でも bind host でもない) では、変更系が loopback に限られる
-  タブ (`studio` / `lesson`、`mutation_guard.h`) の中身を操作できない: ボタン・一覧・入力・スライダーの操作を
-  宣言に入れず、タブの先頭に「公開名からはこのタブを操作できません」と出す。タブの切り替えはできる。
-  ビューはプラグインの API をプロセス内から loopback の名前で呼ぶため、この判定は宣言の側で行う。
+- **遠隔の口から開いたページ** (`ScreenAccess::published`。Host ではなく、ページの `/shell/ws` を受けた口で決める)
+  では、変更系が loopback に限られるタブ (`studio` / `lesson`、`mutation_guard.h`) の中身を操作できない:
+  ボタン・一覧・入力・スライダーの操作を宣言に入れず、タブの先頭に「公開名からはこのタブを操作できません」と出す。
+  タブの切り替えはできる。ビューはプラグインの API をプロセス内から loopback の名前で呼ぶため、この判定は宣言の側で行う。
 
 ## 追加したタブ
 
@@ -111,8 +118,9 @@ Studio の UI は 1 つの宣言 (`tela::Document`) にまとめ、それを画�
 `tests/studio/test_studio_tela.cpp` (`ERGO_TELA_SOURCE_DIR` があるときだけ):
 ViewBuilder が作る `tela::Document` の形 (部品の種類・ID・値・Layout)、タブの切り替えと作り直し、
 窓とページの 2 つの Runtime で値が揃いフォーカスは別なこと、ページの入力 (`/shell/ws` の受け渡し) で
-callback が走ること、`/shell/` の配信と接続数の上限、公開名のページで loopback 限定タブが操作できないこと、
-ランチャーだけで始まり開くと帯とタブになること (公開名のページには外す・追加が無いこと)。
+callback が走ること、`/shell/` の配信と接続数の上限、遠隔の口のページで loopback 限定タブが操作できないこと
+(口で決まり Host では決まらないこと)、ページはランチャーだけで始まり開くと帯とタブになること (遠隔のページには外す・
+追加が無いこと)、窓はランチャーのままで行のボタンが Web サーバを起動・停止すること。
 Tela なし構成の既存テスト (`test_studio_ui` など) は ui_kit の書き出しを通して従来どおり。
 
 窓とブラウザでの実際の見た目・操作感 (文字の位置、GPU 描画、WebRTC の映像) は人間の確認として残す。

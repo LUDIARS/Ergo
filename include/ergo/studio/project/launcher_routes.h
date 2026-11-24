@@ -5,9 +5,10 @@
 ///   POST /api/launcher/close          {}
 ///   POST /api/launcher/add            {source}   loopback only
 ///   POST /api/launcher/remove         {source}   loopback only
-/// Adding and removing change the list on this machine, so a request under a
-/// public (Access) host name is refused, like the other loopback-only
-/// operations (spec/feature/tool/web.md). request_guard has already run.
+/// Adding and removing change the list on this machine, so a request that came
+/// in on the remote gate (net::Gate::remote) is refused, like the other
+/// loopback-only operations (ingress/remote_scope.h). The entrance check has
+/// already run.
 #include "ergo/studio/net/server.h"
 #include "ergo/studio/project/launcher.h"
 
@@ -17,7 +18,7 @@ namespace ergo::studio::project {
 
 class LauncherRoutes final : public net::IHttpHandler {
 public:
-    LauncherRoutes(Launcher& launcher, net::IHttpHandler& next, std::string bind_host);
+    LauncherRoutes(Launcher& launcher, net::IHttpHandler& next);
 
     net::HttpResponse handle(const net::HttpRequest& req) override;
 
@@ -27,7 +28,6 @@ private:
 
     Launcher&          launcher_;
     net::IHttpHandler& next_;
-    std::string        bind_host_;
 };
 
 } // namespace ergo::studio::project

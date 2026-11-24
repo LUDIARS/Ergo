@@ -1,6 +1,7 @@
-// ergo_studio.exe — reads the environment, builds the plugins, serves the
-// engine-facing HTTP / WS contract and runs the window. Nothing else lives
-// here (design: "the entry point only assembles host and shell").
+// ergo_studio.exe — reads the environment, builds the plugins, runs the
+// launcher window and the web server of the project it serves (the remote dev
+// server: spec/plan/2026-11-23-studio-launcher-and-devserver.md, B). Nothing
+// else lives here (design: "the entry point only assembles host and shell").
 #include "builtin_plugins.h"
 #include "studio_settings.h"
 #include "plugins/common/launcher_profiles.h"
@@ -10,8 +11,10 @@
 #include "ergo/studio/host/external_loader.h"
 #include "ergo/studio/host/plugin_host.h"
 #include "ergo/studio/net/server.h"
+#include "ergo/studio/project/dev_server.h"
 #include "ergo/studio/project/launcher.h"
 #include "ergo/studio/project/launcher_routes.h"
+#include "ergo/studio/web/web_server.h"
 #include "views/view_registry.h"
 #ifdef ERGO_STUDIO_HAS_TELA
 #  include "ergo/studio/tela/screen_hub.h"
@@ -29,8 +32,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
+#include <vector>
 
 #ifdef _WIN32
 #  ifndef NOMINMAX
@@ -78,6 +84,26 @@ std::filesystem::path exe_dir() {
 #else
     return std::filesystem::canonical("/proc/self/exe").parent_path();
 #endif
+}
+
+/// What a started web server serves: its gates, and each plugin with its path.
+void log_serving(const ergo::studio::web::WebServer& server, const ergo::studio::host::PluginHost& plugins,
+                 const ergo::studio::app::StudioSettings& settings, const char* page) {
+    using namespace ergo::studio;
+    const std::string addr = settings.bind_host + ":" + std::to_string(server.local_port());
+    log_line("info", "[ergo] local gate: http://" + addr + page);
+    if (const auto remote = server.remote_port()) {
+        log_line("info", "[ergo] remote gate: " + settings.bind_host + ":" + std::to_string(*remote) +
+                             " (the target of cloudflared / tailscale serve; loopback-only operations refused)");
+        for (const auto& h : settings.public_hosts) log_line("info", "[ergo]   https://" + h + page + " (Cloudflare Access)");
+        for (const auto& h : settings.tailnet_hosts) log_line("info", "[ergo]   https://" + h + page + " (tailnet)");
+    }
+    for (auto* p : plugins.plugins()) {
+        log_line("info", "[ergo]   -> " + p->info().title + "  (/" + p->info().id + "/" + (p->socket() ? ", ws" : "") + ")");
+        if (!p->info().usage_hint.empty()) {
+            log_line("info", "[ergo]        " + host::expand_usage_hint(p->info().usage_hint, addr));
+        }
+    }
 }
 
 } // namespace
@@ -133,40 +159,71 @@ int main(int argc, char** argv) {
     host::PluginHost plugins(std::move(loaded), &log_line);
     views::ViewRegistry views(&plugins);   // native tabs; outlives every screen
 
+    // The remote dev server: started from the launcher (or at once, see below). The server is made
+    // by `serve`, assigned once the routes exist (the declaration below needs the dev server first).
 #ifdef ERGO_STUDIO_HAS_TELA
-    // One Tela declaration for every screen: the window and the browser pages of /shell/
+    const char* page = "/shell/";
+#else
+    const char* page = "/";
+#endif
+    project::ServeFn          serve;
+    project::DevServerOptions dev_options{settings.bind_host, page, settings.public_hosts};
+    dev_options.published_names.insert(dev_options.published_names.end(), settings.tailnet_hosts.begin(),
+                                       settings.tailnet_hosts.end());
+    project::DevServer devserver(launcher, [&serve](std::string& e) { return serve(e); }, dev_options);
+
+#ifdef ERGO_STUDIO_HAS_TELA
+    // One Tela declaration for every screen: the window (the launcher) and the browser pages of /shell/
     // (spec/feature/tool/shell.md). The routes sit in front of the plugin host.
-    tela_shell::StudioDeclaration declaration(plugins, views.lookup(), ui::Theme{}, &launcher);
+    tela_shell::StudioDeclaration declaration(plugins, views.lookup(), ui::Theme{}, &launcher, &devserver);
     tela_shell::BrowserScreens    pages(&log_line);
     tela_shell::ScreenHub         hub(declaration, pages);
-    tela_shell::ShellRoutes       routes(plugins, plugins, pages, settings.bind_host);
+    tela_shell::ShellRoutes       routes(plugins, plugins, pages);
     net::IHttpHandler&            http_handler = routes;
     net::IWsAcceptor&             ws_acceptor  = routes;
 #else
     net::IHttpHandler& http_handler = plugins;
     net::IWsAcceptor&  ws_acceptor  = plugins;
 #endif
-    project::LauncherRoutes launcher_routes(launcher, http_handler, settings.bind_host);   // /api/launcher/*
+    project::LauncherRoutes launcher_routes(launcher, http_handler);   // /api/launcher/*
 
-    net::Server server({settings.bind_host, settings.port, settings.public_hosts}, launcher_routes, ws_acceptor, &log_line);
-    for (const auto& h : settings.public_hosts) log_line("info", "[ergo] published as https://" + h + "/web/ (Cloudflare Access only)");
-    std::string err;
-    if (!server.start(err)) {
-        log_line("error", "[ergo] " + err);
-        return 1;
-    }
-    const std::string addr = settings.bind_host + ":" + std::to_string(server.port());
-    log_line("info", "[ergo] http://" + addr + "/");
-#ifdef ERGO_STUDIO_HAS_TELA
-    log_line("info", "[ergo] browser shell: http://" + addr + "/shell/");
-#endif
-    for (auto* p : plugins.plugins()) {
-        log_line("info", "[ergo]   -> " + p->info().title + "  (/" + p->info().id + "/" + (p->socket() ? ", ws" : "") + ")");
-        if (!p->info().usage_hint.empty()) {
-            log_line("info", "[ergo]        " + host::expand_usage_hint(p->info().usage_hint, addr));
-        }
-    }
+    std::vector<std::string> plugin_ids;
+    for (auto* p : plugins.plugins()) plugin_ids.push_back(p->info().id);
+    web::WebServerConfig web_config;
+    web_config.bind_host     = settings.bind_host;
+    web_config.local_port    = settings.port;
+    web_config.remote_port   = settings.remote_port;
+    web_config.public_hosts  = settings.public_hosts;
+    web_config.tailnet_hosts = settings.tailnet_hosts;
+    serve = [&](std::string& e) -> std::unique_ptr<project::IServing> {
+        auto server = std::make_unique<web::WebServer>(web_config, launcher_routes, ws_acceptor, plugin_ids, &log_line);
+        if (!server->start(e)) return nullptr;
+        log_serving(*server, plugins, settings, page);
+        return server;
+    };
     for (const auto& r : plugins.rejected()) log_line("error", "[ergo]   !! rejected " + r.source + ": " + r.reason);
+
+#if defined(ERGO_STUDIO_HAS_TELA_WINDOW) || defined(ERGO_STUDIO_HAS_SHELL)
+    const bool windowed = !settings.headless;
+#else
+    const bool windowed = false;   // a build without the window is always headless
+#endif
+    // --project serves that profile at once; without a window the server runs from the start (no project
+    // open: the launcher's HTTP API opens one); with a window it waits for "リモート開発サーバ起動".
+    std::string err;
+    if (!settings.project.empty()) {
+        if (!devserver.start(settings.project, err)) {
+            log_line("error", "[ergo] cannot serve " + settings.project + ": " + err);
+            return 1;
+        }
+    } else if (!windowed) {
+        if (!devserver.serve_without_project(err)) {
+            log_line("error", "[ergo] " + err);
+            return 1;
+        }
+    } else {
+        log_line("info", "[ergo] launcher: start the remote dev server of a project to serve it");
+    }
 
     int code = 0;
 #if defined(ERGO_STUDIO_HAS_TELA_WINDOW)
@@ -189,6 +246,7 @@ int main(int argc, char** argv) {
         wc.shader_dir = settings.shader_dir;
         wc.views      = views.lookup();
         wc.launcher   = &launcher;
+        wc.devserver  = &devserver;
 #  ifdef ERGO_STUDIO_HAS_TELA
         wc.on_frame = [&hub](float dt) { hub.pump(dt); };   // browser pages share the window's UI thread
 #  endif
@@ -215,6 +273,6 @@ int main(int argc, char** argv) {
         while (!g_stop.load()) std::this_thread::sleep_for(std::chrono::milliseconds(200));
 #endif
     }
-    server.stop();
+    devserver.stop();
     return code;
 }

@@ -334,7 +334,7 @@ TEST(StudioTela, PublishedPagesCannotOperateLoopbackOnlyTabs) {
 TEST(StudioTela, ShellRoutesServeThePageAndOpenPages) {
     NoHttp             next;
     ts::BrowserScreens pages(&log_nothing, 1);
-    ts::ShellRoutes    routes(next, next, pages, "127.0.0.1");
+    ts::ShellRoutes    routes(next, next, pages);
 
     const auto page = routes.handle(request("/shell/"));
     EXPECT_EQ(page.status, 200);
@@ -352,8 +352,14 @@ TEST(StudioTela, ShellRoutesServeThePageAndOpenPages) {
 
     EXPECT_TRUE(routes.accepts("shell"));
     EXPECT_FALSE(routes.accepts("other"));
-    EXPECT_EQ(ts::screen_access(request("/shell/ws"), "127.0.0.1"), ts::ScreenAccess::local);
-    EXPECT_EQ(ts::screen_access(request("/shell/ws", "studio.example.com"), "127.0.0.1"), ts::ScreenAccess::published);
+    // Decided by the gate the page came in on, not by its Host.
+    EXPECT_EQ(ts::screen_access(request("/shell/ws")), ts::ScreenAccess::local);
+    auto remote = request("/shell/ws", "studio.example.com");
+    remote.gate = net::Gate::remote;
+    EXPECT_EQ(ts::screen_access(remote), ts::ScreenAccess::published);
+    auto local_name_remotely = request("/shell/ws");
+    local_name_remotely.gate = net::Gate::remote;
+    EXPECT_EQ(ts::screen_access(local_name_remotely), ts::ScreenAccess::published);
 
     auto first  = std::make_shared<FakeConn>(1);
     auto second = std::make_shared<FakeConn>(2);
@@ -374,7 +380,7 @@ TEST(StudioTela, AssetAndPlayHelpers) {
     EXPECT_EQ(views::play_state_text("idle"), "停止中");
 }
 
-// ---- the launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A) ----
+// ---- the launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A / B) ----
 
 namespace {
 
@@ -386,6 +392,38 @@ const tela::Element* find_suffix(const tela::Document& d, const std::string& suf
     }
     return nullptr;
 }
+
+/// A dev server that records start / stop and opens the project the way the real one does.
+class FakeDevServer final : public project::IDevServerControl {
+public:
+    explicit FakeDevServer(project::Launcher& l) : launcher_(l) {}
+    bool start(const std::string& source, std::string& err) override {
+        if (!launcher_.open(source, err)) return false;
+        running_ = true;
+        ++revision_;
+        return true;
+    }
+    void stop() override {
+        running_ = false;
+        launcher_.close();
+        ++revision_;
+    }
+    project::DevServerStatus status() const override {
+        project::DevServerStatus s;
+        s.running = running_;
+        if (running_) {
+            if (const auto c = launcher_.project().current()) s.source = c->source;
+            s.local_url = "http://127.0.0.1:5170/shell/";
+        }
+        return s;
+    }
+    uint64_t revision() const override { return revision_; }
+
+private:
+    project::Launcher& launcher_;
+    bool               running_  = false;
+    uint64_t           revision_ = 0;
+};
 
 struct LauncherFixture {
     LauncherFixture() {
@@ -404,12 +442,15 @@ struct LauncherFixture {
                                                        std::move(deps));
         std::string err;
         launcher->add((dir / "game.json").string(), err);   // a recent row (remove is shown on local screens)
-        decl = std::make_unique<ts::StudioDeclaration>(*base.host, ui::ViewLookup{}, ui::Theme{}, launcher.get());
+        devserver = std::make_unique<FakeDevServer>(*launcher);
+        decl = std::make_unique<ts::StudioDeclaration>(*base.host, ui::ViewLookup{}, ui::Theme{}, launcher.get(),
+                                                       devserver.get());
     }
     Fixture                                base;
     fs::path                               dir;
     project::OpenProject                   open;
     std::unique_ptr<project::Launcher>     launcher;
+    std::unique_ptr<FakeDevServer>         devserver;
     std::unique_ptr<ts::StudioDeclaration> decl;
 };
 
@@ -423,20 +464,48 @@ TEST(StudioTelaLauncher, DeclaresTheLauncherAloneUntilAProjectIsOpen) {
     EXPECT_NE(find(local, ts::StudioDeclaration::launcher_id()), nullptr);
     EXPECT_EQ(find(local, ts::StudioDeclaration::tabs_id()), nullptr);   // no tab list
     EXPECT_EQ(find(local, "content/overview"), nullptr);
-    const auto* devserver = find_suffix(local, "/devserver");
-    ASSERT_NE(devserver, nullptr);
-    EXPECT_FALSE(static_cast<bool>(devserver->action));   // stage 2: shown, not usable yet
+    EXPECT_NE(find_suffix(local, "/open"), nullptr);   // a page opens the project in its server
+    EXPECT_EQ(find_suffix(local, "/devserver"), nullptr);
     EXPECT_NE(find_suffix(local, "/remove"), nullptr);
     EXPECT_NE(find_suffix(local, "/add"), nullptr);
 
-    // A page under a public name: the list without add / remove.
+    // A page on the remote gate: the list without add / remove.
     const auto& published = f.decl->document(ts::ScreenAccess::published);
     EXPECT_NE(find_suffix(published, "/open"), nullptr);
     EXPECT_EQ(find_suffix(published, "/remove"), nullptr);
     EXPECT_EQ(find_suffix(published, "/add"), nullptr);
 }
 
-TEST(StudioTelaLauncher, OpenShowsTheBandOverTheTabsAndBackReturns) {
+TEST(StudioTelaLauncher, TheWindowIsTheLauncherAndItsRowsStartAndStopTheServer) {
+    LauncherFixture f;
+    f.decl->refresh(0);
+    const auto* start = find_suffix(f.decl->document(ts::ScreenAccess::window), "/devserver");
+    ASSERT_NE(start, nullptr);
+    ASSERT_TRUE(static_cast<bool>(start->action));
+    EXPECT_EQ(find_suffix(f.decl->document(ts::ScreenAccess::window), "/open"), nullptr);
+    start->action();
+    EXPECT_TRUE(f.decl->refresh(0));
+    ASSERT_TRUE(f.open.current().has_value());
+
+    // The window stays on the launcher (with the server's URL); the pages get the tabs.
+    const auto& window = f.decl->document(ts::ScreenAccess::window);
+    EXPECT_NE(find(window, ts::StudioDeclaration::launcher_id()), nullptr);
+    EXPECT_EQ(find(window, ts::StudioDeclaration::tabs_id()), nullptr);
+    EXPECT_NE(find_kind(window, tela::ElementKind::text, "手元: http://127.0.0.1:5170/shell/"), nullptr);
+    const auto& page = f.decl->document(ts::ScreenAccess::local);
+    EXPECT_FALSE(f.decl->showing_launcher());
+    EXPECT_NE(find(page, ts::StudioDeclaration::tabs_id()), nullptr);
+    EXPECT_NE(find(page, ts::StudioDeclaration::project_id()), nullptr);
+
+    const auto* stop = find_suffix(window, "/devserver-stop");
+    ASSERT_NE(stop, nullptr);
+    stop->action();
+    EXPECT_TRUE(f.decl->refresh(0));
+    EXPECT_FALSE(f.open.current().has_value());
+    EXPECT_NE(find_suffix(f.decl->document(ts::ScreenAccess::window), "/devserver"), nullptr);
+}
+
+TEST(StudioTelaLauncher, APageOpensTheBandOverTheTabsAndBackReturns) {
     LauncherFixture f;
     f.decl->refresh(0);
     const auto* open = find_suffix(f.decl->document(ts::ScreenAccess::local), "/open");

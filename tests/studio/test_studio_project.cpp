@@ -1,6 +1,8 @@
-// The launcher's model (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A, and
+// The launcher's model (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A / B, and
 // spec/plan/2026-11-23-studio-gen5-intake.md, 1): recent_projects.json text and file, the
-// launcher's rows and operations, project style detection and the /api/launcher/* routes.
+// launcher's rows and operations, project style detection, the /api/launcher/* routes and the
+// remote dev server's start / stop / switch.
+#include "ergo/studio/project/dev_server.h"
 #include "ergo/studio/project/launcher.h"
 #include "ergo/studio/project/launcher_routes.h"
 #include "ergo/studio/project/project_catalog.h"
@@ -90,13 +92,14 @@ public:
 };
 
 net::HttpRequest request(const std::string& method, const std::string& path, const std::string& body = {},
-                         const std::string& host = "127.0.0.1:5170") {
+                         net::Gate gate = net::Gate::local) {
     net::HttpRequest r;
     r.method          = method;
     r.path            = path;
     r.target          = path;
     r.body            = body;
-    r.headers["host"] = host;
+    r.gate            = gate;
+    r.headers["host"] = gate == net::Gate::local ? "127.0.0.1:5170" : "devbox.tail1234.ts.net";
     return r;
 }
 
@@ -384,7 +387,7 @@ TEST(LauncherRoutes, ListsOpensAndClosesAndPassesTheRestOn) {
     OpenProject open;
     Launcher l(ProjectCatalog(dir / "recent_projects.json"), open, fake_deps({{(dir / "a.json").u8string(), "a", "", "other", "lesson"}}));
     Next next;
-    LauncherRoutes routes(l, next, "127.0.0.1");
+    LauncherRoutes routes(l, next);
 
     auto res = routes.handle(request("GET", "/api/launcher/projects"));
     EXPECT_EQ(res.status, 200);
@@ -412,22 +415,153 @@ TEST(LauncherRoutes, ListsOpensAndClosesAndPassesTheRestOn) {
     EXPECT_EQ(next.calls, 1);
 }
 
-TEST(LauncherRoutes, AddAndRemoveAreLoopbackOnly) {
+TEST(LauncherRoutes, AddAndRemoveAreRefusedOnTheRemoteGate) {
     const fs::path dir = fresh_dir("guard");
     write(dir / "a.json", "{}");
     OpenProject open;
     Launcher l(ProjectCatalog(dir / "recent_projects.json"), open, fake_deps());
     Next next;
-    LauncherRoutes routes(l, next, "127.0.0.1");
+    LauncherRoutes routes(l, next);
     const std::string body = body_with_source(dir / "a.json");
 
-    EXPECT_EQ(routes.handle(request("POST", "/api/launcher/add", body, "studio.example.com")).status, 403);
+    // Decided by the gate the request came in on, not by its Host.
+    EXPECT_EQ(routes.handle(request("POST", "/api/launcher/add", body, net::Gate::remote)).status, 403);
     EXPECT_TRUE(l.rows().empty());
     EXPECT_EQ(routes.handle(request("POST", "/api/launcher/add", body)).status, 200);
     EXPECT_EQ(l.rows().size(), 1u);
-    EXPECT_EQ(routes.handle(request("POST", "/api/launcher/remove", body, "studio.example.com")).status, 403);
+    EXPECT_EQ(routes.handle(request("POST", "/api/launcher/remove", body, net::Gate::remote)).status, 403);
     EXPECT_EQ(routes.handle(request("POST", "/api/launcher/remove", body)).status, 200);
     EXPECT_EQ(routes.handle(request("POST", "/api/launcher/remove", body)).status, 404);
-    // Opening is allowed from a published page (it changes no list on disk beyond the recency).
-    EXPECT_EQ(routes.handle(request("POST", "/api/launcher/open", body, "studio.example.com")).status, 200);
+    // Opening is allowed from a remote page (it changes no list on disk beyond the recency).
+    EXPECT_EQ(routes.handle(request("POST", "/api/launcher/open", body, net::Gate::remote)).status, 200);
+}
+
+// ---- the remote dev server (B) ------------------------------------------------------
+
+namespace {
+
+/// A server that only counts: how many are running, on which ports.
+struct FakeServers {
+    int  running = 0;
+    int  started = 0;
+    bool fail    = false;
+
+    struct Serving final : IServing {
+        explicit Serving(FakeServers& o) : owner(o) { ++owner.running; }
+        ~Serving() override { --owner.running; }
+        uint16_t                local_port() const override { return 5170; }
+        std::optional<uint16_t> remote_port() const override { return remote; }
+        FakeServers&            owner;
+        std::optional<uint16_t> remote;
+    };
+
+    std::optional<uint16_t> remote;
+
+    ServeFn serve() {
+        return [this](std::string& err) -> std::unique_ptr<IServing> {
+            if (fail) {
+                err = "port taken";
+                return nullptr;
+            }
+            ++started;
+            auto s    = std::make_unique<Serving>(*this);
+            s->remote = remote;
+            return s;
+        };
+    }
+};
+
+struct DevFixture {
+    DevFixture() : dir(fresh_dir("dev")) {
+        write(dir / "a.json", "{}");
+        write(dir / "b.json", "{}");
+        launcher = std::make_unique<Launcher>(ProjectCatalog(dir / "recent_projects.json"), open, fake_deps());
+    }
+    std::string source(const char* name) const { return Launcher::normalize((dir / name).u8string()); }
+    fs::path                  dir;
+    OpenProject               open;
+    std::unique_ptr<Launcher> launcher;
+    FakeServers               servers;
+};
+
+} // namespace
+
+TEST(DevServer, StartOpensTheProjectAndServesItStopClosesIt) {
+    DevFixture f;
+    DevServer dev(*f.launcher, f.servers.serve(), {"127.0.0.1", "/shell/", {"studio.example.com"}});
+    EXPECT_FALSE(dev.status().running);
+    std::string err;
+    ASSERT_TRUE(dev.start(f.source("a.json"), err));
+    EXPECT_EQ(f.servers.running, 1);
+    ASSERT_TRUE(f.open.current().has_value());
+    EXPECT_EQ(f.open.current()->source, f.source("a.json"));
+    const DevServerStatus s = dev.status();
+    EXPECT_TRUE(s.running);
+    EXPECT_EQ(s.source, f.source("a.json"));
+    EXPECT_EQ(s.local_url, "http://127.0.0.1:5170/shell/");
+    EXPECT_TRUE(s.remote_target.empty());   // the remote gate is off by default
+    EXPECT_TRUE(s.remote_urls.empty());
+
+    const uint64_t before = dev.revision();
+    dev.stop();
+    EXPECT_GT(dev.revision(), before);
+    EXPECT_EQ(f.servers.running, 0);
+    EXPECT_FALSE(f.open.current().has_value());
+    EXPECT_FALSE(dev.status().running);
+}
+
+TEST(DevServer, AnotherProjectStopsTheCurrentOneFirst) {
+    DevFixture f;
+    DevServer dev(*f.launcher, f.servers.serve());
+    std::string err;
+    ASSERT_TRUE(dev.start(f.source("a.json"), err));
+    ASSERT_TRUE(dev.start(f.source("a.json"), err));   // already serving it: nothing restarts
+    EXPECT_EQ(f.servers.started, 1);
+    ASSERT_TRUE(dev.start(f.source("b.json"), err));
+    EXPECT_EQ(f.servers.started, 2);
+    EXPECT_EQ(f.servers.running, 1);   // one project at a time
+    EXPECT_EQ(f.open.current()->source, f.source("b.json"));
+    EXPECT_EQ(dev.status().source, f.source("b.json"));
+}
+
+TEST(DevServer, AFailedStartLeavesNothingOpen) {
+    DevFixture f;
+    f.servers.fail = true;
+    DevServer dev(*f.launcher, f.servers.serve());
+    std::string err;
+    EXPECT_FALSE(dev.start(f.source("a.json"), err));
+    EXPECT_EQ(err, "port taken");
+    EXPECT_FALSE(f.open.current().has_value());
+    EXPECT_FALSE(dev.status().running);
+
+    f.servers.fail = false;
+    err.clear();
+    EXPECT_FALSE(dev.start(f.source("none.json"), err));   // no such profile: no server either
+    EXPECT_EQ(f.servers.started, 0);
+}
+
+TEST(DevServer, TheRemoteGateShowsItsTargetAndTheNames) {
+    DevFixture f;
+    f.servers.remote = 5171;
+    DevServer dev(*f.launcher, f.servers.serve(), {"127.0.0.1", "/shell/", {"studio.example.com", "devbox.tail1234.ts.net"}});
+    std::string err;
+    ASSERT_TRUE(dev.start(f.source("a.json"), err));
+    const DevServerStatus s = dev.status();
+    EXPECT_EQ(s.remote_target, "127.0.0.1:5171");
+    ASSERT_EQ(s.remote_urls.size(), 2u);
+    EXPECT_EQ(s.remote_urls[0], "https://studio.example.com/shell/");
+    EXPECT_EQ(s.remote_urls[1], "https://devbox.tail1234.ts.net/shell/");
+}
+
+TEST(DevServer, ServesWithoutAProjectForAHeadlessStart) {
+    DevFixture f;
+    DevServer dev(*f.launcher, f.servers.serve());
+    std::string err;
+    ASSERT_TRUE(dev.serve_without_project(err));
+    EXPECT_TRUE(dev.status().running);
+    EXPECT_TRUE(dev.status().source.empty());
+    EXPECT_FALSE(f.open.current().has_value());
+    ASSERT_TRUE(dev.start(f.source("a.json"), err));   // the launcher's row: restarts on the project
+    EXPECT_EQ(f.servers.running, 1);
+    EXPECT_EQ(dev.status().source, f.source("a.json"));
 }

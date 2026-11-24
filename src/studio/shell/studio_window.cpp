@@ -121,7 +121,7 @@ int run_studio_window(host::PluginHost& host, const WindowConfig& cfg, const std
         return 6;
     }
 
-    ui::StudioApp app(host, font, ui::Theme{}, cfg.views, cfg.launcher);
+    ui::StudioApp app(host, font, ui::Theme{}, cfg.views, cfg.launcher, cfg.devserver);
     auto last = std::chrono::steady_clock::now();
     int code = 0;
     while (!stop.load() && !surface.should_close()) {

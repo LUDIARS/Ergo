@@ -1,7 +1,5 @@
 #include "ergo/studio/tela/shell_routes.h"
 
-#include "ergo/studio/net/request_guard.h"
-
 #include <utility>
 
 // Compiled in by ergo_embed_text (CMakeLists.txt): the page, its script and Tela's web/tela.js.
@@ -31,13 +29,12 @@ net::HttpResponse file(const char* body, std::size_t size, const char* type) {
 
 } // namespace
 
-ScreenAccess screen_access(const net::HttpRequest& req, const std::string& bind_host) {
-    return net::is_trusted_host(req.header("host"), bind_host) ? ScreenAccess::local : ScreenAccess::published;
+ScreenAccess screen_access(const net::HttpRequest& req) {
+    return req.gate == net::Gate::local ? ScreenAccess::local : ScreenAccess::published;
 }
 
-ShellRoutes::ShellRoutes(net::IHttpHandler& next_http, net::IWsAcceptor& next_ws, BrowserScreens& pages,
-                         std::string bind_host)
-    : next_http_(next_http), next_ws_(next_ws), pages_(pages), bind_host_(std::move(bind_host)) {}
+ShellRoutes::ShellRoutes(net::IHttpHandler& next_http, net::IWsAcceptor& next_ws, BrowserScreens& pages)
+    : next_http_(next_http), next_ws_(next_ws), pages_(pages) {}
 
 net::HttpResponse ShellRoutes::handle(const net::HttpRequest& req) {
     if (req.path != "/shell" && req.path.rfind("/shell/", 0) != 0) return next_http_.handle(req);
@@ -64,7 +61,7 @@ bool ShellRoutes::accepts(const std::string& plugin_id) const {
 net::WsHandlers ShellRoutes::accept(const std::string& plugin_id, const net::HttpRequest& req,
                                     std::shared_ptr<net::IWsConnection> conn) {
     if (plugin_id != kShellId) return next_ws_.accept(plugin_id, req, std::move(conn));
-    return pages_.open(std::move(conn), screen_access(req, bind_host_));
+    return pages_.open(std::move(conn), screen_access(req));
 }
 
 } // namespace ergo::studio::tela_shell

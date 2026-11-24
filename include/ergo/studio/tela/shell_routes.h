@@ -4,9 +4,9 @@
 ///   GET /shell/tela.js     Tela's web renderer (embedded at build time)
 ///   GET /shell/shell.js    the page script (socket, remote-play video)
 ///   WS  /shell/ws          one BrowserScreens page
-/// Everything else goes to the next handler. request_guard has already run
-/// (the server checks Host / Origin / the Access header before any handler);
-/// a page reached under a public name gets ScreenAccess::published.
+/// Everything else goes to the next handler. The entrance check has already
+/// run (ingress/entrance.h); a page opened on the remote gate gets
+/// ScreenAccess::published, whatever its Host.
 #include "ergo/studio/net/server.h"
 #include "ergo/studio/tela/browser_screens.h"
 
@@ -14,12 +14,12 @@
 
 namespace ergo::studio::tela_shell {
 
-/// local for a loopback Host (or the bind host), published otherwise.
-ScreenAccess screen_access(const net::HttpRequest& req, const std::string& bind_host);
+/// local for a request on the local gate, published for the remote gate.
+ScreenAccess screen_access(const net::HttpRequest& req);
 
 class ShellRoutes final : public net::IHttpHandler, public net::IWsAcceptor {
 public:
-    ShellRoutes(net::IHttpHandler& next_http, net::IWsAcceptor& next_ws, BrowserScreens& pages, std::string bind_host);
+    ShellRoutes(net::IHttpHandler& next_http, net::IWsAcceptor& next_ws, BrowserScreens& pages);
 
     net::HttpResponse handle(const net::HttpRequest& req) override;
     bool              accepts(const std::string& plugin_id) const override;
@@ -30,7 +30,6 @@ private:
     net::IHttpHandler& next_http_;
     net::IWsAcceptor&  next_ws_;
     BrowserScreens&    pages_;
-    std::string        bind_host_;
 };
 
 } // namespace ergo::studio::tela_shell

@@ -30,6 +30,69 @@
       "module": "tests/packages/contracts/package-cli-process.contract.mjs",
       "mode": "observe",
       "sample": 1
+    },
+    {
+      "id": "C-5",
+      "criterion": "C-5 verifyStudioEntrance(executable): 手元の口は loopback の名前と同じ Origin だけを通し公開名・tailnet 名を断る。遠隔の口は公開名に Access のヘッダー、tailnet 名に Tailscale-User-Login を求め、知らない Host と Origin の食い違いを断り、loopback 専用の操作を断る",
+      "symbol": "verifyStudioEntrance",
+      "file": "tests/studio/verify_entrance.mjs",
+      "module": "tests/studio/contracts/entrance.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-6",
+      "criterion": "C-6 verifyStudioWebServer(executable): Portus の Web サーバはルート表に無い経路を 404、本文上限を超えた要求を 413 で断り、遠隔の口は既定で無効、口はヘッダーではなくポートで決まり遠隔の口で loopback 専用の操作を断り、エンジンの WS クライアントが同じポートで話せる",
+      "symbol": "verifyStudioWebServer",
+      "file": "tests/studio/verify_web_server.mjs",
+      "module": "tests/studio/contracts/web-server.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-7",
+      "criterion": "C-7 verifyStudioDevServer(executable): リモート開発サーバの起動でプロジェクトを開いて配信し、停止で閉じ、別のプロジェクトの起動は今の方を止めてから切り替え (同時に 1 つ)、起動に失敗したら何も開かず、launcher の add / remove は遠隔の口で断る",
+      "symbol": "verifyStudioDevServer",
+      "file": "tests/studio/verify_dev_server.mjs",
+      "module": "tests/studio/contracts/dev-server.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-8",
+      "criterion": "C-8 verifyStudioServedProfile(executable): --project で配信したプロフィールだけをプラグインが見て、停止すると何も見えない",
+      "symbol": "verifyStudioServedProfile",
+      "file": "tests/studio/verify_served_profile.mjs",
+      "module": "tests/studio/contracts/served-profile.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-9",
+      "criterion": "C-9 verifyStudioLauncherWindow(executable): ui_kit の窓はランチャーだけで、リモート開発サーバを起動・停止しても、別の画面から開いても窓にタブを出さない",
+      "symbol": "verifyStudioLauncherWindow",
+      "file": "tests/studio/verify_launcher_window.mjs",
+      "module": "tests/studio/contracts/launcher-window.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-10",
+      "criterion": "C-10 verifyStudioTelaLauncher(executable): Tela の窓の宣言はランチャーのままで行のボタンが Web サーバを起動・停止し、ブラウザのページは開くとタブになり、遠隔の口のページは Host ではなく口で published になる",
+      "symbol": "verifyStudioTelaLauncher",
+      "file": "tests/studio/verify_tela_launcher.mjs",
+      "module": "tests/studio/contracts/tela-launcher.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-11",
+      "criterion": "C-11 verifyStudioStartArguments(executable): --headless --project <profile.json> を読み、遠隔の口は --remote-port か ERGO_STUDIO_REMOTE_PORT が無ければ無効、不正なポートと PORT と同じポートは誤り、公開名と tailnet 名を読む",
+      "symbol": "verifyStudioStartArguments",
+      "file": "tests/studio/verify_start_arguments.mjs",
+      "module": "tests/studio/contracts/start-arguments.contract.mjs",
+      "mode": "observe",
+      "sample": 1
     }
   ]
 }

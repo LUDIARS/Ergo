@@ -90,7 +90,8 @@ TEST(StudioSettings, UsageListsEveryOptionAndVariableReadSettingsReads) {
                              "LUDIARS_ROOT", "EXCUBITOR_URL", "ERGO_ACTIO_TOKEN", "ERGO_CURARE_URL", "ERGO_CURARE_TOKEN",
                              "ERGO_PLUGIN_OWNERS", "ERGO_STUDIO_TIMEOUT_MS", "VISUS_PROJECT_ROOTS",
                              "ERGO_UI_LAYOUT_ROOT", "ERGO_PICTOR_PROFILE_DIR", "ERGO_VFX_BACKEND", "ERGO_VFX_MODEL",
-                             "CLAUDE_BIN", "ERGO_STUDIO_FONT", "WINDIR"}) {
+                             "CLAUDE_BIN", "ERGO_STUDIO_FONT", "WINDIR", "--project", "--remote-port",
+                             "ERGO_STUDIO_REMOTE_PORT", "ERGO_STUDIO_PUBLIC_HOSTS", "ERGO_STUDIO_TAILNET_HOSTS"}) {
         EXPECT_NE(u.find(word), std::string::npos);
     }
     EXPECT_NE(u.find("default " + std::to_string(kDefaultPort)), std::string::npos);
@@ -99,4 +100,48 @@ TEST(StudioSettings, UsageListsEveryOptionAndVariableReadSettingsReads) {
 #else
     EXPECT_NE(u.find("HOME "), std::string::npos);
 #endif
+}
+
+// ---- the web server's gates and --project (spec/feature/tool/ergo.md "起動モード", "口と入口") ----
+
+TEST(StudioSettings, TheRemoteGateIsOffUnlessAPortIsGiven) {
+    const auto s = read({});
+    EXPECT_TRUE(s.error.empty());
+    EXPECT_FALSE(s.remote_port.has_value());
+    EXPECT_TRUE(s.project.empty());
+}
+
+TEST(StudioSettings, HeadlessProjectServesThatProfile) {
+    const auto spaced = read({"--headless", "--project", "D:/games/alpha.json"});
+    EXPECT_TRUE(spaced.error.empty());
+    EXPECT_TRUE(spaced.headless);
+    EXPECT_EQ(spaced.project, "D:/games/alpha.json");
+    const auto joined = read({"--project=D:/games/beta.json"});
+    EXPECT_TRUE(joined.error.empty());
+    EXPECT_EQ(joined.project, "D:/games/beta.json");
+    EXPECT_FALSE(read({"--project"}).error.empty());   // the path is missing
+    EXPECT_FALSE(read({"--project="}).error.empty());
+}
+
+TEST(StudioSettings, TheRemotePortComesFromTheArgumentOrTheEnvironment) {
+    const auto env = read({}, {{"ERGO_STUDIO_REMOTE_PORT", "5171"}});
+    EXPECT_TRUE(env.error.empty());
+    ASSERT_TRUE(env.remote_port.has_value());
+    EXPECT_EQ(*env.remote_port, 5171);
+    const auto arg = read({"--remote-port", "5172"}, {{"ERGO_STUDIO_REMOTE_PORT", "5171"}});
+    ASSERT_TRUE(arg.remote_port.has_value());
+    EXPECT_EQ(*arg.remote_port, 5172);   // the argument wins
+    EXPECT_FALSE(read({"--remote-port", "0"}).error.empty());
+    EXPECT_FALSE(read({"--remote-port=abc"}).error.empty());
+    EXPECT_FALSE(read({}, {{"ERGO_STUDIO_REMOTE_PORT", "70000"}}).error.empty());
+    EXPECT_FALSE(read({"--remote-port", "5170"}).error.empty());   // the same port as the local gate
+}
+
+TEST(StudioSettings, PublicAndTailnetNamesAreRead) {
+    const auto s = read({}, {{"ERGO_STUDIO_PUBLIC_HOSTS", "Studio.Example.com"},
+                             {"ERGO_STUDIO_TAILNET_HOSTS", "devbox.tail1234.ts.net, not-a-tailnet.example"}});
+    ASSERT_EQ(s.public_hosts.size(), 1u);
+    EXPECT_EQ(s.public_hosts[0], "studio.example.com");
+    ASSERT_EQ(s.tailnet_hosts.size(), 1u);
+    EXPECT_EQ(s.tailnet_hosts[0], "devbox.tail1234.ts.net");
 }

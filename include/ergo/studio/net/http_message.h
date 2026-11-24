@@ -7,6 +7,14 @@
 
 namespace ergo::studio::net {
 
+/// The listener a request came in on (spec/feature/tool/ergo.md "口"). cloudflared and
+/// `tailscale serve` dial the Studio from 127.0.0.1 too, so the peer address cannot tell
+/// a local browser from a remote one: the port can.
+enum class Gate {
+    local,   ///< 127.0.0.1:<PORT>, this machine's browser and engine clients (every operation)
+    remote,  ///< 127.0.0.1:<ERGO_STUDIO_REMOTE_PORT>, the tunnel / tailnet target (loopback-only operations refused)
+};
+
 struct HttpRequest {
     std::string                        method;   // "GET", "POST", ...
     std::string                        target;   // raw request-target ("/a/b?x=1")
@@ -14,6 +22,11 @@ struct HttpRequest {
     std::map<std::string, std::string> query;    // percent-decoded query pairs
     std::map<std::string, std::string> headers;  // lower-cased names
     std::string                        body;
+    /// Set by the server from the listener, never from a header.
+    Gate                               gate = Gate::local;
+    /// Who the entrance check found on the remote gate (the Access e-mail or the
+    /// Tailscale login); "" on the local gate.
+    std::string                        who;
 
     /// Header value, or nullopt when absent.
     std::optional<std::string> header(const std::string& lower_name) const;
