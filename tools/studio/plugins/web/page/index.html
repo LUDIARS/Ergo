@@ -42,6 +42,12 @@
       <aside class="side">
         <div class="bar"><strong>サービス</strong><button id="svc-reload">更新</button></div>
         <ul id="svc-list" class="list"></ul>
+        <details id="gen5-services">
+          <summary>Gen5 ワークフローの稼働状況</summary>
+          <p>この Excubitor での状態です。外部プレイ環境の状態は未確認です。</p>
+          <button id="gen5-reload">Gen5 の状態を更新</button>
+          <ul id="gen5-list" class="list" aria-live="polite"></ul>
+        </details>
         <pre id="svc-log" class="log" hidden></pre>
       </aside>
     </div>

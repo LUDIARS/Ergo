@@ -46,6 +46,7 @@ struct WorkspaceProfile {
     std::map<std::string, std::filesystem::path> tuning;    ///< app -> versions folder (absolute)
     std::vector<std::filesystem::path>           git;       ///< repositories (absolute)
     std::vector<AssetRoot>                       assets;    ///< asset folders, in file order
+    JsonValue                                    tuning_templates;
     JsonValue                                    play;      ///< the raw "play" value (null when absent)
 };
 

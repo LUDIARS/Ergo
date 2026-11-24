@@ -374,6 +374,26 @@ async function showLogs(code) {
 }
 
 $('svc-reload').addEventListener('click', loadServices);
+async function loadGen5() {
+  const button = $('gen5-reload');
+  if (button.disabled) return;
+  button.disabled = true;
+  const list = $('gen5-list');
+  list.textContent = '読み込み中…';
+  try {
+    const services = await api('/services/api/gen5');
+    const labels = { running: '稼働中', stopped: '停止', unregistered: '未登録', unknown: '不明' };
+    list.replaceChildren(...services.map(s => el('li', {
+      text: s.code + ' — ' + (Object.hasOwn(labels, s.state) ? labels[s.state] : s.state || '不明')
+    })));
+  } catch (err) {
+    list.textContent = 'Gen5 の状態を取得できませんでした。' + err.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+$('gen5-reload').addEventListener('click', loadGen5);
+$('gen5-services').addEventListener('toggle', e => { if (e.target.open) loadGen5(); });
 
 // ---- assets (assets plugin) --------------------------------------------------
 
@@ -595,7 +615,7 @@ function stopWatching() {
   $('play-watch').textContent = '映像を見る';
 }
 
-async function watch() {
+async function watchPlayStream() {
   const t = currentTarget();
   if (!t) return;
   if (play.watching) {   // the button toggles
@@ -695,7 +715,7 @@ $('play-target').addEventListener('change', () => { if (play.watching) stopWatch
 $('play-build').addEventListener('click', () => targetAction('build'));
 $('play-run').addEventListener('click', () => targetAction('run'));
 $('play-stop').addEventListener('click', () => targetAction('stop'));
-$('play-watch').addEventListener('click', watch);
+$('play-watch').addEventListener('click', watchPlayStream);
 
 // ---- start -----------------------------------------------------------------
 

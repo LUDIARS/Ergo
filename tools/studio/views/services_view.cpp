@@ -9,8 +9,10 @@ namespace {
 
 std::string state_word(const std::string& state, bool running) {
     if (running) return "稼働中";
-    if (state == "stopped" || state.empty()) return "停止";
-    return state.c_str();
+    if (state == "stopped") return "停止";
+    if (state == "unregistered") return "未登録";
+    if (state.empty() || state == "unknown") return "不明";
+    return state;
 }
 
 } // namespace
@@ -53,7 +55,31 @@ void ServicesView::render(ui::ViewBuilder& b) {
     render_notice(b);
     {
         ui::ViewBuilder r = b.row(6);
-        r.button("更新", [this] { get("list", "/api/services"); });
+        r.button("プロジェクト", [this] { gen5_ = false; touch(); }, !gen5_);
+        r.button("Gen5", [this] { gen5_ = true; get("gen5", "/api/gen5"); }, gen5_);
+        r.button("更新", [this] {
+            if (gen5_) get("gen5", "/api/gen5");
+            else get("list", "/api/services");
+        });
+    }
+    if (gen5_) {
+        b.label("Gen5 ワークフロー");
+        b.muted("この Excubitor の登録状態を表示します。外部のプレイ環境の稼働状況は未確認です。");
+        if (!slot_state(b, "gen5")) return;
+        const auto& services = slot("gen5").result.json;
+        if (!services.is_array()) return;
+        for (const auto& service : *services.a) {
+            const auto code = text_of(service, "code");
+            if (code == "voluptas") b.label("制作ループ");
+            if (code == "concordia") b.label("共通基盤");
+            if (code == "ingenium") b.label("オートプレイ");
+            auto row = b.row(8);
+            row.clipped_label(code, 220);
+            const auto state = text_of(service, "state");
+            const bool running = state == "running";
+            row.label(state_word(state, running), running ? &b.theme().ok : nullptr);
+        }
+        return;
     }
     if (!contested_.empty()) {
         ui::ViewBuilder r = b.row(6);

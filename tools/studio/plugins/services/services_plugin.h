@@ -39,7 +39,7 @@ public:
     JsonValue         snapshot() const override;
 
 private:
-    net::HttpResponse list();
+    net::HttpResponse list(bool gen5 = false);
     net::HttpResponse control(const std::string& code, const net::HttpRequest& req);
     net::HttpResponse logs(const std::string& code);
     ProfileSet        profiles() const;

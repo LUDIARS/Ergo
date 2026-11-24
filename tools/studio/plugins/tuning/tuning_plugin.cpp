@@ -82,7 +82,13 @@ net::HttpResponse TuningPlugin::handle(const net::HttpRequest& req, const std::s
                             {"created", jstr(v.created)},
                             {"values", jnum(static_cast<double>(v.values))}}));
         }
-        return json_response(200, jobj({{"folder", jstr(folder.u8string())}, {"versions", list}}));
+        JsonValue layout = JsonValue::make_array();
+        for (const auto& profile : profiles_->profiles().profiles) {
+            const auto* groups = field(profile.tuning_templates, app);
+            if (groups && groups->is_array()) layout = *groups;
+        }
+        return json_response(200, jobj({{"folder", jstr(folder.u8string())}, {"versions", list},
+                                        {"app", jstr(app)}, {"layout", layout}}));
     }
     if (path == "/api/versions" && req.method == "POST") return save(req);
     const std::string prefix = "/api/versions/";

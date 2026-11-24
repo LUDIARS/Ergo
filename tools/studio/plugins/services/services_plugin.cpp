@@ -50,11 +50,13 @@ JsonValue pick_services(const JsonValue& excubitor_list, const std::vector<Works
         }
         if (any_listed && profile.empty()) continue;
         const JsonValue* running = field(s, "running");
+        std::string state = text_of(s, "state");
+        if (state.empty() && running && running->is_bool()) state = running->as_bool() ? "running" : "stopped";
         const JsonValue* port = field(s, "port");
         JsonValue item = jobj({{"code", jstr(code)},
                                {"name", jstr(text_of(s, "name"))},
-                               {"state", jstr(text_of(s, "state"))},
-                               {"running", jbool(running != nullptr && running->as_bool())},
+                               {"state", jstr(state)},
+                               {"running", jbool(state == "running")},
                                {"project", jstr(text_of(s, "project_code"))},
                                {"profile", jstr(profile)}});
         if (port != nullptr && port->is_number()) item.set("port", *port);
@@ -106,6 +108,7 @@ JsonValue ServicesPlugin::snapshot() const {
 net::HttpResponse ServicesPlugin::handle(const net::HttpRequest& req, const std::string& sub) {
     if (sub == "/api/health") return json_response(200, snapshot());
     if (sub == "/api/services" && req.method == "GET") return list();
+    if (sub == "/api/gen5" && req.method == "GET") return list(true);
     const std::string prefix = "/api/services/";
     if (sub.rfind(prefix, 0) == 0) {
         const std::string rest = sub.substr(prefix.size());
@@ -119,10 +122,26 @@ net::HttpResponse ServicesPlugin::handle(const net::HttpRequest& req, const std:
     return fail(404, "not found");
 }
 
-net::HttpResponse ServicesPlugin::list() {
+net::HttpResponse ServicesPlugin::list(bool gen5) {
     const auto result = caller_->call(endpoints_->url(studio::Service::Excubitor), "/api/v1/services");
     if (!result.ok) return fail(studio::failure_http_status(result.kind), "Excubitor: " + result.message);
-    return json_response(200, pick_services(result.data, profiles().profiles));
+    const JsonValue* catalog = result.data.is_array() ? &result.data : field(result.data, "services");
+    if (!catalog || !catalog->is_array()) return fail(502, "Excubitor returned an invalid service catalog");
+    if (!gen5) return json_response(200, pick_services(*catalog, profiles().profiles));
+
+    const auto services = pick_services(*catalog, {});
+    JsonValue rows = JsonValue::make_array();
+    for (const char* code : {"voluptas", "discutere", "conflux", "concordia", "revisor", "actio",
+                             "excubitor", "praeforma", "breviarium", "ingenium", "commentarii"}) {
+        auto match = std::find_if(services.a->begin(), services.a->end(), [code](const JsonValue& service) {
+            return text_of(service, "code") == code;
+        });
+        JsonValue row = match == services.a->end()
+                            ? jobj({{"code", jstr(code)}, {"state", jstr("unregistered")}})
+                            : *match;
+        rows.push(std::move(row));
+    }
+    return json_response(200, rows);
 }
 
 net::HttpResponse ServicesPlugin::control(const std::string& code, const net::HttpRequest& req) {

@@ -103,9 +103,46 @@ void TuningView::render(ui::ViewBuilder& b) {
             }, a == app_);
         }
     }
-    render_values(b, vars);
+    const auto& versions = slot("versions");
+    const auto* layout = versions.result.json.find("layout");
+    if (versions.loaded && versions.result.ok() && text_of(versions.result.json, "app") == app_ &&
+        layout && layout->is_array() && !layout->a->empty()) {
+        auto tabs = b.row(4);
+        tabs.button("調整テンプレート", [this] { use_template_ = true; touch(); }, use_template_);
+        tabs.button("全項目", [this] { use_template_ = false; touch(); }, !use_template_);
+        if (use_template_) render_template(b, *layout, vars);
+        else render_values(b, vars);
+    } else {
+        render_values(b, vars);
+    }
     b.separator();
     render_versions(b, vars);
+}
+
+void TuningView::render_template(ui::ViewBuilder& b, const jm::JsonValue& groups, const std::vector<BoundVar>& vars) {
+    for (const auto& group : *groups.a) {
+        const auto* fields = group.find("fields");
+        if (!fields || !fields->is_array()) continue;
+        b.label(text_of(group, "title"));
+        auto panel = b.panel(5);
+        for (const auto& field : *fields->a) {
+            const auto name = text_of(field, "name");
+            const auto widget = text_of(field, "widget");
+            auto v = std::find_if(vars.begin(), vars.end(), [&](const BoundVar& item) {
+                return item.app == app_ && item.name == name;
+            });
+            if (v == vars.end()) { panel.muted(name + "（未接続）"); continue; }
+            if (!read_only(*v) && widget == "toggle" && v->kind == "bool") {
+                const bool on = v->value.as_bool();
+                panel.button(name + (on ? " ON" : " OFF"), [this, name, on] { set(name, jm::JsonValue::make_bool(!on)); }, on);
+            } else if (!read_only(*v) && (widget == "slider" || widget == "number") &&
+                       (v->kind == "float" || v->kind == "double" || v->kind == "int32" || v->kind == "int64")) {
+                render_number(panel, *v, widget == "slider");
+            } else {
+                panel.label(name + "   " + jm::serialize(v->value));
+            }
+        }
+    }
 }
 
 void TuningView::render_values(ui::ViewBuilder& b, const std::vector<BoundVar>& vars) {
@@ -148,7 +185,7 @@ void TuningView::render_values(ui::ViewBuilder& b, const std::vector<BoundVar>& 
     }
 }
 
-void TuningView::render_number(ui::ViewBuilder& b, const BoundVar& v) {
+void TuningView::render_number(ui::ViewBuilder& b, const BoundVar& v, bool slider) {
     const double lo = meta_number(v, "min", 0.0);
     const double hi = meta_number(v, "max", 0.0);
     const bool integer = v.kind == "int32" || v.kind == "int64";
@@ -162,7 +199,7 @@ void TuningView::render_number(ui::ViewBuilder& b, const BoundVar& v) {
     ui::ViewBuilder r = b.row(8);
     r.clipped_label(short_name(v.name), 260);
     // A wide range (a cooldown in ticks, a distance in mm) is dragged on a slider; exact values are typed.
-    if (hi > lo) r.slider(static_cast<float>((value - lo) / (hi - lo)), [clamp_set, lo, hi](float f) { clamp_set(lo + (hi - lo) * f); }, 200);
+    if (slider && hi > lo) r.slider(static_cast<float>((value - lo) / (hi - lo)), [clamp_set, lo, hi](float f) { clamp_set(lo + (hi - lo) * f); }, 200);
     std::string& text = edits_[name];
     if (text.empty()) text = number_text(value, integer);
     r.text_field(text, {}, 110, [this, clamp_set, name] {

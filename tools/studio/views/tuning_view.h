@@ -31,7 +31,9 @@ protected:
 
 private:
     void render_values(ui::ViewBuilder& b, const std::vector<plugins::variable::BoundVar>& vars);
-    void render_number(ui::ViewBuilder& b, const plugins::variable::BoundVar& v);
+    void render_number(ui::ViewBuilder& b, const plugins::variable::BoundVar& v, bool slider = true);
+    void render_template(ui::ViewBuilder& b, const common::jsonm::JsonValue& groups,
+                         const std::vector<plugins::variable::BoundVar>& vars);
     void render_versions(ui::ViewBuilder& b, const std::vector<plugins::variable::BoundVar>& vars);
     void load_versions();
     void save_version(const std::vector<plugins::variable::BoundVar>& vars);
@@ -40,6 +42,7 @@ private:
 
     plugins::variable::VariablePlugin* variable_ = nullptr;
     std::string app_;                           ///< the app shown
+    bool use_template_ = true;
     std::string group_;                         ///< the category shown
     std::map<std::string, std::string> edits_;  ///< number field text per variable
     std::string version_name_, version_note_;

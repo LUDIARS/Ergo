@@ -20,6 +20,7 @@ private:
     void control(const std::string& code, const std::string& action, bool force);
     void show_logs(const std::string& code);
 
+    bool gen5_ = false;
     std::string selected_;   ///< service whose log is shown
     std::string contested_;  ///< a start refused because someone else is testing it
 };
