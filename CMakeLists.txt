@@ -1495,7 +1495,9 @@ if(ERGO_BUILD_STUDIO)
             tools/studio/plugins/asset_import/asset_import_plugin.cpp
             tools/studio/plugins/asset_import/capture_request.cpp
             tools/studio/plugins/asset_import/import_assets.cpp
-            tools/studio/plugins/asset_import/model_analysis.cpp)
+            tools/studio/plugins/asset_import/model_analysis.cpp
+            tools/studio/plugins/asset_import/preview_mesh.cpp
+            tools/studio/plugins/asset_import/source_family.cpp)
         target_link_libraries(ergo_studio_plugins PRIVATE pictor Lorica::boundary)
         target_compile_definitions(ergo_studio_plugins PUBLIC ERGO_STUDIO_HAS_ASSET_IMPORT=1)
     endif()
@@ -2572,7 +2574,6 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
         if(TARGET Lorica::boundary)
             add_library(ergo_studio_asset_preview STATIC
                 tools/studio/plugins/asset_import/preview_gpu.cpp
-                tools/studio/plugins/asset_import/preview_mesh.cpp
                 tools/studio/plugins/asset_import/preview_surface.cpp
                 tools/studio/plugins/asset_import/preview_window.cpp
                 src/custos/png_writer.cpp)

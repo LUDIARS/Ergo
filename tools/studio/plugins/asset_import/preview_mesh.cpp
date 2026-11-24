@@ -1,4 +1,5 @@
 #include "preview_mesh.h"
+#include "model_analysis.h"
 
 #include "pictor/animation/fbx_importer.h"
 #include "pictor/core/transform_math.h"
@@ -87,9 +88,10 @@ std::vector<Triangle> triangles(const pictor::FBXScene& scene) {
 
 } // namespace
 
-std::vector<PreviewVertex> preview_mesh(const std::string& fbx) {
+std::vector<PreviewVertex> preview_mesh(SourceFormat format, const std::string& bytes) {
+    if (const auto* issue = model_loader_issue(format)) throw std::runtime_error(issue);
     const pictor::FBXImporter loader;
-    const auto model = loader.import_memory(reinterpret_cast<const uint8_t*>(fbx.data()), fbx.size());
+    const auto model = loader.import_memory(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
     if (!model.success || !model.scene) throw std::runtime_error(model.error_message);
     auto mesh = triangles(*model.scene);
     if (mesh.empty()) throw std::runtime_error("FBX has no drawable triangles");

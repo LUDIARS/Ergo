@@ -5,8 +5,17 @@
   "importFrom": "../../contracts/contract-runtime.mjs",
   "contracts": [
     {
-      "id": "C-12",
-      "criterion": "C-12 verifyAssetImport(executable): FBX の増分解析、Visus の生成と手編集の保持、撮影の受け渡し、窓なしでの未撮影を確認する",
+      "id": "C-16",
+      "criterion": "C-16 verifyAssetImportFormats(executable): 同名の組を優先順位で選び、代替素材を Visus に記録し、未対応の形式を理由付きで飛ばす",
+      "symbol": "verifyAssetImportFormats",
+      "file": "tests/studio/verify_asset_import.mjs",
+      "module": "tests/studio/contracts/asset-import-formats.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-15",
+      "criterion": "C-15 verifyAssetImport(executable): FBX の増分解析、Visus の生成と手編集の保持、撮影の受け渡し、窓なしでの未撮影を確認する",
       "symbol": "verifyAssetImport",
       "file": "tests/studio/verify_asset_import.mjs",
       "module": "tests/studio/contracts/asset-import.contract.mjs",

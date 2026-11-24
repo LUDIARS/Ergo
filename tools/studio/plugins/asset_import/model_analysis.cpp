@@ -20,6 +20,23 @@ std::string texture_slot(const std::string& channel) {
 
 } // namespace
 
+const char* model_loader_issue(SourceFormat format) {
+    switch (format) {
+    case SourceFormat::Fbx: return nullptr;
+    case SourceFormat::Obj: return "Pictor does not expose an OBJ/MTL model loader";
+    case SourceFormat::Gltf: return "Pictor does not expose a glTF model loader";
+    case SourceFormat::Glb: return "Pictor does not expose a GLB model loader";
+    case SourceFormat::Blend: return "Blender files are alternate import sources only";
+    case SourceFormat::Unknown: return "unrecognized model source format";
+    }
+    return "unrecognized model source format";
+}
+
+ModelAnalysis analyze_model(const std::filesystem::path& source, const std::string& bytes) {
+    if (const auto* issue = model_loader_issue(source_format(source))) throw std::runtime_error(issue);
+    return analyze_fbx(bytes);
+}
+
 ModelAnalysis analyze_fbx(const std::string& bytes) {
     pictor::FBXImporter loader;
     const auto* data = reinterpret_cast<const uint8_t*>(bytes.data());

@@ -92,7 +92,20 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "pictor",
+        "pictor"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/asset_import/source_family.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
         "odeum-lorica-5e8281b"
       ]
     },

@@ -1,5 +1,6 @@
 #include "plugins/asset_import/asset_import_plugin.h"
 #include "plugins/asset_import/capture_request.h"
+#include "plugins/asset_import/preview_mesh.h"
 #include "plugins/common/file_io.h"
 #include "fixtures/asset_import_fbx.h"
 
@@ -8,7 +9,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <stdexcept>
 
@@ -54,7 +57,7 @@ TEST_F(AssetImport, IncrementalCatalog) {
     write(inbox / "broken.fbx", "broken");
     FolderAssetCatalog catalog(root / ".ergo-visus");
     int successful = 0;
-    const Analyze analyze = [&](const auto& bytes) {
+    const Analyze analyze = [&](const auto&, const auto& bytes) {
         auto result = analyze_fbx(bytes);
         ++successful;
         return result;
@@ -155,6 +158,136 @@ TEST_F(AssetImport, CaptureLifecycle) {
     EXPECT_FALSE(read_capture(entry, asset_revision(*bytes, file)));
     EXPECT_TRUE(ingress::remote_refusal("POST", "/asset_import/api/capture"));
     EXPECT_FALSE(ingress::remote_refusal("GET", "/asset_import/api/list"));
+}
+
+TEST_F(AssetImport, SourceFamilies) {
+    const auto fbx = inbox / "one" / "Hero.fbx";
+    const auto obj = inbox / "one" / "Hero.OBJ";
+    const auto blend = inbox / "one" / "Hero.blend";
+    write(fbx, kFbx);
+    write(obj, "alternative");
+    write(inbox / "two" / "Hero.fbx", kFbx);
+    write(inbox / "blend-only.BLEND", "source document");
+    FolderAssetCatalog catalog(root / ".ergo-visus");
+    std::vector<fs::path> selected;
+    const Analyze analyze = [&](const auto& source, const auto& bytes) {
+        selected.push_back(source);
+        return analyze_model(source, bytes);
+    };
+    ASSERT_TRUE(import_assets(inbox, catalog, analyze).empty());
+    ASSERT_EQ(selected.size(), 2u);
+    EXPECT_EQ(selected.front(), fbx);
+    ASSERT_EQ(catalog.entries().size(), 2u);
+    const auto entry = catalog.find("Hero");
+    auto json = read_bounded(entry.visus_path(), kMaxVisusBytes);
+    ASSERT_TRUE(json);
+    pictor::VisusDesc before;
+    ASSERT_TRUE(pictor::from_visus_json(*json, before));
+    const auto* sources = before.metadata.get_array("import.source_files");
+    ASSERT_TRUE(sources);
+    ASSERT_EQ(sources->size(), 1u);
+    EXPECT_EQ(sources->front().as_string(), obj.generic_u8string());
+    EXPECT_EQ(before.metadata.get_string("import.source"), fbx.generic_u8string());
+
+    write(blend, "new alternate source");
+    ASSERT_TRUE(import_assets(inbox, catalog, analyze).empty());
+    EXPECT_EQ(selected.size(), 2u);
+    json = read_bounded(entry.visus_path(), kMaxVisusBytes);
+    ASSERT_TRUE(json);
+    pictor::VisusDesc updated;
+    ASSERT_TRUE(pictor::from_visus_json(*json, updated));
+    EXPECT_EQ(updated.metadata.get_string("import.sha256"), before.metadata.get_string("import.sha256"));
+    sources = updated.metadata.get_array("import.source_files");
+    ASSERT_TRUE(sources);
+    ASSERT_EQ(sources->size(), 2u);
+    EXPECT_EQ(sources->at(0).as_string(), obj.generic_u8string());
+    EXPECT_EQ(sources->at(1).as_string(), blend.generic_u8string());
+    EXPECT_FALSE(preview_mesh(source_format(fbx), kFbx).empty());
+}
+
+TEST_F(AssetImport, SourcePriority) {
+    const std::vector<std::string> suffixes{".OBJ", ".fbx", ".GLTF", ".glb", ".blend"};
+    FolderAssetCatalog catalog(root / ".ergo-visus");
+    std::vector<fs::path> selected;
+    const Analyze analyze = [&](const auto& source, const auto&) {
+        selected.push_back(source);
+        return ModelAnalysis{};
+    };
+    for (std::size_t i = 0; i < suffixes.size(); ++i) {
+        const auto source = inbox / ("Hero" + suffixes[i]);
+        write(source, "same bytes");
+        ASSERT_TRUE(import_assets(inbox, catalog, analyze).empty());
+        ASSERT_EQ(selected.size(), std::min(i + 1, std::size_t{4}));
+        if (i < 4) EXPECT_EQ(selected.back(), source);
+        ASSERT_EQ(catalog.entries().size(), 1u);
+    }
+    const auto entry = catalog.find("Hero");
+    const auto json = read_bounded(entry.visus_path(), kMaxVisusBytes);
+    ASSERT_TRUE(json);
+    pictor::VisusDesc desc;
+    ASSERT_TRUE(pictor::from_visus_json(*json, desc));
+    EXPECT_EQ((entry.directory / fs::u8path(desc.asset)).lexically_normal(), inbox / "Hero.glb");
+    const auto* sources = desc.metadata.get_array("import.source_files");
+    ASSERT_TRUE(sources);
+    ASSERT_EQ(sources->size(), 4u);
+    EXPECT_EQ(sources->front().as_string(), (inbox / "Hero.GLTF").generic_u8string());
+
+    const auto edited = *json + "\n";
+    catalog.put(entry, entry.visus_filename(), edited);
+    fs::remove(inbox / "Hero.glb");
+    EXPECT_TRUE(import_assets(inbox, catalog, analyze).empty());
+    EXPECT_EQ(read_bounded(entry.visus_path(), kMaxVisusBytes), edited);
+    EXPECT_EQ(selected.size(), 4u);
+}
+
+TEST_F(AssetImport, UnsupportedPictorLoaders) {
+    const auto obj = inbox / "Wavefront.obj";
+    write(obj, "mtllib Wavefront.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl Paint\nf 1 2 3\n");
+    write(inbox / "Wavefront.mtl", "newmtl Paint\nKd 0 1 0\nmap_Kd paint.png\n");
+    const auto gltf = inbox / "Scene.gltf";
+    const std::string gltf_scene = R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],)"
+        R"("nodes":[{"mesh":0}],"meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],)"
+        R"("accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]}],)"
+        R"("bufferViews":[{"buffer":0,"byteLength":36}],"buffers":[{"byteLength":36)";
+    write(gltf, gltf_scene + R"(,"uri":"data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA"}]})");
+    const auto glb = inbox / "Hero.glb";
+    std::string glb_json = gltf_scene + "}]}";
+    while (glb_json.size() % 4) glb_json += ' ';
+    std::string glb_bytes = "glTF";
+    const auto append_u32 = [&](std::uint32_t value) {
+        for (unsigned shift = 0; shift < 32; shift += 8)
+            glb_bytes += static_cast<char>((value >> shift) & 0xff);
+    };
+    append_u32(2);
+    append_u32(static_cast<std::uint32_t>(28 + glb_json.size() + 36));
+    append_u32(static_cast<std::uint32_t>(glb_json.size()));
+    glb_bytes += "JSON";
+    glb_bytes += glb_json;
+    append_u32(36);
+    append_u32(0x004e4942); // BIN chunk type
+    for (unsigned axis = 0; axis < 9; ++axis) append_u32(axis == 3 || axis == 7 ? 0x3f800000 : 0);
+    write(glb, glb_bytes);
+    write(inbox / "Hero.fbx", kFbx);
+    FolderAssetCatalog catalog(root / ".ergo-visus");
+    const auto issues = import_assets(inbox, catalog);
+    ASSERT_EQ(issues.size(), 3u);
+    for (const auto& issue : issues) {
+        EXPECT_NE(issue.reason.find("Pictor"), std::string::npos);
+        EXPECT_NE(issue.reason.find("loader"), std::string::npos);
+    }
+    EXPECT_EQ(issues.front().source, glb.u8string());
+    EXPECT_TRUE(catalog.entries().empty());
+    for (const auto& file : {obj, gltf, glb}) {
+        const auto bytes = read_bounded(file, kMaxModelBytes);
+        ASSERT_TRUE(bytes);
+        std::string reason;
+        try {
+            preview_mesh(source_format(file), *bytes);
+        } catch (const std::runtime_error& error) {
+            reason = error.what();
+        }
+        EXPECT_NE(reason.find("Pictor"), std::string::npos);
+    }
 }
 
 } // namespace

@@ -7,7 +7,7 @@
 
 namespace ergo::studio::plugins::asset_import {
 
-using Analyze = std::function<ModelAnalysis(const std::string&)>;
+using Analyze = std::function<ModelAnalysis(const std::filesystem::path&, const std::string&)>;
 
 struct ImportIssue {
     std::string source;
@@ -15,7 +15,7 @@ struct ImportIssue {
 };
 
 std::vector<ImportIssue> import_assets(const std::filesystem::path& inbox, IAssetCatalog& catalog,
-                                      const Analyze& analyze = analyze_fbx);
+                                      const Analyze& analyze = {});
 inline constexpr std::size_t kMaxModelBytes = 64 * 1024 * 1024;
 inline constexpr std::size_t kMaxVisusBytes = 2 * 1024 * 1024;
 inline constexpr std::size_t kMaxThumbnailBytes = 1024 * 1024;

@@ -115,6 +115,7 @@ JsonValue AssetImportPlugin::scan(const WorkspaceProfile& profile) {
         auto asset = read_asset(entry, profile);
         if (!asset) continue;
         if (queue_available && !asset->source.empty() && !asset->revision.empty() &&
+            !model_loader_issue(source_format(asset->source)) &&
             !has_capture(entry, asset->revision)) {
             queue_available = preview_({entry.name, entry.visus_path(), asset->source, asset->revision, true});
         }
@@ -220,6 +221,7 @@ net::HttpResponse AssetImportPlugin::handle(const net::HttpRequest& req, const s
             if (!asset) return failure(404, "Visus not found");
             if (!preview_) return json_response(200, jobj({{"status", jstr("uncaptured")}}));
             if (asset->source.empty() || asset->revision.empty()) return failure(422, "model source is unavailable");
+            if (const auto* issue = model_loader_issue(source_format(asset->source))) return failure(422, issue);
             if (!preview_({asset->entry.name, asset->entry.visus_path(), asset->source,
                            asset->revision, sub == "/api/capture", true})) return failure(409, "preview queue is full");
             return json_response(202, jobj({{"status", jstr("queued")}}));

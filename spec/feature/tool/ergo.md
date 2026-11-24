@@ -282,7 +282,7 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 | `tuning` | `ergo_bind` (`variable` プラグイン経由) | リポ外のゲーム: 全カテゴリの変数 | REST `GET /tuning/api/versions?app=`・`/api/versions/<app>/<id>`、`POST /api/versions`。WS なし | [game-ops.md](game-ops.md) |
 | `git` | git (子プロセス) | プロフィールに書いたリポジトリ | REST `GET /git/api/repos`・`/api/repos/<i>/{status,log,branches}`、`POST /api/repos/<i>/{fetch,pull,push,switch,commit}` (変更系は loopback の Host だけ)。WS なし | [game-ops.md](game-ops.md) |
 | `assets` | — | ファイル: プロフィールの `assets` に書いたフォルダ (読み取りのみ) | REST `GET /assets/api/roots`・`/api/list?root=&dir=`・`/api/file?root=&path=` (画像と小さな文字ファイルだけ)。WS なし | [web.md](web.md) |
-| `asset_import` | Visus 一覧 | 外部 FBX の増分解析、Visus v2 の登録、モデル表示窓とサムネイル | REST `GET /asset_import/api/list`・`/api/detail?name=`・`/api/thumbnail?name=`、手元の口で `POST /asset_import/api/import`・`/api/preview?name=`・`/api/capture?name=` | [取り込み設計](../../plan/2026-11-23-studio-launcher-and-devserver.md#c2-取り込んだアセットの自動解析と画像付きの-visus-一覧) |
+| `asset_import` | Visus 一覧 | 同名素材の集約、Pictor による増分解析、Visus v2 の登録、モデル表示窓とサムネイル | REST `GET /asset_import/api/list`・`/api/detail?name=`・`/api/thumbnail?name=`、手元の口で `POST /asset_import/api/import`・`/api/preview?name=`・`/api/capture?name=` | [取り込み設計](../../plan/2026-11-23-studio-launcher-and-devserver.md#c2-取り込んだアセットの自動解析と画像付きの-visus-一覧) |
 | `web` | — | アプリのみ (他のプラグインの API を使うブラウザのページ) | ページ `GET /web/`、`GET /web/api/config`。公開は Cloudflare Access 経由 (`ERGO_STUDIO_PUBLIC_HOSTS`) | [web.md](web.md) |
 | `play` | Odeum `odeum_remote_play` (`ERGO_ODEUM_SOURCE_DIR`) | 子プロセス: プロフィールの `play` に書いたビルド・実行のコマンド、ゲームの窓 (ffmpeg で撮影) | REST `GET /play/api/{health,targets,ice}`・`/api/targets/<name>/logs`、`POST /api/targets/<name>/{build,run,stop}`。WS `/play/ws` (offer → answer、key / pointer / wheel、state) | [play.md](play.md) |
 | `lesson` | `ergo_bind` (`variable` プラグイン経由) | odeum-lesson (授業の進行) と、`variable` に接続したゲーム | REST `/lesson/api/*` (変更系は loopback の Host・同一 Origin・JSON のみ)。WS なし | [lesson.md](lesson.md) |
@@ -313,21 +313,24 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 ### `asset_import`
 
 Actio `actio:3ce4ecf9-5b7c-4630-8453-c4c69ae941f3`。プロフィールの `"import": "assets/incoming"`
-はプロジェクトルートから解決する。プロジェクトを開いている間、Studio は FBX を走査し、
-Pictor で解析した結果を `.ergo-visus/<name>/<name>.visus.json` に保存する。自動生成時の内容は
-同じフォルダの `import.json` に保存し、生成済みの Visus が編集されていればそのまま保持する。
-登録先は `IAssetCatalog` を介して差し替えられる。
+はプロジェクトルートから解決する。同じフォルダの同じベース名を一組として、GLB、glTF、FBX、OBJ の順で
+モデルを選ぶ。残りのファイルと同名の `.blend` はパスを `metadata.import.source_files` に記録する。
+`.blend` だけの組は取り込み対象外。Pictor で解析した結果を `.ergo-visus/<name>/<name>.visus.json` に保存する。
+選択したパスと SHA-256 が同じなら解析結果を再利用する。自動生成時の内容は同じフォルダの `import.json` に保存し、
+生成済みの Visus が編集されていればそのまま保持する。登録先は `IAssetCatalog` を介して差し替えられる。
 
 `GET /asset_import/api/list` は名前、種類、子、内容の版、撮影状態とスキップ理由を返す。
 `GET /asset_import/api/detail?name=` は定義を返す。`GET /asset_import/api/thumbnail?name=` は
 現在の版に対応する PNG を返し、未撮影または更新後の撮影待ちは 404 を返す。
 表示と撮影の POST は窓へ依頼を渡すと 202、窓がない構成では `{"status":"uncaptured"}` を返す。
-FBX または定義の内容が変わると撮影済みの版は無効になり、窓のある構成では再撮影を依頼する。
+選択したモデルまたは定義の内容が変わると撮影済みの版は無効になり、窓のある構成では再撮影を依頼する。
 
 取り込みは Pictor と Lorica が有効な構成で使える。指定の Studio ビルドでは Odeum が取得する
 Lorica を共有する。モデル表示窓は Tela ランチャーのある Vulkan 構成で有効になる。
-撮影時は FBX のメッシュとマテリアル色を使う。テクスチャ参照と Visus のシェーダは詳細で確認できる。
-FBX の対応形式は Pictor に従う。現在の Pictor では、ノード名の直後にコロンがある ASCII FBX は読み込みエラーになる。
+撮影時はモデルのメッシュとマテリアル色を使う。テクスチャ参照と Visus のシェーダは詳細で確認できる。
+現行の Pictor パッケージで解析と撮影に使える形式は FBX。選択した OBJ、glTF、GLB は理由付きでスキップし、
+同名の下位形式への切り替えは行わない。表示・撮影の依頼でモデルのローダーが使えない場合は 422 を返す。
+現在の Pictor では、ノード名の直後にコロンがある ASCII FBX は読み込みエラーになる。
 
 ### `web`
 - ブラウザで開く Studio (アセット・ライティング・調整値・ゲームの起動と遠隔プレイ)。Cloudflare Access で限定公開する。仕様は [web.md](web.md)

@@ -1,6 +1,6 @@
 {
   "name": "dev-tools",
-  "description": "【AI 案・人の承認前】開発者ツール Ergo Studio (C++ ネイティブアプリ ergo_studio.exe)。 exe と組み込みプラグイン (tools/studio: studio / particle / variable / rive / profile / pictor_perf / render_pipeline / visus / ui_layout / vfx-suggest / vfx-breed / scene_editor / log / lookdev / services / tuning / git / assets / web (ブラウザのページ) / lesson / musa_*)、 ライブラリ (src/studio + include/ergo/studio: net (HTTP / WS の契約) / ingress (手元と遠隔の口の入口の確認・遠隔で断る操作) / web (Portus C++ の Web サーバ: ルート表・2 つの口) / host / platform / project (ランチャー: 最近のプロジェクト・開いているプロジェクト・様式の判定・/api/launcher・リモート開発サーバの起動と停止) / ui / shell / tela (Tela の宣言・窓・ブラウザの /shell/)、 外部 plugin pack の C ABI)、 テスト (tests/studio)。 ゲーム固有のエディタは持たない。",
+  "description": "【AI 案・人の承認前】開発者ツール Ergo Studio (C++ ネイティブアプリ ergo_studio.exe)。 exe と組み込みプラグイン (tools/studio: studio / particle / variable / rive / profile / pictor_perf / render_pipeline / visus / asset_import (同名素材から Visus を生成・撮影) / ui_layout / vfx-suggest / vfx-breed / scene_editor / log / lookdev / services / tuning / git / assets / web (ブラウザのページ) / lesson / musa_*)、 ライブラリ (src/studio + include/ergo/studio: net (HTTP / WS の契約) / ingress (手元と遠隔の口の入口の確認・遠隔で断る操作) / web (Portus C++ の Web サーバ: ルート表・2 つの口) / host / platform / project (ランチャー: 最近のプロジェクト・開いているプロジェクト・様式の判定・/api/launcher・リモート開発サーバの起動と停止) / ui / shell / tela (Tela の宣言・窓・ブラウザの /shell/)、 外部 plugin pack の C ABI)、 テスト (tests/studio)。 ゲーム固有のエディタは持たない。",
   "presetRules": [],
   "templateRules": [],
   "specRefs": [
@@ -26,9 +26,6 @@
     "spec/architecture/domains-and-ux.md"
   ],
   "membership": [
-    {
-      "pathPattern": "^tools/studio/plugins/asset_import/[^/]+$"
-    },
     {
       "pathPattern": "^tools/studio/(?:.*/)?[^/]+$"
     },

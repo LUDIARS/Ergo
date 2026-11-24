@@ -1,5 +1,7 @@
 #pragma once
 
+#include "source_family.h"
+
 #include <array>
 #include <string>
 #include <vector>
@@ -16,5 +18,7 @@ struct ModelAnalysis {
 };
 
 ModelAnalysis analyze_fbx(const std::string& bytes);
+ModelAnalysis analyze_model(const std::filesystem::path& source, const std::string& bytes);
+const char* model_loader_issue(SourceFormat format);
 
 } // namespace ergo::studio::plugins::asset_import
