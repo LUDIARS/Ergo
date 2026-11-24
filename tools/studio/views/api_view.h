@@ -28,10 +28,12 @@ public:
     uint64_t view_revision() const override { return revision_.load(); }
     /// Locks the slots and calls render(). Views also refresh on their first build.
     void build(ui::ViewBuilder& b) final;
+    bool build_published(ui::ViewBuilder& b) final;
 
 protected:
     /// Draw the tab. Slots may be read freely (the lock is held).
     virtual void render(ui::ViewBuilder& b) = 0;
+    virtual bool render_published(ui::ViewBuilder&) { return false; }
     /// Requests to make when the tab is first shown (and on "refresh").
     virtual void on_first_show() {}
 

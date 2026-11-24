@@ -1186,6 +1186,20 @@ if(ERGO_BUILD_STUDIO)
     include(cmake/ErgoStudioPortus.cmake)
     ergo_studio_add_portus()
     if(ERGO_STUDIO_HAS_PORTUS)
+        find_path(ERGO_LORICA_INCLUDE_DIR lorica/input_budget.hpp HINTS "${PROJECT_SOURCE_DIR}/../Lorica/include" REQUIRED)
+        get_target_property(_ergo_portus_dir portus SOURCE_DIR)
+        add_library(ergo_studio_registry STATIC
+            src/studio/registry/canonical.cpp
+            src/studio/registry/fetch.cpp
+            src/studio/registry/portus_transport.cpp
+            src/studio/registry/signature.cpp
+            src/studio/registry/trust.cpp)
+        target_include_directories(ergo_studio_registry PUBLIC include PRIVATE
+            "${ERGO_LORICA_INCLUDE_DIR}" "${_ergo_portus_dir}/src/net")
+        target_link_libraries(ergo_studio_registry PUBLIC portus::portus)
+        if(MSVC)
+            target_compile_options(ergo_studio_registry PRIVATE /utf-8)
+        endif()
         add_library(ergo_studio_web STATIC
             src/studio/web/connection.cpp
             src/studio/web/head_request.cpp
@@ -1431,6 +1445,30 @@ if(ERGO_BUILD_STUDIO)
     ergo_embed_text(ergo_studio_plugins ergo_web_app_js tools/studio/plugins/web/page/app.js)
     ergo_embed_text(ergo_studio_plugins ergo_web_style_css tools/studio/plugins/web/page/style.css)
     target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform ergo_studio_project)
+    if(TARGET ergo_studio_registry)
+        target_sources(ergo_studio_plugins PRIVATE
+            tools/studio/plugins/studio/plugin_registry.cpp
+            tools/studio/plugins/studio/studio_routes_registry.cpp)
+        target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_registry)
+        target_compile_definitions(ergo_studio_plugins PUBLIC ERGO_STUDIO_HAS_REGISTRY=1)
+        if(EXISTS "${PROJECT_SOURCE_DIR}/trust/root.pem")
+            ergo_embed_text(ergo_studio_plugins ergo_plugin_registry_root "${PROJECT_SOURCE_DIR}/trust/root.pem")
+            target_compile_definitions(ergo_studio_plugins PRIVATE ERGO_STUDIO_HAS_REGISTRY_ROOT=1)
+        endif()
+        if(ERGO_BUILD_TESTS)
+            add_executable(test_studio_registry tests/studio/test_registry.cpp)
+            target_include_directories(test_studio_registry PRIVATE src/studio/registry)
+            target_link_libraries(test_studio_registry PRIVATE ergo_studio_plugins ergo_studio_ingress ergo_gtest_main)
+            find_program(ERGO_STUDIO_REGISTRY_NODE node)
+            if(ERGO_STUDIO_REGISTRY_NODE)
+                add_test(NAME studio_registry COMMAND "${ERGO_STUDIO_REGISTRY_NODE}"
+                    "${PROJECT_SOURCE_DIR}/tests/studio/verify_plugin_registry.mjs" $<TARGET_FILE:test_studio_registry>)
+                set_tests_properties(studio_registry PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+            else()
+                add_test(NAME studio_registry COMMAND test_studio_registry)
+            endif()
+        endif()
+    endif()
     # Remote play (spec/feature/tool/play.md) is Odeum's odeum_remote_play (Odeum
     # spec/feature/remote-play-library.md). ERGO_ODEUM_SOURCE_DIR = an Odeum checkout builds it here
     # (its dependencies come from Odeum's own CMake; pass FETCHCONTENT_SOURCE_DIR_* for an offline build).
@@ -1522,6 +1560,9 @@ if(ERGO_BUILD_STUDIO)
         )
         target_include_directories(ergo_studio_views PUBLIC tools/studio)
         target_link_libraries(ergo_studio_views PUBLIC ergo_studio_ui ergo_studio_host ergo_studio_plugins)
+        if(TARGET ergo_studio_registry)
+            target_sources(ergo_studio_views PRIVATE tools/studio/views/studio_plugins_view.cpp)
+        endif()
         if(MSVC)
             target_compile_options(ergo_studio_views PRIVATE /utf-8)
         endif()

@@ -6,6 +6,7 @@
   "specRefs": [
     "spec/feature/tool/ergo.md",
     "spec/feature/tool/studio.md",
+    "trust/README.md",
     "spec/plan/2026-11-23-studio-launcher-and-devserver.md",
     "spec/plan/2026-11-23-studio-gen5-intake.md",
     "spec/plan/2026-11-23-ergo-curation-and-data-tables.md",
@@ -39,6 +40,9 @@
     },
     {
       "pathPattern": "(^|/)tests/studio/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "^trust/(?:README\\.md|root\\.pem)$"
     }
   ]
 }

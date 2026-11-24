@@ -15,6 +15,8 @@ public:
     virtual uint64_t view_revision() const = 0;
     /// Build the tab content. Called on the UI thread.
     virtual void build(ui::ViewBuilder& b) = 0;
+    /// Optional read-only content for a tab whose regular controls are local-only.
+    virtual bool build_published(ui::ViewBuilder&) { return false; }
 };
 
 } // namespace ergo::studio::host

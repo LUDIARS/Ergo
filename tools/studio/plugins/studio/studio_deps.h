@@ -9,6 +9,9 @@
 #include "git_client.h"
 #include "plugin_installer.h"
 #include "revisor_client.h"
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+#include "plugin_registry.h"
+#endif
 
 #include <map>
 #include <memory>
@@ -29,6 +32,9 @@ struct StudioDeps {
     std::unique_ptr<GitClient>                git;
     std::unique_ptr<RevisorClient>            revisor;
     std::unique_ptr<PluginInstaller>          installer;
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+    std::unique_ptr<PluginRegistry>           registry;
+#endif
     std::mutex                                last_ok_mtx;
     std::map<Service, std::string>            last_ok;   ///< for the connection map
 
@@ -51,6 +57,10 @@ struct Route {
 std::optional<net::HttpResponse> project_routes(StudioDeps& d, const Route& r);
 std::optional<net::HttpResponse> task_routes(StudioDeps& d, const Route& r);
 std::optional<net::HttpResponse> source_routes(StudioDeps& d, const Route& r);
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+std::optional<net::HttpResponse> registry_routes(StudioDeps& d, const Route& r);
+bool recheck_registry_preview(StudioDeps& d, const registry::Provenance& trust, const PluginPreview& preview);
+#endif
 
 /// Cc project by code: the record, or the error response.
 std::variant<JsonValue, net::HttpResponse> find_project(StudioDeps& d, const std::string& code);

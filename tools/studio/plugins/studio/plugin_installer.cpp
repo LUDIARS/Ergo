@@ -118,7 +118,8 @@ void PluginInstaller::sweep() {
     }
 }
 
-std::optional<PluginPreview> PluginInstaller::preview(const PluginSource& s, std::string& err) {
+std::optional<PluginPreview> PluginInstaller::preview(const PluginSource& s, std::string& err,
+                                                     std::optional<registry::Provenance> trust) {
     {
         std::lock_guard<std::mutex> lk(mtx_);
         sweep();
@@ -145,6 +146,9 @@ std::optional<PluginPreview> PluginInstaller::preview(const PluginSource& s, std
         !git({"fetch", "-q", "--depth", "1", "origin", *sha}, dir, out, err) || !git({"checkout", "-q", "FETCH_HEAD"}, dir, out, err)) {
         return fail(err);
     }
+    if (trust && (!git({"rev-parse", "HEAD"}, dir, out, err) || trim(out) != *sha)) {
+        return fail("検証したコミットと取得したコミットが一致しません");
+    }
     std::string log;
     if (!git({"log", "-1", "--format=%s%x00%cI"}, dir, log, err)) return fail(err);
     log = trim(log);
@@ -168,12 +172,12 @@ std::optional<PluginPreview> PluginInstaller::preview(const PluginSource& s, std
     p.requested      = s.rev;
     p.commit_subject = nul == std::string::npos ? log : log.substr(0, nul);
     p.commit_date    = nul == std::string::npos ? std::string() : log.substr(nul + 1);
-    for (const auto& e : read_ledger(home_).packs) {
+    for (const auto& e : list()) {
         if (e.id == p.id) p.replaces = e.rev;
     }
     p.expires_at = iso_after(kPreviewTtl);
     std::lock_guard<std::mutex> lk(mtx_);
-    staged_[token] = {p, dir, std::chrono::steady_clock::now()};
+    staged_[token] = {p, dir, std::chrono::steady_clock::now(), std::move(trust)};
     return p;
 }
 
@@ -205,7 +209,7 @@ bool PluginInstaller::build_plugin(const fs::path& dir, std::string& err) const 
     return false;
 }
 
-std::optional<LedgerPack> PluginInstaller::install(const std::string& token, std::string& err) {
+std::optional<LedgerPack> PluginInstaller::install(const std::string& token, std::string& err, const Recheck& recheck) {
     Staged st;
     {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -219,10 +223,25 @@ std::optional<LedgerPack> PluginInstaller::install(const std::string& token, std
         staged_.erase(it);
     }
     const PluginPreview& p = st.preview;
+    std::error_code ec;
+    if (st.trust && (!recheck || !recheck(*st.trust, p))) {
+        fs::remove_all(st.dir, ec);
+        err = "プレビューした版の信頼を再確認できません";
+        return std::nullopt;
+    }
+    std::lock_guard<std::mutex> ledger_lock(ledger_mtx_);
+    Ledger l = read_ledger(home_);
+    if (!st.trust && std::any_of(l.packs.begin(), l.packs.end(), [&](const LedgerPack& entry) {
+        return entry.trust && entry.id == p.id;
+    })) {
+        fs::remove_all(st.dir, ec);
+        err = "署名付きで導入したパックの更新は索引から行ってください";
+        return std::nullopt;
+    }
     std::string flat = p.subpath;
     for (std::size_t i = 0; (i = flat.find('/', i)) != std::string::npos;) flat.replace(i, 1, "__");
-    const fs::path checkout = home_ / "plugins" / "packs" / fs::u8path(p.owner) / fs::u8path(p.repo) / p.rev / fs::u8path(flat);
-    std::error_code ec;
+    const fs::path checkout = home_ / "plugins" / "packs" / fs::u8path(p.owner) / fs::u8path(p.repo) / p.rev
+        / fs::u8path(st.trust ? flat + "-" + token : flat);
     if (!fs::exists(checkout, ec)) {
         fs::create_directories(checkout.parent_path(), ec);
         fs::rename(st.dir, checkout, ec);
@@ -236,17 +255,24 @@ std::optional<LedgerPack> PluginInstaller::install(const std::string& token, std
     }
     const fs::path pack = checkout / fs::u8path(p.subpath);
     for (const auto& name : p.plugins) {
-        if (!build_plugin(pack / fs::u8path(name), err)) return std::nullopt;
+        if (!build_plugin(pack / fs::u8path(name), err)) {
+            if (st.trust) fs::remove_all(checkout, ec);
+            return std::nullopt;
+        }
     }
-    LedgerPack entry{p.id, p.owner, p.repo, p.subpath, p.rev, utf8(checkout), true, now_iso_utc(), p.plugins};
-    Ledger l = read_ledger(home_);
+    LedgerPack entry{p.id, p.owner, p.repo, p.subpath, p.rev, utf8(checkout), true, now_iso_utc(), p.plugins, st.trust};
+    if (entry.trust) entry.trust->checked_at = entry.installed_at;
     l.packs.erase(std::remove_if(l.packs.begin(), l.packs.end(), [&](const LedgerPack& x) { return x.id == p.id; }), l.packs.end());
     l.packs.push_back(entry);
-    if (!write_ledger(home_, l, err)) return std::nullopt;
+    if (!write_ledger(home_, l, err)) {
+        if (st.trust) fs::remove_all(checkout, ec);
+        return std::nullopt;
+    }
     return entry;
 }
 
 std::optional<LedgerPack> PluginInstaller::set_enabled(const std::string& id, bool enabled, std::string& err) {
+    std::lock_guard<std::mutex> lock(ledger_mtx_);
     Ledger l = read_ledger(home_);
     for (auto& p : l.packs) {
         if (p.id != id) continue;
@@ -259,6 +285,7 @@ std::optional<LedgerPack> PluginInstaller::set_enabled(const std::string& id, bo
 }
 
 bool PluginInstaller::remove(const std::string& id, std::string& err) {
+    std::lock_guard<std::mutex> lock(ledger_mtx_);
     Ledger l = read_ledger(home_);
     const auto it = std::find_if(l.packs.begin(), l.packs.end(), [&](const LedgerPack& p) { return p.id == id; });
     if (it == l.packs.end()) {
@@ -276,6 +303,9 @@ bool PluginInstaller::remove(const std::string& id, std::string& err) {
     return true;
 }
 
-std::vector<LedgerPack> PluginInstaller::list() const { return read_ledger(home_).packs; }
+std::vector<LedgerPack> PluginInstaller::list() const {
+    std::lock_guard<std::mutex> lock(ledger_mtx_);
+    return read_ledger(home_).packs;
+}
 
 } // namespace ergo::studio::plugins::studio

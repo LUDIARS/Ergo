@@ -89,11 +89,18 @@ Curare の取得計画 (`POST /api/v1/acquisition/plan`、`overwrite: false`) �
 
 ### ST-INV-08 プラグインの取得 {#SPEC-ergo-studio-plugins}
 
-取得元は許可リスト (`ERGO_PLUGIN_OWNERS`、既定 `LUDIARS`) の GitHub owner
-だけ。rev を 40 桁の sha に解決してから subpath だけを取得し、中身 (コミット・プラグイン名・依存の有無・
-置き換え) を見せて承認を取る。導入するのはプレビューで取得した物そのもの (再取得しない)。pack は
-C ABI の共有ライブラリなので、取得時に CMake で構成・ビルドする (`plugin_installer.cpp`。
-旧版の `npm install` は無い)。台帳に sha を固定して記録し、読み込みは次回起動時。
+Actio `actio:c6c6c340-8831-4fc9-b08f-f2054fdfbc1b`。
+署名付き索引は `LUDIARS/ErgoPlugin` の最新 Release から索引・失効リスト・署名用証明書の 3 点を取る。
+HTTPS の転送先は `github.com`、`objects.githubusercontent.com`、`release-assets.githubusercontent.com` に限る。
+`trust/root.pem` がある場合はビルドに埋め込み、署名用 Ed25519 証明書の連鎖・期限と両文書の署名を検証する。
+両文書の serial が同じで、保存済みの serial 以上の版だけを受け入れる。失効した署名用証明書・プラグイン版は
+導入できない。ルートが無い場合や検証に失敗した場合、取得できた索引は理由付きの「信頼できない」として表示する。
+発行者の接頭辞と GitHub owner の対応は ErgoPlugin の署名前検査で承認され、Studio は署名済み索引でその承認を確認する。
+
+署名付き pack の rev は 40 桁の Git SHA に固定し、ローカルの口でプレビューしたコミットを承認後にそのまま CMake でビルドする。
+署名の無い取得元を手動で指定するときは `ERGO_PLUGIN_OWNERS` (既定 `LUDIARS`) を適用する。
+台帳には Git SHA と、署名付きの場合は索引の ID・発行者・serial・署名用証明書の SHA-256 指紋・検証時刻を記録する。
+署名付きの有効な pack があれば Studio 起動時に失効情報を再取得し、再確認できた pack だけを読み込む。
 
 
 ### ST-INV-09 秘密 {#SPEC-ergo-studio-secrets}
@@ -112,7 +119,7 @@ Actio / Curare のトークンは環境変数で渡し、保存・画面表示�
 | タスク | 選択プロジェクトの Actio タスクの一覧・作成・状態変更、タスクを AI に実装させる | Actio `/api/tasks`、Cc `/v1/delegation/invoke` |
 | ソース | 全登録プロジェクトの git 状態、選択プロジェクトの Revisor PR、fetch / main の早送り | `git`、Revisor CLI `pr list --json` |
 | リソース | Curare のプロジェクト → フォルダ → アセット → 版を選び、Cc プロジェクトの repo 内へ取得 | Curare `/api/v1/{projects,assets,acquisition/plan}` |
-| プラグイン | 取得元の指定 → 中身の確認 → 承認・導入、有効 / 無効 / 削除 | GitHub (`git ls-remote` / sparse fetch) |
+| プラグイン | `/shell/` の Studio で用途と様式による絞り込み、署名の信頼と理由を表示。手元の口でプレビュー・導入・有効化・無効化・削除 | `GET /studio/api/plugins/registry`、手元のみ `POST /studio/api/plugins/registry/preview`、既存の `/studio/api/plugins` |
 | 連携 | Studio と各サービスの生死・接続先・認証・最終成功時刻の図と表、topology の全サービス | 各サービスの読み取り API |
 
 ## 連携の可視化 {#SPEC-ergo-studio-connections}

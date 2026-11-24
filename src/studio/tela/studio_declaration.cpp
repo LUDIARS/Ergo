@@ -108,7 +108,14 @@ void StudioDeclaration::rebuild() {
     full_      = {};
     published_ = {};
     declare(full_, tabs, body, false, false);
-    declare(published_, tabs, body, loopback_only(active_plugin()), true);
+    const bool locked = loopback_only(active_plugin());
+    ui::ViewNode published_body;
+    bool has_published_body = false;
+    if (locked && active_ != 0) {
+        ui::ViewBuilder b(published_body, measure_, theme_);
+        if (auto* view = ui::view_of(*host_.plugins()[active_ - 1], views_)) has_published_body = view->build_published(b);
+    }
+    declare(published_, tabs, has_published_body ? published_body : body, locked && !has_published_body, true);
     if (const auto project = launcher_ ? launcher_->project().current() : std::nullopt) {
         ui::ViewNode band;
         {

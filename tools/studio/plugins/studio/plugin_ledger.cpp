@@ -31,9 +31,15 @@ std::string norm(const std::string& d) {
 JsonValue to_json_value(const LedgerPack& p) {
     JsonValue plugins = JsonValue::make_array();
     for (const auto& n : p.plugins) plugins.push(jstr(n));
-    return jobj({{"id", jstr(p.id)}, {"owner", jstr(p.owner)}, {"repo", jstr(p.repo)}, {"subpath", jstr(p.subpath)},
+    auto out = jobj({{"id", jstr(p.id)}, {"owner", jstr(p.owner)}, {"repo", jstr(p.repo)}, {"subpath", jstr(p.subpath)},
                  {"rev", jstr(p.rev)}, {"checkoutDir", jstr(p.checkout_dir)}, {"enabled", jbool(p.enabled)},
                  {"installedAt", jstr(p.installed_at)}, {"plugins", plugins}});
+    if (p.trust) {
+        const auto& t = *p.trust;
+        out.set("trust", jobj({{"id", jstr(t.id)}, {"publisher", jstr(t.publisher)}, {"fingerprint", jstr(t.fingerprint)},
+                               {"checkedAt", jstr(t.checked_at)}, {"serial", jstr(std::to_string(t.serial))}}));
+    }
+    return out;
 }
 
 fs::path ledger_path(const fs::path& home) { return home / "plugins" / "ledger.json"; }
@@ -60,6 +66,17 @@ Ledger parse_ledger(const std::string& text) {
         const JsonValue* en = field(o, "enabled");
         p.enabled      = en && en->is_bool() && en->b;
         p.installed_at = s("installedAt") ? s("installedAt")->s : std::string();
+        if (const auto* t = field(o, "trust")) {
+            const auto str = [&](const char* name) {
+                const auto* v = field(*t, name);
+                return v && v->is_string() ? v->s : std::string();
+            };
+            const auto serial = str("serial");
+            std::uint64_t number = 0;
+            if (!serial.empty() && serial.size() <= 16 && serial.find_first_not_of("0123456789") == std::string::npos)
+                number = std::stoull(serial);
+            p.trust = registry::Provenance{str("id"), str("publisher"), str("fingerprint"), str("checkedAt"), number};
+        }
         if (const JsonValue* pl = field(o, "plugins"); pl && pl->is_array()) {
             for (const auto& n : *pl->a) {
                 if (n.is_string()) p.plugins.push_back(n.s);
@@ -84,6 +101,7 @@ bool write_ledger(const fs::path& home, const Ledger& l, std::string& err) {
         for (const char* k : {"id", "owner", "repo", "subpath", "rev", "checkoutDir", "enabled", "installedAt", "plugins"}) {
             o.add(k, OrderedJson::from(*v.find(k)));
         }
+        if (const auto* trust = v.find("trust")) o.add("trust", OrderedJson::from(*trust));
         packs.push(std::move(o));
     }
     OrderedJson root = OrderedJson::object();

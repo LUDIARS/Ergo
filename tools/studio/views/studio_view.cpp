@@ -52,6 +52,11 @@ void StudioView::render(ui::ViewBuilder& b) {
     case Page::Tasks: render_tasks(b); break;
     case Page::Runs: render_runs(b); break;
     case Page::Connections: render_connections(b); break;
+    case Page::Plugins:
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+        render_plugins(b, true);
+#endif
+        break;
     case Page::Api: render_explorer(b); break;
     }
 }
@@ -69,6 +74,9 @@ void StudioView::render_pages(ui::ViewBuilder& b) {
     tab(Page::Tasks, "\xE3\x82\xBF\xE3\x82\xB9\xE3\x82\xAF", "tasks", "/api/tasks");                                                  // タスク
     tab(Page::Runs, "\xE5\xAE\x9F\xE8\xA1\x8C", "runs", "/api/runs");                                                                 // 実行
     tab(Page::Connections, "\xE6\x8E\xA5\xE7\xB6\x9A", "connections", "/api/connections");                                           // 接続
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+    tab(Page::Plugins, "プラグイン", "registry", "/api/plugins/registry");
+#endif
     tab(Page::Api, "API", nullptr, nullptr);
 }
 

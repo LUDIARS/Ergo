@@ -14,9 +14,12 @@ public:
 protected:
     void render(ui::ViewBuilder& b) override;
     void on_first_show() override;
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+    bool render_published(ui::ViewBuilder& b) override;
+#endif
 
 private:
-    enum class Page { Projects, Tasks, Runs, Connections, Api };
+    enum class Page { Projects, Tasks, Runs, Connections, Plugins, Api };
 
     void render_pages(ui::ViewBuilder& b);
     void render_projects(ui::ViewBuilder& b);
@@ -25,6 +28,11 @@ private:
     void render_tasks(ui::ViewBuilder& b);
     void render_runs(ui::ViewBuilder& b);
     void render_connections(ui::ViewBuilder& b);
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+    void render_plugins(ui::ViewBuilder& b, bool local);
+    void render_installed(ui::ViewBuilder& b);
+    std::string domains_, styles_, published_domains_, published_styles_;
+#endif
 
     void select_project(const std::string& code);
     void instruct();

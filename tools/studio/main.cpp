@@ -10,6 +10,7 @@
 #ifdef ERGO_STUDIO_HAS_ASSET_PREVIEW
 #  include "plugins/asset_import/preview_window.h"
 #endif
+#include "plugins/studio/plugin_registry.h"
 
 #include "ergo/studio/host/external_loader.h"
 #include "ergo/studio/host/plugin_host.h"
@@ -146,10 +147,8 @@ int main(int argc, char** argv) {
     }
 
     // ERGO_PLUGIN_DIR plus the packs enabled in the Studio plugin ledger.
-    const std::string pack_dirs = settings.studio.home.empty()
-        ? settings.plugin_dirs
-        : plugins::studio::plugin_dirs_with_ledger(settings.plugin_dirs,
-                                                   plugins::studio::read_ledger(utf8_path(settings.studio.home)));
+    const std::string pack_dirs = plugins::studio::registry_plugin_dirs(
+        settings.plugin_dirs, utf8_path(settings.studio.home), settings.studio.request_timeout_ms);
     // The launcher (spec/plan/2026-11-23-studio-launcher-and-devserver.md, A): nothing is open on start;
     // the game-ops plugins see only the project opened there.
     const std::filesystem::path home = utf8_path(settings.studio.home);

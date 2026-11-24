@@ -231,7 +231,11 @@ std::optional<net::HttpResponse> source_routes(StudioDeps& d, const Route& r) {
         if (s.size() == 3 && s[2] == "install" && r.is("POST")) {
             const std::string token = str_field(r.body, "token");
             if (token.empty()) return send_error(400, "token は必須です");
-            const auto pack = d.installer->install(token, err);
+            const auto pack = d.installer->install(token, err
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+                , [&](const auto& trust, const auto& preview) { return recheck_registry_preview(d, trust, preview); }
+#endif
+            );
             return pack ? json_response(201, jobj({{"pack", to_json_value(*pack)}, {"restartRequired", jbool(true)}}))
                         : send_error(409, err);
         }

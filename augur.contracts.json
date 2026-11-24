@@ -102,6 +102,33 @@
       "module": "tests/studio/contracts/start-arguments.contract.mjs",
       "mode": "observe",
       "sample": 1
+    },
+    {
+      "id": "C-12",
+      "criterion": "C-12 verifyPluginRegistrySignatures(executable): Ed25519 の連鎖・署名・正規化と版の巻き戻しを検証する",
+      "symbol": "verifyPluginRegistrySignatures",
+      "file": "tests/studio/verify_plugin_registry.mjs",
+      "module": "tests/studio/contracts/plugin-registry-1.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-13",
+      "criterion": "C-13 verifyPluginRegistryRevocations(executable): 失効リストの不正と証明書・版の失効を拒否し、ルートが無い場合も一覧を導入不可で返す",
+      "symbol": "verifyPluginRegistryRevocations",
+      "file": "tests/studio/verify_plugin_registry.mjs",
+      "module": "tests/studio/contracts/plugin-registry-2.contract.mjs",
+      "mode": "observe",
+      "sample": 1
+    },
+    {
+      "id": "C-14",
+      "criterion": "C-14 verifyPluginRegistryBoundary(executable): 取得先を固定の三ファイルと許可された HTTPS 転送先に限定し、遠隔の口の変更要求を拒否する",
+      "symbol": "verifyPluginRegistryBoundary",
+      "file": "tests/studio/verify_plugin_registry.mjs",
+      "module": "tests/studio/contracts/plugin-registry-3.contract.mjs",
+      "mode": "observe",
+      "sample": 1
     }
   ]
 }

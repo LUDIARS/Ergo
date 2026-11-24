@@ -21,6 +21,9 @@ std::unique_ptr<StudioDeps> StudioDeps::create(StudioConfig cfg, std::shared_ptr
     d->revisor   = std::make_unique<RevisorClient>(runner, d->cfg.ludiars_root, t);
     d->installer = std::make_unique<PluginInstaller>(d->cfg.home.empty() ? std::filesystem::path() : std::filesystem::u8path(d->cfg.home),
                                                      sdk_dir, runner, t);
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+    d->registry = make_registry(std::filesystem::u8path(d->cfg.home), t);
+#endif
     return d;
 }
 
@@ -33,6 +36,8 @@ StudioPlugin::StudioPlugin(std::unique_ptr<StudioDeps> deps, host::LogFn log)
 
 net::HttpResponse StudioPlugin::handle(const net::HttpRequest& req, const std::string& sub) {
     if (sub.rfind("/api/", 0) == 0) {
+        if (req.gate == net::Gate::remote && req.method != "GET" && req.method != "HEAD" && req.method != "OPTIONS")
+            return send_error(403, "この操作は手元の口からだけ実行できます");
         if (const auto why = check_mutation(req.method, req.header("host"), req.header("origin"), req.header("content-type"))) {
             if (log_) log_("warn", "[studio] rejected " + req.method + " " + sub + ": " + *why);
             return json_response(403, jobj({{"error", jstr("forbidden")}, {"message", jstr(*why)}}));
@@ -56,6 +61,9 @@ net::HttpResponse StudioPlugin::handle(const net::HttpRequest& req, const std::s
         start = end + 1;
     }
     if (!req.body.empty()) ergo::common::jsonm::parse(req.body, r.body);
+#ifdef ERGO_STUDIO_HAS_REGISTRY
+    if (auto response = registry_routes(*deps_, r)) return *response;
+#endif
     for (auto group : {&project_routes, &task_routes, &source_routes}) {
         if (auto res = group(*deps_, r)) return *res;
     }

@@ -18,6 +18,11 @@ void ApiView::build(ui::ViewBuilder& b) {
     render(b);
 }
 
+bool ApiView::build_published(ui::ViewBuilder& b) {
+    std::lock_guard<std::recursive_mutex> lock(mtx_);
+    return render_published(b);
+}
+
 void ApiView::fetch(const std::string& name, const std::string& method, const std::string& sub_with_query,
                     const std::string& body, std::function<void(const ApiResult&)> then) {
     {

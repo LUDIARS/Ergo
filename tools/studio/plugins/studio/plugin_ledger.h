@@ -4,6 +4,7 @@
 /// and installed; it does not fetch or check anything. At start the enabled
 /// packs are appended to ERGO_PLUGIN_DIR and load like any other pack.
 #include "../common/json_util.h"
+#include "ergo/studio/registry/trust.h"
 
 #include <filesystem>
 #include <string>
@@ -21,6 +22,7 @@ struct LedgerPack {
     bool                     enabled = false;
     std::string              installed_at;
     std::vector<std::string> plugins;       ///< names shown at approval
+    std::optional<registry::Provenance> trust;
 };
 JsonValue to_json_value(const LedgerPack& p);
 

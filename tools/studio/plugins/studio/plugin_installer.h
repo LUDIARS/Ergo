@@ -15,6 +15,7 @@
 #include "ergo/studio/platform/process_runner.h"
 
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -39,8 +40,10 @@ public:
                     std::shared_ptr<platform::IProcessRunner> runner, int timeout_ms);
 
     /// nullopt with `err` on failure (the staging dir is removed).
-    std::optional<PluginPreview> preview(const PluginSource& s, std::string& err);
-    std::optional<LedgerPack>    install(const std::string& token, std::string& err);
+    std::optional<PluginPreview> preview(const PluginSource& s, std::string& err,
+                                         std::optional<registry::Provenance> trust = std::nullopt);
+    using Recheck = std::function<bool(const registry::Provenance&, const PluginPreview&)>;
+    std::optional<LedgerPack>    install(const std::string& token, std::string& err, const Recheck& recheck = {});
     std::optional<LedgerPack>    set_enabled(const std::string& id, bool enabled, std::string& err);
     bool                         remove(const std::string& id, std::string& err);
     std::vector<LedgerPack>      list() const;
@@ -50,6 +53,7 @@ private:
         PluginPreview                          preview;
         std::filesystem::path                  dir;
         std::chrono::steady_clock::time_point  at;
+        std::optional<registry::Provenance>      trust;
     };
     platform::ProcessResult run(const std::string& program, const std::vector<std::string>& args,
                                 const std::filesystem::path& cwd, int timeout_ms) const;
@@ -63,6 +67,7 @@ private:
     std::shared_ptr<platform::IProcessRunner> runner_;
     int                                       timeout_ms_;
     std::mutex                                mtx_;
+    mutable std::mutex                        ledger_mtx_;
     std::map<std::string, Staged>             staged_;
 };
 

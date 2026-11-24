@@ -4127,6 +4127,149 @@
       "packages": [
         "portus-e1b71a6"
       ]
+    },
+    {
+      "file": "src/studio/registry/canonical.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": [
+        "portus-e1b71a6",
+        "lorica-5e8281b"
+      ]
+    },
+    {
+      "file": "src/studio/registry/fetch.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": [
+        "portus-e1b71a6",
+        "lorica-5e8281b"
+      ]
+    },
+    {
+      "file": "src/studio/registry/portus_transport.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": [
+        "portus-9a73450"
+      ]
+    },
+    {
+      "file": "src/studio/registry/signature.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": [
+        "portus-e1b71a6",
+        "lorica-5e8281b",
+        "odeum-openssl-3"
+      ]
+    },
+    {
+      "file": "src/studio/registry/trust.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": [
+        "portus-e1b71a6"
+      ]
+    },
+    {
+      "file": "tools/studio/plugins/studio/plugin_registry.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/studio/studio_routes_registry.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/views/studio_plugins_view.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tests/studio/test_registry.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio",
+        "src/studio/registry"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN",
+        "ERGO_STUDIO_HAS_REGISTRY=1"
+      ],
+      "packages": [
+        "portus-e1b71a6",
+        "odeum-openssl-3"
+      ]
     }
   ],
   "web": []
