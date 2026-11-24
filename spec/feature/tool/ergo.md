@@ -399,18 +399,18 @@ using PluginFactory = std::function<std::unique_ptr<IPlugin>(const LogFn& log)>;
 - 一覧: 最近起動・追加した順 (`<studio home>/recent_projects.json`) → 見つかったプロフィール
   (`<studio home>/profiles/*.json`、`<ERGO_PLUGIN_DIR>/*.studio.json`) で最近に無いもの。
   行: 名前・root・様式・用途・最後に起動した時刻。ファイルが消えた行は「プロフィールが見つかりません」。
-- 操作: 開く / 一覧から外す / パスを入れて追加。「リモート開発サーバ起動」は段 2 (`ergo_devserver`) の置き場として
-  押せないボタンで出す。外す・追加は loopback の画面だけに出す。
+- 操作: 開く / 一覧から外す / パスを入れて追加。「リモート開発サーバ起動」は段 2 (Studio 自身の Web サーバ化、
+  neco 2026-11-24) の置き場として押せないボタンで出す。外す・追加は loopback の画面だけに出す。
 - キャッシュ `recent_projects.json`: `{"version":1,"projects":[{"source","name","root","style","domain","last_opened"}]}`。
   開いたら先頭へ、同じ `source` は 1 つにまとめ、上限 30。一時ファイルに書いて置き換える。読めない・形が違う
   ファイルは空として扱い、**原本を上書きしない** (この起動中の変更はメモリだけ、ランチャーに注意を出す)。
 - 様式 (`style`): `unity` / `cpp-ludiars` / `cpp-other` / `other`。プロフィールの `"style"` があればそれ、無ければ
   root を見て判定する (`include/ergo/studio/project/project_style.h` の `detect(FileProbe)`、純粋関数)。
-- 用途 (`domain`): プロフィールの `"domain"` をそのまま出す (`lesson` / `game` / `cglive` / `industrial` や任意の文字列)。
+- 用途 (`domain`): プロフィールの `"domain"` をそのまま出す (`lesson` / `game` / `cglive` や任意の文字列。産業系は対象外、neco 2026-11-24)。
   [2026-11-23-ergo-curation-and-data-tables.md](../../plan/2026-11-23-ergo-curation-and-data-tables.md) の入口。この段では
   表示と記録だけで、用途ごとの判定・候補提示・プラグイン構成・データテーブルは持たない (用途で分岐するコードは書かない)。
-- 開いた後は今のタブ一覧と、上に帯 (プロジェクト名・root・「ランチャーへ戻る」)。段 2 で devserver に
-  載せ替えるまでの暫定。
+- 開いた後は今のタブ一覧と、上に帯 (プロジェクト名・root・「ランチャーへ戻る」)。段 2 で機能の画面を Web 側へ
+  移すまでの暫定 (その後、窓はランチャーだけ)。
 - プラグインは開いたプロジェクトのプロフィールだけを見る: `services` / `tuning` / `git` / `assets` / `play` は
   `load_workspace_profiles()` を直接呼ばず `IProfileSource` (`tools/studio/plugins/common/profile_source.h`) を受ける。
   Studio では `OpenProjectProfiles` (開いているプロフィールを読む。未選択なら空)、テストでは `FixedProfiles`。
