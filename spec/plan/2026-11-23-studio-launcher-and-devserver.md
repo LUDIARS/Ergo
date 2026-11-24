@@ -5,6 +5,7 @@
 2. 「で、プロジェクトを選択して『リモート開発サーバ起動』で、アセット確認用の Web サービスやエフェクト生成やゲーム画面の遠隔操作などを Web から出来るようにする。これは昔作っていた tool を C++ (Portus) で再実装するもの」
 3. 「Cc と連携してアセット生成は Astra (Codex の Cloud) で AI ドリブンで行えるようにする。エフェクトやモデルの仕様はそれぞれのプロジェクトで定義される」
 4. 「開発サーバだけど Studio が Web サーバ化して CF Tunnel や Tailscale でアクセス出来るようになる感じね」(2026-11-24) → 別プログラムにしない (§B)
+5. 「アセット生成は Fg に移譲で Clio で管理」(2026-11-24) → 生成は Figmentum、管理は Clio。Ergo は依頼と表示だけ (§C)
 
 前提: Ergo #4112 (fd1536e, 段 3) で Studio の UI は Tela の宣言 1 つになり、窓 (Tela GPU) とブラウザ (`/shell/`、Tela::Web) が
 同じ宣言を描く。HTTP / WS は Ergo 自前の `src/studio/net`。旧 tool は `tools/ergo` (Node + Electron、2026-11-06 削除、
@@ -15,10 +16,10 @@ poll 単一ループ + ワーカー、外部依存は OpenSSL のみ)。
 ## 全体像 (決定 2026-11-24)
 
 ```
-ergo_studio.exe (1 つのプログラム)                                         Concordia -> Astra (Codex Cloud)
- [窓 = ランチャー, Tela GPU]                                               生成依頼   [アセット生成]
-  最近のプロジェクト / 開く / 外す / 追加                                  --------->  プロジェクトの仕様に従い
-  [リモート開発サーバ起動] ─┐                                               <---------  モデル・エフェクトを作る
+ergo_studio.exe (1 つのプログラム)                                         Figmentum (生成)      Clio (管理)
+ [窓 = ランチャー, Tela GPU]                                               生成依頼 ------->     成果を登録 --->  [Depot / Metadata]
+  最近のプロジェクト / 開く / 外す / 追加                                  プロジェクトの仕様に従い             <--- 一覧・版を引く
+  [リモート開発サーバ起動] ─┐                                               モデル・エフェクトを作る
                             v
  [Web サーバ = 開いたプロジェクトの開発サーバ, Portus HTTP/WS + Tela::Web]
   手元の口  127.0.0.1:<N>  ── 手元のブラウザ (全操作)
@@ -76,24 +77,27 @@ cloudflared も `tailscale serve` も Studio には 127.0.0.1 から接続して
   調整 (tuning・variable) / ログ (log) / サービス (services) / git
 - プラグインは開いたプロジェクトのプロフィールだけを見る (`IProfileSource`。`load_workspace_profiles()` を直接呼ばない)。
 
-## C. AI ドリブンのアセット生成 (Concordia → Astra)
+## C. アセット生成 (Figmentum に移譲、Clio で管理)
 
-- 仕様の正本は各プロジェクト。プロフィールに生成の定義を足す:
-  `"generation": {"model": {"spec": "spec/assets/models", "output": "games/x/models"}, "effect": {"spec": "spec/assets/effects", "output": "games/x/vfx"}}`
-  (spec は各プロジェクトの Markdown / JSON。Ergo は中身を解釈せず、種類・一覧・依頼文への添付だけを行う)。
-- Web 側の「生成」画面: 種類 (モデル / エフェクト) と仕様 (一覧から選ぶ) と追加の指示 → Concordia に依頼。
-  Concordia が Astra (Codex Cloud) の委託テンプレートで起動し、結果 (成果物の置き場所・状態) を Studio が Concordia から読む。
-  Ergo は Codex Cloud を直接呼ばない (鍵を持たない、委託の記録を Concordia に一本化)。
-- 成果物は対象プロジェクトのブランチ / PR (Revisor) で戻る。Studio はアセット確認画面でその版を見られるようにする。
-- 既存の経路: Castra の `officina-cloud-production` スキル (Codex Cloud への制作投入・Drive 納品)、Cc の委託テンプレート (astra)。
-  どちらに乗せるかは Concordia 側の口で決める (要調査: Cc に「アセット生成依頼」の API があるか、無ければ Cc に足す)。
+neco (2026-11-24):「アセット生成は Fg に移譲で Clio で管理」。旧案 (Studio → Concordia → Astra) はやめる。
+
+- **生成は Figmentum (Fg)**。モデル・エフェクトなどを作る仕組み (AI を使うかどうか、どこで動かすか) は Figmentum が持つ。
+  Ergo は生成の中身を持たない (Codex Cloud も Concordia の委託も直接は呼ばない)。
+- **管理は Clio (Cl)**。生成したアセットは Clio に登録し、種類・出どころ (どの仕様・どの依頼から作ったか)・版を Clio が持つ。
+  プロジェクトに取り込む版も Clio から選ぶ。
+- **仕様の正本は各プロジェクト** (今までどおり)。プロフィールの `generation` は「仕様の置き場」と「Clio のどこに登録するか」を示す:
+  `"generation": {"model": {"spec": "spec/assets/models", "clio": "<Clio の置き場>"}, "effect": {"spec": "spec/assets/effects", "clio": "..."}}`
+  (Ergo は仕様の中身を解釈せず、一覧と依頼への添付だけを行う)。
+- **Studio の役割は依頼と表示だけ**: Web 側の「生成」画面で種類と仕様を選んで Figmentum に依頼し、進み具合を出す。
+  アセット確認画面は Clio の一覧と版を表示する (プロジェクトのフォルダを直接たどる今の assets は、Clio に移すまでの暫定)。
+- 依頼と一覧の口 (API) は Figmentum と Clio の側で決める。Ergo はその口を使うプラグインを足すだけにする (Ergo のコアに分岐を書かない)。
 
 ## D. 段階
 
 1. ランチャー (A) と `IProfileSource`。Studio 単体で完結。
 2. Studio の Web サーバ化: Portus の HTTP/WS に移し、手元と遠隔の 2 つの口、Host とヘッダーでの入口の確認、ランチャーからの起動・停止・URL 表示、`--headless --project`。
 3. 機能の載せ替え: assets → play → vfx / particle → tuning / variable / log / services / git。
-4. 生成 (C): プロフィールの `generation`、Cc の依頼 API、Astra テンプレート。
+4. 生成 (C): Figmentum の依頼の口と Clio の一覧の口が決まってから、それを使うプラグイン (生成画面・Clio のアセット確認)。
 5. 撤去: Studio 窓のタブ群、Ergo 自前の `src/studio/net` (Portus に置き換え後)、web プラグインの HTML (Actio 80ae489f)。
 
 ## 決まったこと
@@ -107,10 +111,10 @@ cloudflared も `tailscale serve` も Studio には 127.0.0.1 から接続して
 - Web サーバ: Portus のルート表 (表に無い経路は 404)、本文上限、`--project` のプロフィールだけが見えること、ランチャーからの起動・停止と切り替え。
 - 口と入口: 遠隔の口では loopback 専用の操作を断る / 公開名で Access のヘッダーが無ければ断る / tailnet 名で `Tailscale-User-Login` が無ければ断る /
   知らない Host・Origin の食い違いは断る / 手元の口に公開名・tailnet 名が来たら断る / 遠隔の口は既定で無効。
-- 生成: プロフィールの `generation` の解釈 (欠け・不正パス・root の外は拒否)、Cc への依頼本文 (偽の Cc で確認)。
+- 生成: プロフィールの `generation` の解釈 (欠け・不正パス・root の外は拒否)、Figmentum への依頼本文と Clio の一覧の読み取り (偽の口で確認)。
 - 既存プラグインのテストは `IProfileSource` の固定実装で渡す形に直す。
 
 ## やらないこと
 
 - 新規プロジェクトの作成 (テンプレート生成)。前回プロジェクトの自動オープン。
-- Ergo から Codex Cloud を直接呼ぶこと。
+- Ergo から Codex Cloud や生成の仕組みを直接呼ぶこと (生成は Figmentum、管理は Clio)。

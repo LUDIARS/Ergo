@@ -39,7 +39,7 @@
 | 遠隔操作の口 (画面・音声・キー・状態: Custos/Odeum の `/stream` `/screenshot` `/key` `/state`) | ゲーム側 | unity: パッケージの追加手順、cpp-ludiars: Odeum `odeum_remote_play` の組み込み (Ergo play プラグインと同じ) | 様式で大きく違う。生成は AI 委託 |
 | 試遊 AI のデータ (Ingenium: `bundle/manifest.json`・`play-rules/*.json`・`manual.md`) | Ingenium `data/games/<game>/` | AI 委託 (Cc → Astra)。説明書は Praeforma から | |
 | 攻略本・プレイデータセット (Commentarii) | Commentarii | AI 委託 | |
-| アセット生成の仕様 (モデル / エフェクト) | 対象リポ `spec/assets/` | ひな形 (空の仕様) + プロフィールの `generation` | |
+| アセット生成の仕様 (モデル / エフェクト) | 対象リポ `spec/assets/` | ひな形 (空の仕様) + プロフィールの `generation` (生成は Figmentum、管理は Clio) | |
 | Cc / Conflux / CDGD への登録 (project code・チーム) | Concordia | Cc の API (無いものは Cc に足す) | |
 
 ## 3. 画面
@@ -56,4 +56,4 @@
 ## 未確定
 
 - Unity 様式の遠隔操作の口をどのパッケージで出すか (Custos の Unity 版の有無を要確認)。
-- Cc に「アセット生成依頼」「プロジェクト登録」の API があるか (無ければ Cc に足す)。
+- Cc に「プロジェクト登録」の API があるか (無ければ Cc に足す)。アセット生成の口は Figmentum、一覧は Clio の側で決める。
