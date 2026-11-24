@@ -6,6 +6,7 @@
 3. 「Cc と連携してアセット生成は Astra (Codex の Cloud) で AI ドリブンで行えるようにする。エフェクトやモデルの仕様はそれぞれのプロジェクトで定義される」
 4. 「開発サーバだけど Studio が Web サーバ化して CF Tunnel や Tailscale でアクセス出来るようになる感じね」(2026-11-24) → 別プログラムにしない (§B)
 5. 「アセット生成は Fg に移譲で Clio で管理」(2026-11-24) → 生成は Figmentum、管理は Clio。Ergo は依頼と表示だけ (§C)
+6. 「アセットは Pictor の Visus の単位でまとめてほしい」(2026-11-24) → 生成・管理・表示の単位を Visus にする (§C)
 
 前提: Ergo #4112 (fd1536e, 段 3) で Studio の UI は Tela の宣言 1 つになり、窓 (Tela GPU) とブラウザ (`/shell/`、Tela::Web) が
 同じ宣言を描く。HTTP / WS は Ergo 自前の `src/studio/net`。旧 tool は `tools/ergo` (Node + Electron、2026-11-06 削除、
@@ -90,6 +91,16 @@ neco (2026-11-24):「アセット生成は Fg に移譲で Clio で管理」。�
   (Ergo は仕様の中身を解釈せず、一覧と依頼への添付だけを行う)。
 - **Studio の役割は依頼と表示だけ**: Web 側の「生成」画面で種類と仕様を選んで Figmentum に依頼し、進み具合を出す。
   アセット確認画面は Clio の一覧と版を表示する (プロジェクトのフォルダを直接たどる今の assets は、Clio に移すまでの暫定)。
+- **まとめる単位は Pictor の Visus** (neco 2026-11-24。Pictor `spec/feature/visus-v2-design.md`)。
+  1 つのアセット = 1 つの Visus = `<name>.visus.json` と、それが指すファイル (`asset` の fbx など、`parts[]` のシェーダ、
+  `metadata` の `texture.*` / `animation.clips`)。identity は Visus の `name` だけ (Visus v2 の決まりのまま)。
+  - 生成: Figmentum への依頼も成果も Visus 単位 (モデルなら fbx + パーツのシェーダ、エフェクトなら `kind: particle` の Visus)。
+  - 管理: Clio には Visus 単位で登録し、版も Visus 単位で持つ。Visus が指すファイルは一緒に登録し、ばらばらに版を進めない。
+  - 入れ子: `children[]` (例 Hero が Facial を持つ) は子も独立した Visus として登録し、親は名前で引く。
+    `kind: group` (例 `hero_full`) は束ねるだけの Visus として扱う。
+  - 表示: Studio のアセット確認は Visus の一覧 (名前・種類・子・版) を出し、選ぶと Visus と指すファイルを見せる。
+    ファイル単位の一覧 (今の assets) は Visus を作る前の素材を見る用として残す。
+  - Ergo は Visus の `metadata` を解釈しない (Visus v2 と同じくホストに委ねる)。形の検証は Pictor の serializer に任せる。
 - 依頼と一覧の口 (API) は Figmentum と Clio の側で決める。Ergo はその口を使うプラグインを足すだけにする (Ergo のコアに分岐を書かない)。
 
 ## D. 段階
@@ -112,6 +123,7 @@ neco (2026-11-24):「アセット生成は Fg に移譲で Clio で管理」。�
 - 口と入口: 遠隔の口では loopback 専用の操作を断る / 公開名で Access のヘッダーが無ければ断る / tailnet 名で `Tailscale-User-Login` が無ければ断る /
   知らない Host・Origin の食い違いは断る / 手元の口に公開名・tailnet 名が来たら断る / 遠隔の口は既定で無効。
 - 生成: プロフィールの `generation` の解釈 (欠け・不正パス・root の外は拒否)、Figmentum への依頼本文と Clio の一覧の読み取り (偽の口で確認)。
+  Visus 単位: 一覧が Visus の名前で並ぶ、子 Visus を名前で引ける、Visus が指すファイルの欠けを出す、`metadata` を書き換えずに表示する。
 - 既存プラグインのテストは `IProfileSource` の固定実装で渡す形に直す。
 
 ## やらないこと
