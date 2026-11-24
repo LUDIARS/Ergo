@@ -24,6 +24,12 @@ public:
     const std::string& error() const { return error_; }
     /// True when the last update() prepared a frame different from the one before.
     bool changed() const { return changed_; }
+    bool animating() const { return reveal_.active(); }
+    void advance(float seconds) { reveal_.advance(seconds); }
+    void reveal(const std::string& region, bool reduced) {
+        region_ = region;
+        reveal_.begin(reduced);
+    }
 
     void initialize(render::RenderContext& ctx) override;
     void set_render_pass(VkRenderPass render_pass) override;
@@ -39,6 +45,8 @@ private:
     std::unique_ptr<::tela::GpuRenderer> renderer_;
     std::string                          error_;
     bool                                 changed_ = false;
+    ::tela::GpuReveal                    reveal_;
+    std::string                          region_;
 };
 
 } // namespace ergo::studio::tela_shell

@@ -56,6 +56,18 @@ std::string parse_err(const std::string& text) {
 
 // ---- profile "play" ----------------------------------------------------------
 
+TEST(StudioPlay, ScenePreviewBindsGameSceneModeAndProgress) {
+    const auto targets = parse_ok(R"([{"name":"dusk","run":{"cmd":"game"},"window":"Game",
+        "scenePreview":{"app":"sample","scene":"station","mode":"lighting","state":"dusk"}}])");
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].scene_id, "station");
+    EXPECT_EQ(targets[0].scene_app, "sample");
+    EXPECT_EQ(targets[0].preview_mode, "lighting");
+    EXPECT_EQ(targets[0].progress_state, "dusk");
+    EXPECT_FALSE(parse_err(R"([{"name":"driver","run":{"cmd":"game"},"window":"Game",
+        "scenePreview":{"app":"sample","scene":"station","mode":"driver","state":"dusk"}}])").empty());
+}
+
 TEST(PlayTarget, ReadsEveryField) {
     const auto list = parse_ok(kTargets);
     ASSERT_EQ(list.size(), 2u);

@@ -84,6 +84,10 @@ JsonValue PlayPlugin::target_json(const PlayTarget& t) const {
                           {"buttons", buttons},
                           {"state", jstr(state_name(s.state))},
                           {"viewers", jnum(static_cast<double>(remote_->viewers(t.name)))}});
+    if (!t.preview_mode.empty()) {
+        out.set("scenePreview", jobj({{"app", jstr(t.scene_app)}, {"scene", jstr(t.scene_id)},
+                                      {"mode", jstr(t.preview_mode)}, {"state", jstr(t.progress_state)}}));
+    }
     out.set("exit_code", s.exit_code ? jnum(*s.exit_code) : JsonValue::make_null());
     return out;
 }

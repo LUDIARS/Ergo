@@ -45,12 +45,18 @@ JsonValue actor_json(const ActorSummary& a) {
 JsonValue to_json_value(const SceneInfo& s) {
     JsonValue actors = JsonValue::make_array();
     for (const auto& a : s.actors) actors.push(actor_json(a));
+    auto matrices = JsonValue::make_array();
+    for (double value : s.camera_matrices) matrices.push(jnum(value));
     return jobj({
+        {"cameraMatrices", matrices},
         {"id", jstr(s.id)},
         {"domain", jstr(s.domain)},
         {"mount", jstr(s.mount)},
         {"actors", actors},
         {"camera", jobj({{"mode", jstr(s.camera_mode)}, {"target", vec(s.camera_target)},
+                         {"position", vec(s.camera_position)}, {"front", vec(s.camera_front)},
+                         {"yaw", jnum(s.camera_yaw)}, {"pitch", jnum(s.camera_pitch)},
+                         {"z_near", jnum(s.camera_near)}, {"z_far", jnum(s.camera_far)},
                          {"distance", jnum(s.camera_distance)}, {"fov_deg", jnum(s.camera_fov_deg)}})},
         {"app", jstr(s.app)},
     });

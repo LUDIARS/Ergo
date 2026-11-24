@@ -24,9 +24,14 @@ public:
     /// then run the browser pages.
     void pump(float dt);
 
+    // Optional window-only workspace. Return true when it supplied the runtime document.
+    using WindowWorkspace = std::function<bool(::tela::Runtime&, const StudioDeclaration&)>;
+    void set_window_workspace(WindowWorkspace render) { window_workspace_ = std::move(render); }
+
     StudioDeclaration& declaration() { return decl_; }
 
 private:
+    WindowWorkspace window_workspace_;
     struct Native {
         ::tela::Runtime* runtime;
         ScreenAccess     access;

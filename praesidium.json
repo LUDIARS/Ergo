@@ -14,7 +14,7 @@
         "VK_USE_PLATFORM_WIN32_KHR=1"
       ],
       "packages": [
-        "tela-786c12c",
+        "tela-376a1ae",
         "pictor",
         "vulkan",
         "glfw"
@@ -188,6 +188,21 @@
       "packages": []
     },
     {
+      "file": "tools/studio/native_scene_workspace.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-376a1ae"
+      ]
+    },
+    {
       "file": "tests/studio/test_studio_asset_import.cpp",
       "standard": "c++17",
       "includes": [
@@ -217,6 +232,18 @@
     },
     {
       "file": "src/package_scan/scan.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "src/scene/editor_link.cpp",
       "standard": "c++17",
       "includes": [
         "include"
@@ -975,6 +1002,19 @@
       ]
     },
     {
+      "file": "src/studio/tela/game_window_preview.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
       "file": "tools/studio/plugins/common/claude_cli.cpp",
       "standard": "c++17",
       "includes": [
@@ -1470,6 +1510,19 @@
     },
     {
       "file": "tools/studio/plugins/scene_editor/parse_scene.cpp",
+      "standard": "c++17",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": []
+    },
+    {
+      "file": "tools/studio/plugins/scene_editor/praeforma_scene_source.cpp",
       "standard": "c++17",
       "includes": [
         "include",
@@ -3705,7 +3758,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "tela-786c12c"
+        "tela-376a1ae"
       ]
     },
     {
@@ -3719,7 +3772,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "tela-786c12c"
+        "tela-376a1ae"
       ]
     },
     {
@@ -3733,7 +3786,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "tela-786c12c"
+        "tela-376a1ae"
       ]
     },
     {
@@ -3747,7 +3800,37 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "tela-786c12c"
+        "tela-376a1ae"
+      ]
+    },
+    {
+      "file": "tools/studio/native_pf_scenes.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-376a1ae"
+      ]
+    },
+    {
+      "file": "tools/studio/scene_preview_raster.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-376a1ae"
       ]
     },
     {
@@ -3761,7 +3844,7 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "tela-786c12c"
+        "tela-376a1ae"
       ]
     },
     {
@@ -3777,7 +3860,7 @@
         "VK_USE_PLATFORM_WIN32_KHR=1"
       ],
       "packages": [
-        "tela-786c12c",
+        "tela-376a1ae",
         "pictor",
         "vulkan",
         "glfw"
@@ -3796,7 +3879,7 @@
         "VK_USE_PLATFORM_WIN32_KHR=1"
       ],
       "packages": [
-        "tela-786c12c",
+        "tela-376a1ae",
         "pictor",
         "vulkan",
         "glfw"
@@ -3815,7 +3898,23 @@
         "WIN32_LEAN_AND_MEAN"
       ],
       "packages": [
-        "tela-786c12c"
+        "tela-376a1ae"
+      ]
+    },
+    {
+      "file": "tests/studio/test_scene_preview_raster.cpp",
+      "standard": "c++20",
+      "includes": [
+        "include",
+        "third_party",
+        "tools/studio"
+      ],
+      "defines": [
+        "NOMINMAX",
+        "WIN32_LEAN_AND_MEAN"
+      ],
+      "packages": [
+        "tela-376a1ae"
       ]
     },
     {

@@ -5,6 +5,8 @@
 // The page, compiled in by ergo_embed_text (CMakeLists.txt).
 extern const char        ergo_web_index_html[];
 extern const std::size_t ergo_web_index_html_size;
+extern const char        ergo_web_scene_js[];
+extern const std::size_t ergo_web_scene_js_size;
 extern const char        ergo_web_app_js[];
 extern const std::size_t ergo_web_app_js_size;
 extern const char        ergo_web_style_css[];
@@ -42,6 +44,7 @@ net::HttpResponse WebPlugin::handle(const net::HttpRequest& req, const std::stri
         res.headers["x-frame-options"] = "DENY";
         return res;
     }
+    if (sub == "/scene.js") return page_file(ergo_web_scene_js, ergo_web_scene_js_size, "text/javascript; charset=utf-8");
     if (sub == "/app.js") return page_file(ergo_web_app_js, ergo_web_app_js_size, "text/javascript; charset=utf-8");
     if (sub == "/style.css") return page_file(ergo_web_style_css, ergo_web_style_css_size, "text/css; charset=utf-8");
     if (sub == "/api/health") return json_response(200, snapshot());

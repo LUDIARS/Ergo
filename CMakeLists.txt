@@ -1379,6 +1379,7 @@ if(ERGO_BUILD_STUDIO)
         tools/studio/plugins/render_pipeline/render_pipeline_plugin.cpp
         tools/studio/plugins/rive/rive_plugin.cpp
         tools/studio/plugins/scene_editor/parse_scene.cpp
+        tools/studio/plugins/scene_editor/praeforma_scene_source.cpp
         tools/studio/plugins/scene_editor/scene_editor_plugin.cpp
         tools/studio/plugins/scene_editor/scene_info.cpp
         tools/studio/plugins/studio/actio_client.cpp
@@ -1442,6 +1443,7 @@ if(ERGO_BUILD_STUDIO)
     ergo_embed_text(ergo_studio_plugins ergo_vfx_catalog_json tools/studio/plugins/vfx_suggest/catalog.json)
     # The web page (spec/feature/tool/web.md) ships inside the executable.
     ergo_embed_text(ergo_studio_plugins ergo_web_index_html tools/studio/plugins/web/page/index.html)
+    ergo_embed_text(ergo_studio_plugins ergo_web_scene_js tools/studio/plugins/web/page/scene.js)
     ergo_embed_text(ergo_studio_plugins ergo_web_app_js tools/studio/plugins/web/page/app.js)
     ergo_embed_text(ergo_studio_plugins ergo_web_style_css tools/studio/plugins/web/page/style.css)
     target_link_libraries(ergo_studio_plugins PUBLIC ergo_studio_host ergo_studio_platform ergo_studio_project)
@@ -1578,7 +1580,9 @@ if(ERGO_BUILD_STUDIO)
             add_test(NAME test_studio_views COMMAND test_studio_views)
             # The Tela declaration over the real views: document shape, tabs, two screens, /shell/ws.
             if(TARGET ergo_studio_tela)
-                add_executable(test_studio_tela tests/studio/test_studio_tela.cpp)
+                add_executable(test_studio_tela tests/studio/test_studio_tela.cpp
+                    tests/studio/test_scene_preview_raster.cpp tools/studio/scene_preview_raster.cpp)
+                target_include_directories(test_studio_tela PRIVATE tools/studio)
                 target_link_libraries(test_studio_tela PRIVATE ergo_studio_tela ergo_studio_views ergo_studio_plugins ergo_gtest_main)
                 if(MSVC)
                     target_compile_options(test_studio_tela PRIVATE /utf-8)
@@ -2542,6 +2546,10 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
             )
             target_include_directories(ergo_studio_tela_window PUBLIC include)
             target_link_libraries(ergo_studio_tela_window PUBLIC ergo_studio_tela ergo_render pictor glfw Tela::Gpu)
+            if(WIN32)
+                target_sources(ergo_studio_tela_window PRIVATE src/studio/tela/game_window_preview.cpp)
+                target_link_libraries(ergo_studio_tela_window PRIVATE dwmapi)
+            endif()
             target_compile_definitions(ergo_studio_tela_window PRIVATE NOMINMAX)
             if(MSVC)
                 target_compile_options(ergo_studio_tela_window PRIVATE /utf-8)
@@ -2566,6 +2574,7 @@ if(ERGO_BUILD_STUDIO AND TARGET ergo_studio_plugins AND TARGET ergo_studio_views
         add_dependencies(ergo_studio ergo_studio_shaders)
     endif()
     if(TARGET ergo_studio_tela)
+        target_sources(ergo_studio PRIVATE tools/studio/native_pf_scenes.cpp tools/studio/native_scene_workspace.cpp tools/studio/scene_preview_raster.cpp)
         target_link_libraries(ergo_studio PRIVATE ergo_studio_tela)
         target_compile_definitions(ergo_studio PRIVATE ERGO_STUDIO_HAS_TELA=1)
     endif()

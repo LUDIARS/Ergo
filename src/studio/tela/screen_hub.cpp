@@ -17,7 +17,12 @@ void ScreenHub::remove(::tela::Runtime& runtime) {
 void ScreenHub::pump(float dt) {
     decl_.refresh(dt);
     for (auto& n : natives_) {
+        if (n.access == ScreenAccess::window && window_workspace_ && window_workspace_(*n.runtime, decl_)) {
+            n.declared = 0;
+            continue;
+        }
         if (n.declared == decl_.revision()) continue;
+        n.runtime->theme(decl_.theme());
         n.runtime->document(decl_.document(n.access));
         n.declared = decl_.revision();
     }

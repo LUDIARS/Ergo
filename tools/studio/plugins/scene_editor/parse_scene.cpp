@@ -92,6 +92,12 @@ std::optional<SceneInfo> parse_scene(const std::string& id, const std::string& j
     const JsonValue& cam = obj_or_empty(root.find("camera"));
     s.camera_mode = str(cam.find("mode"), "orbit");
     as_vec(cam.find("target"), s.camera_target);
+    as_vec(cam.find("position"), s.camera_position);
+    as_vec(cam.find("front"), s.camera_front);
+    for (const auto& key : {std::pair{"yaw", &s.camera_yaw}, {"pitch", &s.camera_pitch},
+                            {"z_near", &s.camera_near}, {"z_far", &s.camera_far}}) {
+        if (const auto* value = cam.find(key.first); value && value->is_number()) *key.second = value->n;
+    }
     if (const JsonValue* d = cam.find("distance"); d && d->is_number()) s.camera_distance = d->n;
     if (const JsonValue* f = cam.find("fov_deg"); f && f->is_number()) s.camera_fov_deg = f->n;
     return s;

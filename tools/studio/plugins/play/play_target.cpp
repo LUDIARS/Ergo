@@ -96,6 +96,22 @@ bool parse_one(const JsonValue& v, std::size_t index, const std::string& profile
     const std::string* label = text_field(v, "label");
     t.label   = label != nullptr && !label->empty() ? *label : *name;
 
+    if (const auto* preview = field(v, "scenePreview")) {
+        const auto* app = text_field(*preview, "app");
+        const auto* id = text_field(*preview, "scene");
+        const auto* mode = text_field(*preview, "mode");
+        const auto* state = text_field(*preview, "state");
+        if (!app || app->empty() || !id || id->empty() || !mode ||
+            (*mode != "driver" && *mode != "lighting") ||
+            (field(*preview, "state") && (!state || state->empty() || *mode != "lighting"))) {
+            err = where + ".scenePreview requires app, scene and mode (driver or lighting); state is optional for lighting";
+            return false;
+        }
+        t.scene_app = *app;
+        t.scene_id = *id;
+        t.preview_mode = *mode;
+        if (state) t.progress_state = *state;
+    }
     const JsonValue* run = field(v, "run");
     if (run == nullptr) {
         err = where + ".run is required";

@@ -34,6 +34,10 @@
 
 namespace ergo::scene {
 
+/// Attach world-space triangles for the editor's untextured camera preview.
+/// Pass an empty list to remove the preview. Invalid input leaves the actor intact.
+bool set_editor_preview_mesh(ActorSpec& actor, const std::vector<Vec3>& world_vertices);
+
 class EditorLink {
 public:
     /// Receives each outgoing text frame (see set_transport()).

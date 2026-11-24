@@ -31,7 +31,19 @@ void TelaLayer::set_render_pass(VkRenderPass render_pass) {
 }
 
 void TelaLayer::update(const render::FrameContext&) {
-    changed_ = renderer_ ? renderer_->prepare(runtime_) : false;
+    if (!renderer_) return;
+    ::tela::GpuQuad overlay{};
+    if (reveal_.active()) {
+        for (const auto& placed : runtime_.elements()) {
+            if (placed.element.id != region_) continue;
+            overlay.rect = ::tela::gpu_clip(::tela::intersect(placed.bounds, placed.clip), runtime_.viewport().dpi_scale);
+            overlay.clip = overlay.rect;
+            overlay.color = runtime_.theme().panel;
+            overlay.color.a = reveal_.alpha();
+            break;
+        }
+    }
+    changed_ = renderer_->prepare(runtime_, overlay);
 }
 
 void TelaLayer::record(VkCommandBuffer cmd, VkExtent2D extent) {

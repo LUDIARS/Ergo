@@ -19,6 +19,7 @@ using ViewLookup = std::function<host::IPluginView*(host::IPlugin&)>;
 
 /// Title of the overview tab (tab 0).
 const std::string& overview_title();
+std::size_t game_scene_tab(const host::PluginHost& host);
 
 /// One line per tab (0 = overview, then the plugins in load order); a click selects it.
 void build_tab_list(ViewBuilder& bar, const host::PluginHost& host, std::size_t active,

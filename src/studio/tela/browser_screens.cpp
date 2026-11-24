@@ -89,6 +89,7 @@ void BrowserScreens::pump(const StudioDeclaration& decl) {
             continue;
         }
         if (p.declared != decl.revision()) {
+            p.runtime.theme(decl.theme());
             p.runtime.document(decl.document(p.access));
             p.declared = decl.revision();
         }

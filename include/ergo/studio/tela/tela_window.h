@@ -12,6 +12,8 @@
 namespace ergo::studio::tela_shell {
 
 struct TelaWindowConfig {
+    std::function<std::string()> game_window;  ///< exact title requested by a local preview action
+    std::function<void(const std::string&)> preview_status;
     std::string title  = "Ergo Studio";
     int         width  = 1280;
     int         height = 800;

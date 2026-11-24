@@ -6,6 +6,8 @@
 /// show engine state. Spec: spec/feature/tool/scene_editor.md.
 #include "../common/client_set.h"
 #include "parse_scene.h"
+#include "../common/profile_source.h"
+#include "../studio/endpoints.h"
 
 #include "ergo/studio/host/plugin.h"
 
@@ -18,7 +20,8 @@ namespace ergo::studio::plugins::scene_editor {
 class SceneEditorPlugin final : public host::IPlugin, public host::IPluginHttp, public host::IPluginSocket,
                                 public host::IPluginHealth {
 public:
-    explicit SceneEditorPlugin(host::LogFn log);
+    using PfRead = std::function<net::HttpResponse(const std::string&)>;
+    explicit SceneEditorPlugin(host::LogFn log, PfRead pf = {});
 
     const host::PluginInfo& info() const override { return info_; }
     host::IPluginHttp*      http() override { return this; }
@@ -45,6 +48,7 @@ private:
     void      on_close(uint64_t id);
     JsonValue scene_list_json() const;   // mtx_ held by caller
 
+    PfRead                        pf_;
     host::PluginInfo              info_;
     host::LogFn                   log_;
     ClientSet                     clients_;
@@ -54,6 +58,6 @@ private:
     std::atomic<uint64_t>         revision_{0};
 };
 
-std::unique_ptr<host::IPlugin> make_scene_editor_plugin(const host::LogFn& log);
+std::unique_ptr<host::IPlugin> make_scene_editor_plugin(const studio::StudioConfig&, std::shared_ptr<const IProfileSource>, const host::LogFn& log);
 
 } // namespace ergo::studio::plugins::scene_editor

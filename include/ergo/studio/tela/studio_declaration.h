@@ -73,6 +73,9 @@ public:
     static const char* launcher_id() { return "launcher"; }
     static const char* project_id() { return "project"; }
     std::string        content_id() const;
+    bool reduced_motion() const { return launcher_input_.reduced_motion; }
+    std::string detail_key() const { return showing_launcher() ? "project:" + launcher_input_.selected_source : content_id(); }
+    std::string detail_region() const { return showing_launcher() ? "launcher/projects/detail" : content_id(); }
 
 private:
     void     rebuild();
@@ -91,6 +94,7 @@ private:
     project::Launcher*        launcher_ = nullptr;
     project::IDevServerControl* devserver_ = nullptr;
     ui::LauncherInput         launcher_input_;
+    bool                      select_scene_on_open_{};
     uint64_t                  built_launcher_revision_ = ~0ull;
     ::tela::Theme             tela_theme_;
     ApproximateMeasure        measure_;

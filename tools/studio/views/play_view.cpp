@@ -46,7 +46,7 @@ void PlayView::action(const std::string& name) {
 }
 
 void PlayView::render(ui::ViewBuilder& b) {
-    b.title(plugin_.info().title);
+    b.title("ゲームシーン");
     b.muted("ゲームのビルド・実行と遠隔プレイ (映像はブラウザの Studio /shell/ で見られます)");
     {
         const Slot& h = slot("health");
@@ -70,7 +70,9 @@ void PlayView::render(ui::ViewBuilder& b) {
         return;
     }
     {
-        ui::ViewBuilder pick = b.panel(2);
+        auto workspace = b.row(12);
+        auto pick = workspace.panel(4);
+        pick.label("プレイ対象");
         for (const auto& t : *targets->a) {
             const std::string name = text_of(t, "name");
             pick.list_item(text_of(t, "label").empty() ? name : text_of(t, "label"), name == target_,
@@ -82,8 +84,13 @@ void PlayView::render(ui::ViewBuilder& b) {
                            },
                            play_state_text(text_of(t, "state")));
         }
+        if (const JsonValue* t = find_target(list, target_)) {
+            auto scene = workspace.panel(6);
+            render_target(scene, *t);
+        } else {
+            workspace.muted("プレイ対象を選択してください");
+        }
     }
-    if (const JsonValue* t = find_target(list, target_)) render_target(b, *t);
 }
 
 void PlayView::render_target(ui::ViewBuilder& b, const JsonValue& t) {
@@ -102,7 +109,14 @@ void PlayView::render_target(ui::ViewBuilder& b, const JsonValue& t) {
         ui::ViewBuilder r = b.row(6);
         const bool can_build = t.find("can_build") && t.find("can_build")->as_bool();
         if (can_build && !busy) r.button("ビルド", [this] { action("build"); });
-        if (!busy) r.button("実行", [this] { action("run"); }, true);
+        const auto* preview = t.find("scenePreview");
+        std::string run_label = "実行";
+        if (preview) {
+            run_label = text_of(*preview, "mode") == "driver" ? "再生" : "ライティング反映";
+            const auto state_label = text_of(*preview, "state");
+            r.muted(text_of(*preview, "scene") + (state_label.empty() ? "" : " / " + state_label));
+        }
+        if (!busy) r.button(run_label, [this] { action("run"); }, true);
         if (busy) r.button("停止", [this] { action("stop"); });
         r.button(watching_ ? "映像を止める" : "映像を見る", [this] {
             watching_ = !watching_;

@@ -69,7 +69,9 @@ std::vector<host::PluginFactory> builtin_plugins(const StudioSettings& s,
     // Remote play: build, run and stream the profiles' games (spec/feature/tool/play.md).
     f.push_back([profiles](const host::LogFn& log) { return p::play::make_play_plugin(profiles, log); });
     f.push_back(&p::particle::make_particle_plugin);
-    f.push_back(&p::scene_editor::make_scene_editor_plugin);
+    f.push_back([cfg = s.studio, profiles](const host::LogFn& log) {
+        return p::scene_editor::make_scene_editor_plugin(cfg, profiles, log);
+    });
     f.push_back(&p::log::make_log_plugin);
     f.push_back(&p::profile::make_profile_plugin);
     f.push_back(&p::pictor_perf::make_pictor_perf_plugin);

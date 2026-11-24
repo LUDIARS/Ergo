@@ -12,14 +12,15 @@ std::string str_field(const JsonValue& msg, const char* key, bool* ok = nullptr)
 }
 } // namespace
 
-SceneEditorPlugin::SceneEditorPlugin(host::LogFn log)
-    : info_{"scene_editor", "Scene Editor",
+SceneEditorPlugin::SceneEditorPlugin(host::LogFn log, PfRead pf)
+    : pf_(std::move(pf)), info_{"scene_editor", "Scene Editor",
             "Scene tree \xC2\xB7 actor inspector \xC2\xB7 live WS patch relay for ergo_scene clients",
             "\xF0\x9F\x8E\xAC"},
       log_(std::move(log)) {}
 
 net::HttpResponse SceneEditorPlugin::handle(const net::HttpRequest& req, const std::string& sub) {
     if (req.method != "GET") return net::HttpResponse::json(405, "{\"ok\":false,\"err\":\"method not allowed\"}");
+    if (pf_ && (sub == "/api/praeforma" || sub.rfind("/api/praeforma/", 0) == 0)) return pf_(sub);
     if (sub == "/api/health") return json_response(200, snapshot());
     if (sub == "/api/scenes") {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -79,6 +80,13 @@ void SceneEditorPlugin::on_text(uint64_t id, const std::string& text) {
             std::lock_guard<std::mutex> lk(mtx_);
             auto parsed = parse_scene(scene_id, json, apps_[id]);
             if (!parsed) return;
+            const auto* matrices = field(*msg, "cameraMatrices");
+            if (matrices && matrices->is_array() && matrices->a->size() == 32) {
+                for (const auto& value : *matrices->a) {
+                    if (!value.is_number()) { parsed->camera_matrices.clear(); break; }
+                    parsed->camera_matrices.push_back(value.n);
+                }
+            }
             frame = to_json(jobj({{"op", jstr("scene_update")}, {"scene", to_json_value(*parsed)}}));
             scenes_[scene_id] = {std::move(*parsed), id};
         } else if (op == "scene_remove") {
@@ -147,10 +155,6 @@ JsonValue SceneEditorPlugin::scene_list_json() const {
     JsonValue arr = JsonValue::make_array();
     for (const auto& [k, s] : scenes_) arr.push(to_json_value(s.info));
     return arr;
-}
-
-std::unique_ptr<host::IPlugin> make_scene_editor_plugin(const host::LogFn& log) {
-    return std::make_unique<SceneEditorPlugin>(log);
 }
 
 } // namespace ergo::studio::plugins::scene_editor

@@ -66,6 +66,7 @@ void build_server_actions(ViewBuilder& actions, project::IDevServerControl& devs
 void build_row(ViewBuilder& list, project::Launcher& launcher, LauncherInput& input, const LauncherScreen& screen,
                const std::function<void()>& changed, const project::LauncherRow& row,
                const project::DevServerStatus& status) {
+    list.name_next("detail");
     ViewBuilder p = list.panel(4);
     {
         ViewBuilder head = p.row(8);
@@ -103,7 +104,7 @@ void build_row(ViewBuilder& list, project::Launcher& launcher, LauncherInput& in
 void build_launcher(ViewBuilder& b, project::Launcher& launcher, LauncherInput& input, const LauncherScreen& screen,
                     const std::function<void()>& changed) {
     b.title("Ergo Studio");
-    b.muted("プロジェクトを選んでください (最近起動した順、続けて見つかったプロフィール)。");
+    b.label("プロジェクト", nullptr, b.theme().title_size);
     const project::DevServerStatus status = screen.devserver ? screen.devserver->status() : project::DevServerStatus{};
     if (screen.devserver != nullptr) build_server_status(b, status);
     const std::string notice = launcher.notice();
@@ -111,8 +112,27 @@ void build_launcher(ViewBuilder& b, project::Launcher& launcher, LauncherInput& 
     if (!input.error.empty()) b.label(input.error, &b.theme().error);
     const auto rows = launcher.rows();
     if (rows.empty()) b.muted("プロジェクトがありません。プロフィール (*.json) のパスを入れて追加してください。");
-    for (const project::LauncherRow& row : rows) build_row(b, launcher, input, screen, changed, row, status);
+    if (!rows.empty()) {
+        b.name_next("projects");
+        auto workspace = b.row(16);
+        auto list = workspace.panel(4);
+        const auto* selected = &rows.front();
+        for (const auto& row : rows)
+            if (row.source == input.selected_source) selected = &row;
+        for (const auto& row : rows) {
+            list.list_item(row.name.empty() ? row.source : row.name, row.source == selected->source,
+                           [&input, changed, source = row.source] {
+                               input.selected_source = source;
+                               if (changed) changed();
+                           }, row.missing ? "見つかりません" : row.last_opened);
+        }
+        build_row(workspace, launcher, input, screen, changed, *selected, status);
+    }
     if (!screen.local) return;
+    b.button(input.reduced_motion ? "動きを減らす：オン" : "動きを減らす：オフ", [&input, changed] {
+        input.reduced_motion = !input.reduced_motion;
+        if (changed) changed();
+    });
     b.separator();
     ViewBuilder add = b.row(8);
     add.name_next("add-path");
@@ -128,6 +148,7 @@ void build_launcher(ViewBuilder& b, project::Launcher& launcher, LauncherInput& 
 
 void build_project_bar(ViewBuilder& b, const project::ProjectRef& project, ClickFn back) {
     ViewBuilder bar = b.row(10);
+    bar.label("Ergo Studio", &b.theme().accent);
     bar.label(project.name.empty() ? project.source : project.name, nullptr, b.theme().title_size);
     bar.muted(project.root);
     bar.name_next("back");

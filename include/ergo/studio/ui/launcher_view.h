@@ -20,6 +20,8 @@ namespace ergo::studio::ui {
 struct LauncherInput {
     std::string add_path;   ///< the path being typed for "追加"
     std::string error;      ///< the last failed operation ("" = none)
+    std::string selected_source;
+    bool reduced_motion{};
 };
 
 /// Who looks at the launcher.

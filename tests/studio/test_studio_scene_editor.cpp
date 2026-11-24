@@ -45,6 +45,24 @@ TEST(StudioSceneParse, FillsDefaultsAndKeepsFreeFormAsJsonText) {
     EXPECT_FALSE(parse_scene("x", "{oops", "g").has_value());
 }
 
+TEST(StudioSceneParse, RelaysCameraPoseAndClipPlanesToBothEditors) {
+    const auto scene = parse_scene("station", R"({"camera":{"mode":"fly","position":[2,3,4],
+        "front":[1,0,0],"yaw":0.75,"pitch":-0.25,"z_near":0.5,"z_far":150}})", "game");
+    ASSERT_TRUE(scene);
+    const auto wire = to_json_value(*scene);
+    const auto* camera = wire.find("camera");
+    ASSERT_NE(camera, nullptr);
+    for (const char* field : {"position", "front", "yaw", "pitch", "z_near", "z_far"}) {
+        ASSERT_NE(camera->find(field), nullptr);
+    }
+    EXPECT_DOUBLE_EQ(camera->find("position")->a->at(2).n, 4);
+    EXPECT_DOUBLE_EQ(camera->find("front")->a->at(0).n, 1);
+    EXPECT_DOUBLE_EQ(camera->find("yaw")->n, 0.75);
+    EXPECT_DOUBLE_EQ(camera->find("pitch")->n, -0.25);
+    EXPECT_DOUBLE_EQ(camera->find("z_near")->n, 0.5);
+    EXPECT_DOUBLE_EQ(camera->find("z_far")->n, 150);
+}
+
 TEST(StudioSceneEditor, RelaysScenesAndPatches) {
     SceneEditorPlugin p(quiet());
     Client engine = open(p, 1);
@@ -78,4 +96,17 @@ TEST(StudioSceneEditor, IgnoresScenesBeforeHello) {
     c.h.on_text(R"({"op":"scene","id":"main","json":"{}"})");
     EXPECT_TRUE(p.scenes().empty());
     EXPECT_EQ(p.handle(req("GET"), "/api/scenes").body, "[]");
+}
+
+TEST(StudioSceneEditor, PfReadsAreScopedToTheOpenProfile) {
+    ProfileSet set;
+    set.profiles.emplace_back();
+    set.profiles.front().praeforma_project = "game-a";
+    auto plugin = make_scene_editor_plugin({}, std::make_shared<FixedProfiles>(std::move(set)), quiet());
+    net::HttpRequest req;
+    req.method = "GET";
+    EXPECT_EQ(plugin->http()->handle(req, "/api/praeforma/game-b/specs/spec1").status, 404);
+    EXPECT_EQ(plugin->http()->handle(req, "/api/praeforma/game-a/specs/../game-b").status, 400);
+    req.method = "POST";
+    EXPECT_EQ(plugin->http()->handle(req, "/api/praeforma").status, 405);
 }

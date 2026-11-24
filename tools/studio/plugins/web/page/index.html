@@ -20,9 +20,13 @@
 
 <main>
   <section id="tab-game" class="tab active">
-    <div class="split">
+    <div class="scene-workspace">
       <div class="play">
-        <div class="bar">
+        <div class="bar scene-tools">
+          <label>シーン <select id="scene-select"></select></label>
+          <button id="scene-run" disabled>再生</button>
+          <label id="scene-state-label" hidden>進行状態 <select id="scene-state"></select></label>
+          <button id="scene-lighting" disabled>ライティング反映</button>
           <strong>遠隔プレイ</strong>
           <select id="play-target"></select>
           <button id="play-build">ビルド</button>
@@ -32,14 +36,20 @@
           <span id="play-state" class="pill">-</span>
         </div>
         <div id="play-stage" class="stage" tabindex="0">
+          <canvas id="scene-canvas" aria-label="シーンカメラ"></canvas>
+          <output id="scene-note" aria-live="polite"></output>
           <video id="play-video" autoplay playsinline muted></video>
           <p id="play-note" class="empty">ゲームを実行してから「映像を見る」を押してください。映像をクリックするとキーボードとマウスがゲームに届きます (映像の外をクリックすると止まります)。</p>
         </div>
+        <details class="pf-scene-spec"><summary>シーン仕様</summary><button id="pf-sync">Pf と同期</button>
+          <p id="pf-info" role="status"></p><div id="pf-specs"></div><div id="pf-spec-detail"></div>
+        </details>
+        <label class="scene-light">ライトの強さ <input id="scene-light" type="range" min="0" max="2" step="0.05" value="1"></label>
         <div id="play-buttons" class="bar"></div>
         <p id="play-missing" class="empty" hidden>遊べるゲームがありません (ワークスペースのプロフィールに "play" を書いてください)。</p>
-        <pre id="play-log" class="log"></pre>
+        <details class="scene-log"><summary>ゲームログ</summary><pre id="play-log" class="log"></pre></details>
       </div>
-      <aside class="side">
+      <details class="side scene-services"><summary>サービス</summary>
         <div class="bar"><strong>サービス</strong><button id="svc-reload">更新</button></div>
         <ul id="svc-list" class="list"></ul>
         <details id="gen5-services">
@@ -49,7 +59,7 @@
           <ul id="gen5-list" class="list" aria-live="polite"></ul>
         </details>
         <pre id="svc-log" class="log" hidden></pre>
-      </aside>
+      </details>
     </div>
   </section>
 
@@ -106,6 +116,7 @@
 </main>
 
 <div id="toast" class="toast" hidden></div>
+<script src="scene.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

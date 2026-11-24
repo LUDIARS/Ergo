@@ -1,5 +1,7 @@
 #include "ergo/studio/tela/studio_declaration.h"
 
+#include "brand_mark_pixels.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -9,6 +11,25 @@ namespace {
 
 constexpr float kSidebarWidth = 230;
 constexpr float kBandHeight   = 48;   // the open project's band over the tabs
+
+void brand_mark(::tela::Document& doc, const std::string& id) {
+    ::tela::Drawing mark;
+    static const auto image = [] {
+        auto pixels = std::make_shared<::tela::Image>();
+        pixels->width = pixels->height = 48;
+        const ::tela::Color palette[] = {{36,97,219,255}, {41,159,244,255}, {148,231,255,255}};
+        for (const auto& row : brand_pixels) {
+            for (int x = 0; x < pixels->width; ++x) {
+                const char code = row[x];
+                const auto color = code >= 'a' && code <= 'c' ? palette[code - 'a'] : ::tela::Color{0,0,0,0};
+                pixels->pixels.insert(pixels->pixels.end(), {color.b, color.g, color.r, color.a});
+            }
+        }
+        return pixels;
+    }();
+    mark.image({0, 0, 26, 26}, image);
+    doc.canvas(id, std::move(mark), {.width = 26, .height = 26, .padding = 0});
+}
 
 /// 公開名からはこのタブを操作できません (ローカルの画面から操作してください)
 const char* const kLockedNotice =
@@ -78,6 +99,7 @@ bool StudioDeclaration::refresh(float dt) {
 void StudioDeclaration::rebuild() {
     dirty_          = false;
     built_revision_ = content_revision();
+    tela_theme_ = tela_theme(theme_);
     built_launcher_revision_ = launcher_revision();
     if (launcher_ != nullptr) {
         // The window: this machine's launcher, whatever the pages show.
@@ -85,8 +107,20 @@ void StudioDeclaration::rebuild() {
         declare_launcher(window_, build_launcher_body(ui::LauncherScreen{true, devserver_}));
     }
     if (showing_launcher()) {
+        tela_theme_.panel = {249, 244, 235, 255};
+        tela_theme_.button = {231, 223, 207, 255};
+        tela_theme_.field = {255, 251, 244, 255};
+        tela_theme_.text = {20, 43, 34, 255};
+        tela_theme_.muted = {73, 88, 78, 255};
+        tela_theme_.pressed = {234, 196, 165, 255};
+        tela_theme_.accent = {175, 65, 26, 255};
+        select_scene_on_open_ = true;
         rebuild_launcher();
         return;
+    }
+    if (select_scene_on_open_) {
+        active_ = ui::game_scene_tab(host_);
+        select_scene_on_open_ = false;
     }
 
     ui::ViewNode tabs;
@@ -150,7 +184,10 @@ void StudioDeclaration::declare_launcher(::tela::Document& doc, const ui::ViewNo
     l.positioned = true;
     l.padding    = 24;
     l.gap        = 10;
-    doc.scroll(launcher_id(), [&] { emit_children(body, doc, launcher_id(), content); }, l);
+    doc.scroll(launcher_id(), [&] {
+        brand_mark(doc, "launcher/brand");
+        emit_children(body, doc, launcher_id(), content);
+    }, l);
 }
 
 void StudioDeclaration::declare_band(::tela::Document& doc, const ui::ViewNode& band) {
@@ -159,7 +196,11 @@ void StudioDeclaration::declare_band(::tela::Document& doc, const ui::ViewNode& 
     l.positioned = true;
     l.height     = kBandHeight;
     l.padding    = 6;
-    doc.scroll(project_id(), [&] { emit_children(band, doc, project_id(), nav); }, l);
+    l.flow = ::tela::Flow::row;
+    doc.scroll(project_id(), [&] {
+        brand_mark(doc, "project/brand");
+        emit_children(band, doc, project_id(), nav);
+    }, l);
 }
 
 void StudioDeclaration::declare(::tela::Document& doc, const ui::ViewNode& tabs, const ui::ViewNode& body,

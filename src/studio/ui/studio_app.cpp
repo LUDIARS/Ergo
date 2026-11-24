@@ -126,7 +126,10 @@ void StudioApp::rebuild() {
     root.name       = "Root";
     root.size       = {static_cast<float>(vw_), static_cast<float>(vh_)};
     root.style.fill = theme_.background;
-    if (showing_launcher()) rebuild_launcher(root);
+    if (showing_launcher()) {
+        active_ = game_scene_tab(host_);
+        rebuild_launcher(root);
+    }
     else rebuild_tabs(root);
     bind_handlers(std::move(doc));
 }

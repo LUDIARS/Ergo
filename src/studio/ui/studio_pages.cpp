@@ -33,6 +33,12 @@ const std::string& overview_title() {
     return t;
 }
 
+std::size_t game_scene_tab(const host::PluginHost& host) {
+    for (std::size_t i = 0; i < host.plugins().size(); ++i)
+        if (host.plugins()[i]->info().id == "play") return i + 1;
+    return 0;
+}
+
 host::IPluginView* view_of(host::IPlugin& p, const ViewLookup& views) {
     if (host::IPluginView* v = p.view()) return v;
     return views ? views(p) : nullptr;

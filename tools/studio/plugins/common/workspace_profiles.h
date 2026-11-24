@@ -50,6 +50,8 @@ struct WorkspaceProfile {
     std::filesystem::path                        import_dir;
     JsonValue                                    tuning_templates;
     JsonValue                                    play;      ///< the raw "play" value (null when absent)
+    std::string                                  praeforma_project;
+    JsonValue                                    praeforma_scenes;  ///< app -> runtime scene id -> Pf layout id
 };
 
 struct ProfileSet {

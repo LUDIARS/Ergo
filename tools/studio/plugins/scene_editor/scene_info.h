@@ -37,8 +37,13 @@ struct SceneInfo {
     std::string               domain;
     std::string               mount;
     std::vector<ActorSummary> actors;
+    std::vector<double>       camera_matrices;  ///< view then unit-aspect projection, column major
     std::string               camera_mode;
     std::array<double, 3>     camera_target{0, 0, 0};
+    std::array<double, 3>     camera_position{0, 0, 8};
+    std::array<double, 3>     camera_front{0, 0, -1};
+    double                    camera_yaw = 0, camera_pitch = 0;
+    double                    camera_near = 0.1, camera_far = 1000;
     double                    camera_distance = 8;
     double                    camera_fov_deg  = 50;
     std::string               app;

@@ -21,6 +21,7 @@
 #include "ergo/studio/web/web_server.h"
 #include "views/view_registry.h"
 #ifdef ERGO_STUDIO_HAS_TELA
+#  include "native_scene_workspace.h"
 #  include "ergo/studio/tela/screen_hub.h"
 #  include "ergo/studio/tela/shell_routes.h"
 #endif
@@ -197,6 +198,10 @@ int main(int argc, char** argv) {
     tela_shell::StudioDeclaration declaration(plugins, views.lookup(), ui::Theme{}, &launcher, &devserver);
     tela_shell::BrowserScreens    pages(&log_line);
     tela_shell::ScreenHub         hub(declaration, pages);
+    app::NativeSceneWorkspace native_scene(plugins, open_project);
+    hub.set_window_workspace([&](::tela::Runtime& runtime, const tela_shell::StudioDeclaration& decl) {
+        return native_scene.update(runtime, decl);
+    });
     tela_shell::ShellRoutes       routes(plugins, plugins, pages);
     net::IHttpHandler&            http_handler = routes;
     net::IWsAcceptor&             ws_acceptor  = routes;
@@ -248,6 +253,8 @@ int main(int argc, char** argv) {
 #if defined(ERGO_STUDIO_HAS_TELA_WINDOW)
     if (!settings.headless) {
         tela_shell::TelaWindowConfig wc;
+        wc.game_window = [&] { return native_scene.game_window(); };
+        wc.preview_status = [&](const std::string& msg) { native_scene.preview_status(msg); };
         wc.font_path  = settings.font_path;
         wc.shader_dir = settings.shader_dir;
 #ifdef ERGO_STUDIO_HAS_ASSET_PREVIEW

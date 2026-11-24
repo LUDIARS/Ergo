@@ -8,6 +8,11 @@
 #include "pictor/surface/vulkan_context.h"
 
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#include "game_window_preview.h"
+#endif
 
 #include <chrono>
 
@@ -54,6 +59,10 @@ int run_tela_window(ScreenHub& hub, const TelaWindowConfig& cfg, const std::atom
         if (code == 0) {
             GlfwTelaInput input(surface.glfw_window(), runtime);
             hub.add(runtime, ScreenAccess::window);   // the window is the launcher (the tabs are on /shell/)
+            std::string shown;
+#ifdef _WIN32
+            GameWindowPreview game_preview(glfwGetWin32Window(surface.glfw_window()));
+#endif
             auto last   = std::chrono::steady_clock::now();
             bool redraw = true;   // the swapchain needs an image even when the runtime did not change
             while (!stop.load() && !surface.should_close()) {
@@ -64,6 +73,23 @@ int run_tela_window(ScreenHub& hub, const TelaWindowConfig& cfg, const std::atom
                 last            = now;
                 redraw          = input.synchronize() || redraw;
                 hub.pump(dt);
+#ifdef _WIN32
+                if(cfg.game_window) {
+                    const auto message=game_preview.update(cfg.game_window(),runtime.viewport().dpi_scale);
+                    if(cfg.preview_status) cfg.preview_status(message);
+                }
+#endif
+                redraw = layer.animating() || redraw;
+                layer.advance(dt);
+                auto& declaration = hub.declaration();
+                const auto key = declaration.detail_key();
+                if (key != shown) {
+                    layer.reveal(declaration.detail_region(), declaration.reduced_motion());
+                    shown = key;
+                    redraw = true;
+                } else if (declaration.reduced_motion() && layer.animating()) {
+                    layer.reveal({}, true);
+                }
                 if (cfg.on_frame) cfg.on_frame();
                 if (!runtime.viewport().visible || (!runtime.needs_frame() && !redraw)) continue;
                 render::FrameContext frame;

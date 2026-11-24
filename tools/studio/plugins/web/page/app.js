@@ -520,7 +520,67 @@ function playSend(msg) {
 
 function currentTarget() { return play.targets.find((t) => t.name === $('play-target').value); }
 
+let startingScenePreview = false;
+let activePreviewTarget = '';
+function sceneTargets() {
+  const select = $('scene-select');
+  const app = select.selectedOptions[0]?.dataset.app;
+  // The run endpoint resolves by name. Suppress ambiguous names across profiles.
+  return play.targets.filter(t => t.scenePreview && t.scenePreview.app === app &&
+    t.scenePreview.scene === select.selectedOptions[0]?.dataset.runtimeId && play.targets.filter(other => other.name === t.name).length === 1);
+}
+
+function updateSceneActions() {
+  const targets = sceneTargets();
+  if (activePreviewTarget && !targets.some(t => t.name === activePreviewTarget)) stopWatching();
+  const drivers = targets.filter(t => t.scenePreview.mode === 'driver');
+  const lighting = targets.filter(t => t.scenePreview.mode === 'lighting');
+  const select = $('scene-state');
+  const keep = select.value;
+  select.replaceChildren(...lighting.map(t => new Option(t.scenePreview.state || t.label, t.name)));
+  if (lighting.some(t => t.name === keep)) select.value = keep;
+  $('scene-state-label').hidden = lighting.length < 2;
+  const unavailable = !play.ws || play.ws.readyState !== WebSocket.OPEN || startingScenePreview;
+  $('scene-run').disabled = unavailable || drivers.length !== 1;
+  $('scene-lighting').disabled = unavailable || lighting.length === 0;
+  $('scene-run').title = drivers.length === 1 ? drivers[0].label : 'シーンドライバを一つ登録してください';
+  $('scene-lighting').title = lighting.length ? select.selectedOptions[0].text : '実シェーダを使う表示対象が未登録です';
+}
+
+async function openScenePreview(mode) {
+  if (startingScenePreview) return;
+  const targets = sceneTargets();
+  const target = targets.find(t => t.scenePreview.mode === mode &&
+    (mode === 'driver' || t.name === $('scene-state').value));
+  if (!target) return;
+  if (targets.some(t => t.name !== target.name && ['building', 'running'].includes(t.state))) {
+    toast('先に実行中のシーン対象を停止してください', true);
+    return;
+  }
+  if (target.state === 'building') { toast('ビルド完了後に選んでください', true); return; }
+  startingScenePreview = true;
+  updateSceneActions();
+  try {
+    if (currentTarget()?.name !== target.name) stopWatching();
+    $('play-target').value = target.name;
+    renderPlayState();
+    if (target.state !== 'running') {
+      await api('/play/api/targets/' + encodeURIComponent(target.name) + '/run', {body:{}});
+    }
+    if (sceneTargets().some(t => t.name === target.name) && currentTarget()?.name === target.name) {
+      activePreviewTarget = target.name;
+      if (!play.watching) await watchPlayStream();
+    }
+  } catch (err) {
+    toast(target.label + ': ' + err.message, true);
+  } finally {
+    startingScenePreview = false;
+    await loadTargets();
+  }
+}
+
 function renderPlayState() {
+  updateSceneActions();
   const t = currentTarget();
   $('play-missing').hidden = play.targets.length > 0;
   for (const id of ['play-build', 'play-run', 'play-stop', 'play-watch']) $(id).disabled = !t;
@@ -560,6 +620,7 @@ async function targetAction(action) {
   if (!t) return;
   try {
     await api('/play/api/targets/' + encodeURIComponent(t.name) + '/' + action, { body: {} });
+    if (action === 'stop' && activePreviewTarget === t.name) stopWatching();
   } catch (e) { toast(t.label + ': ' + e.message, true); }
   loadTargets();
 }
@@ -586,7 +647,7 @@ async function pollLogs() {
 function connectPlay() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   play.ws = new WebSocket(proto + '//' + location.host + '/play/ws');
-  play.ws.addEventListener('open', () => { play.retry = 0; });
+  play.ws.addEventListener('open', () => { play.retry = 0; updateSceneActions(); });
   play.ws.addEventListener('message', async (ev) => {
     let m;
     try { m = JSON.parse(ev.data); } catch { return; }
@@ -602,15 +663,20 @@ function connectPlay() {
   });
   play.ws.addEventListener('close', () => {
     stopWatching();
+    updateSceneActions();
     play.retry = Math.min(play.retry + 1, 6);
     setTimeout(connectPlay, 500 * play.retry);
   });
 }
 
+let streamRevision = 0;
 function stopWatching() {
+  ++streamRevision;
+  activePreviewTarget = '';
   if (play.pc) { play.pc.close(); play.pc = null; }
   play.watching = '';
   $('play-video').srcObject = null;
+  $('play-stage').classList.remove('live-game');
   $('play-note').hidden = false;
   $('play-watch').textContent = '映像を見る';
 }
@@ -623,8 +689,11 @@ async function watchPlayStream() {
     if (play.ws) play.ws.close();   // the plugin ends the viewer with the socket; it reconnects
     return;
   }
+  const revision = ++streamRevision;
+  if (play.pc) play.pc.close();
   try {
     const ice = await api('/play/api/ice');
+    if (streamRevision !== revision) return;
     const pc = new RTCPeerConnection({ iceServers: ice.iceServers || [] });
     play.pc = pc;
     const tr = pc.addTransceiver('video', { direction: 'recvonly' });
@@ -634,6 +703,8 @@ async function watchPlayStream() {
       if (h264.length) tr.setCodecPreferences(h264);
     }
     pc.addEventListener('track', (e) => {
+      if (play.pc !== pc) return;
+      $('play-stage').classList.add('live-game');
       $('play-video').srcObject = e.streams[0] || new MediaStream([e.track]);
       $('play-note').hidden = true;
     });
@@ -645,10 +716,13 @@ async function watchPlayStream() {
       pc.addEventListener('icegatheringstatechange', done);
       setTimeout(resolve, 3000);
     });
+    if (play.pc !== pc || currentTarget()?.name !== t.name) return;
+    if (play.ws?.readyState !== WebSocket.OPEN) throw new Error('映像接続が切れました');
     play.watching = t.name;
     $('play-watch').textContent = '映像を止める';
     playSend({ type: 'offer', target: t.name, sdp: pc.localDescription.sdp });
   } catch (e) {
+    if (streamRevision !== revision) return;
     stopWatching();
     toast('映像をつなげません: ' + e.message, true);
   }
@@ -711,7 +785,12 @@ function bindPlayInput() {
   }, { passive: false });
 }
 
-$('play-target').addEventListener('change', () => { if (play.watching) stopWatching(); renderPlayState(); });
+$('scene-select').addEventListener('change', () => { stopWatching(); updateSceneActions(); });
+$('scene-select').addEventListener('scene-list', updateSceneActions);
+$('scene-state').addEventListener('change', updateSceneActions);
+$('scene-run').addEventListener('click', () => openScenePreview('driver'));
+$('scene-lighting').addEventListener('click', () => openScenePreview('lighting'));
+$('play-target').addEventListener('change', () => { stopWatching(); renderPlayState(); });
 $('play-build').addEventListener('click', () => targetAction('build'));
 $('play-run').addEventListener('click', () => targetAction('run'));
 $('play-stop').addEventListener('click', () => targetAction('stop'));

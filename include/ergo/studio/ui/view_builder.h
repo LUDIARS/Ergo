@@ -43,10 +43,10 @@ std::string fit_tail(const std::string& text, float max_width, float font_size, 
 
 /// Colours of the Studio (one dark theme).
 struct Theme {
-    ui_kit::Color background{0.11f, 0.12f, 0.14f, 1};
-    ui_kit::Color panel{0.15f, 0.16f, 0.19f, 1};
-    ui_kit::Color panel_alt{0.18f, 0.19f, 0.23f, 1};
-    ui_kit::Color accent{0.30f, 0.55f, 0.95f, 1};
+    ui_kit::Color background{0.045f, 0.10f, 0.085f, 1};
+    ui_kit::Color panel{0.075f, 0.15f, 0.13f, 1};
+    ui_kit::Color panel_alt{0.11f, 0.21f, 0.18f, 1};
+    ui_kit::Color accent{0.72f, 0.24f, 0.055f, 1};
     ui_kit::Color text{0.92f, 0.93f, 0.95f, 1};
     ui_kit::Color muted{0.62f, 0.65f, 0.70f, 1};
     ui_kit::Color ok{0.35f, 0.80f, 0.45f, 1};

@@ -158,6 +158,9 @@ std::optional<WorkspaceProfile> parse_workspace_profile(const std::string& text,
             p.assets.push_back({label != nullptr && label->is_string() ? label->as_string() : path->as_string(), *d});
         }
     }
+    if (const auto* id = field(*json, "praeformaProjectId"); id && id->is_string()) p.praeforma_project = id->s;
+    if (const auto* scenes = field(*json, "praeformaScenes"); scenes && scenes->is_object())
+        p.praeforma_scenes = deep_copy(*scenes);
     if (const auto* import = field(*json, "import")) {
         if (!import->is_string() || import->as_string().empty()) {
             err = "\"import\" must be a nonempty folder path";

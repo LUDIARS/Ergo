@@ -6,6 +6,7 @@
 #include "patch_queue.h"
 
 #include <algorithm>
+#include <cmath>
 #include <mutex>
 #include <utility>
 #include <vector>
@@ -30,6 +31,13 @@ std::string scene_frame(const Scene& scene) {
     m.set("op",   jsonm::JsonValue::make_string("scene"));
     m.set("id",   jsonm::JsonValue::make_string(scene.id()));
     m.set("json", jsonm::JsonValue::make_string(scene.to_json()));
+    float view[16], projection[16];
+    scene.camera().view_matrix(view);
+    scene.camera().projection_matrix(1.0f, projection);
+    auto matrices = jsonm::JsonValue::make_array();
+    for (const float value : view) matrices.push(jsonm::JsonValue::make_number(value));
+    for (const float value : projection) matrices.push(jsonm::JsonValue::make_number(value));
+    m.set("cameraMatrices", std::move(matrices));
     return jsonm::serialize(m);
 }
 
@@ -46,6 +54,29 @@ std::string string_field(const jsonm::JsonValue& obj, const char* key) {
 }
 
 } // namespace
+
+bool set_editor_preview_mesh(ActorSpec& actor, const std::vector<Vec3>& vertices) {
+    if (vertices.size() % 3 != 0 || vertices.size() > 300000) return false;
+    auto coords = jsonm::JsonValue::make_array();
+    for (const Vec3& point : vertices) {
+        for (float value : {point.x, point.y, point.z}) {
+            if (!std::isfinite(value)) return false;
+            coords.push(jsonm::JsonValue::make_number(value));
+        }
+    }
+    auto& components = actor.components;
+    const auto found = std::find_if(components.begin(), components.end(), [](const ComponentSpec& c) {
+        return c.type == "EditorPreviewMesh";
+    });
+    if (vertices.empty()) {
+        if (found != components.end()) components.erase(found);
+    } else {
+        ComponentSpec mesh{"EditorPreviewMesh", {{"worldTriangles", jsonm::serialize(coords)}}};
+        if (found == components.end()) components.push_back(std::move(mesh));
+        else *found = std::move(mesh);
+    }
+    return true;
+}
 
 // ===========================================================================
 // Impl — owns the transport and the published-scene cache. Inbound patches

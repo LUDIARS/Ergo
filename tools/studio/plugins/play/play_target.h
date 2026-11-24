@@ -33,6 +33,9 @@ struct PlayTarget {
     int                        fps     = 30;
     long long                  bitrate = 4'000'000;
     std::vector<PlayButton>    buttons;
+    std::string scene_app, scene_id;   ///< editor publisher and scene for an optional preview target
+    std::string preview_mode;          ///< "driver" or "lighting"
+    std::string progress_state;        ///< lighting variant supplied by the title
 };
 
 constexpr int       kMinFps = 5, kMaxFps = 60;
